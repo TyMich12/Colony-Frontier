@@ -1,0 +1,342 @@
+COMPLETE GAME SYSTEM
+1. The Four Technology Tiers
+Tier
+Unlock
+What it represents
+🟢 Foundation
+Starting technology
+Reliable technology that gets the colony functioning
+🔵 Frontier
+1,000 XP
+Highly improved conventional technology
+🟣 Apex
+3,000 XP
+Extremely advanced conventional technology
+🟠 Research
+10,000 XP + Research Tokens
+Experimental breakthrough technology that massively changes capability
+
+2. COMPLETE TECHNOLOGY TREE
+SOLAR POWER
+Tier
+Technology
+What it does
+🟢 Foundation
+Helios-1 Array
+Basic solar generation; reliable during normal sunlight
+🔵 Frontier
+Helios-X Array
+Higher output and improved low-angle sunlight performance
+🟣 Apex
+Helios-XR Array
+Very high output with automated tracking and improved dust tolerance
+🟠 Research
+Helios-Nova Array
+10,000 XP + 5 RT
+Extreme power generation, autonomous tracking, strong dust resistance and much better performance during difficult sunlight conditions
+
+ENERGY STORAGE
+Tier
+Technology
+What it does
+🟢 Foundation
+Atlas Battery Pack
+Stores excess electricity for nighttime/emergencies
+🔵 Frontier
+Atlas-L Battery Pack
+Larger capacity and faster charging
+🟣 Apex
+Atlas-V Battery Bank
+Very large capacity with advanced power management
+🟠 Research
+Atlas-Sovereign Storage Core
+10,000 XP + 5 RT
+Massive energy density, extremely rapid power redistribution and highly efficient emergency storage
+
+
+
+OXYGEN
+Tier
+Technology
+What it does
+🟢 Foundation
+AeroLife-1
+Produces and regulates breathable oxygen
+🔵 Frontier
+AeroLife-2
+Higher production and more efficient oxygen recycling
+🟣 Apex
+AeroLife-X
+High-output oxygen production with automated atmospheric management
+🟠 Research
+AeroLife-Aegis
+10,000 XP + 1 RT
+Extremely efficient oxygen production and recycling with automatic emergency atmospheric balancing
+
+
+
+
+WATER
+Tier
+Technology
+What it does
+🟢 Foundation
+AquaLoop-1
+Basic water recycling
+🔵 Frontier
+AquaLoop-2
+Recovers more water from waste and humidity
+🟣 Apex
+AquaLoop-X
+Very high-efficiency recycling and purification
+🟠 Research
+AquaLoop-Eternis
+10,000 XP + 5 RT
+Near-total recovery of usable water streams and advanced purification; dramatically reduces external water requirements
+
+CO₂ CONTROL
+Tier
+Technology
+What it does
+🟢 Foundation
+Carbon-1 Scrubber
+Removes CO₂ from habitat air
+🔵 Frontier
+Carbon-2 Scrubber
+Higher removal rate and lower power consumption
+🟣 Apex
+Carbon-X Scrubber
+Highly efficient CO₂ removal and partial resource recovery
+🟠 Research
+Carbon-Synthesis Cor
+10,000 XP + 1 RT
+Removes CO₂ while recovering useful carbon compounds for colony processes
+
+
+THERMAL CONTROL
+Tier
+Technology
+What it does
+🟢 Foundation
+Thermo-1
+Basic heating and cooling
+🔵 Frontier
+Thermo-L
+Better insulation and heat redistribution
+🟣 Apex
+Thermo-X
+Advanced thermal regulation and heat recovery
+🟠 Research
+Thermo-Aegis
+10,000 XP + 1 RT
+Highly efficient heat redistribution, storage and recovery; dramatically reduces thermal energy consumption
+
+
+
+
+COMMUNICATIONS
+Tier
+Technology
+What it does
+🟢 Foundation
+Relay-1
+Basic settlement-to-Earth communications
+🔵 Frontier
+Relay-X
+Greater range and reliability
+🟣 Apex
+DeepLink-XR
+High-bandwidth deep-space communications with redundancy
+🟠 Research
+DeepLink-Quantum
+10,000 XP + 1 RT
+Ultra-high reliability autonomous communications network with intelligent routing and extreme redundancy
+
+HABITAT
+Tier
+Technology
+What it does
+🟢 Foundation
+Haven-1 Module
+Basic pressurised living space
+🔵 Frontier
+Haven-L Module
+Larger, better insulated and more efficient habitat
+🟣 Apex
+Haven-X Module
+Advanced life-support integration and stronger structural protection
+🟠 Research
+Haven-Genesis Module
+10,000 XP + 10 RT
+Highly resilient habitat integrating life support, thermal systems, recycling and automated emergency isolation
+
+RADIATION
+Tier
+Technology
+What it does
+🟢 Foundation
+Shield-1
+Basic radiation protection
+🔵 Frontier
+Shield-L
+Improved shielding and greater protection
+🟣 Apex
+Shield-X
+Advanced radiation shielding
+🟠 Research
+Shield-Aegis
+10,000 XP + 1 RT
+Extremely high radiation protection with active monitoring and automatic shelter management
+
+
+ROVERS
+Tier
+Technology
+What it does
+🟢 Foundation
+Scout-1 Rover
+Basic transport and exploration
+🔵 Frontier
+Pathfinder-L Rover
+Greater range, payload and navigation capability
+🟣 Apex
+Odyssey-X Rover
+Highly autonomous exploration and resource operations
+🟠 Research
+Odyssey-Titan Rover
+10,000 XP + 1 RT
+Extreme range, autonomous navigation, resource collection, repair assistance and operation with minimal communication
+
+
+
+
+RESOURCE EXTRACTION
+Tier
+Technology
+What it does
+🟢 Foundation
+Drill-1
+Extracts accessible subsurface resources
+🔵 Frontier
+CryoDrill-L
+Reaches deeper/colder deposits and extracts resources more efficiently
+🟣 Apex
+CryoDrill-X
+High-output autonomous extraction
+🟠 Research
+CryoForge-X
+10,000 XP + 1 RT
+Deep extraction combined with advanced processing and resource separation
+
+ISRU
+In-Situ Resource Utilisation - This is a real thing btw
+Tier
+Technology
+What it does
+🟢 Foundation
+Forge-1
+Processes local materials into basic usable resources
+🔵 Frontier
+Forge-L
+Produces more materials with greater efficiency
+🟣 Apex
+Forge-X
+Produces construction materials, processed resources and useful industrial products
+🟠 Research
+Forge-Genesis
+10,000 XP + 1 RT
+Turns a much wider range of local resources into construction materials, industrial feedstocks and critical colony supplies
+
+AGRICULTURE
+Tier
+Technology
+What it does
+🟢 Foundation
+GreenPod-1
+Small controlled crop production
+🔵 Frontier
+AgriCore-L
+Larger production with improved water/light efficiency
+🟣 Apex
+AgriCore-X
+Highly automated agriculture integrated with CO₂, water and oxygen systems
+🟠 Research
+AgriCore-Eden
+10,000 XP + 1 RT
+Extremely efficient closed-loop agriculture capable of supporting a major portion of colony food production
+
+MAINTENANCE
+Tier
+Technology
+What it does
+🟢 Foundation
+Service-1
+Basic manual maintenance equipment
+🔵 Frontier
+Service-L
+Automated diagnostics and maintenance assistance
+🟣 Apex
+Service-X
+Autonomous maintenance of many colony systems
+🟠 Research
+Service-Sentinel
+10,000 XP + 1 RT
+Advanced autonomous maintenance that detects, predicts and responds to developing equipment failures
+
+
+
+POWER GRID
+Tier
+Technology
+What it does
+🟢 Foundation
+Grid-1
+Distributes power between systems
+🔵 Frontier
+Grid-L
+Better load balancing and redundancy
+🟣 Apex
+Grid-X
+Automatically prioritises critical systems
+🟠 Research
+Grid-Nexus
+10,000 XP + 10 RT
+Fully adaptive colony-wide power management that dynamically redirects energy during cascading failures
+
+SCIENCE
+Tier
+Technology
+What it does
+🟢 Foundation
+Lab-1
+Basic scientific experiments
+🔵 Frontier
+Lab-L
+More advanced experiments and analysis
+🟣 Apex
+Lab-X
+High-level automated scientific analysis
+🟠 Research
+Lab-Omnis
+10,000XP + 1 RT
+Extremely advanced research platform capable of analysing resources, environmental conditions and biological systems simultaneously
+
+
+NAVIGATION
+Tier
+Technology
+What it does
+🟢 Foundation
+Nav-1
+Basic navigation and positioning
+🔵 Frontier
+Nav-L
+Improved precision and autonomous routing
+🟣 Apex
+Nav-X
+Advanced autonomous navigation
+🟠 Research
+Nav-Sovereig
+10,000 XP + 1 RT
+Colony-wide autonomous navigation and routing with minimal dependence on Earth
+

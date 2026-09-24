@@ -31,17 +31,22 @@ type Mission = {
   x: string;
   y: string;
   prerequisite?: string;
+  objective: string;
+  reward: string;
+  xp: string;
+  token: string;
+  technology: string;
 };
 
 const missions: Mission[] = [
-  { number: "01", title: "Survival", subtitle: "First Light", status: "complete", x: "6%", y: "49%" },
-  { number: "02", title: "The Signal", subtitle: "Find the rhythm", status: "complete", x: "17%", y: "27%" },
-  { number: "03", title: "The Shadow", subtitle: "Ice below", status: "current", x: "31%", y: "55%" },
-  { number: "04", title: "The Descent", subtitle: "Into the dark", status: "available", x: "45%", y: "23%" },
-  { number: "05", title: "The Relay", subtitle: "Hold the line", status: "locked", x: "59%", y: "52%", prerequisite: "Complete The Descent" },
-  { number: "06", title: "The Garden", subtitle: "Make it grow", status: "locked", x: "70%", y: "28%", prerequisite: "Complete The Relay" },
-  { number: "07", title: "The Anchor", subtitle: "Stay the course", status: "locked", x: "82%", y: "52%", prerequisite: "Complete The Garden" },
-  { number: "08", title: "Cascade", subtitle: "A foothold becomes home", status: "locked", x: "93%", y: "25%", prerequisite: "Complete The Anchor" },
+  { number: "01", title: "Survival", subtitle: "First Light", status: "current", x: "6%", y: "49%", objective: "Stabilize the landing site and bring every Foundation system online.", reward: "$8M", xp: "500", token: "0", technology: "Foundation systems" },
+  { number: "02", title: "The Long Night", subtitle: "Hold the heat", status: "locked", x: "17%", y: "27%", prerequisite: "Complete Survival", objective: "Maintain heat and power through the first lunar night.", reward: "$10M", xp: "750", token: "+1", technology: "Thermal Control" },
+  { number: "03", title: "The Shadow", subtitle: "Ice below", status: "locked", x: "31%", y: "55%", prerequisite: "Complete The Long Night", objective: "Locate and extract subsurface ice before the thermal window closes.", reward: "$14M", xp: "1,000", token: "+1", technology: "Water / Ice Extraction" },
+  { number: "04", title: "Dust + Power Failure", subtitle: "Keep the grid alive", status: "locked", x: "45%", y: "23%", prerequisite: "Complete The Shadow", objective: "Restore power distribution during a high-dust equipment failure.", reward: "$16M", xp: "1,250", token: "+1", technology: "Power Grid" },
+  { number: "05", title: "Meteoroid Damage", subtitle: "Patch the breach", status: "locked", x: "59%", y: "52%", prerequisite: "Complete Dust + Power Failure", objective: "Repair a damaged habitat shell before pressure loss becomes critical.", reward: "$18M", xp: "1,500", token: "+1", technology: "Habitat Protection" },
+  { number: "06", title: "Radiation Event", subtitle: "Under the storm", status: "locked", x: "70%", y: "28%", prerequisite: "Complete Meteoroid Damage", objective: "Protect crew and systems through a major radiation event.", reward: "$20M", xp: "1,750", token: "+1", technology: "Radiation Shielding" },
+  { number: "07", title: "Resource Crisis", subtitle: "Make more from less", status: "locked", x: "82%", y: "52%", prerequisite: "Complete Radiation Event", objective: "Keep the colony supplied while external deliveries are delayed.", reward: "$24M", xp: "2,000", token: "+1", technology: "ISRU" },
+  { number: "08", title: "Cascade", subtitle: "A foothold becomes home", status: "locked", x: "93%", y: "25%", prerequisite: "Complete Resource Crisis", objective: "Prevent a systems cascade and prove the Moon can sustain a colony.", reward: "$30M", xp: "3,000", token: "+2", technology: "Mars Campaign access" },
 ];
 
 const statusCopy: Record<MissionStatus, string> = {
@@ -52,8 +57,8 @@ const statusCopy: Record<MissionStatus, string> = {
 };
 
 export function CampaignMap() {
-  const [selected, setSelected] = useState("03");
-  const activeMission = missions.find((mission) => mission.number === selected) ?? missions[2];
+  const [selected, setSelected] = useState("01");
+  const activeMission = missions.find((mission) => mission.number === selected) ?? missions[0];
 
   return (
     <GameShell active="campaign" eyebrow="Campaign // Lunar Operations" title="Moon Campaign">
@@ -62,13 +67,13 @@ export function CampaignMap() {
           <div className="mb-5 flex items-center justify-between border-y border-[#29434a] py-4">
             <div>
               <p className="text-[10px] uppercase tracking-[0.3em] text-[#789293]">Operation status</p>
-              <p className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-[#dce9dc]">03 / 08 missions secured</p>
+              <p className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-[#dce9dc]">Mission 01 / 08 · starting route</p>
             </div>
             <div className="w-36">
               <div className="mb-2 flex justify-between text-[9px] uppercase tracking-[0.2em] text-[#799394]">
-                <span>Moon progress</span><span className="text-[#efb658]">38%</span>
+                <span>Moon progress</span><span className="text-[#efb658]">0%</span>
               </div>
-              <ProgressBar value={38} />
+              <ProgressBar value={0} />
             </div>
           </div>
 
@@ -146,7 +151,7 @@ export function CampaignMap() {
               <>
                 <div>
                   <p className="mb-2 text-[10px] uppercase tracking-[0.26em] text-[#769092]">Objective</p>
-                  <p className="text-sm leading-6 text-[#dbe7da]">Locate and extract subsurface ice before the thermal window closes.</p>
+                   <p className="text-sm leading-6 text-[#dbe7da]">{activeMission.objective}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="border border-[#29434a] bg-[#0f2429] p-3"><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Difficulty</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#efb658]"><Target className="h-4 w-4" /> High</p></div>
@@ -155,14 +160,14 @@ export function CampaignMap() {
                 <div>
                   <p className="mb-3 text-[10px] uppercase tracking-[0.26em] text-[#769092]">Mission reward</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="border-l-2 border-[#efb658] pl-3"><p className="text-lg font-semibold text-[#f0bf67]">$14M</p><p className="text-[8px] uppercase tracking-[0.14em] text-[#71898b]">Funding</p></div>
-                    <div className="border-l-2 border-[#76bba6] pl-3"><p className="text-lg font-semibold text-[#b3d7bd]">1,000</p><p className="text-[8px] uppercase tracking-[0.14em] text-[#71898b]">XP</p></div>
-                    <div className="border-l-2 border-[#9caf84] pl-3"><p className="text-lg font-semibold text-[#cbd9b2]">+1</p><p className="text-[8px] uppercase tracking-[0.14em] text-[#71898b]">Research</p></div>
+                     <div className="border-l-2 border-[#efb658] pl-3"><p className="text-lg font-semibold text-[#f0bf67]">{activeMission.reward}</p><p className="text-[8px] uppercase tracking-[0.14em] text-[#71898b]">Funding</p></div>
+                     <div className="border-l-2 border-[#76bba6] pl-3"><p className="text-lg font-semibold text-[#b3d7bd]">{activeMission.xp}</p><p className="text-[8px] uppercase tracking-[0.14em] text-[#71898b]">XP</p></div>
+                     <div className="border-l-2 border-[#9caf84] pl-3"><p className="text-lg font-semibold text-[#cbd9b2]">{activeMission.token}</p><p className="text-[8px] uppercase tracking-[0.14em] text-[#71898b]">Research</p></div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 border-t border-[#29434a] pt-5">
                   <Snowflake className="h-5 w-5 text-[#8fc8c4]" />
-                  <div><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Technology unlocked</p><p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#d5e4ce]">Water / Ice Extraction</p></div>
+                   <div><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Technology unlocked</p><p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#d5e4ce]">{activeMission.technology}</p></div>
                 </div>
                 {activeMission.status === "current" && <a href="/__mockup/preview/colony-frontier/MissionLoadout" className="flex w-full items-center justify-between bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#1a211d] transition hover:bg-[#f6cb7b]">Prepare mission <ArrowRight className="h-4 w-4" /></a>}
                 {activeMission.status === "complete" && <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#89c9a8]"><ShieldCheck className="h-4 w-4" /> Mission secured</div>}

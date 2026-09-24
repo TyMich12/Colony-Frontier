@@ -61,7 +61,7 @@ export function MainMenu() {
               href={routes.moon}
               className="group mt-9 inline-flex items-center gap-5 border border-[#efb658] bg-[#efb658] px-5 py-4 text-[11px] font-bold uppercase tracking-[0.23em] text-[#142127] transition hover:bg-[#f8cc79] focus:outline-none focus:ring-2 focus:ring-[#f8cc79] focus:ring-offset-2 focus:ring-offset-[#0b1b22]"
             >
-              Resume moon campaign
+              Begin moon campaign
               <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </a>
             <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-[10px] uppercase tracking-[0.2em] text-[#78938f]">
@@ -75,27 +75,27 @@ export function MainMenu() {
           <SectionLabel>Program status</SectionLabel>
           <div className="mb-7 flex items-end justify-between border-b border-[#284047] pb-5">
             <div>
-              <p className="text-3xl font-semibold tracking-[0.08em] text-[#f0f1dc]">01</p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-[#789690]">Active campaign</p>
+               <p className="text-3xl font-semibold tracking-[0.08em] text-[#f0f1dc]">01</p>
+               <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-[#789690]">Starting mission</p>
             </div>
             <span className="border border-[#477466] bg-[#19362f] px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-[#91d0ad]">In progress</span>
           </div>
           <div className="space-y-6">
             <div>
               <div className="mb-2 flex justify-between text-[10px] uppercase tracking-[0.19em]">
-                <span className="text-[#d9e4cd]">Moon / Mare Tranquillitatis</span>
-                <span className="text-[#efb658]">34%</span>
+                 <span className="text-[#d9e4cd]">Moon / Mission 01 — Survival</span>
+                 <span className="text-[#efb658]">0%</span>
               </div>
-              <ProgressBar value={34} />
+               <ProgressBar value={0} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="border border-[#263f45] bg-[#0d2228] p-4">
-                <p className="font-mono text-xl text-[#d6e2c7]">07</p>
-                <p className="mt-2 text-[9px] uppercase tracking-[0.15em] text-[#78938f]">Sol objectives</p>
+                 <p className="font-mono text-xl text-[#d6e2c7]">00</p>
+                 <p className="mt-2 text-[9px] uppercase tracking-[0.15em] text-[#78938f]">Missions secured</p>
               </div>
               <div className="border border-[#263f45] bg-[#0d2228] p-4">
-                <p className="font-mono text-xl text-[#d6e2c7]">03</p>
-                <p className="mt-2 text-[9px] uppercase tracking-[0.15em] text-[#78938f]">Crew aboard</p>
+                 <p className="font-mono text-xl text-[#d6e2c7]">0</p>
+                 <p className="mt-2 text-[9px] uppercase tracking-[0.15em] text-[#78938f]">Research tokens</p>
               </div>
             </div>
           </div>
