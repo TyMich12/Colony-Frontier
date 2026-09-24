@@ -18,9 +18,9 @@ import {
 import { GameShell, LinkArrow, ProgressBar, SectionLabel } from "./_shared/GameShell";
 
 const routes = {
-  moon: "/__mockup/preview/colony-frontier/CampaignMap",
-  lab: "/__mockup/preview/colony-frontier/TechnologyLab",
-  loadout: "/__mockup/preview/colony-frontier/MissionLoadout",
+  moon: "/__mockup/preview/colony-frontier/CampaignMapRefresh",
+  lab: "/__mockup/preview/colony-frontier/TechnologyLabRefresh",
+  loadout: "/__mockup/preview/colony-frontier/MissionLoadoutRefresh",
   achievements: "/__mockup/preview/colony-frontier/Achievements",
   settings: "/__mockup/preview/colony-frontier/Settings",
 };

@@ -1,0 +1,246 @@
+🌙 MOON CAMPAIGN
+8 missions
+The Moon teaches the player the fundamental systems they'll later need on Mars.
+#
+Mission
+Credits
+XP
+Research
+1
+Survival
+$10M
+500
++1
+2
+The Long Night
+$12M
+750
++1
+3
+The Shadow
+$14M
+1,000
++1
+4
+Dust + Power Failure
+$16M
+1,250
++1
+5
+Meteoroid Damage
+$18M
+1,500
++1
+6
+Radiation Event
+$20M
+1,750
++2
+7
+Resource Crisis
+$23M
+2,000
++2
+8
+Cascade
+$27M
+2,500
++3
+
+Moon totals
+Credits: $140M
+ XP: 11,250
+ Maximum Research Tokens: 12
+
+
+
+
+
+
+
+
+Mission 1:
+Objective
+Establish the first lunar outpost and survive 14 Earth days.
+Systems introduced
+Solar
+Batteries
+Oxygen
+Water
+CO₂ removal
+Thermal control
+Habitat
+Communications
+Food
+Basic maintenance
+Major event
+A manageable environmental failure forces the player to actually manage their resources rather than simply deploying equipment.
+💰 Reward
+$10M
+⭐ XP
+500
+🔬 Research Opportunity — Lunar Environmental Study
+Perform an optional scientific investigation of the local environment while maintaining the colony.
+Reward: +1 Research Token
+Requirement:
+Complete the investigation and finish the mission without a critical life-support failure.
+Technology reward
+Improved Energy Storage
+
+🌙 MISSION 2 — THE LONG NIGHT
+Objective
+Survive a prolonged period of extremely limited sunlight.
+The player must manage:
+Battery reserves
+Heating
+Life support
+Power consumption
+Emergency reserves
+💰 Reward
+$12M
+⭐ XP
+750
+🔬 Research Opportunity — Thermal Environment Survey
+Collect and analyse temperature data throughout the darkness period.
+Reward: +1 Research Token
+Hard condition:
+Complete the survey without activating emergency power.
+Technology reward
+Thermal Storage Technology
+
+🌙 MISSION 3 — THE SHADOW
+Objective
+Explore a permanently shadowed region and retrieve a useful resource.
+Mission chain
+Locate → Explore → Extract → Transport → Process → Store
+Requires coordination between:
+Rover
+Communications
+Navigation
+Extraction
+Power
+Thermal
+Water/resource processing
+💰 Reward
+$14M
+⭐ XP
+1,000
+🔬 Research Opportunity — Subsurface Ice Characterisation
+Find an ice deposit and scientifically characterise it.
+Reward: +1 Research Token
+Hard condition:
+Return the scientific data to the colony without losing the rover.
+Technology reward
+Water/Ice Extraction
+
+🌙 MISSION 4 — DUST + POWER FAILURE
+Lunar dust begins contaminating equipment.
+Solar output decreases.
+The player has to decide:
+Clean the equipment or preserve power?
+💰 Reward
+$16M
+⭐ XP
+1,250
+🔬 Research Opportunity — Dust Behaviour Study
+Collect data on how dust affects multiple systems.
+Reward: +1 Research Token
+Hard condition:
+Complete the study while keeping the colony above its critical power reserve.
+Technology reward
+Autonomous Maintenance Rover
+
+🌙 MISSION 5 — METEOROID DAMAGE
+A micrometeoroid damages part of the settlement.
+The player must:
+Detect pressure loss
+Identify the damaged module
+Isolate it
+Preserve oxygen
+Repair it
+Restore the module
+💰 Reward
+$18M
+⭐ XP
+1,500
+🔬 Research Opportunity — Structural Impact Analysis
+Analyse the damage and determine the impact characteristics.
+Reward: +1 Research Token
+Hard condition:
+Complete the analysis and repair without permanently abandoning the damaged module.
+Technology reward
+Improved Habitat Structure
+
+🌙 MISSION 6 — RADIATION EVENT
+A major radiation event approaches.
+The player must manage:
+Radiation shielding
+Regolith
+Shelter
+Power
+Communications
+Life support
+💰 Reward
+$20M
+⭐ XP
+1,750
+🔬 Research Opportunity — Radiation Mapping
+Deploy instruments to map radiation levels around the settlement.
+Reward: +2 Research Tokens
+Hard condition:
+Complete the map while keeping the crew and critical systems within safe operating limits.
+Technology reward
+Regolith Shielding
+
+🌙 MISSION 7 — RESOURCE CRISIS
+The settlement is no longer simply a bunker.
+It is becoming a colony.
+Manage:
+Food
+Water
+Oxygen
+Power
+Construction
+Maintenance
+Local resources
+💰 Reward
+$23M
+⭐ XP
+2,000
+🔬 Research Opportunity — Local Resource Discovery
+Find a previously unknown usable resource.
+Reward: +2 Research Tokens
+Hard condition:
+Discover, verify and successfully process the resource.
+
+🌙 MISSION 8 — CASCADE
+The major Moon challenge.
+Failure chain
+Solar degradation
+↓
+Power shortage
+↓
+Greenhouse power loss
+↓
+Food production decreases
+↓
+Water demand changes
+↓
+Life-support load increases
+↓
+Battery reserve falls
+↓
+Thermal control threatened
+💰 Reward
+$27M
+⭐ XP
+2,500
+🔬 Research Opportunity — Cascade Prevention Study
+Analyse the failure chain and prevent it from reaching a critical system.
+Reward: +3 Research Tokens
+Hard condition:
+Complete the Cascade without losing any critical colony system.
+Technology reward
+Advanced Colony Management
+
+

@@ -1,0 +1,325 @@
+import { useState } from "react";
+import {
+  Battery,
+  Car,
+  Check,
+  Cloud,
+  Compass,
+  Droplets,
+  Factory,
+  FlaskConical,
+  Home,
+  LockKeyhole,
+  Microscope,
+  Pickaxe,
+  Radio,
+  Shield,
+  Sprout,
+  Sun,
+  Thermometer,
+  Wind,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import {
+  GameShell,
+  ProgressBar,
+  SectionLabel,
+} from "./_shared/GameShell";
+import {
+  formatCredits,
+  technologyTracks,
+  tierMeta,
+  tierUnlockRequirements,
+  type TechnologyTrack,
+  type Tier,
+} from "./_shared/gameData";
+
+const categoryIcons = {
+  Solar: Sun,
+  Battery,
+  Oxygen: Wind,
+  Water: Droplets,
+  "CO₂": Cloud,
+  Thermal: Thermometer,
+  Comms: Radio,
+  Habitat: Home,
+  Radiation: Shield,
+  "Power Grid": Zap,
+  Science: Microscope,
+  Navigation: Compass,
+  Rover: Car,
+  Extraction: Pickaxe,
+  ISRU: Factory,
+  Agriculture: Sprout,
+  Maintenance: Wrench,
+} as const;
+
+const tiers: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
+const currentXp = 0;
+const currentTokens = 0;
+
+function requirementCopy(tier: Tier) {
+  const requirement = tierUnlockRequirements[tier];
+  if (tier === "Foundation") return "Starting technology";
+  if (tier === "Research") {
+    return `${requirement.xp.toLocaleString()} XP + required Research Tokens`;
+  }
+  return `${requirement.xp.toLocaleString()} XP`;
+}
+
+export function TechnologyLabRefresh() {
+  const [selectedTrackId, setSelectedTrackId] = useState("solar");
+  const [selectedTier, setSelectedTier] = useState<Tier>("Foundation");
+  const selectedTrack =
+    technologyTracks.find((track) => track.id === selectedTrackId) ??
+    technologyTracks[0];
+  const SelectedIcon =
+    categoryIcons[selectedTrack.category as keyof typeof categoryIcons] ?? Zap;
+
+  function canBuy(tier: Tier) {
+    const requirement = tierUnlockRequirements[tier];
+    return currentXp >= requirement.xp && currentTokens >= requirement.tokens;
+  }
+
+  function selectTier(tier: Tier) {
+    if (canBuy(tier)) setSelectedTier(tier);
+  }
+
+  return (
+    <GameShell
+      active="lab"
+      eyebrow="Research terminal / capability ladder"
+      title="Technology Lab"
+    >
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#47553d] bg-[#172a2a] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <Check className="h-4 w-4 text-[#9fce82]" />
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#dce9cd]">
+            Foundation systems online · 17 / 17
+          </p>
+        </div>
+        <p className="text-[10px] uppercase tracking-[0.16em] text-[#9fba9e]">
+          Locked tiers cannot be selected or purchased
+        </p>
+      </div>
+
+      <div className="grid gap-7 xl:grid-cols-[245px_minmax(0,1fr)_300px]">
+        <aside className="border border-[#29434a] bg-[#0b1a21] p-4">
+          <SectionLabel>Technology tracks</SectionLabel>
+          <p className="mb-4 text-xs leading-5 text-[#829d99]">
+            Choose a category to inspect its visible capability ladder.
+          </p>
+          <div className="space-y-1.5">
+            {technologyTracks.map((track) => {
+              const Icon =
+                categoryIcons[track.category as keyof typeof categoryIcons] ??
+                Zap;
+              const active = selectedTrack.id === track.id;
+              return (
+                <button
+                  key={track.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTrackId(track.id);
+                    setSelectedTier("Foundation");
+                  }}
+                  className={`flex w-full items-center gap-3 border px-3 py-2.5 text-left transition ${
+                    active
+                      ? "border-[#738b64] bg-[#18302f] text-[#e5efdb]"
+                      : "border-transparent text-[#76918e] hover:border-[#36545a] hover:bg-[#10242a] hover:text-[#d5e5ce]"
+                  }`}
+                >
+                  <Icon
+                    className={`h-4 w-4 shrink-0 ${
+                      active ? "text-[#efb658]" : "text-[#75918f]"
+                    }`}
+                  />
+                  <span className="min-w-0 flex-1 text-[9px] font-bold uppercase tracking-[0.16em]">
+                    {track.category}
+                  </span>
+                  <Check className="h-3 w-3 text-[#84c89e]" />
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <section className="min-w-0">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#29434a] pb-5">
+            <div>
+              <SectionLabel>
+                {selectedTrack.category} progression · {selectedTrack.shortName}
+              </SectionLabel>
+              <div className="flex items-center gap-3">
+                <SelectedIcon className="h-6 w-6 text-[#efb658]" />
+                <h2 className="text-xl font-semibold uppercase tracking-[0.14em] text-[#f0f4e8]">
+                  {selectedTrack.description}
+                </h2>
+              </div>
+            </div>
+            <div className="border border-[#3d5b50] bg-[#10232a] px-4 py-3">
+              <p className="text-[9px] uppercase tracking-[0.2em] text-[#76908e]">
+                Research bank
+              </p>
+              <p className="font-mono text-sm text-[#e8efdd]">
+                {currentXp.toLocaleString()} XP{" "}
+                <span className="text-[#76908e]">· {currentTokens} tokens</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="relative space-y-3">
+            <div className="absolute bottom-7 left-5 top-7 w-px bg-gradient-to-b from-[#9fce82] via-[#72b9d4] to-[#e9a15d]" />
+            {tiers.map((tier) => {
+              const equipment = selectedTrack.tiers[tier];
+              const unlocked = canBuy(tier);
+              const selected = selectedTier === tier;
+              const meta = tierMeta[tier];
+              return (
+                <button
+                  key={tier}
+                  type="button"
+                  disabled={!unlocked}
+                  onClick={() => selectTier(tier)}
+                  className={`relative w-full border p-4 text-left transition ${
+                    selected
+                      ? "border-[#d3e49f] bg-[#182f2f] shadow-[inset_3px_0_0_#efb658]"
+                      : unlocked
+                        ? "border-[#29434a] bg-[#0d2028] hover:border-[#90b4a2]"
+                        : "border-[#29434a] bg-[#0d2028] opacity-70"
+                  } disabled:cursor-not-allowed`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="mt-0.5 grid h-9 w-9 place-items-center border text-[10px] font-bold"
+                        style={{ borderColor: meta.color, color: meta.color }}
+                      >
+                        {meta.short}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-[9px] font-bold uppercase tracking-[0.22em]"
+                            style={{ color: meta.color }}
+                          >
+                            {tier}
+                          </span>
+                          {unlocked ? (
+                            <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#9cd0a8]">
+                              <Check className="h-3 w-3" />
+                              {selected ? "Selected" : "Unlocked"}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#a6a796]">
+                              <LockKeyhole className="h-3 w-3" /> Locked
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="mt-1 text-lg font-semibold uppercase tracking-[0.1em] text-[#eef3e7]">
+                          {equipment.name}
+                        </h3>
+                        <p className="mt-1 text-[10px] uppercase tracking-[0.13em] text-[#789491]">
+                          Unlock: {requirementCopy(tier)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.17em] text-[#92a9a0]">
+                      {selected ? "Current loadout tier" : unlocked ? "Select" : "Earn first"}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[#29434a] pt-4 sm:grid-cols-4">
+                    <div>
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-[#76908e]">
+                        Mass
+                      </p>
+                      <p className="font-mono text-xs text-[#d8e3cf]">
+                        {equipment.mass.toLocaleString()} kg
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-[#76908e]">
+                        Cost
+                      </p>
+                      <p className="font-mono text-xs text-[#d8e3cf]">
+                        {formatCredits(equipment.cost)}
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-[#76908e]">
+                        Efficiency
+                      </p>
+                      <p className="font-mono text-xs text-[#d8e3cf]">
+                        {equipment.efficiency}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 border-l-2 border-[#526c5a] bg-[#10252a] px-3 py-2 text-xs leading-5 text-[#a9c0b5]">
+                    {equipment.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="border border-[#67543b] bg-[#171f23] p-5">
+            <SectionLabel>Research gate</SectionLabel>
+            <h2 className="text-lg font-semibold uppercase tracking-[0.12em] text-[#f1ebd1]">
+              Earn, then select.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[#b6b19d]">
+              Research opportunities are optional, but they are the only way to
+              earn Research Tokens. XP and tokens keep counting beyond every
+              milestone.
+            </p>
+            <div className="mt-5 space-y-4 border-t border-[#514635] pt-4">
+              <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
+                <span className="text-[#8e978a]">Experience earned</span>
+                <span className="font-mono text-[#f1d47c]">
+                  {currentXp.toLocaleString()} XP
+                </span>
+              </div>
+              <ProgressBar value={0} color="#efbd5d" />
+              <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
+                <span className="text-[#8e978a]">Research Tokens earned</span>
+                <span className="font-mono text-[#f1d47c]">
+                  {currentTokens}
+                </span>
+              </div>
+            </div>
+          </section>
+          <section className="border border-[#29434a] bg-[#0d2028] p-5">
+            <SectionLabel>Tier requirements</SectionLabel>
+            <div className="space-y-3">
+              {tiers.map((tier) => (
+                <div
+                  key={tier}
+                  className="flex items-center justify-between border-b border-[#29434a] pb-3 last:border-0 last:pb-0"
+                >
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-[0.18em]"
+                    style={{ color: tierMeta[tier].color }}
+                  >
+                    {tier}
+                  </span>
+                  <span className="text-right text-[9px] uppercase tracking-[0.12em] text-[#829b96]">
+                    {requirementCopy(tier)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+          <p className="border border-[#29434a] bg-[#0c1b23] p-4 text-[10px] leading-5 uppercase tracking-[0.14em] text-[#7f9c96]">
+            No hover popup in the lab. All field details remain visible in each
+            tier row.
+          </p>
+        </aside>
+      </div>
+    </GameShell>
+  );
+}
+
+export default TechnologyLabRefresh;

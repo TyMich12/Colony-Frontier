@@ -1,0 +1,411 @@
+🔴 MARS CAMPAIGN
+
+
+#
+Mission
+Credits
+XP
+Research
+1
+Arrival
+$20M
+1,000
++1
+2
+The Dust
+$22M
+1,250
++1
+3
+The Water Search
+$25M
+1,500
++1
+4
+Martian Winter
+$28M
+1,750
++1
+5
+The Rover Network
+$31M
+2,000
++1
+6
+Dust Storm
+$34M
+2,250
++2
+7
+The Greenhouse
+$37M
+2,500
++2
+8
+Habitat Breach
+$40M
+2,750
++2
+9
+ISRU
+$43M
+3,000
++2
+10
+The Supply Gap
+$46M
+3,250
++2
+11
+The Great Dust Storm
+$50M
+3,500
++3
+12
+The Expansion
+$55M
+3,750
++3
+13
+The Independent Colony
+$60M
+4,000
++3
+14
+Cascade
+$65M
+4,500
++3
+15
+Mars Rising
+$75M
+5,000
++5
+
+
+
+
+
+
+🔴 MARS 1 — ARRIVAL
+Objective
+Land on Mars and survive 30 Earth days.
+Learn:
+Entry/descent/landing
+Solar
+Batteries
+Oxygen
+Water
+CO₂
+Thermal
+Communications
+Dust
+Maintenance
+💰 $20M
+⭐ 1,000 XP
+🔬 Research Opportunity — Martian Landing Site Survey
+Perform a detailed environmental survey after landing.
++1 Token
+Hard condition:
+Complete the survey without compromising the colony's critical reserves.
+Reward
+Improved Power Management
+
+🔴 MARS 2 — THE DUST
+Solar output begins falling because of atmospheric dust.
+Manage:
+Batteries
+Solar production
+Consumption
+Life support
+Equipment cleaning
+💰 $22M
+⭐ 1,250 XP
+🔬 Research Opportunity — Dust Composition Analysis
+Collect and analyse Martian dust.
++1 Token
+Hard condition:
+Complete the analysis while maintaining minimum power reserves.
+Reward
+Dust-Resistant Solar
+
+🔴 MARS 3 — THE WATER SEARCH
+Find accessible subsurface ice.
+Process
+Scan → Locate → Rover → Drill → Extract → Transport → Purify → Store
+💰 $25M
+⭐ 1,500 XP
+🔬 Research Opportunity — Ice Deposit Characterisation
+Determine:
+depth
+purity
+accessibility
+extraction difficulty
++1 Token
+Hard condition:
+Complete the investigation and successfully return a verified sample.
+Reward
+Ice Extraction
+
+🔴 MARS 4 — MARTIAN WINTER
+Extreme cold threatens:
+Habitat
+Batteries
+Water
+Machinery
+Greenhouse
+💰 $28M
+⭐ 1,750 XP
+🔬 Research Opportunity — Subsurface Thermal Study
+Investigate Martian subsurface temperature behaviour.
++1 Token
+Hard condition:
+Complete the experiment without allowing the colony's thermal system to enter emergency operation.
+Reward
+Advanced Thermal Regulation
+
+🔴 MARS 5 — THE ROVER NETWORK
+The colony now has multiple rovers.
+You need:
+Charging stations
+Communications
+Autonomous routes
+Maintenance
+Recovery
+💰 $31M
+⭐ 2,000 XP
+🔬 Research Opportunity — Autonomous Navigation Trial
+Send a rover through an area without continuous Earth control.
++1 Token
+Hard condition:
+Rover completes the route and returns without manual intervention.
+Reward
+Autonomous Rover Technology
+
+🔴 MARS 6 — DUST STORM
+A major storm is approaching.
+Prepare:
+Batteries
+Rovers
+Oxygen
+Water
+Power
+Equipment
+Emergency systems
+💰 $34M
+⭐ 2,250 XP
+🔬 Research Opportunity — Storm Prediction Model
+Collect atmospheric data and attempt to predict the storm's behaviour.
++2 Tokens
+Hard condition:
+Produce a successful prediction while maintaining colony operations.
+Reward
+Storm Prediction System
+
+🔴 MARS 7 — THE GREENHOUSE
+Agriculture becomes a major part of the colony.
+Manage:
+Water
+Lighting
+Temperature
+CO₂
+Oxygen
+Nutrients
+Energy
+Crops
+💰 $37M
+⭐ 2,500 XP
+🔬 Research Opportunity — Closed-Loop Agriculture Experiment
+Demonstrate that waste from one colony system can become an input for another.
++2 Tokens
+Hard condition:
+Complete the experiment without increasing the colony's net external resource demand.
+Reward
+Closed-Loop Agriculture
+
+🔴 MARS 8 — HABITAT BREACH
+Structural failure.
+Process
+Detect → Identify → Isolate → Evacuate → Preserve Oxygen → Repair → Restore
+💰 $40M
+⭐ 2,750 XP
+🔬 Research Opportunity — Habitat Failure Analysis
+Determine why the structural failure occurred and identify a preventative solution.
++2 Tokens
+Hard condition:
+Complete the analysis and repair while keeping all essential habitat systems operational.
+Reward
+Modular Habitat System
+
+🔴 MARS 9 — ISRU
+Now Mars itself becomes your supply chain.
+Process
+Extract → Process → Store → Manufacture → Use
+Resources can become:
+Water
+Oxygen
+Construction materials
+Industrial feedstocks
+Fuel-related resources
+💰 $43M
+⭐ 3,000 XP
+🔬 Research Opportunity — New Resource Discovery
+Discover a previously unused Martian resource.
++2 Tokens
+Hard condition:
+Discover it, prove it is usable and successfully incorporate it into the colony.
+Reward
+Advanced ISRU
+
+🔴 MARS 10 — THE SUPPLY GAP
+Earth can no longer provide normal resupply.
+Manage:
+Food
+Water
+Oxygen
+Spare parts
+Fuel
+Batteries
+Medical supplies
+Construction materials
+💰 $46M
+⭐ 3,250 XP
+🔬 Research Opportunity — Advanced Waste Recovery
+Find a way to recover a useful material from something previously treated as waste.
++2 Tokens
+Hard condition:
+Establish a repeatable recovery process that produces a useful colony input.
+Reward
+Advanced Recycling
+
+🔴 MARS 11 — THE GREAT DUST STORM
+The major Mars cascade.
+Chain
+Solar output ↓
+↓
+Battery reserves ↓
+↓
+Heating demand ↑
+↓
+Greenhouse production ↓
+↓
+Food ↓
+↓
+Water recycling becomes more important
+↓
+Oxygen production ↓
+↓
+Emergency power
+↓
+Rover charging lost
+↓
+Ice extraction stops
+↓
+Water reserves ↓
+↓
+Thermal systems threatened
+💰 $50M
+⭐ 3,500 XP
+🔬 Research Opportunity — Cascade Prediction
+Identify the cascade before it reaches the critical systems.
++3 Tokens
+Hard condition:
+Predict and interrupt the cascade without losing a critical system.
+Reward
+Planetary Resilience
+
+🔴 MARS 12 — THE EXPANSION
+Build a second settlement.
+You must design:
+Habitat
+Power
+Water
+Communications
+Transport
+Agriculture
+Resource extraction
+Emergency systems
+The settlements can share resources.
+💰 $55M
+⭐ 3,750 XP
+🔬 Research Opportunity — Inter-Settlement Optimisation
+Develop a way for the settlements to share resources more efficiently.
++3 Tokens
+Hard condition:
+Demonstrate successful resource sharing without causing either settlement to become critically dependent on the other.
+Reward
+Colony Grid Architecture
+
+🔴 MARS 13 — THE INDEPENDENT COLONY
+No meaningful emergency support from Earth.
+Small failures constantly occur.
+The colony must become:
+autonomous
+repairable
+resource-independent
+resilient
+💰 $60M
+⭐ 4,000 XP
+🔬 Research Opportunity — Local Manufacturing Breakthrough
+Produce something locally that previously required Earth resupply.
++3 Tokens
+Hard condition:
+Manufacture a genuinely useful replacement/component and successfully integrate it into the colony.
+Reward
+Self-Sufficient Colony Technology
+
+🔴 MARS 14 — CASCADE
+Multiple systems fail simultaneously.
+The player cannot save everything.
+They must determine:
+What is essential?
+What can be sacrificed?
+What failure must be prevented?
+💰 $65M
+⭐ 4,500 XP
+🔬 Research Opportunity — Autonomous Colony Management
+Allow the colony to identify and respond to a developing cascade without direct player intervention.
++3 Tokens
+Hard condition:
+The automated system successfully prevents a critical-system loss.
+Reward
+Advanced Colony Management
+
+🔴 MARS 15 — MARS RISING
+THE FINAL MISSION
+The colony must survive:
+ONE COMPLETE MARTIAN YEAR
+with zero external resupply.
+It must maintain:
+Food
+Water
+Oxygen
+Power
+Manufacturing
+Maintenance
+Agriculture
+Resource extraction
+Communications
+Multiple settlements
+Emergency resilience
+💰 $75M
+⭐ 5,000 XP
+🔬 FINAL RESEARCH OPPORTUNITY — MARS BIOSPHERE
+This is the hardest Research Opportunity in the entire game.
+Create an integrated system in which:
+Food → Waste → Recycling → Water → Oxygen → CO₂ → Agriculture → Food
+forms a highly efficient colony loop.
+Reward
++5 Research Tokens
+Hard condition
+You must complete the entire Martian year while:
+maintaining all critical systems
+producing enough food
+producing enough water
+producing enough oxygen
+maintaining power
+maintaining both settlements
+requiring zero external resupply
+Final technology reward
+🌍 CLOSED-LOOP COLONY CORE
+The ultimate Research technology.
