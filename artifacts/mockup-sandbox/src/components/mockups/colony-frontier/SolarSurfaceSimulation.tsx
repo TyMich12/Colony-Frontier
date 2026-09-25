@@ -98,11 +98,11 @@ function Readout({
   );
 }
 
-function DustStormCoating({ dust }: { dust: number }) {
+function DustStormCoating({ dust, terrain }: { dust: number; terrain: TerrainKind }) {
   const amount = Math.max(0, Math.min(1, dust / 100));
   if (amount <= 0.001) return null;
 
-  const opacity = 0.04 + Math.pow(amount, 0.7) * 0.58;
+  const opacity = terrain === "moon"\n    ? 0.10 + Math.pow(amount, 0.7) * 0.72\n    : 0.04 + Math.pow(amount, 0.7) * 0.58;
   const material = (
     <meshStandardMaterial
       color="#b48762"
@@ -118,11 +118,11 @@ function DustStormCoating({ dust }: { dust: number }) {
     <group>
       {/* Dust settling over the central base and equipment stack */}
       <mesh position={[0, 0.12, 0]} scale={[1.02, 1.02, 1.02]}>
-        <cylinderGeometry args={[3.55, 3.95, 0.36, 40]} />
+        <cylinderGeometry args={[3.4, 3.8, 0.30, 40]} />
         {material}
       </mesh>
       <mesh position={[0, 1.7, 0]} scale={[1.06, 1.04, 1.06]}>
-        <cylinderGeometry args={[1.56, 1.86, 3.18, 16]} />
+        <cylinderGeometry args={[1.5, 1.8, 3.1, 12]} />
         {material}
       </mesh>
       <mesh position={[0, 4.2, 0]} scale={1.08}>
@@ -216,7 +216,7 @@ function SolarScene({
         <Terrain kind={terrain} />
         <Rocks kind={terrain} />
         <DustParticles kind={terrain} dust={dust} />
-        <DustStormCoating dust={dust} />
+        <DustStormCoating dust={dust} terrain={terrain} />
       </group>
 
       <OrbitControls
