@@ -167,10 +167,10 @@ export function makeDustTexture(kind: "moon" | "mars", size = 384) {
       const streak = fbm(nx * 2.2 + ny * 5, ny * 14, 3);
       // Dense, irregular deposition: dust should become visibly widespread rather
       // than looking like a few isolated transparent patches at moderate loading.
-      const deposit = Math.max(0, (coarse * 0.58 + fine * 0.18 + streak * 0.24) - 0.18) / 0.82;
-      const clumps = Math.pow(Math.max(0, Math.min(1, deposit)), 0.35);
-      const alpha = Math.max(0, Math.min(255, clumps * 285));
-      const grain = (fine - 0.5) * 18;
+      const deposit = Math.max(0, (coarse * 0.60 + fine * 0.15 + streak * 0.25) - 0.34) / 0.66;
+      const clumps = Math.pow(Math.max(0, Math.min(1, deposit)), 0.80);
+      const alpha = Math.max(0, Math.min(255, clumps * 255));
+      const grain = (fine - 0.5) * 28 + (coarse - 0.5) * 14;
       const i = (y * size + x) * 4;
       image.data[i] = Math.max(0, Math.min(255, base[0] + grain));
       image.data[i + 1] = Math.max(0, Math.min(255, base[1] + grain));
