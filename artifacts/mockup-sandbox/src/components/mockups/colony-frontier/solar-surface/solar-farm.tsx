@@ -32,6 +32,7 @@ interface FarmProps {
   tier: SolarTier;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
+  dustGenerationKey: number;
 }
 
 export function SolarFarm({
@@ -42,6 +43,7 @@ export function SolarFarm({
   tier,
   onComponentSelect,
   selectedComponentName,
+  dustGenerationKey,
 }: FarmProps) {
   const cellMap = useMemo(() => makeSolarCellTexture(), []);
   const cellEmissive = useMemo(() => makeCellEmissiveTexture(), []);
@@ -171,6 +173,9 @@ export function SolarFarm({
           frameMaterial={frameMaterial}
           boomMaterial={boomMaterial}
           dustMaterial={dustMaterial}
+          terrain={terrain}
+          wingIndex={i}
+          dustGenerationKey={dustGenerationKey}
           onSelect={onComponentSelect}
           selectedComponentName={selectedComponentName}
         />
