@@ -3,7 +3,6 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { solarLive, type TerrainKind } from "./state";
 import { makeDustTexture } from "./textures";
-import { makeDustAwareMaterial, updateDustStrength } from "./dust-material";
 
 type HubProps = {
   dust: number;
@@ -50,20 +49,24 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
   const indicatorRef = useRef<THREE.MeshStandardMaterial>(null);
   const gridRef = useRef<THREE.MeshStandardMaterial>(null);
   const dustTexture = useMemo(() => makeDustTexture(terrain), [terrain]);
-  const dustColor = terrain === "moon" ? "#b7b1a4" : "#c08a5c";
+  const dustMaterial = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: dustTexture,
+        color: "#ffffff",
+        roughness: 1,
+        metalness: 0,
+        alphaTest: 0.9,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      }),
+    [dustTexture],
+  );
 
-  const metal = useMemo(
-    () => makeDustAwareMaterial({ color: "#c9ccd2", metalness: 0.85, roughness: 0.35 }, dustTexture, dustColor),
-    [dustTexture, dustColor],
-  );
-  const dark = useMemo(
-    () => makeDustAwareMaterial({ color: "#3a3d44", metalness: 0.7, roughness: 0.5 }, dustTexture, dustColor),
-    [dustTexture, dustColor],
-  );
-  const gold = useMemo(
-    () => makeDustAwareMaterial({ color: "#caa14a", metalness: 0.9, roughness: 0.25 }, dustTexture, dustColor),
-    [dustTexture, dustColor],
-  );
+  const metal = useMemo(() => new THREE.MeshStandardMaterial({ color: "#c9ccd2", metalness: 0.85, roughness: 0.35 }), []);
+  const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3d44", metalness: 0.7, roughness: 0.5 }), []);
+  const gold = useMemo(() => new THREE.MeshStandardMaterial({ color: "#caa14a", metalness: 0.9, roughness: 0.25 }), []);
 
   const select = (event: { stopPropagation: () => void }, info: string[]) => {
     event.stopPropagation();
@@ -71,9 +74,11 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
   };
 
   useFrame((state) => {
-    updateDustStrength(metal, dust);
-    updateDustStrength(dark, dust);
-    updateDustStrength(gold, dust);
+    dustMaterial.alphaTest = Math.max(
+      0.08,
+      0.9 - Math.pow(Math.max(0, dust / 100), 0.58) * 0.78,
+    );
+    dustMaterial.needsUpdate = true;
     const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
     if (indicatorRef.current) indicatorRef.current.emissiveIntensity = 0.6 + pulse * 1.4;
     if (gridRef.current) gridRef.current.emissiveIntensity = 0.15 + (solarLive.powerKW / 100) * 0.9;
@@ -85,9 +90,23 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
         <cylinderGeometry args={[3.4, 3.8, 0.3, 40]} />
       </mesh>
       <HubHighlight name={details.base[0]} selected={selectedComponentName === details.base[0]} />
+      <mesh position={[0, 0.205, 0]} material={dustMaterial}>
+        <cylinderGeometry args={[3.4, 3.4, 0.012, 40]} />
+      </mesh>
+
+
 
       <mesh position={[0, 1.7, 0]} castShadow receiveShadow material={metal} onClick={(e) => select(e, details.power)}>
         <cylinderGeometry args={[1.5, 1.8, 3.1, 12]} />
+      </mesh>
+      <mesh position={[0, 1.7, 0]} scale={[1.002, 1.002, 1.002]} material={dustMaterial}>
+        <cylinderGeometry args={[1.5, 1.8, 3.1, 12]} />
+      </mesh>
+      <mesh position={[0, 1.35, 0]} material={dustMaterial}>
+        <cylinderGeometry args={[1.85, 1.85, 0.012, 12]} />
+      </mesh>
+      <mesh position={[0, 3.602, 0]} material={dustMaterial}>
+        <cylinderGeometry args={[2.15, 2.15, 0.012, 12]} />
       </mesh>
       <HubHighlight name={details.power[0]} selected={selectedComponentName === details.power[0]} />
 
@@ -101,6 +120,12 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
 
       <mesh position={[0, 4.2, 0]} castShadow material={metal} onClick={(e) => select(e, details.avionics)}>
         <boxGeometry args={[1.2, 1.2, 1.2]} />
+      </mesh>
+      <mesh position={[0, 4.2, 0]} scale={[1.003, 1.003, 1.003]} material={dustMaterial}>
+        <boxGeometry args={[1.2, 1.2, 1.2]} />
+      </mesh>
+      <mesh position={[0, 4.805, 0]} material={dustMaterial}>
+        <boxGeometry args={[1.2, 0.012, 1.2]} />
       </mesh>
       <HubHighlight name={details.avionics[0]} selected={selectedComponentName === details.avionics[0]} />
 
@@ -129,8 +154,17 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
               <boxGeometry args={[1.1, 1.3, 1.6]} />
             </mesh>
             <HubHighlight name={details.drive[0]} selected={selectedComponentName === details.drive[0]} />
+            <mesh position={[2.6, 1.405, 0]} material={dustMaterial}>
+              <boxGeometry args={[1.1, 0.012, 1.6]} />
+            </mesh>
+            <mesh position={[2.6, 0.75, 0]} scale={[1.003, 1.003, 1.003]} material={dustMaterial}>
+              <boxGeometry args={[1.1, 1.3, 1.6]} />
+            </mesh>
             {[-0.5, -0.17, 0.17, 0.5].map((z, j) => (
               <mesh key={j} position={[3.18, 0.75, z]} castShadow material={metal}>
+                <boxGeometry args={[0.06, 1.1, 0.22]} />
+              </mesh>
+              <mesh key={`dust-rib-${j}`} position={[3.18, 0.75, z]} scale={[1.01, 1.01, 1.01]} material={dustMaterial}>
                 <boxGeometry args={[0.06, 1.1, 0.22]} />
               </mesh>
             ))}
@@ -146,6 +180,9 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
               <boxGeometry args={[2.6, 1.6, 0.05]} />
             </mesh>
             <HubHighlight name={details.radiator[0]} selected={selectedComponentName === details.radiator[0]} />
+            <mesh position={[2.4, 2.6, 0]} scale={[1.003, 1.003, 1.02]} material={dustMaterial}>
+              <boxGeometry args={[2.6, 1.6, 0.05]} />
+            </mesh>
             {[-0.6, -0.2, 0.2, 0.6].map((y, j) => (
               <mesh key={j} position={[2.4, 2.6 + y, 0.05]} material={dark}>
                 <boxGeometry args={[2.5, 0.06, 0.06]} />
@@ -160,7 +197,11 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
         return (
           <group key={i} rotation={[0, a, 0]}>
             <mesh position={[2.4, 0.0, 0]} rotation={[0, 0, Math.PI / 5]} castShadow material={metal} />
+            <mesh position={[2.4, 0.01, 0]} rotation={[0, 0, Math.PI / 5]} material={dustMaterial}>
+              <boxGeometry args={[0.34, 1.1, 0.02]} />
+            </mesh>
             <mesh position={[3.2, -0.85, 0]} castShadow material={dark} />
+            <mesh position={[3.2, -0.85, 0]} scale={[1.003, 1.003, 1.003]} material={dustMaterial} />
           </group>
         );
       })}
