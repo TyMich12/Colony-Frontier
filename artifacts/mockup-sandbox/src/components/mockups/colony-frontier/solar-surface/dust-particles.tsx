@@ -5,7 +5,7 @@ import { mulberry32 } from "./noise";
 import { terrainHeight } from "./terrain";
 import type { TerrainKind } from "./state";
 
-const COUNT = 600;
+const COUNT = 2400;
 
 export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number }) {
   const matRef = useRef<THREE.PointsMaterial>(null);
@@ -21,9 +21,9 @@ export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number 
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       pos[i * 3] = x;
-      pos[i * 3 + 1] = terrainHeight(x, z) + rnd() * 5;
+      pos[i * 3 + 1] = terrainHeight(x, z) + 0.4 + rnd() * 10;
       pos[i * 3 + 2] = z;
-      spd[i] = 0.05 + rnd() * 0.25;
+      spd[i] = 0.08 + rnd() * 0.55;
     }
 
     return { positions: pos, speeds: spd };
@@ -43,13 +43,13 @@ export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number 
       const x = arr.getX(i);
       const z = arr.getZ(i);
       const floor = terrainHeight(x, z);
-      if (y > floor + 6) y = floor;
+      if (y > floor + 10) y = floor + 0.4;
       arr.setY(i, y);
     }
 
     arr.needsUpdate = true;
     if (matRef.current) {
-      matRef.current.opacity = 0.15 + (dust / 100) * 0.55;
+      matRef.current.opacity = 0.12 + (dust / 100) * 0.78;
     }
   });
 
@@ -57,7 +57,7 @@ export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number 
     <points geometry={geometry}>
       <pointsMaterial
         ref={matRef}
-        size={0.09}
+        size={0.15}
         color={kind === "moon" ? "#b8b2a6" : "#c98a5e"}
         transparent
         opacity={0.2}
