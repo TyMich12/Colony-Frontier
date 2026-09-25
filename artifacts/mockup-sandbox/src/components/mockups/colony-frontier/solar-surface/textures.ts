@@ -249,7 +249,9 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
 
       // Keep the layer particulate: strong density changes create visible
       // islands, feathered edges and thin translucent gaps instead of a flat tint.
-      const density = Math.pow(powder, 0.92);
+      // Push the high end toward a storm-like, nearly continuous deposit while retaining
+      // irregular holes, streaks and grains so it still reads as real particulate dust.
+      const density = Math.pow(powder, 0.72);
       const localShade =
         (mediumA - 0.5) * 30 +
         (mediumB - 0.5) * 24 +
