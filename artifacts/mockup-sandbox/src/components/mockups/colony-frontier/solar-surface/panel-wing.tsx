@@ -127,7 +127,7 @@ function PanelSegment({
   const info = panelInfo(segmentIndex);
   const dustVariation = useMemo(() => {
     const seed = Math.sin((segmentIndex + 1) * 91.731) * 43758.5453;
-    return 0.62 + (seed - Math.floor(seed)) * 0.56;
+    return 0.35 + (seed - Math.floor(seed)) * 1.15;
   }, [segmentIndex]);
 
   const localDustMaterial = useMemo(() => {
@@ -140,14 +140,14 @@ function PanelSegment({
       const seedB = Math.sin((segmentIndex + 1) * 43.91) * 43758.5453;
       const seedC = Math.sin((segmentIndex + 1) * 71.33) * 43758.5453;
       material.map.offset.set(
-        (seedA - Math.floor(seedA)) * 6,
-        (seedB - Math.floor(seedB)) * 6,
+        (seedA - Math.floor(seedA)) * 14,
+        (seedB - Math.floor(seedB)) * 14,
       );
       material.map.repeat.set(
-        1.15 + (seedC - Math.floor(seedC)) * 1.25,
-        1.15 + (1 - (seedC - Math.floor(seedC))) * 1.25,
+        0.72 + (seedC - Math.floor(seedC)) * 1.75,
+        0.72 + (1 - (seedC - Math.floor(seedC))) * 1.75,
       );
-      material.map.rotation = ((seedA - Math.floor(seedA)) - 0.5) * 0.3;
+      material.map.rotation = ((seedA - Math.floor(seedA)) - 0.5) * 1.05;
     }
     return material;
   }, [dustMaterial, segmentIndex]);
