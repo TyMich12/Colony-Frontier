@@ -17,8 +17,9 @@ import {
 } from "./_shared/GameShell";
 
 type MissionStatus = "current" | "locked";
+type CampaignId = "moon" | "mars";
 
-type MoonMission = {
+type Mission = {
   number: string;
   title: string;
   status: MissionStatus;
@@ -33,7 +34,7 @@ type MoonMission = {
   prerequisite?: string;
 };
 
-const missions: MoonMission[] = [
+const moonMissions: Mission[] = [
   {
     number: "01",
     title: "Survival",
@@ -77,7 +78,7 @@ const missions: MoonMission[] = [
   },
   {
     number: "04",
-    title: "The Fourth Signal",
+    title: "Contamination",
     status: "locked",
     duration: "35 Earth days",
     credits: "$16M",
@@ -91,7 +92,7 @@ const missions: MoonMission[] = [
   },
   {
     number: "05",
-    title: "The Quiet Margin",
+    title: "Impact",
     status: "locked",
     duration: "45 Earth days",
     credits: "$18M",
@@ -101,11 +102,11 @@ const missions: MoonMission[] = [
     objective: "Detect, isolate, and repair an unexpected structural anomaly.",
     opportunity: "Structural Impact Analysis",
     technology: "Improved Habitat Structure",
-    prerequisite: "Complete The Fourth Signal",
+    prerequisite: "Complete Contamination",
   },
   {
     number: "06",
-    title: "The Long Arc",
+    title: "Stormfall",
     status: "locked",
     duration: "60 Earth days",
     credits: "$20M",
@@ -115,7 +116,7 @@ const missions: MoonMission[] = [
     objective: "Keep crew and critical systems within safe operating limits.",
     opportunity: "Radiation Mapping",
     technology: "Regolith Shielding",
-    prerequisite: "Complete The Quiet Margin",
+    prerequisite: "Complete Impact",
   },
   {
     number: "07",
@@ -129,7 +130,7 @@ const missions: MoonMission[] = [
     objective: "Turn local material and limited reserves into a growing colony.",
     opportunity: "Local Resource Discovery",
     technology: "Local Resource Processing",
-    prerequisite: "Complete The Long Arc",
+    prerequisite: "Complete Stormfall",
   },
   {
     number: "08",
@@ -147,16 +148,268 @@ const missions: MoonMission[] = [
   },
 ];
 
+const marsMissions: Mission[] = [
+  {
+    number: "01",
+    title: "Arrival",
+    status: "locked",
+    duration: "30 Earth days",
+    credits: "$20M",
+    xp: "1,000",
+    research: "+1",
+    difficulty: 2,
+    objective: "Land on Mars and survive 30 Earth days.",
+    opportunity: "Martian Landing Site Survey",
+    technology: "Improved Power Management",
+    prerequisite: "Complete the Moon Campaign",
+  },
+  {
+    number: "02",
+    title: "The Dust",
+    status: "locked",
+    duration: "45 Earth days",
+    credits: "$22M",
+    xp: "1,250",
+    research: "+1",
+    difficulty: 3,
+    objective: "Manage falling solar output caused by atmospheric dust.",
+    opportunity: "Dust Composition Analysis",
+    technology: "Dust-Resistant Solar",
+    prerequisite: "Complete Arrival",
+  },
+  {
+    number: "03",
+    title: "The Water Search",
+    status: "locked",
+    duration: "60 Earth days",
+    credits: "$25M",
+    xp: "1,500",
+    research: "+1",
+    difficulty: 3,
+    objective: "Find accessible subsurface ice and return a verified sample.",
+    opportunity: "Ice Deposit Characterisation",
+    technology: "Ice Extraction",
+    prerequisite: "Complete The Dust",
+  },
+  {
+    number: "04",
+    title: "Martian Winter",
+    status: "locked",
+    duration: "90 Earth days",
+    credits: "$28M",
+    xp: "1,750",
+    research: "+1",
+    difficulty: 4,
+    objective: "Survive extreme cold threatening habitat, batteries, and machinery.",
+    opportunity: "Subsurface Thermal Study",
+    technology: "Advanced Thermal Regulation",
+    prerequisite: "Complete The Water Search",
+  },
+  {
+    number: "05",
+    title: "The Rover Network",
+    status: "locked",
+    duration: "120 Earth days",
+    credits: "$31M",
+    xp: "2,000",
+    research: "+1",
+    difficulty: 4,
+    objective: "Operate multiple rovers with charging, routing, and recovery.",
+    opportunity: "Autonomous Navigation Trial",
+    technology: "Autonomous Rover Technology",
+    prerequisite: "Complete Martian Winter",
+  },
+  {
+    number: "06",
+    title: "Dust Storm",
+    status: "locked",
+    duration: "150 Earth days",
+    credits: "$34M",
+    xp: "2,250",
+    research: "+2",
+    difficulty: 5,
+    objective: "Prepare the colony for a major approaching storm.",
+    opportunity: "Storm Prediction Model",
+    technology: "Storm Prediction System",
+    prerequisite: "Complete The Rover Network",
+  },
+  {
+    number: "07",
+    title: "The Greenhouse",
+    status: "locked",
+    duration: "180 Earth days",
+    credits: "$37M",
+    xp: "2,500",
+    research: "+2",
+    difficulty: 5,
+    objective: "Make agriculture a major part of the colony.",
+    opportunity: "Closed-Loop Agriculture Experiment",
+    technology: "Closed-Loop Agriculture",
+    prerequisite: "Complete Dust Storm",
+  },
+  {
+    number: "08",
+    title: "Habitat Breach",
+    status: "locked",
+    duration: "210 Earth days",
+    credits: "$40M",
+    xp: "2,750",
+    research: "+2",
+    difficulty: 6,
+    objective: "Detect, isolate, and repair a structural failure.",
+    opportunity: "Habitat Failure Analysis",
+    technology: "Modular Habitat System",
+    prerequisite: "Complete The Greenhouse",
+  },
+  {
+    number: "09",
+    title: "ISRU",
+    status: "locked",
+    duration: "240 Earth days",
+    credits: "$43M",
+    xp: "3,000",
+    research: "+2",
+    difficulty: 6,
+    objective: "Turn Mars itself into your supply chain.",
+    opportunity: "New Resource Discovery",
+    technology: "Advanced ISRU",
+    prerequisite: "Complete Habitat Breach",
+  },
+  {
+    number: "10",
+    title: "The Supply Gap",
+    status: "locked",
+    duration: "270 Earth days",
+    credits: "$46M",
+    xp: "3,250",
+    research: "+2",
+    difficulty: 7,
+    objective: "Manage the colony without normal resupply from Earth.",
+    opportunity: "Advanced Waste Recovery",
+    technology: "Advanced Recycling",
+    prerequisite: "Complete ISRU",
+  },
+  {
+    number: "11",
+    title: "The Great Dust Storm",
+    status: "locked",
+    duration: "300 Earth days",
+    credits: "$50M",
+    xp: "3,500",
+    research: "+3",
+    difficulty: 7,
+    objective: "Survive the major Mars cascade across all colony systems.",
+    opportunity: "Cascade Prediction",
+    technology: "Planetary Resilience",
+    prerequisite: "Complete The Supply Gap",
+  },
+  {
+    number: "12",
+    title: "The Expansion",
+    status: "locked",
+    duration: "330 Earth days",
+    credits: "$55M",
+    xp: "3,750",
+    research: "+3",
+    difficulty: 8,
+    objective: "Build a second settlement and share resources between them.",
+    opportunity: "Inter-Settlement Optimisation",
+    technology: "Colony Grid Architecture",
+    prerequisite: "Complete The Great Dust Storm",
+  },
+  {
+    number: "13",
+    title: "The Independent Colony",
+    status: "locked",
+    duration: "1 Earth year",
+    credits: "$60M",
+    xp: "4,000",
+    research: "+3",
+    difficulty: 8,
+    objective: "Achieve autonomy with no meaningful emergency support from Earth.",
+    opportunity: "Local Manufacturing Breakthrough",
+    technology: "Self-Sufficient Colony Technology",
+    prerequisite: "Complete The Expansion",
+  },
+  {
+    number: "14",
+    title: "Cascade",
+    status: "locked",
+    duration: "1 Earth year",
+    credits: "$65M",
+    xp: "4,500",
+    research: "+3",
+    difficulty: 9,
+    objective: "Triage multiple simultaneous system failures. Not everything can be saved.",
+    opportunity: "Autonomous Colony Management",
+    technology: "Advanced Colony Management",
+    prerequisite: "Complete The Independent Colony",
+  },
+  {
+    number: "15",
+    title: "Mars Rising",
+    status: "locked",
+    duration: "1 Martian year (~687 Earth days)",
+    credits: "$75M",
+    xp: "5,000",
+    research: "+5",
+    difficulty: 10,
+    objective: "Survive one complete Martian year with zero external resupply.",
+    opportunity: "Mars Biosphere — Final Research Opportunity",
+    technology: "Closed-Loop Colony Core",
+    prerequisite: "Complete Cascade",
+  },
+];
+
+const campaignMeta: Record<
+  CampaignId,
+  { label: string; eyebrow: string; title: string; total: string; maxDifficulty: number }
+> = {
+  moon: {
+    label: "Moon",
+    eyebrow: "Campaign // Lunar Operations",
+    title: "Moon Campaign",
+    total: "08",
+    maxDifficulty: 5,
+  },
+  mars: {
+    label: "Mars",
+    eyebrow: "Campaign // Martian Operations",
+    title: "Mars Campaign",
+    total: "15",
+    maxDifficulty: 10,
+  },
+};
+
+function difficultyStars(difficulty: number, max: number) {
+  const filled = Math.min(difficulty, max);
+  const empty = Math.max(0, max - filled);
+  return (
+    <>
+      <span className="text-[#efb658]">{"★".repeat(filled)}</span>
+      <span className="text-[#405d60]">{"★".repeat(empty)}</span>
+    </>
+  );
+}
+
 export function CampaignMapRefresh() {
+  const [campaign, setCampaign] = useState<CampaignId>("moon");
   const [selected, setSelected] = useState("01");
+  const missions = campaign === "moon" ? moonMissions : marsMissions;
+  const meta = campaignMeta[campaign];
   const activeMission =
     missions.find((mission) => mission.number === selected) ?? missions[0];
+
+  function switchCampaign(id: CampaignId) {
+    setCampaign(id);
+    setSelected("01");
+  }
 
   return (
     <GameShell
       active="campaign"
-      eyebrow="Campaign // Lunar Operations"
-      title="Moon Campaign"
+      eyebrow={meta.eyebrow}
+      title={meta.title}
     >
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#47553d] bg-[#172a2a] px-5 py-4">
         <div className="flex items-center gap-3">
@@ -165,9 +418,30 @@ export function CampaignMapRefresh() {
             Research opportunities are optional
           </p>
         </div>
-        <p className="text-[10px] uppercase tracking-[0.16em] text-[#9fba9e]">
-          They are the only source of Research Tokens
-        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => switchCampaign("moon")}
+            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
+              campaign === "moon"
+                ? "bg-[#efb658] text-[#17201b]"
+                : "border border-[#34545a] text-[#8aaba8] hover:text-[#d5e5ce]"
+            }`}
+          >
+            Moon
+          </button>
+          <button
+            type="button"
+            onClick={() => switchCampaign("mars")}
+            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
+              campaign === "mars"
+                ? "bg-[#efb658] text-[#17201b]"
+                : "border border-[#34545a] text-[#8aaba8] hover:text-[#d5e5ce]"
+            }`}
+          >
+            Mars
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
@@ -178,12 +452,12 @@ export function CampaignMapRefresh() {
                 Operation status
               </p>
               <p className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-[#dce9dc]">
-                Mission 01 / 08 · starting route
+                Mission 01 / {meta.total} · starting route
               </p>
             </div>
             <div className="w-36">
               <div className="mb-2 flex justify-between text-[9px] uppercase tracking-[0.2em] text-[#799394]">
-                <span>Moon progress</span>
+                <span>{meta.label} progress</span>
                 <span className="text-[#efb658]">0%</span>
               </div>
               <ProgressBar value={0} />
@@ -193,12 +467,20 @@ export function CampaignMapRefresh() {
           <div className="relative overflow-hidden border border-[#29474e] bg-[#09151d] px-5 py-8 sm:px-8">
             <div className="mb-7 flex items-center justify-between">
               <div>
-                <SectionLabel>Lunar route // Mare Tranquillitatis</SectionLabel>
+                <SectionLabel>
+                  {campaign === "moon"
+                    ? "Lunar route // Mare Tranquillitatis"
+                    : "Martian route // Utopia Planitia"}
+                </SectionLabel>
                 <p className="text-xs text-[#789091]">
                   Titles reveal intent only after the mission is earned.
                 </p>
               </div>
-              <Moon className="h-7 w-7 text-[#d7e7c0]" strokeWidth={1.1} />
+              {campaign === "moon" ? (
+                <Moon className="h-7 w-7 text-[#d7e7c0]" strokeWidth={1.1} />
+              ) : (
+                <Target className="h-7 w-7 text-[#d77a5a]" strokeWidth={1.1} />
+              )}
             </div>
 
             <div className="relative min-h-[420px]">
@@ -224,6 +506,8 @@ export function CampaignMapRefresh() {
               </svg>
               {missions.map((mission) => {
                 const isSelected = mission.number === selected;
+                const count = missions.length;
+                const leftPct = 6 + ((Number(mission.number) - 1) / (count - 1)) * 88;
                 return (
                   <button
                     key={mission.number}
@@ -233,7 +517,7 @@ export function CampaignMapRefresh() {
                       isSelected ? "scale-110" : ""
                     }`}
                     style={{
-                      left: `${6 + (Number(mission.number) - 1) * 12.5}%`,
+                      left: `${leftPct}%`,
                       top: Number(mission.number) % 2 ? "52%" : "30%",
                     }}
                     aria-label={`Select mission ${mission.number}, ${mission.title}`}
@@ -280,13 +564,15 @@ export function CampaignMapRefresh() {
             <Trophy className="h-5 w-5 shrink-0 text-[#efb658]" />
             <div className="flex-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#efb658]">
-                Moon complete
+                {campaign === "moon" ? "Moon complete" : "Mars complete"}
               </p>
               <p className="mt-1 text-xs text-[#9a9f87]">
-                Complete all eight lunar missions to authorize Mars.
+                {campaign === "moon"
+                  ? "Complete all eight lunar missions to authorize Mars."
+                  : "Complete all fifteen Martian missions to achieve planetary independence."}
               </p>
             </div>
-            <LinkArrow />
+            {campaign === "moon" && <LinkArrow />}
           </div>
         </section>
 
@@ -296,7 +582,7 @@ export function CampaignMapRefresh() {
               <CircleDot className="h-3 w-3" /> Mission brief
             </p>
             <p className="text-[10px] uppercase tracking-[0.2em] text-[#718c8d]">
-              Mission {activeMission.number} / 08
+              Mission {activeMission.number} / {meta.total}
             </p>
             <h2 className="mt-2 text-2xl font-semibold uppercase tracking-[0.13em] text-[#eef3e7]">
               {activeMission.title}
@@ -331,11 +617,8 @@ export function CampaignMapRefresh() {
                     <p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">
                       Difficulty
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-[#efb658]">
-                      {"★".repeat(activeMission.difficulty)}
-                      <span className="text-[#405d60]">
-                        {"★".repeat(5 - activeMission.difficulty)}
-                      </span>
+                    <p className="mt-2 text-sm font-semibold">
+                      {difficultyStars(activeMission.difficulty, meta.maxDifficulty)}
                     </p>
                   </div>
                   <div className="border border-[#29434a] bg-[#0f2429] p-3">
@@ -405,7 +688,7 @@ export function CampaignMapRefresh() {
                   </div>
                 </div>
                 <a
-                  href="/__mockup/preview/colony-frontier/MissionLoadoutRefresh"
+                  href="/__mockup/preview/colony-frontier/MissionLoadout"
                   className="flex w-full items-center justify-between bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#1a211d] transition hover:bg-[#f6cb7b]"
                 >
                   Prepare Mission 01 <Target className="h-4 w-4" />

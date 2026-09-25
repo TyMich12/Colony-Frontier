@@ -3,7 +3,6 @@ import {
   Battery,
   Car,
   Check,
-  ChevronDown,
   Cloud,
   Compass,
   Droplets,
@@ -58,8 +57,8 @@ const categoryIcons = {
 } as const;
 
 const tierOrder: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
-const currentXp = 0;
-const currentTokens = 0;
+const currentXp = 4500;
+const currentTokens = 3;
 
 function Metric({
   label,
@@ -109,12 +108,14 @@ function EquipmentRow({
     <button
       type="button"
       onClick={onSelect}
-      onFocus={onSelect}
+      disabled={!isUnlocked}
       className={`group relative w-full border p-4 text-left transition ${
         isSelected
           ? "border-[#d3e49f] bg-[#182f2f] shadow-[inset_3px_0_0_#efb658]"
-          : "border-[#29434a] bg-[#0d2028] hover:border-[#90b4a2] hover:bg-[#122a2e]"
-      } ${!isUnlocked ? "opacity-75" : ""}`}
+          : isUnlocked
+            ? "border-[#29434a] bg-[#0d2028] hover:border-[#90b4a2] hover:bg-[#122a2e]"
+            : "border-[#29434a] bg-[#0d2028] opacity-60"
+      } ${!isUnlocked ? "cursor-not-allowed" : ""}`}
       aria-label={`${equipment.name}, ${tier} tier`}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -151,9 +152,8 @@ function EquipmentRow({
             </p>
           </div>
         </div>
-        <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#9bb5ac]">
-          Hover / focus
-          <ChevronDown className="h-3 w-3 transition-transform group-hover:rotate-180 group-focus:rotate-180" />
+        <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#9bb5ac]">
+          {isSelected ? "Selected" : isUnlocked ? "Select" : "Locked"}
         </span>
       </div>
 
@@ -164,19 +164,9 @@ function EquipmentRow({
         <Metric label="Slot" value={isSelected ? "Selected" : "Available"} />
       </div>
 
-      <div className="pointer-events-none absolute left-6 right-6 top-[calc(100%-1px)] z-20 hidden border border-[#6f8058] bg-[#162d30] p-4 text-left shadow-[0_18px_38px_rgba(0,0,0,0.42)] group-hover:block group-focus-within:block">
-        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#efb658]">
-          Field brief · {equipment.name}
-        </p>
-        <p className="mt-2 text-xs leading-5 text-[#c1d1bd]">
-          {equipment.description}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[9px] uppercase tracking-[0.14em] text-[#8da8a0]">
-          <span>{equipment.mass.toLocaleString()} kg aboard</span>
-          <span>{formatCredits(equipment.cost)} procurement</span>
-          <span>{equipment.efficiency}</span>
-        </div>
-      </div>
+      <p className="mt-3 border-l-2 border-[#526c5a] bg-[#10252a] px-3 py-2 text-xs leading-5 text-[#a9c0b5]">
+        {equipment.description}
+      </p>
     </button>
   );
 }
@@ -266,8 +256,8 @@ export function TechnologyLab() {
                 Colony research
               </p>
               <p className="font-mono text-sm text-[#e8efdd]">
-                {currentXp.toLocaleString()}{" "}
-                <span className="text-[#76908e]">/ 10,000 XP</span>
+                {currentXp.toLocaleString()} XP{" "}
+                <span className="text-[#76908e]">· {currentTokens} tokens</span>
               </p>
             </div>
           </div>
@@ -306,21 +296,16 @@ export function TechnologyLab() {
             </p>
             <div className="mt-5 space-y-4 border-t border-[#514635] pt-4">
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
-                <span className="text-[#8e978a]">Experience</span>
-                <span className="font-mono text-[#f1d47c]">0 / 10,000 XP</span>
+                <span className="text-[#8e978a]">Experience earned</span>
+                <span className="font-mono text-[#f1d47c]">
+                  {currentXp.toLocaleString()} XP
+                </span>
               </div>
-              <ProgressBar value={0} color="#efbd5d" />
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
-                <span className="text-[#8e978a]">Research tokens</span>
-                <span className="font-mono text-[#f1d47c]">0 secured</span>
-              </div>
-              <div className="flex gap-1.5">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <span
-                    key={index}
-                    className="h-2 flex-1 border border-[#655844]"
-                  />
-                ))}
+                <span className="text-[#8e978a]">Research tokens earned</span>
+                <span className="font-mono text-[#f1d47c]">
+                  {currentTokens}
+                </span>
               </div>
             </div>
           </section>
@@ -348,7 +333,7 @@ export function TechnologyLab() {
         </aside>
       </div>
       <div className="mt-7 flex items-center justify-between border-t border-[#29434a] pt-4 text-[9px] uppercase tracking-[0.22em] text-[#657e7e]">
-        <span>Hover any equipment row for field efficiency and procurement data</span>
+        <span>All details shown inline · no hover popup in the lab</span>
         <span>{selectedTier} selected</span>
       </div>
     </GameShell>

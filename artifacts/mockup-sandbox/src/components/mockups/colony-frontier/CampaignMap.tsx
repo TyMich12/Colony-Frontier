@@ -7,11 +7,9 @@ import {
   LockKeyhole,
   Moon,
   ShieldCheck,
-  Snowflake,
   Sparkles,
   Target,
   Trophy,
-  Waves,
   Zap,
 } from "lucide-react";
 import {
@@ -32,21 +30,23 @@ type Mission = {
   y: string;
   prerequisite?: string;
   objective: string;
+  duration: string;
   reward: string;
   xp: string;
   token: string;
   technology: string;
+  difficulty: number;
 };
 
 const missions: Mission[] = [
-  { number: "01", title: "Survival", subtitle: "First Light", status: "current", x: "6%", y: "49%", objective: "Stabilize the landing site and bring every Foundation system online.", reward: "$8M", xp: "500", token: "0", technology: "Foundation systems" },
-  { number: "02", title: "The Long Night", subtitle: "Hold the heat", status: "locked", x: "17%", y: "27%", prerequisite: "Complete Survival", objective: "Maintain heat and power through the first lunar night.", reward: "$10M", xp: "750", token: "+1", technology: "Thermal Control" },
-  { number: "03", title: "The Shadow", subtitle: "Ice below", status: "locked", x: "31%", y: "55%", prerequisite: "Complete The Long Night", objective: "Locate and extract subsurface ice before the thermal window closes.", reward: "$14M", xp: "1,000", token: "+1", technology: "Water / Ice Extraction" },
-  { number: "04", title: "Dust + Power Failure", subtitle: "Keep the grid alive", status: "locked", x: "45%", y: "23%", prerequisite: "Complete The Shadow", objective: "Restore power distribution during a high-dust equipment failure.", reward: "$16M", xp: "1,250", token: "+1", technology: "Power Grid" },
-  { number: "05", title: "Meteoroid Damage", subtitle: "Patch the breach", status: "locked", x: "59%", y: "52%", prerequisite: "Complete Dust + Power Failure", objective: "Repair a damaged habitat shell before pressure loss becomes critical.", reward: "$18M", xp: "1,500", token: "+1", technology: "Habitat Protection" },
-  { number: "06", title: "Radiation Event", subtitle: "Under the storm", status: "locked", x: "70%", y: "28%", prerequisite: "Complete Meteoroid Damage", objective: "Protect crew and systems through a major radiation event.", reward: "$20M", xp: "1,750", token: "+1", technology: "Radiation Shielding" },
-  { number: "07", title: "Resource Crisis", subtitle: "Make more from less", status: "locked", x: "82%", y: "52%", prerequisite: "Complete Radiation Event", objective: "Keep the colony supplied while external deliveries are delayed.", reward: "$24M", xp: "2,000", token: "+1", technology: "ISRU" },
-  { number: "08", title: "Cascade", subtitle: "A foothold becomes home", status: "locked", x: "93%", y: "25%", prerequisite: "Complete Resource Crisis", objective: "Prevent a systems cascade and prove the Moon can sustain a colony.", reward: "$30M", xp: "3,000", token: "+2", technology: "Mars Campaign access" },
+  { number: "01", title: "Survival", subtitle: "First Light", status: "current", x: "6%", y: "49%", duration: "14 Earth days", objective: "Stabilize the landing site and bring every Foundation system online.", reward: "$10M", xp: "500", token: "+1", technology: "Improved Energy Storage", difficulty: 1 },
+  { number: "02", title: "The Long Night", subtitle: "Hold the heat", status: "locked", x: "17%", y: "27%", prerequisite: "Complete Survival", duration: "21 Earth days", objective: "Maintain heat and power through the first lunar night.", reward: "$12M", xp: "750", token: "+1", technology: "Thermal Storage Technology", difficulty: 2 },
+  { number: "03", title: "The Shadow", subtitle: "Ice below", status: "locked", x: "31%", y: "55%", prerequisite: "Complete The Long Night", duration: "30 Earth days", objective: "Locate and extract subsurface ice before the thermal window closes.", reward: "$14M", xp: "1,000", token: "+1", technology: "Water / Ice Extraction", difficulty: 2 },
+  { number: "04", title: "Contamination", subtitle: "Keep the grid alive", status: "locked", x: "45%", y: "23%", prerequisite: "Complete The Shadow", duration: "35 Earth days", objective: "Restore power distribution during a high-dust equipment failure.", reward: "$16M", xp: "1,250", token: "+1", technology: "Autonomous Maintenance Rover", difficulty: 3 },
+  { number: "05", title: "Impact", subtitle: "Patch the breach", status: "locked", x: "59%", y: "52%", prerequisite: "Complete Contamination", duration: "45 Earth days", objective: "Repair a damaged habitat shell before pressure loss becomes critical.", reward: "$18M", xp: "1,500", token: "+1", technology: "Improved Habitat Structure", difficulty: 3 },
+  { number: "06", title: "Stormfall", subtitle: "Under the storm", status: "locked", x: "70%", y: "28%", prerequisite: "Complete Impact", duration: "60 Earth days", objective: "Protect crew and systems through a major radiation event.", reward: "$20M", xp: "1,750", token: "+2", technology: "Regolith Shielding", difficulty: 4 },
+  { number: "07", title: "The Inheritance", subtitle: "Make more from less", status: "locked", x: "82%", y: "52%", prerequisite: "Complete Stormfall", duration: "90 Earth days", objective: "Keep the colony supplied while external deliveries are delayed.", reward: "$23M", xp: "2,000", token: "+2", technology: "Local Resource Processing", difficulty: 4 },
+  { number: "08", title: "Cascade", subtitle: "A foothold becomes home", status: "locked", x: "93%", y: "25%", prerequisite: "Complete The Inheritance", duration: "120 Earth days", objective: "Prevent a systems cascade and prove the Moon can sustain a colony.", reward: "$27M", xp: "2,500", token: "+3", technology: "Advanced Colony Management", difficulty: 5 },
 ];
 
 const statusCopy: Record<MissionStatus, string> = {
@@ -154,8 +154,14 @@ export function CampaignMap() {
                    <p className="text-sm leading-6 text-[#dbe7da]">{activeMission.objective}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="border border-[#29434a] bg-[#0f2429] p-3"><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Difficulty</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#efb658]"><Target className="h-4 w-4" /> High</p></div>
-                  <div className="border border-[#29434a] bg-[#0f2429] p-3"><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Duration</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#d9e5d3]"><Zap className="h-4 w-4 text-[#efb658]" /> 14 days</p></div>
+                  <div className="border border-[#29434a] bg-[#0f2429] p-3">
+                    <p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Difficulty</p>
+                    <p className="mt-2 text-sm font-semibold text-[#efb658]">
+                      <span className="text-[#efb658]">{"★".repeat(activeMission.difficulty)}</span>
+                      <span className="text-[#405d60]">{"★".repeat(5 - activeMission.difficulty)}</span>
+                    </p>
+                  </div>
+                  <div className="border border-[#29434a] bg-[#0f2429] p-3"><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Duration</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[#d9e5d3]"><Zap className="h-4 w-4 text-[#efb658]" /> {activeMission.duration}</p></div>
                 </div>
                 <div>
                   <p className="mb-3 text-[10px] uppercase tracking-[0.26em] text-[#769092]">Mission reward</p>
@@ -166,7 +172,7 @@ export function CampaignMap() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 border-t border-[#29434a] pt-5">
-                  <Snowflake className="h-5 w-5 text-[#8fc8c4]" />
+                  <ShieldCheck className="h-5 w-5 text-[#8fc8c4]" />
                    <div><p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">Technology unlocked</p><p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#d5e4ce]">{activeMission.technology}</p></div>
                 </div>
                 {activeMission.status === "current" && <a href="/__mockup/preview/colony-frontier/MissionLoadout" className="flex w-full items-center justify-between bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#1a211d] transition hover:bg-[#f6cb7b]">Prepare mission <ArrowRight className="h-4 w-4" /></a>}

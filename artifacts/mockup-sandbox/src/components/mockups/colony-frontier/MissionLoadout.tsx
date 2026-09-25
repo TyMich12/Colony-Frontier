@@ -72,10 +72,12 @@ const missionBudget = 25;
 function CatalogCard({
   track,
   selected,
+  affordable,
   onToggle,
 }: {
   track: TechnologyTrack;
   selected: boolean;
+  affordable: boolean;
   onToggle: () => void;
 }) {
   const equipment = track.tiers.Foundation;
@@ -85,10 +87,13 @@ function CatalogCard({
     <button
       type="button"
       onClick={onToggle}
+      disabled={!selected && !affordable}
       className={`group relative overflow-visible border p-4 text-left transition ${
         selected
           ? "border-[#afc78f] bg-[#172c2d] shadow-[inset_3px_0_0_#efb658]"
-          : "border-[#2d4648] bg-[#0c1a22] hover:border-[#718f80] hover:bg-[#10252a]"
+          : affordable
+            ? "border-[#2d4648] bg-[#0c1a22] shadow-[0_0_12px_rgba(110,200,130,0.18)] hover:border-[#718f80] hover:bg-[#10252a] hover:shadow-[0_0_18px_rgba(110,200,130,0.28)]"
+            : "border-[#3a2a2a] bg-[#0c1a22] opacity-65 shadow-[0_0_12px_rgba(200,80,80,0.15)] cursor-not-allowed"
       }`}
       aria-pressed={selected}
     >
@@ -113,17 +118,29 @@ function CatalogCard({
           className={`grid h-6 w-6 shrink-0 place-items-center border ${
             selected
               ? "border-[#efb658] bg-[#efb658] text-[#162127]"
-              : "border-[#49615d] text-[#67817e]"
+              : affordable
+                ? "border-[#49615d] text-[#67817e]"
+                : "border-[#5a3030] text-[#805050]"
           }`}
         >
-          {selected ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {selected ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : affordable ? (
+            <Plus className="h-3.5 w-3.5" />
+          ) : (
+            <LockKeyhole className="h-3 w-3" />
+          )}
         </span>
       </div>
       <div className="mt-4 flex items-center gap-3 border-t border-[#2c4445] pt-3 text-[9px] uppercase tracking-[0.14em] text-[#89a39e]">
         <span>{equipment.mass.toLocaleString()} kg</span>
         <span>{formatCredits(equipment.cost)}</span>
-        <span className="ml-auto text-[#617b78]">
-          {selected ? "Loaded" : "Optional"}
+        <span
+          className={`ml-auto ${
+            selected || affordable ? "text-[#617b78]" : "text-[#805050]"
+          }`}
+        >
+          {selected ? "Loaded" : affordable ? "Optional" : "Over budget"}
         </span>
       </div>
       <div className="pointer-events-none absolute left-4 right-4 top-[calc(100%-1px)] z-30 hidden border border-[#6f8058] bg-[#162d30] p-4 shadow-[0_18px_38px_rgba(0,0,0,0.42)] group-hover:block">
@@ -168,6 +185,14 @@ export function MissionLoadout() {
   const remainingCredits = missionBudget - spend;
 
   function toggleTrack(track: TechnologyTrack) {
+    const isCurrentlySelected = selected.includes(track.id);
+    if (!isCurrentlySelected) {
+      const newSpend = spend + track.tiers.Foundation.cost;
+      if (newSpend > missionBudget) {
+        setNotice(`${track.category} exceeds the remaining budget of ${formatCredits(missionBudget - spend)}.`);
+        return;
+      }
+    }
     setSelected((current) =>
       current.includes(track.id)
         ? current.filter((id) => id !== track.id)
@@ -175,7 +200,7 @@ export function MissionLoadout() {
     );
     setConfirmed(false);
     setNotice(
-      selected.includes(track.id)
+      isCurrentlySelected
         ? `${track.category} removed from the Mission 01 manifest.`
         : `${track.tiers.Foundation.name} staged in the ${track.category} slot.`,
     );
@@ -231,14 +256,20 @@ export function MissionLoadout() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            {technologyTracks.map((track) => (
-              <CatalogCard
-                key={track.id}
-                track={track}
-                selected={selected.includes(track.id)}
-                onToggle={() => toggleTrack(track)}
-              />
-            ))}
+            {technologyTracks.map((track) => {
+              const isSelected = selected.includes(track.id);
+              const cost = track.tiers.Foundation.cost;
+              const affordable = isSelected || spend + cost <= missionBudget;
+              return (
+                <CatalogCard
+                  key={track.id}
+                  track={track}
+                  selected={isSelected}
+                  affordable={affordable}
+                  onToggle={() => toggleTrack(track)}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -283,7 +314,7 @@ export function MissionLoadout() {
                     Mission budget
                   </span>
                   <span className="font-mono text-sm text-[#f4e7c5]">
-                    {formatCredits(remainingCredits)}{" "}
+                    {formatCredits(Math.max(0, remainingCredits))}{" "}
                     <span className="text-[#839993]">remaining</span>
                   </span>
                 </div>

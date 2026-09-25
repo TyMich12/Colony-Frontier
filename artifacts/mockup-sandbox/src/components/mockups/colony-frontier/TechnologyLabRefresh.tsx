@@ -56,8 +56,8 @@ const categoryIcons = {
 } as const;
 
 const tiers: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
-const currentXp = 0;
-const currentTokens = 0;
+const currentXp = 4500;
+const currentTokens = 3;
 
 function requirementCopy(tier: Tier) {
   const requirement = tierUnlockRequirements[tier];
@@ -282,7 +282,6 @@ export function TechnologyLabRefresh() {
                   {currentXp.toLocaleString()} XP
                 </span>
               </div>
-              <ProgressBar value={0} color="#efbd5d" />
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
                 <span className="text-[#8e978a]">Research Tokens earned</span>
                 <span className="font-mono text-[#f1d47c]">
