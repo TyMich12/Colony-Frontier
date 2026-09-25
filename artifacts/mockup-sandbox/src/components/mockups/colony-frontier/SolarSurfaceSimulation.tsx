@@ -207,7 +207,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           <p className="mt-1 text-[9px] text-white/35">
             Tier cell efficiency: {nominalCellEfficiency.toFixed(0)}%
           </p>
-          {terrain === "mars" ? (
+          {terrain === "mars" && (
             <>
               <p className="mt-1 text-[9px] text-white/35">
                 Atmospheric optical depth: τ = {live.atmosphericTau.toFixed(2)}
@@ -219,7 +219,8 @@ export function SolarSurfaceSimulation({ tier }: Props) {
                 Surface direct irradiance: {live.surfaceIrradiance.toFixed(0)} W/m²
               </p>
             </>
-          ) : (
+          )}
+          {terrain === "moon" && (
             <p className="mt-1 text-[9px] text-white/35">
               Surface irradiance: {live.surfaceIrradiance.toFixed(0)} W/m²
             </p>
