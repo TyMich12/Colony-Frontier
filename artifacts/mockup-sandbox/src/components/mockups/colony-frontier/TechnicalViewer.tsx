@@ -1334,10 +1334,12 @@ export function TechnicalViewer({
     return (
       <GameShell active="lab" eyebrow="Engineering visualization / systems knowledge" title="Technical Viewer">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border border-[#3a5559] bg-[#0c1a21] px-4 py-3">
-          <button type="button" onClick={onBack} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#b8d1c5] hover:text-[#f0f4e8]">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Technology Lab
-          </button>
+          <a
+            href="/preview/TechnologyLabRefresh"
+            className="text-[9px] font-bold uppercase tracking-[.16em] text-[#789690] hover:text-[#d8e6df]"
+          >
+            ← Technology Lab
+          </a>
           <span className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: accent }}>
             SOLAR · ADVANCED SYSTEM STUDY
           </span>
