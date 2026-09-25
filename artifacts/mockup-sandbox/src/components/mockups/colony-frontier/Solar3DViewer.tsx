@@ -394,6 +394,23 @@ function buildSolarObjects(geometries: { box: Geometry; cylinder: Geometry; sphe
   return objects;
 }
 
+function projectScreen(point: Vec3, state: { yaw: number; pitch: number; distance: number }, width: number, height: number) {
+  const camera = {
+    x: Math.sin(state.yaw) * Math.cos(state.pitch) * state.distance,
+    y: Math.sin(state.pitch) * state.distance,
+    z: Math.cos(state.yaw) * Math.cos(state.pitch) * state.distance,
+  };
+  const view = lookAt(camera, { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+  const projection = perspective(Math.PI / 4.2, Math.max(1, width / height), 20, 4000);
+  const clip = transformPoint(multiply(projection, view), point);
+  if (!clip.w) return null;
+  return {
+    x: width * (clip.x / clip.w + 1) / 2,
+    y: height * (1 - clip.y / clip.w) / 2,
+    depth: clip.z / clip.w,
+  };
+}
+
 function createShader(gl: WebGLRenderingContext, type: number, source: string) {
   const shader = gl.createShader(type);
   if (!shader) throw new Error("Could not create WebGL shader");
@@ -547,6 +564,7 @@ function SolarCanvas({
       return { x: width * (nx + 1) / 2, y: height * (1 - ny) / 2, z: clip.z / clip.w };
     };
 
+    let frameId = 0;
     const draw = () => {
       const { width, height } = setSize();
       const s = state.current;
@@ -590,8 +608,7 @@ function SolarCanvas({
         gl.drawElements(gl.TRIANGLES, object.geometry.indices.length, gl.UNSIGNED_SHORT, 0);
       }
 
-      window.requestAnimationFrame(draw);
-      return { width, height, project };
+      frameId = window.requestAnimationFrame(draw);
     };
 
     const resizeObserver = new ResizeObserver(() => setSize());
@@ -605,12 +622,7 @@ function SolarCanvas({
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
 
-    let frameId = window.requestAnimationFrame(draw);
-
-    const syncSelection = () => {
-      frameId = window.requestAnimationFrame(() => undefined);
-    };
-    void syncSelection;
+    frameId = window.requestAnimationFrame(draw);
 
     return () => {
       window.cancelAnimationFrame(frameId);
@@ -648,6 +660,27 @@ function SolarCanvas({
     state.current.dragging = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (!state.current.moved) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const projected = anchors
+        .map((anchor) => ({
+          id: anchor.id,
+          point: projectScreen(anchor.point, state.current, rect.width, rect.height),
+        }))
+        .filter((item) => item.point !== null)
+        .map((item) => ({
+          id: item.id,
+          point: item.point as { x: number; y: number; depth: number },
+          distance: Math.hypot((item.point as { x: number; y: number }).x - x, (item.point as { x: number; y: number }).y - y),
+        }))
+        .sort((a, b) => a.distance - b.distance);
+
+      const hit = projected.find((item) => item.distance < 58);
+      if (hit) setSelected(hit.id);
     }
   }
 
