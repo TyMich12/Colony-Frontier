@@ -16,7 +16,6 @@ interface WingProps {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
   boomMaterial: THREE.Material;
-  dustMaterial: THREE.Material;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }
@@ -112,7 +111,6 @@ function Highlight({
 function PanelSegment({
   pvMaterial,
   frameMaterial,
-  dustMaterial,
   segmentIndex,
   onSelect,
   selectedComponentName,
@@ -178,18 +176,6 @@ function PanelSegment({
       </mesh>
 
       {panelSelected && <Highlight type="panel" />}
-
-      <mesh
-        position={[SEG_LEN / 2, 0.091, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        material={dustMaterial}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect?.(info.name, info.role, info.explanation);
-        }}
-      >
-        <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
-      </mesh>
 
       {busSelected && <Highlight type="bus" />}
 
