@@ -21,13 +21,15 @@ export const MARS_AIRMASS_LIMIT_ZENITH_DEG = 80;
 export const MARS_AIRMASS_LIMIT_COS_ZENITH =
   Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
 
-// The power model uses P = G × A × η. No arbitrary extra derating is applied.
+// Dust attenuation is modeled exponentially, matching laboratory observations that PV
+// output falls approximately exponentially as dust loading increases. The endpoints
+// represent severe, heavily dust-loaded panels rather than a universal measured value.
+export const MARS_PANEL_DUST_MAX_OPTICAL_DEPTH = Math.log(10); // 10% power remains at 100% dust.
+export const LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH = Math.log(12.5); // 8% power remains at 100% dust.
+
+// Explicit non-dust electrical losses so displayed efficiency and calculated power agree.
+export const SYSTEM_ELECTRICAL_EFFICIENCY = 0.92;
 export const ARRAY_DERATING = 1.0;
-export const MARS_PANEL_DUST_MAX_OPTICAL_DEPTH = 1.0;
-export const LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH = 0.7;
-export const MARS_SEVERE_DUST_REMAINING = 0.05;
-export const LUNAR_DUST_REFERENCE_MG_CM2 = 3.0;
-export const LUNAR_DUST_REFERENCE_REMAINING = 0.08;
 
 export const CELL_EFFICIENCY: Record<SolarTier, number> = {
   Foundation: 0.28,
