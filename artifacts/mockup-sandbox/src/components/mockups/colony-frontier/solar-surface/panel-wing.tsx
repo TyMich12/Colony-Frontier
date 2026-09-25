@@ -138,7 +138,7 @@ function PanelSegment({
     }
     return material;
   }, [dustMaterial]);
-  const frame = frameInfo(segmentIndex);
+  useFrame(() => {\n    // Keep every randomized panel dust layer synchronized with the global dust slider.\n    // Cloned materials have independent opacity, so without this index 0 could still look dusty.\n    localDustMaterial.opacity = dustMaterial.opacity;\n  });\n\n  const frame = frameInfo(segmentIndex);
   const bus = busInfo(segmentIndex);
   const panelSelected = selectedComponentName === info.name;
   const frameSelected = selectedComponentName === frame.name;
