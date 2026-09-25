@@ -107,11 +107,11 @@ export function SolarFarm({
 
     const dustFrac = Math.max(0, Math.min(100, solarLive.dust)) / 100;
     // Visual density is intentionally nonlinear and separate from the power model:
-    // a little dust is patchy, while severe accumulation becomes visually dominant.
+    // a little dust is patchy, while severe accumulation quickly becomes a thick, visually dominant deposit.
     dustMaterial.opacity =
       dustFrac <= 0
         ? 0
-        : Math.min(0.995, 0.02 + Math.pow(dustFrac, 0.68) * 0.975);
+        : Math.min(1, 0.01 + Math.pow(dustFrac, 0.52) * 0.99);
     dustMaterial.alphaTest = 0.01;
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const dustCoverage = dustCoverageFraction(solarLive.dust);
