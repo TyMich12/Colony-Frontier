@@ -6,7 +6,12 @@ import { Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
 import { SolarFarm } from "./solar-surface/solar-farm";
 import { Terrain, Rocks } from "./solar-surface/terrain";
 import { DustParticles } from "./solar-surface/dust-particles";
-import { CELL_EFFICIENCY, solarLive, type SolarTier, type TerrainKind } from "./solar-surface/state";
+import {
+  CELL_EFFICIENCY,
+  solarLive,
+  type SolarTier,
+  type TerrainKind,
+} from "./solar-surface/state";
 
 type Props = { tier: SolarTier };
 
@@ -193,7 +198,26 @@ export function SolarSurfaceSimulation({ tier }: Props) {
         <div className="absolute left-5 top-28 border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
           <p className="text-[9px] uppercase tracking-[.14em] text-white/40">Calculated model</p>
           <p className="mt-1 font-mono text-[10px] text-white/75">{live.activeAreaM2.toFixed(1)} m² active PV area</p>
-          <p className="mt-1 text-[9px] text-white/35">Tier cell efficiency: {nominalCellEfficiency.toFixed(0)}%</p>
+          <p className="mt-1 text-[9px] text-white/35">
+            Tier cell efficiency: {nominalCellEfficiency.toFixed(0)}%
+          </p>
+          {terrain === "mars" ? (
+            <>
+              <p className="mt-1 text-[9px] text-white/35">
+                Atmospheric optical depth: τ = {live.atmosphericTau.toFixed(2)}
+              </p>
+              <p className="mt-1 text-[9px] text-white/35">
+                Direct transmission: {(live.atmosphericTransmission * 100).toFixed(1)}%
+              </p>
+              <p className="mt-1 text-[9px] text-white/35">
+                Surface direct irradiance: {live.surfaceIrradiance.toFixed(0)} W/m²
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-[9px] text-white/35">
+              Surface irradiance: {live.surfaceIrradiance.toFixed(0)} W/m²
+            </p>
+          )
         </div>
       </div>
 
@@ -281,7 +305,11 @@ export function SolarSurfaceSimulation({ tier }: Props) {
 
         <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/35">
           <Gauge className="h-3.5 w-3.5" />
-          P = G × A × η × deployment × sin(elevation) × dust × 0.92 · Moon array is 1.2× larger linearly than Mars
+          {terrain === "mars"
+            ? "Mars: P uses G₀ × sin(e) × exp(−τ / sin(e)) × A × η × deployment × dust × 0.92"
+            : "Moon: P uses G₀ × sin(e) × A × η × deployment × dust × 0.92"}
+          {" · "}
+          τ = 0.50 is the normal/quiescent Mars atmosphere model; panel dust is modelled separately.
         </p>
       </div>
     </div>
