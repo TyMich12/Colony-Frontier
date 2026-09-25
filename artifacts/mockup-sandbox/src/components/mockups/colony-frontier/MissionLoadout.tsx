@@ -3,6 +3,7 @@ import {
   Battery,
   Car,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleDot,
   Cloud,
@@ -13,7 +14,6 @@ import {
   Home,
   LockKeyhole,
   Pickaxe,
-  Plus,
   Radio,
   Shield,
   Sprout,
@@ -32,7 +32,10 @@ import {
   formatCredits,
   payloadProgression,
   technologyTracks,
+  tierMeta,
+  tierUnlockRequirements,
   type TechnologyTrack,
+  type Tier,
 } from "./_shared/gameData";
 import { loadGameState, saveGameState } from "./gameState";
 
@@ -75,93 +78,245 @@ const missionCapacity = payloadProgression[0].capacity;
  */
 const missionBudget = 25;
 
-function CatalogCard({
+const tierOrder: Tier[] = [
+  "Foundation",
+  "Frontier",
+  "Apex",
+  "Research",
+];
+
+function technologyKey(trackId: string, tier: Tier) {
+  return `${trackId}:${tier}`;
+}
+
+function isTierUnlocked(
+  track: TechnologyTrack,
+  tier: Tier,
+  unlockedTechnologies: string[],
+) {
+  // Foundation equipment is part of the starting technology base.
+  if (tier === "Foundation") {
+    return true;
+  }
+
+  return unlockedTechnologies.includes(technologyKey(track.id, tier));
+}
+
+function getTierStatus(
+  track: TechnologyTrack,
+  tier: Tier,
+  gameState: ReturnType<typeof loadGameState>,
+  availableCredits: number,
+  availableMass: number,
+) {
+  if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
+    return "locked";
+  }
+
+  const equipment = track.tiers[tier];
+
+  if (equipment.cost > availableCredits) {
+    return "funds";
+  }
+
+  if (equipment.mass > availableMass) {
+    return "mass";
+  }
+
+  return "available";
+}
+
+function CategoryHeader({
   track,
-  selected,
-  affordable,
-  onToggle,
+  selectedTier,
+  open,
+  onClick,
 }: {
   track: TechnologyTrack;
-  selected: boolean;
-  affordable: boolean;
-  onToggle: () => void;
+  selectedTier?: Tier;
+  open: boolean;
+  onClick: () => void;
 }) {
-  const equipment = track.tiers.Foundation;
-
   const Icon =
     categoryIcons[track.category as keyof typeof categoryIcons] ?? Zap;
 
   return (
     <button
       type="button"
-      onClick={onToggle}
-      disabled={!selected && !affordable}
-      className={`group relative overflow-visible border p-4 text-left transition ${
-        selected
+      onClick={onClick}
+      className={`flex w-full items-center justify-between border p-4 text-left transition ${
+        open
           ? "border-[#afc78f] bg-[#172c2d] shadow-[inset_3px_0_0_#efb658]"
-          : affordable
-            ? "border-[#2d4648] bg-[#0c1a22] shadow-[0_0_12px_rgba(110,200,130,0.18)] hover:border-[#718f80] hover:bg-[#10252a] hover:shadow-[0_0_18px_rgba(110,200,130,0.28)]"
-            : "border-[#3a2a2a] bg-[#0c1a22] shadow-[0_0_12px_rgba(200,80,80,0.15)] cursor-not-allowed"
+          : selectedTier
+            ? "border-[#3e5b55] bg-[#102228] hover:border-[#718f80]"
+            : "border-[#2d4648] bg-[#0c1a22] hover:border-[#718f80] hover:bg-[#10252a]"
       }`}
-      aria-pressed={selected}
+      aria-expanded={open}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center border border-[#3d5552] bg-[#0a171e] text-[#9fce82]">
+          <Icon className="h-4 w-4" />
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#9fce82]">
+            Technology category
+          </p>
+
+          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-[#eef4e9]">
+            {track.category}
+          </h3>
+
+          <p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-[#779390]">
+            {selectedTier
+              ? `${selectedTier} tier selected`
+              : "No system loaded"}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {selectedTier && (
+          <span className="hidden border border-[#49615d] bg-[#0a171e] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#9fce82] sm:inline">
+            Loaded
+          </span>
+        )}
+
+        {open ? (
+          <ChevronDown className="h-4 w-4 text-[#efb658]" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-[#67817e]" />
+        )}
+      </div>
+    </button>
+  );
+}
+
+function TierOption({
+  track,
+  tier,
+  selected,
+  status,
+  onSelect,
+}: {
+  track: TechnologyTrack;
+  tier: Tier;
+  selected: boolean;
+  status: "locked" | "funds" | "mass" | "available";
+  onSelect: () => void;
+}) {
+  const equipment = track.tiers[tier];
+  const meta = tierMeta[tier];
+  const requirement = tierUnlockRequirements[tier];
+
+  const disabled = status !== "available" && !selected;
+
+  const statusLabel =
+    status === "locked"
+      ? tier === "Research"
+        ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${requirement.tokens} RT in Technology Lab`
+        : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
+      : status === "funds"
+        ? "INSUFFICIENT MISSION FUNDS"
+        : status === "mass"
+          ? "INSUFFICIENT PAYLOAD CAPACITY"
+          : selected
+            ? "SELECTED"
+            : "AVAILABLE";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={`group relative w-full border p-4 text-left transition ${
+        selected
+          ? "border-[#efb658] bg-[#26332c] shadow-[inset_3px_0_0_#efb658]"
+          : status === "available"
+            ? "border-[#2d4648] bg-[#0c1a22] hover:border-[#718f80] hover:bg-[#10252a]"
+            : "border-[#4a3030] bg-[#0c1a22] opacity-75"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center border border-[#3d5552] bg-[#0a171e] text-[#9fce82]">
-            <Icon className="h-4 w-4" />
+          <div
+            className="grid h-9 w-9 shrink-0 place-items-center border bg-[#0a171e]"
+            style={{
+              borderColor: selected ? meta.color : "#3d5552",
+              color: meta.color,
+            }}
+          >
+            <span className="text-[8px] font-black tracking-[0.08em]">
+              {meta.short}
+            </span>
           </div>
 
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.19em] text-[#9fce82]">
-              {track.category}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#9fce82]">
+                {tier}
+              </p>
 
-            <h3 className="mt-1 truncate text-sm font-semibold uppercase tracking-[0.08em] text-[#eef4e9]">
+              {tier === "Foundation" && (
+                <span className="text-[8px] uppercase tracking-[0.12em] text-[#607976]">
+                  Base technology
+                </span>
+              )}
+            </div>
+
+            <h4 className="mt-1 truncate text-sm font-semibold uppercase tracking-[0.08em] text-[#eef4e9]">
               {equipment.name}
-            </h3>
+            </h4>
 
-            <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#779390]">
-              Foundation level
+            <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#779390]">
+              {equipment.description}
             </p>
           </div>
         </div>
 
         <span
-          className={`grid h-6 w-6 shrink-0 place-items-center border ${
+          className={`grid h-7 w-7 shrink-0 place-items-center border ${
             selected
               ? "border-[#efb658] bg-[#efb658] text-[#162127]"
-              : affordable
+              : status === "available"
                 ? "border-[#49615d] text-[#67817e]"
                 : "border-[#5a3030] text-[#805050]"
           }`}
         >
           {selected ? (
             <Check className="h-3.5 w-3.5" />
-          ) : affordable ? (
-            <Plus className="h-3.5 w-3.5" />
+          ) : status === "available" ? (
+            <CircleDot className="h-3.5 w-3.5" />
           ) : (
             <LockKeyhole className="h-3 w-3" />
           )}
         </span>
       </div>
 
-      <div className="mt-4 flex items-center gap-3 border-t border-[#2c4445] pt-3 text-[9px] uppercase tracking-[0.14em] text-[#89a39e]">
-        <span>{equipment.mass.toLocaleString()} kg</span>
-
-        <span>{formatCredits(equipment.cost)}</span>
-
-        <span
-          className={`ml-auto ${
-            selected || affordable ? "text-[#617b78]" : "text-[#805050]"
-          }`}
-        >
-          {selected ? "Loaded" : affordable ? "Optional" : "Over budget"}
+      <div className="mt-4 grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t border-[#2c4445] pt-3 text-[9px] uppercase tracking-[0.14em]">
+        <span className="text-[#89a39e]">{equipment.efficiency}</span>
+        <span className="text-[#89a39e]">
+          {equipment.mass.toLocaleString()} kg
         </span>
+        <span className="font-mono text-[#d7e3d1]">
+          {formatCredits(equipment.cost)}
+        </span>
+      </div>
+
+      <div
+        className={`mt-3 text-[8px] font-bold uppercase tracking-[0.13em] ${
+          selected || status === "available"
+            ? "text-[#78bb92]"
+            : "text-[#c46c6c]"
+        }`}
+      >
+        {statusLabel}
       </div>
 
       <div className="pointer-events-none absolute left-4 right-4 top-[calc(100%-1px)] z-50 hidden border border-[#6f8058] bg-[#162d30] p-4 shadow-[0_18px_38px_rgba(0,0,0,0.42)] group-hover:block">
         <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#efb658]">
-          Foundation field brief
+          {tier} field brief
         </p>
 
         <p className="mt-2 text-xs leading-5 text-[#c1d1bd]">
@@ -181,110 +336,139 @@ function CatalogCard({
 export function MissionLoadout() {
   const gameState = loadGameState();
 
-  const [selected, setSelected] = useState<string[]>([
-    ...starterCategories,
-  ]);
+  const [selected, setSelected] = useState<Record<string, Tier>>(
+    () =>
+      Object.fromEntries(
+        [...starterCategories].map((id) => [id, "Foundation"]),
+      ) as Record<string, Tier>,
+  );
+
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   const [notice, setNotice] = useState(
-    "Mission 01 begins with reliable Foundation systems. Optional systems can be added while capacity and funding hold.",
+    "Mission 01 begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
 
   const [confirmed, setConfirmed] = useState(false);
 
   const selectedTracks = useMemo(
     () =>
-      technologyTracks.filter((track) =>
-        selected.includes(track.id),
+      technologyTracks.filter(
+        (track) => selected[track.id] !== undefined,
       ),
     [selected],
   );
 
-  const mass = selectedTracks.reduce(
-    (total, track) => total + track.tiers.Foundation.mass,
-    0,
-  );
+  const mass = selectedTracks.reduce((total, track) => {
+    const tier = selected[track.id];
+    return total + track.tiers[tier].mass;
+  }, 0);
 
-  const spend = selectedTracks.reduce(
-    (total, track) => total + track.tiers.Foundation.cost,
-    0,
-  );
+  const spend = selectedTracks.reduce((total, track) => {
+    const tier = selected[track.id];
+    return total + track.tiers[tier].cost;
+  }, 0);
 
   const remainingMass = missionCapacity - mass;
-
   const remainingMissionBudget = missionBudget - spend;
-
   const remainingTreasury = gameState.credits - spend;
 
-  /*
-   * A system can only be added when BOTH limits allow it:
-   *
-   * 1. Mission allocation
-   * 2. Actual colony treasury
-   */
-  function toggleTrack(track: TechnologyTrack) {
-    const isCurrentlySelected = selected.includes(track.id);
+  const requiredCategories = starterCategories;
 
-    if (!isCurrentlySelected) {
-      const newSpend = spend + track.tiers.Foundation.cost;
+  function isCategoryRequired(track: TechnologyTrack) {
+    return requiredCategories.has(track.id);
+  }
 
-      if (newSpend > missionBudget) {
-        setNotice(
-          `${track.category} exceeds the remaining Mission 01 allocation of ${formatCredits(
-            Math.max(0, remainingMissionBudget),
-          )}.`,
-        );
-        return;
-      }
-
-      if (newSpend > gameState.credits) {
-        setNotice(
-          `${track.category} exceeds your available Colony Treasury of ${formatCredits(
-            gameState.credits,
-          )}.`,
-        );
-        return;
-      }
-
-      if (mass + track.tiers.Foundation.mass > missionCapacity) {
-        setNotice(
-          `${track.category} exceeds the remaining payload capacity of ${remainingMass.toLocaleString()} kg.`,
-        );
-        return;
-      }
+  function selectTier(track: TechnologyTrack, tier: Tier) {
+    if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
+      setNotice(
+        `${track.category} / ${tier} is not unlocked. Upgrade this technology in the Technology Lab first.`,
+      );
+      return;
     }
 
-    setSelected((current) =>
-      current.includes(track.id)
-        ? current.filter((id) => id !== track.id)
-        : [...current, track.id],
-    );
+    const previousTier = selected[track.id];
+    const previousEquipment = previousTier
+      ? track.tiers[previousTier]
+      : null;
+    const nextEquipment = track.tiers[tier];
+
+    const newSpend = spend - (previousEquipment?.cost ?? 0) + nextEquipment.cost;
+    const newMass =
+      mass - (previousEquipment?.mass ?? 0) + nextEquipment.mass;
+
+    if (newSpend > missionBudget) {
+      setNotice(
+        `${track.category} / ${tier} exceeds the remaining Mission 01 allocation of ${formatCredits(
+          Math.max(0, missionBudget - (spend - (previousEquipment?.cost ?? 0))),
+        )}.`,
+      );
+      return;
+    }
+
+    if (newSpend > gameState.credits) {
+      setNotice(
+        `${track.category} / ${tier} exceeds your available Colony Treasury of ${formatCredits(
+          gameState.credits,
+        )}.`,
+      );
+      return;
+    }
+
+    if (newMass > missionCapacity) {
+      setNotice(
+        `${track.category} / ${tier} exceeds the remaining payload capacity by ${(
+          newMass - missionCapacity
+        ).toLocaleString()} kg.`,
+      );
+      return;
+    }
+
+    setSelected((current) => ({
+      ...current,
+      [track.id]: tier,
+    }));
 
     setConfirmed(false);
+    setNotice(
+      `${nextEquipment.name} selected for the ${track.category} slot. XP and Research Tokens are not spent in Loadout.`,
+    );
+  }
+
+  function openTrack(track: TechnologyTrack) {
+    setOpenCategory((current) =>
+      current === track.id ? null : track.id,
+    );
 
     setNotice(
-      isCurrentlySelected
-        ? `${track.category} removed from the Mission 01 manifest.`
-        : `${track.tiers.Foundation.name} staged in the ${track.category} slot.`,
+      openCategory === track.id
+        ? "Technology catalog restored. Select another category when ready."
+        : `${track.category} expanded. Other categories are hidden while you configure this slot.`,
     );
   }
 
   function confirmManifest() {
-    if (selected.length === 0) {
+    if (selectedTracks.length === 0) {
       setNotice("No systems are loaded. Mission cannot deploy.");
       return;
     }
 
+    if (
+      [...requiredCategories].some(
+        (categoryId) => selected[categoryId] === undefined,
+      )
+    ) {
+      setNotice("All required Mission 01 systems must have a technology tier selected.");
+      return;
+    }
+
     if (mass > missionCapacity) {
-      setNotice(
-        "Manifest exceeds the Early Moon payload capacity.",
-      );
+      setNotice("Manifest exceeds the Early Moon payload capacity.");
       return;
     }
 
     if (spend > missionBudget) {
-      setNotice(
-        "Manifest exceeds the Mission 01 allocation.",
-      );
+      setNotice("Manifest exceeds the Mission 01 allocation.");
       return;
     }
 
@@ -299,9 +483,6 @@ export function MissionLoadout() {
       return;
     }
 
-    /*
-     * Deduct the equipment cost from the actual persistent treasury.
-     */
     saveGameState({
       ...gameState,
       credits: gameState.credits - spend,
@@ -315,6 +496,10 @@ export function MissionLoadout() {
       )} transferred from the Colony Treasury.`,
     );
   }
+
+  const visibleTracks = openCategory
+    ? technologyTracks.filter((track) => track.id === openCategory)
+    : technologyTracks;
 
   return (
     <GameShell
@@ -336,57 +521,100 @@ export function MissionLoadout() {
                 </p>
 
                 <p className="mt-1 text-xs text-[#9cb2aa]">
-                  Mission 01 · Survival · all Foundation systems available
+                  Mission 01 · Survival · choose one technology tier per category
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 border-l border-[#38504c] pl-4 text-[10px] uppercase tracking-[0.18em] text-[#d1dfbf]">
               <CircleDot className="h-3.5 w-3.5 text-[#70d0a5]" />
-              One per category
+              {openCategory ? "Category configuration" : "One per category"}
             </div>
           </div>
 
-          <div className="mb-3 flex items-end justify-between">
+          <div className="mb-3 flex items-end justify-between gap-4">
             <div>
               <SectionLabel>
-                Foundation equipment catalog
+                Technology loadout catalog
               </SectionLabel>
 
               <p className="text-sm text-[#8fa7a2]">
-                Select at most one system from each category. Hover any card
-                for efficiency and procurement details.
+                {openCategory
+                  ? "Configure this category. All other categories are hidden until you close it."
+                  : "Select a category to configure its technology tier. Only one tier can be deployed per category."}
               </p>
             </div>
 
-            <span className="text-right text-[10px] uppercase tracking-[0.18em] text-[#6e8986]">
-              {selected.length} / {technologyTracks.length} slots loaded
+            <span className="shrink-0 text-right text-[10px] uppercase tracking-[0.18em] text-[#6e8986]">
+              {selectedTracks.length} / {technologyTracks.length} slots loaded
             </span>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {technologyTracks.map((track) => {
-              const isSelected = selected.includes(track.id);
-
-              const cost = track.tiers.Foundation.cost;
-
-              const affordable =
-                isSelected ||
-                (spend + cost <= missionBudget &&
-                  spend + cost <= gameState.credits &&
-                  mass + track.tiers.Foundation.mass <= missionCapacity);
+          <div className="space-y-3">
+            {visibleTracks.map((track) => {
+              const selectedTier = selected[track.id];
 
               return (
-                <CatalogCard
-                  key={track.id}
-                  track={track}
-                  selected={isSelected}
-                  affordable={affordable}
-                  onToggle={() => toggleTrack(track)}
-                />
+                <div key={track.id} className="space-y-2">
+                  <CategoryHeader
+                    track={track}
+                    selectedTier={selectedTier}
+                    open={openCategory === track.id}
+                    onClick={() => openTrack(track)}
+                  />
+
+                  {openCategory === track.id && (
+                    <div className="grid gap-2 border border-[#29434a] bg-[#09161d] p-2 md:grid-cols-2">
+                      {tierOrder.map((tier) => {
+                        const previousTier = selected[track.id];
+                        const previousEquipment = previousTier
+                          ? track.tiers[previousTier]
+                          : null;
+
+                        const availableCredits =
+                          gameState.credits -
+                          (spend - (previousEquipment?.cost ?? 0));
+
+                        const availableMass =
+                          missionCapacity -
+                          (mass - (previousEquipment?.mass ?? 0));
+
+                        const status = getTierStatus(
+                          track,
+                          tier,
+                          gameState,
+                          availableCredits,
+                          availableMass,
+                        );
+
+                        return (
+                          <TierOption
+                            key={tier}
+                            track={track}
+                            tier={tier}
+                            selected={selectedTier === tier}
+                            status={status}
+                            onSelect={() => selectTier(track, tier)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
+
+          {openCategory && (
+            <button
+              type="button"
+              onClick={() => setOpenCategory(null)}
+              className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#8fa9a2] hover:text-[#efb658]"
+            >
+              <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+              Return to full technology catalog
+            </button>
+          )}
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
@@ -406,7 +634,6 @@ export function MissionLoadout() {
             </div>
 
             <div className="space-y-6 p-5">
-              {/* Colony Treasury */}
               <div className="border border-[#3b5048] bg-[#0d1d22] p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9ab1a8]">
@@ -423,7 +650,6 @@ export function MissionLoadout() {
                 </p>
               </div>
 
-              {/* Payload */}
               <div>
                 <div className="mb-2 flex items-end justify-between">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#9ab1a8]">
@@ -457,7 +683,6 @@ export function MissionLoadout() {
                 </div>
               </div>
 
-              {/* Mission Allocation */}
               <div>
                 <div className="mb-2 flex items-end justify-between">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#9ab1a8]">
@@ -491,7 +716,6 @@ export function MissionLoadout() {
                 </div>
               </div>
 
-              {/* Deployment finances */}
               <div className="border border-[#304949] bg-[#101f23] p-4">
                 <div className="mb-3 text-[9px] font-bold uppercase tracking-[0.2em] text-[#718f80]">
                   Deployment finances
@@ -528,28 +752,40 @@ export function MissionLoadout() {
                 </div>
               </div>
 
-              {/* Loaded systems */}
               <div className="border-t border-[#304949] pt-5">
                 <SectionLabel>
-                  Loaded Foundation systems
+                  Loaded technology systems
                 </SectionLabel>
 
-                <div className="max-h-52 space-y-3 overflow-y-auto pr-1">
-                  {selectedTracks.map((track) => (
-                    <div
-                      key={track.id}
-                      className="flex items-center justify-between text-xs"
-                    >
-                      <span className="flex items-center gap-2 text-[#c3d3c1]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#9fce82]" />
-                        {track.category}
-                      </span>
+                <div className="max-h-60 space-y-3 overflow-y-auto pr-1">
+                  {selectedTracks.map((track) => {
+                    const tier = selected[track.id];
+                    const equipment = track.tiers[tier];
 
-                      <span className="font-mono text-[#859f99]">
-                        {track.tiers.Foundation.mass.toLocaleString()} kg
-                      </span>
-                    </div>
-                  ))}
+                    return (
+                      <div
+                        key={track.id}
+                        className="flex items-center justify-between gap-3 text-xs"
+                      >
+                        <span className="min-w-0 text-[#c3d3c1]">
+                          <span className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#9fce82]" />
+                            <span className="truncate">
+                              {track.category}
+                            </span>
+                          </span>
+
+                          <span className="ml-3.5 text-[8px] uppercase tracking-[0.12em] text-[#718f80]">
+                            {tier} · {equipment.name}
+                          </span>
+                        </span>
+
+                        <span className="shrink-0 font-mono text-[#859f99]">
+                          {equipment.mass.toLocaleString()} kg
+                        </span>
+                      </div>
+                    );
+                  })}
 
                   {!selectedTracks.length && (
                     <p className="text-xs text-[#78918e]">
