@@ -108,6 +108,7 @@ function SolarScene({
   deployed: boolean;
   tier: SolarTier;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
+  selectedComponentName?: string | null;
 }) {
   return (
     <Canvas
@@ -144,6 +145,7 @@ function SolarScene({
           terrain={terrain}
           tier={tier}
           onComponentSelect={onComponentSelect}
+          selectedComponentName={selectedComponentName}
         />
         <Terrain kind={terrain} />
         <Rocks kind={terrain} />
@@ -244,6 +246,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           deployed={deployed}
           tier={tier}
           onComponentSelect={(name, role, explanation) => setSelectedComponent({ name, role, explanation })}
+          selectedComponentName={selectedComponent?.name ?? null}
         />
       </div>
 
