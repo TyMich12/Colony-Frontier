@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Battery,
   Car,
@@ -144,6 +144,12 @@ function CategoryHeader({
       ? "#72b9d4"
       : "#9fce82";
 
+  const categoryStatus = categoryBlocked
+    ? "INSUFFICIENT FUNDS — NOTHING AVAILABLE"
+    : required
+      ? "REQUIRED SYSTEM"
+      : "OPTIONAL SYSTEM";
+
   return (
     <button
       type="button"
@@ -185,12 +191,10 @@ function CategoryHeader({
           </h3>
 
           <p
-            className="mt-1 text-[9px] uppercase tracking-[0.13em]"
+            className="mt-1 text-[9px] font-bold uppercase tracking-[0.13em]"
             style={{ color: categoryColor }}
           >
-            {selectedTier
-              ? `${selectedTier} tier selected`
-              : "No system loaded"}
+            {categoryStatus}
           </p>
         </div>
       </div>
@@ -358,6 +362,8 @@ function TierOption({
 
 export function MissionLoadout() {
   const gameState = loadGameState();
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const catalogScrollY = useRef(0);
 
   const [selected, setSelected] = useState<Record<string, Tier>>(
     () =>
@@ -497,12 +503,32 @@ export function MissionLoadout() {
   }
 
   function openTrack(track: TechnologyTrack) {
-    setOpenCategory((current) =>
-      current === track.id ? null : track.id,
-    );
+    const closing = openCategory === track.id;
+
+    if (!closing) {
+      catalogScrollY.current = window.scrollY;
+    }
+
+    setOpenCategory(closing ? null : track.id);
+
+    if (closing) {
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: catalogScrollY.current,
+          behavior: "smooth",
+        });
+      });
+    } else {
+      requestAnimationFrame(() => {
+        categoryRefs.current[track.id]?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
 
     setNotice(
-      openCategory === track.id
+      closing
         ? "Technology catalog restored. Select another category when ready."
         : `${track.category} expanded. Other categories are hidden while you configure this slot.`,
     );
@@ -611,14 +637,29 @@ export function MissionLoadout() {
               const selectedTier = selected[track.id];
 
               return (
-                <div key={track.id} className="space-y-2">
+                <div
+                  key={track.id}
+                  ref={(element) => {
+                    categoryRefs.current[track.id] = element;
+                  }}
+                  className="space-y-2 scroll-mt-6"
+                >
                   <CategoryHeader
                     track={track}
                     selectedTier={selectedTier}
                     open={openCategory === track.id}
                     required={requiredCategories.has(track.id)}
                     categoryBlocked={categoryIsBlocked(track)}
-                    onClick={() => openTrack(track)}
+                    onClick={() => {
+                      if (categoryIsBlocked(track)) {
+                        setNotice(
+                          `${track.category} has no affordable or available technology for this mission. You cannot select anything from this category.`,
+                        );
+                        return;
+                      }
+
+                      openTrack(track);
+                    }}
                   />
 
                   {openCategory === track.id && (
