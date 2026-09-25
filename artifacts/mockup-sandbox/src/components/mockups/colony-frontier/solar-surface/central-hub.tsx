@@ -161,12 +161,14 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
               <boxGeometry args={[1.1, 1.3, 1.6]} />
             </mesh>
             {[-0.5, -0.17, 0.17, 0.5].map((z, j) => (
-              <mesh key={j} position={[3.18, 0.75, z]} castShadow material={metal}>
-                <boxGeometry args={[0.06, 1.1, 0.22]} />
-              </mesh>
-              <mesh key={`dust-rib-${j}`} position={[3.18, 0.75, z]} scale={[1.01, 1.01, 1.01]} material={dustMaterial}>
-                <boxGeometry args={[0.06, 1.1, 0.22]} />
-              </mesh>
+              <group key={j}>
+                <mesh position={[3.18, 0.75, z]} castShadow material={metal}>
+                  <boxGeometry args={[0.06, 1.1, 0.22]} />
+                </mesh>
+                <mesh position={[3.18, 0.75, z]} scale={[1.01, 1.01, 1.01]} material={dustMaterial}>
+                  <boxGeometry args={[0.06, 1.1, 0.22]} />
+                </mesh>
+              </group>
             ))}
           </group>
         );
@@ -201,7 +203,9 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
               <boxGeometry args={[0.34, 1.1, 0.02]} />
             </mesh>
             <mesh position={[3.2, -0.85, 0]} castShadow material={dark} />
-            <mesh position={[3.2, -0.85, 0]} scale={[1.003, 1.003, 1.003]} material={dustMaterial} />
+            <mesh position={[3.2, -0.85, 0]} scale={[1.003, 1.003, 1.003]} material={dustMaterial}>
+              <boxGeometry args={[0.7, 0.4, 0.7]} />
+            </mesh>
           </group>
         );
       })}
