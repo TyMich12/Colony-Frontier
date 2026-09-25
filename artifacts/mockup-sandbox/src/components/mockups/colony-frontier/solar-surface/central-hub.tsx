@@ -1,9 +1,13 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { solarLive } from "./state";
+import { solarLive, type TerrainKind } from "./state";
+import { makeDustTexture } from "./textures";
+import { makeDustAwareMaterial, updateDustStrength } from "./dust-material";
 
 type HubProps = {
+  dust: number;
+  terrain: TerrainKind;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 };
@@ -42,13 +46,24 @@ function HubHighlight({ name, selected }: { name: string; selected: boolean }) {
   return <mesh position={[0, 0.05, 0]} scale={1.045}>{material}<cylinderGeometry args={[3.4, 3.8, 0.3, 40]} /></mesh>;
 }
 
-export function CentralHub({ onSelect, selectedComponentName }: HubProps) {
+export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: HubProps) {
   const indicatorRef = useRef<THREE.MeshStandardMaterial>(null);
   const gridRef = useRef<THREE.MeshStandardMaterial>(null);
+  const dustTexture = useMemo(() => makeDustTexture(terrain), [terrain]);
+  const dustColor = terrain === "moon" ? "#b7b1a4" : "#c08a5c";
 
-  const metal = useMemo(() => new THREE.MeshStandardMaterial({ color: "#c9ccd2", metalness: 0.85, roughness: 0.35 }), []);
-  const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3d44", metalness: 0.7, roughness: 0.5 }), []);
-  const gold = useMemo(() => new THREE.MeshStandardMaterial({ color: "#caa14a", metalness: 0.9, roughness: 0.25 }), []);
+  const metal = useMemo(
+    () => makeDustAwareMaterial({ color: "#c9ccd2", metalness: 0.85, roughness: 0.35 }, dustTexture, dustColor),
+    [dustTexture, dustColor],
+  );
+  const dark = useMemo(
+    () => makeDustAwareMaterial({ color: "#3a3d44", metalness: 0.7, roughness: 0.5 }, dustTexture, dustColor),
+    [dustTexture, dustColor],
+  );
+  const gold = useMemo(
+    () => makeDustAwareMaterial({ color: "#caa14a", metalness: 0.9, roughness: 0.25 }, dustTexture, dustColor),
+    [dustTexture, dustColor],
+  );
 
   const select = (event: { stopPropagation: () => void }, info: string[]) => {
     event.stopPropagation();
@@ -56,6 +71,9 @@ export function CentralHub({ onSelect, selectedComponentName }: HubProps) {
   };
 
   useFrame((state) => {
+    updateDustStrength(metal, dust);
+    updateDustStrength(dark, dust);
+    updateDustStrength(gold, dust);
     const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
     if (indicatorRef.current) indicatorRef.current.emissiveIntensity = 0.6 + pulse * 1.4;
     if (gridRef.current) gridRef.current.emissiveIntensity = 0.15 + (solarLive.powerKW / 100) * 0.9;

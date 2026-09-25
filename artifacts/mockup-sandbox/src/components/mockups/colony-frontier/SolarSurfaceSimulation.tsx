@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
@@ -6,7 +6,6 @@ import { ArrowLeft, ArrowRight, Moon, Power, Sparkles, Sun, Wind, Gauge } from "
 import { SolarFarm } from "./solar-surface/solar-farm";
 import { Terrain, Rocks } from "./solar-surface/terrain";
 import { DustParticles } from "./solar-surface/dust-particles";
-import { makeDustTexture } from "./solar-surface/textures";
 import {
   CELL_EFFICIENCY,
   solarLive,
@@ -99,195 +98,6 @@ function Readout({
   );
 }
 
-function DustStormCoating({ dust, terrain }: { dust: number; terrain: TerrainKind }) {
-  const amount = Math.max(0, Math.min(1, dust / 100));
-  const dustTexture = useMemo(() => makeDustTexture(terrain), [terrain]);
-
-  if (amount <= 0.001) return null;
-
-  // The Moon uses opaque alpha-cutout dust decals rather than transparent shells.
-  // Transparent overlapping meshes were the source of the halo artifacts.
-  if (terrain === "moon") {
-    const alphaTest = 0.78 - Math.pow(amount, 0.72) * 0.70;
-    const dustMaterial = (
-      <meshStandardMaterial
-        color="#b7b1a4"
-        alphaMap={dustTexture}
-        alphaTest={Math.max(0.06, alphaTest)}
-        roughness={1}
-        metalness={0}
-        polygonOffset
-        polygonOffsetFactor={-1}
-        polygonOffsetUnits={-1}
-      />
-    );
-
-    return (
-      <group>
-        {/* Central base and the full equipment stack. Exact geometry avoids floating shells. */}
-        <mesh position={[0, 0.05, 0]} scale={[1.002, 1.002, 1.002]}>
-          <cylinderGeometry args={[3.4, 3.8, 0.3, 40]} />
-          {dustMaterial}
-        </mesh>
-        <mesh position={[0, 1.7, 0]} scale={[1.002, 1.002, 1.002]}>
-          <cylinderGeometry args={[1.5, 1.8, 3.1, 12]} />
-          {dustMaterial}
-        </mesh>
-        <mesh position={[0, 0.9, 0]} scale={[1.002, 1.002, 1.002]}>
-          <cylinderGeometry args={[1.85, 1.85, 0.9, 12]} />
-          {dustMaterial}
-        </mesh>
-        <mesh position={[0, 3.35, 0]} scale={[1.002, 1.002, 1.002]}>
-          <cylinderGeometry args={[2.15, 1.6, 0.5, 12]} />
-          {dustMaterial}
-        </mesh>
-        <mesh position={[0, 4.2, 0]} scale={[1.002, 1.002, 1.002]}>
-          <boxGeometry args={[1.2, 1.2, 1.2]} />
-          {dustMaterial}
-        </mesh>
-
-        {/* The avionics display and indicators remain exposed to lunar dust as well. */}
-        <mesh position={[0, 4.2, 0.625]}>
-          <planeGeometry args={[0.9, 0.9]} />
-          {dustMaterial}
-        </mesh>
-        {[-0.5, 0, 0.5].map((x) => (
-          <mesh key={x} position={[x, 4.85, 0.4]} scale={1.08}>
-            <sphereGeometry args={[0.07, 12, 12]} />
-            {dustMaterial}
-          </mesh>
-        ))}
-
-        {/* Four hub drives, including their exposed face ribs. */}
-        {[0, 1, 2, 3].map((i) => {
-          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-          return (
-            <group key={i} rotation={[0, a, 0]}>
-              <mesh position={[2.6, 0.75, 0]} scale={[1.002, 1.002, 1.002]}>
-                <boxGeometry args={[1.1, 1.3, 1.6]} />
-                {dustMaterial}
-              </mesh>
-              {[-0.5, -0.17, 0.17, 0.5].map((z) => (
-                <mesh key={z} position={[3.18, 0.75, z]} scale={[1.02, 1.02, 1.02]}>
-                  <boxGeometry args={[0.06, 1.1, 0.22]} />
-                  {dustMaterial}
-                </mesh>
-              ))}
-            </group>
-          );
-        })}
-
-        {/* Both radiator panels and their fins can accumulate lunar dust. */}
-        {[0, 1].map((i) => {
-          const a = i === 0 ? Math.PI / 4 : -Math.PI / 4 + Math.PI;
-          return (
-            <group key={i} rotation={[0, a, 0]}>
-              <mesh position={[2.4, 2.6, 0]} scale={[1.002, 1.002, 1.01]}>
-                <boxGeometry args={[2.6, 1.6, 0.05]} />
-                {dustMaterial}
-              </mesh>
-              {[-0.6, -0.2, 0.2, 0.6].map((y) => (
-                <mesh key={y} position={[2.4, 2.6 + y, 0.05]} scale={[1.01, 1.01, 1.02]}>
-                  <boxGeometry args={[2.5, 0.06, 0.06]} />
-                  {dustMaterial}
-                </mesh>
-              ))}
-            </group>
-          );
-        })}
-
-        {/* Four deployment booms, their actuators and exposed lower braces. */}
-        {[0, 1, 2, 3].map((i) => {
-          const a = (i / 4) * Math.PI * 2;
-          return (
-            <group key={i} rotation={[0, a, 0]}>
-              <mesh position={[3.85, 3.2, 0]} scale={[1.002, 1.02, 1.02]}>
-                <boxGeometry args={[3.4, 0.22, 0.22]} />
-                {dustMaterial}
-              </mesh>
-              {[0.6, 1.5, 2.4].map((x) => (
-                <mesh key={x} position={[2.15 + x, 3.2, 0]} scale={1.03}>
-                  <boxGeometry args={[0.06, 0.34, 0.34]} />
-                  {dustMaterial}
-                </mesh>
-              ))}
-              <mesh position={[2.25, 3.2, 0]} rotation={[Math.PI / 2, 0, 0]} scale={1.002}>
-                <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
-                {dustMaterial}
-              </mesh>
-              <mesh position={[2.15 + 1.7, 3.06, 0.09]} scale={[1.002, 1.02, 1.02]}>
-                <boxGeometry args={[3.4, 0.05, 0.05]} />
-                {dustMaterial}
-              </mesh>
-            </group>
-          );
-        })}
-      </group>
-    );
-  }
-
-  // Mars keeps the existing broad coating because atmospheric dust is carried by wind
-  // and naturally reaches more exposed surfaces.
-  const opacity = 0.04 + Math.pow(amount, 0.7) * 0.58;
-  const material = (
-    <meshStandardMaterial
-      color="#b48762"
-      transparent
-      opacity={opacity}
-      roughness={1}
-      metalness={0}
-      depthWrite={false}
-    />
-  );
-
-  return (
-    <group>
-      <mesh position={[0, 0.12, 0]}>
-        <cylinderGeometry args={[3.4, 3.8, 0.30, 40]} />
-        {material}
-      </mesh>
-      <mesh position={[0, 1.7, 0]}>
-        <cylinderGeometry args={[1.5, 1.8, 3.1, 12]} />
-        {material}
-      </mesh>
-      <mesh position={[0, 4.2, 0]}>
-        <boxGeometry args={[1.2, 1.2, 1.2]} />
-        {material}
-      </mesh>
-      {[0, 1, 2, 3].map((i) => {
-        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        return (
-          <group key={i} rotation={[0, a, 0]}>
-            <mesh position={[2.6, 0.75, 0]}>
-              <boxGeometry args={[1.1, 1.3, 1.6]} />
-              {material}
-            </mesh>
-          </group>
-        );
-      })}
-      {[0, 1, 2, 3].map((i) => {
-        const a = (i / 4) * Math.PI * 2;
-        return (
-          <group key={i} rotation={[0, a, 0]}>
-            <mesh position={[3.9, 3.2, 0]}>
-              <boxGeometry args={[3.8, 0.34, 0.34]} />
-              {material}
-            </mesh>
-          </group>
-        );
-      })}
-      <mesh position={[0, 3.60, 0]}>
-        <cylinderGeometry args={[2.15, 1.6, 0.06, 12]} />
-        {material}
-      </mesh>
-      <mesh position={[0, 4.81, 0]}>
-        <boxGeometry args={[1.2, 0.06, 1.2]} />
-        {material}
-      </mesh>
-    </group>
-  );
-}
-
 function SolarScene({
   terrain,
   dust,
@@ -335,7 +145,6 @@ function SolarScene({
         <Terrain kind={terrain} />
         <Rocks kind={terrain} />
         <DustParticles kind={terrain} dust={dust} />
-        <DustStormCoating dust={dust} terrain={terrain} />
       </group>
 
       <OrbitControls
