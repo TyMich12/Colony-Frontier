@@ -46,7 +46,7 @@ function Highlight({
   type,
   position = [0, 0, 0],
 }: {
-  type: "panel" | "cylinder" | "frame" | "bus";
+  type: "panel" | "cylinder" | "actuator" | "frame" | "bus";
   position?: [number, number, number];
 }) {
   const material = (
@@ -92,9 +92,18 @@ function Highlight({
     );
   }
 
+  if (type === "actuator") {
+    return (
+      <mesh position={position} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.315, 0.315, 0.72, 20]} />
+        {material}
+      </mesh>
+    );
+  }
+
   return (
     <mesh position={position} rotation={[Math.PI / 2, 0, 0]}>
-      <cylinderGeometry args={[0.15, 0.15, 0.54, 16]} />
+      <cylinderGeometry args={[0.13, 0.13, 0.52, 16]} />
       {material}
     </mesh>
   );
@@ -184,25 +193,32 @@ function PanelSegment({
 
       {busSelected && <Highlight type="bus" />}
 
-      {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
-        <mesh
-          key={z}
-          position={[0, 0.13, z]}
-          rotation={[Math.PI / 2, 0, 0]}
-          material={frameMaterial}
-          castShadow
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect?.("Panel hinge · segment " + (segmentIndex + 1), "Controls folding between panel segments.", "The hinge transfers deployment loads while allowing the blanket to fold for launch and unfold on the surface. Bearings, flexures or geared joints must survive repeated thermal cycling and dust exposure.");
-          }}
-        >
-          <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
-        </mesh>
-      ))}
-
-      {selectedComponentName === "Panel hinge · segment " + (segmentIndex + 1) &&
-        <Highlight type="cylinder" position={[0, 0.13, 0]} />
-      }
+      {segmentIndex < NUM_SEG - 1 && (
+        <>
+          {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
+            <mesh
+              key={z}
+              position={[SEG_LEN, 0.13, z]}
+              rotation={[Math.PI / 2, 0, 0]}
+              material={frameMaterial}
+              castShadow
+              onClick={(event) => {
+                event.stopPropagation();
+                const hingeName = "Panel hinge · between segments " + (segmentIndex + 1) + "–" + (segmentIndex + 2);
+                onSelect?.(hingeName, "Controls folding between panel segments.", "The hinge transfers deployment loads while allowing the blanket to fold for launch and unfold on the surface. Bearings, flexures or geared joints must survive repeated thermal cycling and dust exposure.");
+              }}
+            >
+              <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
+            </mesh>
+          ))}
+          {selectedComponentName === "Panel hinge · between segments " + (segmentIndex + 1) + "–" + (segmentIndex + 2) && (
+            <>
+              <Highlight type="cylinder" position={[SEG_LEN, 0.13, -SEG_WIDTH / 2 + 0.3]} />
+              <Highlight type="cylinder" position={[SEG_LEN, 0.13, SEG_WIDTH / 2 - 0.3]} />
+            </>
+          )}
+        </>
+      )}
     </group>
   );
 }
@@ -276,8 +292,8 @@ export function PanelWing({
         </mesh>
         {selectedComponentName === boomName && (
           <mesh position={[BOOM_LEN / 2, 0, 0]}>
-            <boxGeometry args={[BOOM_LEN + 0.14, 0.36, 0.36]} />
-            <meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe />
+            <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
+            <meshBasicMaterial color="#45f3ff" transparent opacity={0.32} depthWrite={false} blending={THREE.AdditiveBlending} />
           </mesh>
         )}
 
@@ -299,7 +315,7 @@ export function PanelWing({
         >
           <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
         </mesh>
-        {selectedComponentName === "Array deployment actuator" && <Highlight type="cylinder" position={[0.1, 0, 0]} />}
+        {selectedComponentName === "Array deployment actuator" && <Highlight type="actuator" position={[0.1, 0, 0]} />}
 
         <mesh position={[BOOM_LEN / 2, -0.14, 0.09]} material={boomMaterial}>
           <boxGeometry args={[BOOM_LEN, 0.05, 0.05]} />
