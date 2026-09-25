@@ -148,6 +148,7 @@ export function calculatePowerKW({
     surfaceIrradiance *
     area *
     CELL_EFFICIENCY[tier] *
+    SYSTEM_ELECTRICAL_EFFICIENCY *
     ARRAY_DERATING *
     Math.max(0, Math.min(1, deployment)) *
     dustFactor;
