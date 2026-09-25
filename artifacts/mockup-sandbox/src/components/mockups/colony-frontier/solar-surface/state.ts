@@ -21,7 +21,10 @@ export const MARS_AIRMASS_LIMIT_ZENITH_DEG = 80;
 export const MARS_AIRMASS_LIMIT_COS_ZENITH =
   Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
 
-// The power model uses P = G × A × η. No arbitrary extra derating is applied.\nexport const ARRAY_DERATING = 1.0;
+// The power model uses P = G × A × η. No arbitrary extra derating is applied.
+export const ARRAY_DERATING = 1.0;
+export const MARS_PANEL_DUST_MAX_OPTICAL_DEPTH = 1.0;
+export const LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH = 0.7;
 export const MARS_SEVERE_DUST_REMAINING = 0.05;
 export const LUNAR_DUST_REFERENCE_MG_CM2 = 3.0;
 export const LUNAR_DUST_REFERENCE_REMAINING = 0.08;
