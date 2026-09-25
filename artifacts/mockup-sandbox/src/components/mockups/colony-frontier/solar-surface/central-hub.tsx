@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { solarLive } from "./state";
 
-export function CentralHub({ onSelect }: { onSelect?: (name: string, role: string, explanation: string) => void }) {
+export function CentralHub({ onSelect, selected = false }: { onSelect?: (name: string, role: string, explanation: string) => void; selected?: boolean }) {
   const indicatorRef = useRef<THREE.MeshStandardMaterial>(null);
   const gridRef = useRef<THREE.MeshStandardMaterial>(null);
 
@@ -56,6 +56,13 @@ export function CentralHub({ onSelect }: { onSelect?: (name: string, role: strin
         "The central hub connects the solar wings to the colony electrical system. It houses structural interfaces, power routing, monitoring hardware and deployment mechanisms that keep the four array wings operating as one power plant.",
       );
     }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
+      {selected && (
+        <mesh position={[0, 2.1, 0]}>
+          <cylinderGeometry args={[3.95, 3.95, 4.7, 32, 1, true]} />
+          <meshBasicMaterial color="#45f3ff" transparent opacity={0.18} depthWrite={false} wireframe />
+        </mesh>
+      )}
+
       <mesh position={[0, 0.05, 0]} receiveShadow material={dark}>
         <cylinderGeometry args={[3.4, 3.8, 0.3, 40]} />
       </mesh>
