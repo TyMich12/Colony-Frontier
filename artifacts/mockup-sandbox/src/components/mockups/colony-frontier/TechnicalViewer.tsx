@@ -3,6 +3,7 @@ import type { PointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { ArrowLeft, ChevronRight, Rotate3D, Scan, X, ZoomIn } from "lucide-react";
 import { GameShell, SectionLabel } from "./_shared/GameShell";
 import { formatCredits, tierMeta, type TechnologyTrack, type Tier } from "./_shared/gameData";
+import { Solar3DViewer } from "./Solar3DViewer";
 
 type Shape = "box" | "panel" | "cylinder" | "dish" | "wheel" | "sphere" | "antenna" | "pipe";
 
@@ -1328,6 +1329,30 @@ export function TechnicalViewer({
   const accent = tierMeta[tier].color;
   const [selected, setSelected] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  if (track.id === "solar") {
+    return (
+      <GameShell active="lab" eyebrow="Engineering visualization / systems knowledge" title="Technical Viewer">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border border-[#3a5559] bg-[#0c1a21] px-4 py-3">
+          <button type="button" onClick={onBack} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#b8d1c5] hover:text-[#f0f4e8]">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Technology Lab
+          </button>
+          <span className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: accent }}>
+            SOLAR · ADVANCED SYSTEM STUDY
+          </span>
+        </div>
+        <div className="mb-5">
+          <SectionLabel>Integrated solar power system</SectionLabel>
+          <h2 className="mt-2 text-2xl font-semibold uppercase tracking-[.11em] text-[#f0f4e8]">{track.tiers[tier].name}</h2>
+          <p className="mt-2 max-w-5xl text-sm leading-6 text-[#91aaa3]">
+            One detailed 3D model for the entire Solar technology: deployable photovoltaic wings, power electronics, battery storage, thermal rejection, avionics, deployment hardware and electrical interfaces.
+          </p>
+        </div>
+        <Solar3DViewer tier={tier} />
+      </GameShell>
+    );
+  }
 
   useEffect(() => {
     setSelected(0);
