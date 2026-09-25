@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
-import { ArrowLeft, ScanLine } from "lucide-react";
+import { ScanLine } from "lucide-react";
 import { tierMeta, type Tier } from "./_shared/gameData";
 
 type SolarComponent = {
@@ -113,6 +113,13 @@ const COMPONENTS: SolarComponent[] = [
 const componentById = Object.fromEntries(
   COMPONENTS.map((component) => [component.id, component]),
 ) as Record<string, SolarComponent>;
+
+const SOLAR_TIERS: Record<Tier, { name: string; mass: number; cost: number; efficiency: string }> = {
+  Foundation: { name: "Helios-1", mass: 850, cost: 3, efficiency: "Reliable normal-sun output" },
+  Frontier: { name: "Helios-X", mass: 1250, cost: 6.5, efficiency: "Improved low-angle performance" },
+  Apex: { name: "Helios-XR", mass: 1750, cost: 12, efficiency: "Automated tracking + dust tolerance" },
+  Research: { name: "Helios-Nova", mass: 1600, cost: 15, efficiency: "Extreme output in difficult light" },
+};
 
 function useEarthTexture() {
   return useMemo(() => {
@@ -305,97 +312,80 @@ function SolarWing({
   onSelectGimbal: () => void;
 }) {
   const gimbal = useRef<THREE.Group>(null);
-  const leftPanel = useRef<THREE.Group>(null);
-  const rightPanel = useRef<THREE.Group>(null);
+  const wingRefs = useRef<Array<THREE.Group | null>>([null, null]);
 
   useFrame(() => {
     if (gimbal.current) gimbal.current.rotation.x = trackingAngle.current;
-    const d = Math.max(0.06, deployment.current);
-    const length = 3.1 + 4.4 * d;
-    const x = side * (3.3 + length / 2);
 
-    if (leftPanel.current) {
-      leftPanel.current.position.x = x;
-      leftPanel.current.scale.x = d;
-    }
-    if (rightPanel.current) {
-      rightPanel.current.position.x = x;
-      rightPanel.current.scale.x = d;
-    }
+    const d = Math.max(0.04, deployment.current);
+    const length = 3.0 + 3.8 * d;
+
+    wingRefs.current.forEach((wing, index) => {
+      if (!wing) return;
+      wing.position.x = side * (0.7 + length / 2);
+      wing.scale.x = d;
+      wing.position.z = index === 0 ? 1.15 : -1.15;
+    });
   });
 
   return (
-    <group position={[side * 3.15, 0, 0]}>
-      <mesh rotation={[0, 0, Math.PI / 2]} onClick={(event) => {
-        event.stopPropagation();
-        onSelectGimbal();
-      }}>
-        <cylinderGeometry args={[0.34, 0.34, 0.46, 32]} />
+    <group position={[side * 2.85, 0, 0]}>
+      <mesh
+        rotation={[0, 0, Math.PI / 2]}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelectGimbal();
+        }}
+      >
+        <cylinderGeometry args={[0.30, 0.30, 0.48, 32]} />
         <meshStandardMaterial
           color={selected === "gimbal" ? "#d89a3b" : "#bcc4cb"}
-          metalness={0.9}
-          roughness={0.22}
+          metalness={0.92}
+          roughness={0.2}
           emissive={selected === "gimbal" ? "#8d5115" : "#000000"}
           emissiveIntensity={selected === "gimbal" ? 0.55 : 0}
         />
       </mesh>
 
-      <group ref={gimbal} scale={[side, 1, 1]}>
-        <mesh position={[0.17, 0, 0]}>
-          <boxGeometry args={[0.22, 0.24, 3.0]} />
+      <group ref={gimbal}>
+        <mesh position={[side * 0.18, 0, 0]}>
+          <boxGeometry args={[0.22, 0.24, 2.75]} />
           <meshStandardMaterial color="#8d969e" metalness={0.86} roughness={0.31} />
         </mesh>
 
-        <group ref={leftPanel}>
-          <Panel
-            position={[0, 0, 0.84]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            selected={selected === "blanket"}
-            onSelect={onSelectBlanket}
-          />
-          <mesh
-            position={[0, -0.13, 1.52]}
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelectBoom();
+        {[1.15, -1.15].map((z, index) => (
+          <group
+            key={z}
+            ref={(node) => {
+              wingRefs.current[index] = node;
             }}
           >
-            <boxGeometry args={[7.2, 0.07, 0.06]} />
-            <meshStandardMaterial
-              color={selected === "booms" ? "#d4aa57" : "#3a4046"}
-              metalness={0.72}
-              roughness={0.4}
+            <Panel
+              position={[0, 0, 0]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              selected={selected === "blanket"}
+              onSelect={onSelectBlanket}
             />
-          </mesh>
-        </group>
-
-        <group ref={rightPanel}>
-          <Panel
-            position={[0, 0, -0.84]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            selected={selected === "blanket"}
-            onSelect={onSelectBlanket}
-          />
-          <mesh
-            position={[0, -0.13, -1.52]}
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelectBoom();
-            }}
-          >
-            <boxGeometry args={[7.2, 0.07, 0.06]} />
-            <meshStandardMaterial
-              color={selected === "booms" ? "#d4aa57" : "#3a4046"}
-              metalness={0.72}
-              roughness={0.4}
-            />
-          </mesh>
-        </group>
+            <mesh
+              position={[0, -0.15, z > 0 ? 1.48 : -1.48]}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectBoom();
+              }}
+            >
+              <boxGeometry args={[7.15, 0.075, 0.07]} />
+              <meshStandardMaterial
+                color={selected === "booms" ? "#d4aa57" : "#3a4046"}
+                metalness={0.72}
+                roughness={0.4}
+              />
+            </mesh>
+          </group>
+        ))}
       </group>
     </group>
   );
 }
-
 function Spacecraft({
   deployment,
   trackingAngle,
@@ -534,10 +524,12 @@ function SimulationModel({
   selected,
   onSelect,
   onTelemetry,
+  deploymentTarget,
 }: {
   selected: string | null;
   onSelect: (id: string) => void;
   onTelemetry: (value: { power: number; incidence: number; eclipse: boolean; deployment: number }) => void;
+  deploymentTarget: number;
 }) {
   const deployment = useRef(0.05);
   const sunAngle = useRef((28 * Math.PI) / 180);
@@ -552,7 +544,8 @@ function SimulationModel({
     const angle = sunAngle.current;
     sunDirection.current.set(0, Math.cos(angle), Math.sin(angle)).normalize();
 
-    deployment.current += (1 - deployment.current) * Math.min(1, dt * 0.95);
+    deployment.current +=
+      (deploymentTarget - deployment.current) * Math.min(1, dt * 1.8);
 
     const eclipse = isEclipsed(sunDirection.current);
     const targetWing = eclipse ? wingAngle.current : angle;
@@ -600,14 +593,16 @@ function SolarScene({
   selected,
   onSelect,
   onTelemetry,
+  deploymentTarget,
 }: {
   selected: string | null;
   onSelect: (id: string) => void;
   onTelemetry: (value: { power: number; incidence: number; eclipse: boolean; deployment: number }) => void;
+  deploymentTarget: number;
 }) {
   return (
     <Canvas
-      camera={{ position: [11, 5.2, 14], fov: 46, near: 0.1, far: 500 }}
+      camera={{ position: [10.5, 4.7, 13.8], fov: 47, near: 0.1, far: 500 }}
       dpr={[1, 1.75]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       aria-label="Interactive 3D simulation of a deployable spacecraft solar array"
@@ -627,18 +622,21 @@ function SolarScene({
       />
 
       <group position={[0, 0, 0]}>
-        <SimulationModel
-          selected={selected}
-          onSelect={onSelect}
-          onTelemetry={onTelemetry}
-        />
+        <group scale={0.82}>
+          <SimulationModel
+            selected={selected}
+            onSelect={onSelect}
+            onTelemetry={onTelemetry}
+            deploymentTarget={deploymentTarget}
+          />
+        </group>
       </group>
 
       <OrbitControls
         enableDamping
         dampingFactor={0.08}
-        minDistance={7}
-        maxDistance={48}
+        minDistance={6.5}
+        maxDistance={40}
         enablePan={false}
         rotateSpeed={0.68}
         zoomSpeed={0.9}
@@ -738,6 +736,7 @@ function InspectPanel({
 export function Solar3DViewer({ tier }: { tier: Tier }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [inspectOpen, setInspectOpen] = useState(false);
+  const [deploymentTarget, setDeploymentTarget] = useState(1);
   const [telemetry, setTelemetry] = useState({
     power: 0,
     incidence: 0,
@@ -747,6 +746,7 @@ export function Solar3DViewer({ tier }: { tier: Tier }) {
 
   const selectedComponent = selected ? componentById[selected] : null;
   const accent = tierMeta[tier].color;
+  const gameTier = SOLAR_TIERS[tier];
 
   return (
     <div className="relative overflow-hidden border border-[#2e4a50] bg-[#02060b]">
@@ -759,10 +759,10 @@ export function Solar3DViewer({ tier }: { tier: Tier }) {
             NASA-inspired integrated 3D simulation
           </p>
           <h2 className="mt-2 text-2xl font-semibold uppercase tracking-[.08em] text-[#edf2e9] md:text-3xl">
-            ROSA-class roll-out solar power system
+            {gameTier.name} · ROSA-class roll-out solar power system
           </h2>
           <p className="mt-2 max-w-xl text-[11px] leading-5 text-[#819b94] md:text-xs">
-            Drag to orbit. Scroll to zoom. Click the actual 3D hardware to select a component. The array deploys, tracks the Sun and responds to eclipse automatically.
+            Drag to orbit. Scroll to zoom. Use the deployment slider below. Click the 3D hardware to select a component. This is the Solar technology family used by the game; each tier changes the loadout specification and capability.
           </p>
         </div>
 
@@ -807,6 +807,24 @@ export function Solar3DViewer({ tier }: { tier: Tier }) {
           </p>
         </div>
 
+
+        <div className="absolute right-5 top-56 w-52 border border-[#30494f] bg-[#061118]/72 p-3 backdrop-blur-md md:right-7 md:top-60">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[8px] font-bold uppercase tracking-[.16em] text-[#708a83]">Game loadout</span>
+            <span className="text-[9px] font-mono text-[#dde7df]">{gameTier.cost{'}'}M</span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[8px] uppercase tracking-[.1em]">
+            <div>
+              <p className="text-[#708a83]">Mass</p>
+              <p className="mt-1 font-mono text-[#dde7df]">{gameTier.mass.toLocaleString(){'}'} kg</p>
+            </div>
+            <div>
+              <p className="text-[#708a83]">Tier</p>
+              <p className="mt-1 text-[#dde7df]">{tier{'}'}</p>
+            </div>
+          </div>
+          <p className="mt-2 text-[8px] leading-4 text-[#78918b]">{gameTier.efficiency{'}'}</p>
+        </div>
         <div className="absolute bottom-24 left-5 border border-[#30494f] bg-[#061118]/75 px-3 py-2 text-[8px] uppercase tracking-[.14em] text-[#78918b] backdrop-blur-md md:left-7">
           {selectedComponent
             ? `Selected · ${selectedComponent.name}`
@@ -821,23 +839,51 @@ export function Solar3DViewer({ tier }: { tier: Tier }) {
         </div>
       </div>
 
-      <div className="h-[700px] w-full md:h-[760px]">
+      <div className="h-[560px] w-full md:h-[620px]">
         <SolarScene
           selected={selected}
           onSelect={setSelected}
           onTelemetry={setTelemetry}
+          deploymentTarget={deploymentTarget}
         />
       </div>
 
       <div className="border-t border-[#29434a] bg-[#07151c] px-5 py-4 md:px-7 md:py-5">
         <div className="mx-auto max-w-5xl">
+          <div className="mb-4 border border-[#30494f] bg-[#0a1920] px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <label htmlFor="solar-deployment" className="text-[9px] font-bold uppercase tracking-[.18em] text-[#d4e2da]">
+                Wing deployment
+              </label>
+              <span className="font-mono text-[10px] tabular-nums text-[#efb658]">
+                {Math.round(deploymentTarget * 100)}%
+              </span>
+            </div>
+            <input
+              id="solar-deployment"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(deploymentTarget * 100)}
+              onChange={(event) => setDeploymentTarget(Number(event.target.value) / 100)}
+              className="mt-3 h-1.5 w-full cursor-pointer accent-[#efb658]"
+              aria-label="Solar wing deployment"
+            />
+            <div className="mt-2 flex justify-between text-[7px] uppercase tracking-[.14em] text-[#647d77]">
+              <span>STOWED</span>
+              <span>PARTIAL</span>
+              <span>DEPLOYED</span>
+            </div>
+          </div>
+
           <button
             type="button"
             disabled={!selectedComponent}
             onClick={() => {
               if (selectedComponent) setInspectOpen(true);
             }}
-            className="flex w-full items-center justify-center gap-2 border border-[#536d61] bg-[#11252a] px-5 py-4 text-[10px] font-bold uppercase tracking-[.18em] text-[#d4e2da] transition-colors hover:border-[#efb658] hover:bg-[#162e34] disabled:cursor-not-allowed disabled:opacity-35"
+            className="flex w-full items-center justify-center gap-2 border border-[#536d61] bg-[#11252a] px-5 py-3.5 text-[10px] font-bold uppercase tracking-[.18em] text-[#d4e2da] transition-colors hover:border-[#efb658] hover:bg-[#162e34] disabled:cursor-not-allowed disabled:opacity-35"
           >
             <ScanLine className="h-4 w-4 text-[#efb658]" />
             {selectedComponent
@@ -846,7 +892,6 @@ export function Solar3DViewer({ tier }: { tier: Tier }) {
           </button>
         </div>
       </div>
-
       {inspectOpen && selectedComponent && (
         <InspectPanel
           component={selectedComponent}
