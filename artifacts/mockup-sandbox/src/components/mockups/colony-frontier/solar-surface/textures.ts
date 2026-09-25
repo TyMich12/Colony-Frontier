@@ -150,44 +150,107 @@ export function makeTerrainTexture(kind: "moon" | "mars", size = 1024) {
   return texture;
 }
 
-export function makeDustTexture(kind: "moon" | "mars", size = 384) {
+export function makeDustTexture(kind: "moon" | "mars", size = 512) {
+  /*
+   * Physical-looking dust layer: broad irregular accumulation + medium clumps
+   * + fine powder + sparse individual grains. The alpha channel exposes the
+   * solar-cell texture through gaps, avoiding the "colour changed in spots" look.
+   */
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
   const image = ctx.createImageData(size, size);
-  const base = kind === "mars" ? [184, 116, 76] : [176, 171, 163];
+
+  const base =
+    kind === "mars"
+      ? { r: 178, g: 106, b: 67 }
+      : { r: 172, g: 168, b: 160 };
+
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  const hash = (x: number, y: number) => {
+    const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const nx = x / size;
       const ny = y / size;
-      const coarse = fbm(nx * 3.4, ny * 3.4, 5);
-      const medium = fbm(nx * 13 + 5, ny * 13 + 9, 4);
-      const fine = fbm(nx * 46 + 17, ny * 46 + 23, 2);
-      const streak = fbm(nx * 2.4 + ny * 5.8, ny * 18 + nx * 2.2, 4);
 
-      const broadDeposit = coarse * 0.48 + medium * 0.22 + streak * 0.22 + fine * 0.08;
-      const largePatches = Math.max(0, Math.min(1, (broadDeposit - 0.52) / 0.30));
-      const smallClumps = Math.max(0, Math.min(1, (fine * 0.78 + medium * 0.22 - 0.60) / 0.30));
-      const deposit = Math.max(0, Math.min(1, largePatches * 0.90 + smallClumps * 0.34));
-      const softened = Math.pow(deposit, 0.68);
-      const alpha = Math.max(0, Math.min(255, softened * 255));
+      const broadA = fbm(nx * 2.7 + 11, ny * 3.1 + 7, 5);
+      const broadB = fbm(nx * 6.0 + 31, ny * 4.2 + 19, 4);
+      const wind = fbm(nx * 2.0 + ny * 5.5, ny * 15.0 + nx * 1.8, 4);
 
-      const grain = (fine - 0.5) * 22 + (medium - 0.5) * 16;
-      const patchShade = (coarse - 0.5) * 12;
+      const mediumA = fbm(nx * 17.0 + 41, ny * 15.0 + 13, 3);
+      const mediumB = fbm(nx * 31.0 + 73, ny * 28.0 + 29, 2);
+
+      const fine = fbm(nx * 72.0 + 101, ny * 68.0 + 47, 2);
+      const grain = hash(Math.floor(nx * size * 0.72), Math.floor(ny * size * 0.72));
+
+      const broad = clamp01((broadA * 0.58 + broadB * 0.18 + wind * 0.24 - 0.43) / 0.40);
+      const brokenMedium = clamp01((mediumA * 0.62 + mediumB * 0.38 - 0.50) / 0.28);
+
+      const coverage = clamp01(
+        broad * 0.72 +
+        broad * brokenMedium * 0.34 +
+        Math.max(0, fine - 0.54) * 0.62 +
+        Math.max(0, grain - 0.72) * 0.18,
+      );
+
+      const powder = Math.pow(coverage, 0.82);
+      const localShade =
+        (mediumA - 0.5) * 18 +
+        (fine - 0.5) * 13 +
+        (grain - 0.5) * 9;
+      const warmShift = kind === "mars" ? (mediumB - 0.5) * 12 : 0;
+
+      const r = clamp01((base.r + localShade + warmShift) / 255) * 255;
+      const g = clamp01((base.g + localShade * 0.82 + warmShift * 0.52) / 255) * 255;
+      const b = clamp01((base.b + localShade * 0.70 + warmShift * 0.34) / 255) * 255;
+
       const i = (y * size + x) * 4;
-      image.data[i] = Math.max(0, Math.min(255, base[0] + grain + patchShade));
-      image.data[i + 1] = Math.max(0, Math.min(255, base[1] + grain + patchShade));
-      image.data[i + 2] = Math.max(0, Math.min(255, base[2] + grain + patchShade));
-      image.data[i + 3] = alpha;
+      image.data[i] = r;
+      image.data[i + 1] = g;
+      image.data[i + 2] = b;
+      image.data[i + 3] = Math.round(powder * 255);
     }
   }
 
   ctx.putImageData(image, 0, 0);
+
+  // Sparse individual grains add fine physical texture at normal viewing distance.
+  ctx.globalCompositeOperation = "source-over";
+  const grainCount = kind === "mars" ? 4200 : 3600;
+  for (let i = 0; i < grainCount; i += 1) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const radius = 0.35 + Math.random() * 1.7;
+    const alpha = 0.025 + Math.random() * 0.11;
+    const tone = kind === "mars"
+      ? `rgba(205, 139, 96, ${alpha})`
+      : `rgba(204, 201, 193, ${alpha})`;
+
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.ellipse(
+      x,
+      y,
+      radius * (0.7 + Math.random() * 0.9),
+      radius * (0.45 + Math.random() * 0.7),
+      Math.random() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
   return texture;
 }
