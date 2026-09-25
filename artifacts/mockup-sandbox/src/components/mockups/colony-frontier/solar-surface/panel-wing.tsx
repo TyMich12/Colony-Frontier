@@ -16,6 +16,7 @@ interface WingProps {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
   boomMaterial: THREE.Material;
+  dustMaterial: THREE.Material;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }
@@ -111,12 +112,14 @@ function Highlight({
 function PanelSegment({
   pvMaterial,
   frameMaterial,
+  dustMaterial,
   segmentIndex,
   onSelect,
   selectedComponentName,
 }: {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
+  dustMaterial: THREE.Material;
   segmentIndex: number;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
@@ -176,6 +179,14 @@ function PanelSegment({
 
       {panelSelected && <Highlight type="panel" />}
 
+      <mesh
+        position={[SEG_LEN / 2, 0.106, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        material={dustMaterial}
+      >
+        <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
+      </mesh>
+
       {busSelected && <Highlight type="bus" />}
 
       {segmentIndex < NUM_SEG - 1 && (
@@ -213,6 +224,7 @@ export function PanelWing({
   pvMaterial,
   frameMaterial,
   boomMaterial,
+  dustMaterial,
   onSelect,
   selectedComponentName,
 }: WingProps) {
@@ -250,6 +262,7 @@ export function PanelWing({
         <PanelSegment
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
+          dustMaterial={dustMaterial}
           segmentIndex={i}
           onSelect={onSelect}
           selectedComponentName={selectedComponentName}
@@ -273,6 +286,10 @@ export function PanelWing({
         >
           <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
         </mesh>
+        <mesh position={[BOOM_LEN / 2, 0.115, 0]} material={dustMaterial}>
+          <boxGeometry args={[BOOM_LEN, 0.012, 0.21]} />
+        </mesh>
+
         {selectedComponentName === boomName && (
           <mesh position={[BOOM_LEN / 2, 0, 0]}>
             <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
@@ -298,6 +315,10 @@ export function PanelWing({
         >
           <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
         </mesh>
+        <mesh position={[0.1, 0, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1.005, 1.005, 1.005]} material={dustMaterial}>
+          <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
+        </mesh>
+
         {selectedComponentName === "Array deployment actuator" && <Highlight type="actuator" position={[0.1, 0, 0]} />}
 
         <mesh position={[BOOM_LEN / 2, -0.14, 0.09]} material={boomMaterial}>
