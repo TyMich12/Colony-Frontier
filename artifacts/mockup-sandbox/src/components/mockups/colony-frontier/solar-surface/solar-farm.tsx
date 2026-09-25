@@ -4,10 +4,12 @@ import * as THREE from "three";
 import { CentralHub } from "./central-hub";
 import { PanelWing } from "./panel-wing";
 import {
-  activeAreaForTerrain,\n  physicalAreaForTerrain,
+  activeAreaForTerrain,
+  physicalAreaForTerrain,
   calculatePowerKW,
   CELL_EFFICIENCY,
-  dustCoverageFraction,\n  dustRemainingFraction,
+  dustCoverageFraction,
+  dustRemainingFraction,
   INSTALLATION_LINEAR_SCALE,
   marsDirectTransmission,
   MARS_DEFAULT_OPTICAL_DEPTH,
@@ -111,7 +113,8 @@ export function SolarFarm({
         ? 0
         : Math.min(0.98, 0.055 + Math.pow(dustFrac, 0.74) * 0.925);
     dustMaterial.alphaTest = 0.01;
-    const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);\n    const dustCoverage = dustCoverageFraction(solarLive.dust);
+    const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
+    const dustCoverage = dustCoverageFraction(solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
     const currentPower = calculatePowerKW({
       terrain,
@@ -133,12 +136,14 @@ export function SolarFarm({
       surfaceResourceFactor *
       solarLive.deploy *
       dustRemaining;
-    solarLive.dustCoverageFraction = dustCoverage;\n    solarLive.dustRemainingFraction = dustRemaining;
+    solarLive.dustCoverageFraction = dustCoverage;
+    solarLive.dustRemainingFraction = dustRemaining;
     solarLive.dustLossPct = (1 - dustRemaining) * 100;
 
     solarLive.sunElevation = sunElevation;
     solarLive.irradiance = topOfAtmosphereIrradiance;
-    solarLive.activeAreaM2 = activeAreaForTerrain(terrain);\n    solarLive.physicalAreaM2 = physicalAreaForTerrain(terrain);
+    solarLive.activeAreaM2 = activeAreaForTerrain(terrain);
+    solarLive.physicalAreaM2 = physicalAreaForTerrain(terrain);
     solarLive.atmosphericTau =
       terrain === "mars" ? MARS_DEFAULT_OPTICAL_DEPTH : 0;
     solarLive.atmosphericTransmission =
