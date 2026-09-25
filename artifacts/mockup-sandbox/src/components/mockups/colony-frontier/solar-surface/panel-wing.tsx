@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { solarLive, smoothstep, lerp, type TerrainKind } from "./state";
+import { solarLive, smoothstep, lerp } from "./state";
 
 const BOOM_LEN = 3.4;
 const SEG_LEN = 2.8;
@@ -17,7 +17,6 @@ interface WingProps {
   frameMaterial: THREE.Material;
   boomMaterial: THREE.Material;
   dustMaterial: THREE.Material;
-  terrain: TerrainKind;
   onSelect?: (name: string, role: string, explanation: string) => void;
 }
 
