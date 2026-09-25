@@ -156,16 +156,14 @@ function DustStormCoating({ dust }: { dust: number }) {
         );
       })}
 
-      {/* A thin dusty veil around the whole installation at storm intensity */}
-      <mesh position={[0, 2.1, 0]} scale={[1, 0.72, 1]}>
-        <sphereGeometry args={[5.2, 32, 20]} />
-        <meshStandardMaterial
-          color="#9b7658"
-          transparent
-          opacity={Math.pow(amount, 1.6) * 0.16}
-          roughness={1}
-          depthWrite={false}
-        />
+      {/* Dust also settles on the upward-facing surfaces of the hub stack. */}
+      <mesh position={[0, 3.62, 0]} scale={[1.01, 1, 1.01]}>
+        <cylinderGeometry args={[2.14, 2.14, 0.08, 12]} />
+        {material}
+      </mesh>
+      <mesh position={[0, 4.805, 0]} scale={[1.02, 1, 1.02]}>
+        <boxGeometry args={[1.22, 0.08, 1.22]} />
+        {material}
       </mesh>
     </group>
   );
