@@ -122,7 +122,7 @@ export function SolarFarm({
     // colour wash, while opacity ramps strongly at moderate loading.
     dustMaterial.opacity = dustFrac <= 0
       ? 0
-      : 0.08 + Math.pow(Math.max(0, dustFrac), 0.55) * 0.92;
+      : 0.12 + Math.pow(Math.max(0, dustFrac), 0.38) * 0.88;
     dustMaterial.needsUpdate = true;
 
     solarLive.efficiency =
@@ -142,8 +142,8 @@ export function SolarFarm({
     solarLive.atmosphericTransmission =
       terrain === "mars" ? marsDirectTransmission(sunElevation) : 1;
     solarLive.surfaceIrradiance = surfaceIrradiance;
-    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, Math.pow(dustFrac, 0.78) * 1.18));
-    pvMaterial.roughness = 0.32 + dustFrac * 0.6;
+    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, Math.pow(dustFrac, 0.52) * 1.35));
+    pvMaterial.roughness = 0.32 + dustFrac * 0.68;
     pvMaterial.metalness = 0.55 * (1 - dustFrac * 0.6);
     pvMaterial.emissiveIntensity =
       0.15 + (1 - dustFrac) * Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) * solarLive.deploy * 0.7;
