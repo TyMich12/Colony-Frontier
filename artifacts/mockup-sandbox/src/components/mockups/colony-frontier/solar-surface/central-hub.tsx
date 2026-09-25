@@ -22,16 +22,16 @@ function HubHighlight({ name, selected }: { name: string; selected: boolean }) {
     <meshBasicMaterial
       color="#45f3ff"
       transparent
-      opacity={0.18}
+      opacity={0.62}
       depthWrite={false}
       blending={THREE.AdditiveBlending}
     />
   );
   if (name === details.radiator[0]) {
-    return <mesh position={[2.4, 2.6, 0]} scale={1.025}>{material}<boxGeometry args={[2.6, 1.6, 0.05]} /></mesh>;
+    return <mesh position={[2.4, 2.6, 0]} scale={1.055}>{material}<boxGeometry args={[2.6, 1.6, 0.05]} /></mesh>;
   }
   if (name === details.drive[0]) {
-    return <mesh position={[2.6, 0.75, 0]} scale={1.04}>{material}<boxGeometry args={[1.1, 1.3, 1.6]} /></mesh>;
+    return <mesh position={[2.6, 0.75, 0]} scale={1.07}>{material}<boxGeometry args={[1.1, 1.3, 1.6]} /></mesh>;
   }
   if (name === details.power[0]) {
     return <mesh position={[0, 1.7, 0]} scale={1.025}>{material}<cylinderGeometry args={[1.5, 1.8, 3.1, 12]} /></mesh>;
@@ -39,7 +39,7 @@ function HubHighlight({ name, selected }: { name: string; selected: boolean }) {
   if (name === details.avionics[0]) {
     return <mesh position={[0, 4.2, 0]} scale={1.04}>{material}<boxGeometry args={[1.2, 1.2, 1.2]} /></mesh>;
   }
-  return <mesh position={[0, 0.05, 0]} scale={1.015}>{material}<cylinderGeometry args={[3.4, 3.8, 0.3, 40]} /></mesh>;
+  return <mesh position={[0, 0.05, 0]} scale={1.045}>{material}<cylinderGeometry args={[3.4, 3.8, 0.3, 40]} /></mesh>;
 }
 
 export function CentralHub({ onSelect, selectedComponentName }: HubProps) {
