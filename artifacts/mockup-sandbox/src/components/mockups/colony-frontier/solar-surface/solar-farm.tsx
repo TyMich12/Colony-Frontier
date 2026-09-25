@@ -65,7 +65,9 @@ export function SolarFarm({
         color: "#ffffff",
         roughness: 1,
         metalness: 0,
-        alphaTest: 0.9,
+        transparent: true,
+        alphaTest: 0.01,
+        depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -1,
         polygonOffsetUnits: -1,
@@ -98,10 +100,8 @@ export function SolarFarm({
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
     const dustFrac = solarLive.dust / 100;
-    dustMaterial.alphaTest = Math.max(
-      0.08,
-      0.9 - Math.pow(Math.max(0, dustFrac), 0.58) * 0.78,
-    );
+    dustMaterial.opacity = Math.min(1, Math.pow(dustFrac, 0.72) * 1.08);
+    dustMaterial.alphaTest = 0.01;
     dustMaterial.needsUpdate = true;
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
