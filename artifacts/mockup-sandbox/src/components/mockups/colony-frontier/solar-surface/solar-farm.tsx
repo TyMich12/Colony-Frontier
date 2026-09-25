@@ -43,7 +43,10 @@ export function SolarFarm({
 }: FarmProps) {
   const cellMap = useMemo(() => makeSolarCellTexture(), []);
   const cellEmissive = useMemo(() => makeCellEmissiveTexture(), []);
-  const dustTexture = useMemo(() => makeDustTexture(terrain), [terrain]);
+  const dustTexture = useMemo(
+    () => makeDustTexture(terrain, 512, Math.floor(Math.random() * 0x7fffffff)),
+    [terrain],
+  );
 
   const pvMaterial = useMemo(
     () =>
