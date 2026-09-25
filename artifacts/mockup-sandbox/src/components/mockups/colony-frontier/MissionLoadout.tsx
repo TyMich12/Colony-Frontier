@@ -71,11 +71,6 @@ const starterCategories = new Set([
 ]);
 
 const missionCapacity = payloadProgression[0].capacity;
-
-/*
- * Mission 01 has its own authorised spending ceiling.
- * This is NOT the player's total treasury.
- */
 const missionBudget = 25;
 
 const tierOrder: Tier[] = [
@@ -94,7 +89,6 @@ function isTierUnlocked(
   tier: Tier,
   unlockedTechnologies: string[],
 ) {
-  // Foundation equipment is part of the starting technology base.
   if (tier === "Foundation") {
     return true;
   }
@@ -209,20 +203,18 @@ function TierOption({
   const meta = tierMeta[tier];
   const requirement = tierUnlockRequirements[tier];
 
-  const disabled = status !== "available" && !selected;
+  const disabled = status === "locked" || status === "mass";
 
   const statusLabel =
-    status === "locked"
-      ? tier === "Research"
-        ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${requirement.tokens} RT in Technology Lab`
-        : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
-      : status === "funds"
-        ? "INSUFFICIENT MISSION FUNDS"
-        : status === "mass"
-          ? "INSUFFICIENT PAYLOAD CAPACITY"
-          : selected
-            ? "SELECTED"
-            : "AVAILABLE";
+    selected
+      ? "SELECTED — CLICK TO DESELECT"
+      : status === "locked"
+        ? tier === "Research"
+          ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${requirement.tokens} RT in Technology Lab`
+          : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
+        : status === "funds"
+          ? "INSUFFICIENT COLONY FUNDS"
+          : "AVAILABLE";
 
   return (
     <button
@@ -344,11 +336,9 @@ export function MissionLoadout() {
   );
 
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-
   const [notice, setNotice] = useState(
     "Mission 01 begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
-
   const [confirmed, setConfirmed] = useState(false);
 
   const selectedTracks = useMemo(
@@ -372,14 +362,24 @@ export function MissionLoadout() {
   const remainingMass = missionCapacity - mass;
   const remainingMissionBudget = missionBudget - spend;
   const remainingTreasury = gameState.credits - spend;
-
   const requiredCategories = starterCategories;
 
-  function isCategoryRequired(track: TechnologyTrack) {
-    return requiredCategories.has(track.id);
-  }
-
   function selectTier(track: TechnologyTrack, tier: Tier) {
+    const previousTier = selected[track.id];
+
+    if (previousTier === tier) {
+      setSelected((current) => {
+        const next = { ...current };
+        delete next[track.id];
+        return next;
+      });
+      setConfirmed(false);
+      setNotice(
+        `${track.category} cleared. Select a technology tier when you are ready.`,
+      );
+      return;
+    }
+
     if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
       setNotice(
         `${track.category} / ${tier} is not unlocked. Upgrade this technology in the Technology Lab first.`,
@@ -387,7 +387,6 @@ export function MissionLoadout() {
       return;
     }
 
-    const previousTier = selected[track.id];
     const previousEquipment = previousTier
       ? track.tiers[previousTier]
       : null;
@@ -408,9 +407,9 @@ export function MissionLoadout() {
 
     if (newSpend > gameState.credits) {
       setNotice(
-        `${track.category} / ${tier} exceeds your available Colony Treasury of ${formatCredits(
-          gameState.credits,
-        )}.`,
+        `${track.category} / ${tier} requires ${formatCredits(nextEquipment.cost)}, but your Colony Treasury only has ${formatCredits(
+          Math.max(0, gameState.credits - (spend - (previousEquipment?.cost ?? 0))),
+        )} available for this change.`,
       );
       return;
     }
@@ -489,7 +488,6 @@ export function MissionLoadout() {
     });
 
     setConfirmed(true);
-
     setNotice(
       `Mission 01 manifest deployed. ${formatCredits(
         spend,
@@ -519,7 +517,6 @@ export function MissionLoadout() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#efb658]">
                   Early Moon / 8,000 kg payload
                 </p>
-
                 <p className="mt-1 text-xs text-[#9cb2aa]">
                   Mission 01 · Survival · choose one technology tier per category
                 </p>
@@ -534,10 +531,7 @@ export function MissionLoadout() {
 
           <div className="mb-3 flex items-end justify-between gap-4">
             <div>
-              <SectionLabel>
-                Technology loadout catalog
-              </SectionLabel>
-
+              <SectionLabel>Technology loadout catalog</SectionLabel>
               <p className="text-sm text-[#8fa7a2]">
                 {openCategory
                   ? "Configure this category. All other categories are hidden until you close it."
@@ -624,12 +618,10 @@ export function MissionLoadout() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#efb658]">
                   Mission 01 manifest
                 </p>
-
                 <h2 className="mt-1 text-lg font-semibold uppercase tracking-[0.12em] text-[#fff0ca]">
                   Survival
                 </h2>
               </div>
-
               <LockKeyhole className="h-4 w-4 text-[#efb658]" />
             </div>
 
@@ -639,12 +631,10 @@ export function MissionLoadout() {
                   <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9ab1a8]">
                     Colony Treasury
                   </span>
-
                   <span className="font-mono text-lg font-bold text-[#efb658]">
                     {formatCredits(gameState.credits)}
                   </span>
                 </div>
-
                 <p className="mt-2 text-[9px] uppercase tracking-[0.12em] text-[#6f8985]">
                   Available before deployment
                 </p>
@@ -655,7 +645,6 @@ export function MissionLoadout() {
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#9ab1a8]">
                     Payload capacity
                   </span>
-
                   <span className="font-mono text-sm text-[#f4e7c5]">
                     {mass.toLocaleString()}{" "}
                     <span className="text-[#839993]">
@@ -663,7 +652,6 @@ export function MissionLoadout() {
                     </span>
                   </span>
                 </div>
-
                 <ProgressBar
                   value={Math.min(
                     100,
@@ -671,12 +659,10 @@ export function MissionLoadout() {
                   )}
                   color="#efb658"
                 />
-
                 <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.15em] text-[#758e89]">
                   <span>
                     {Math.max(0, remainingMass).toLocaleString()} kg remaining
                   </span>
-
                   <span>
                     {Math.round((mass / missionCapacity) * 100)}% loaded
                   </span>
@@ -688,15 +674,11 @@ export function MissionLoadout() {
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#9ab1a8]">
                     Mission allocation
                   </span>
-
                   <span className="font-mono text-sm text-[#f4e7c5]">
                     {formatCredits(Math.max(0, remainingMissionBudget))}{" "}
-                    <span className="text-[#839993]">
-                      remaining
-                    </span>
+                    <span className="text-[#839993]">remaining</span>
                   </span>
                 </div>
-
                 <ProgressBar
                   value={Math.min(
                     100,
@@ -704,15 +686,9 @@ export function MissionLoadout() {
                   )}
                   color="#d792e9"
                 />
-
                 <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.15em] text-[#758e89]">
-                  <span>
-                    {formatCredits(spend)} committed
-                  </span>
-
-                  <span>
-                    of {formatCredits(missionBudget)}
-                  </span>
+                  <span>{formatCredits(spend)} committed</span>
+                  <span>of {formatCredits(missionBudget)}</span>
                 </div>
               </div>
 
@@ -720,23 +696,17 @@ export function MissionLoadout() {
                 <div className="mb-3 text-[9px] font-bold uppercase tracking-[0.2em] text-[#718f80]">
                   Deployment finances
                 </div>
-
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-[#8fa7a2]">
-                      Current loadout
-                    </span>
-
+                    <span className="text-[#8fa7a2]">Current loadout</span>
                     <span className="font-mono text-[#dfe8d9]">
                       {formatCredits(spend)}
                     </span>
                   </div>
-
                   <div className="flex justify-between">
                     <span className="text-[#8fa7a2]">
                       Treasury after deployment
                     </span>
-
                     <span
                       className={`font-mono ${
                         remainingTreasury < 0
@@ -744,19 +714,14 @@ export function MissionLoadout() {
                           : "text-[#9fce82]"
                       }`}
                     >
-                      {formatCredits(
-                        Math.max(0, remainingTreasury),
-                      )}
+                      {formatCredits(Math.max(0, remainingTreasury))}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-[#304949] pt-5">
-                <SectionLabel>
-                  Loaded technology systems
-                </SectionLabel>
-
+                <SectionLabel>Loaded technology systems</SectionLabel>
                 <div className="max-h-60 space-y-3 overflow-y-auto pr-1">
                   {selectedTracks.map((track) => {
                     const tier = selected[track.id];
@@ -770,16 +735,12 @@ export function MissionLoadout() {
                         <span className="min-w-0 text-[#c3d3c1]">
                           <span className="flex items-center gap-2">
                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#9fce82]" />
-                            <span className="truncate">
-                              {track.category}
-                            </span>
+                            <span className="truncate">{track.category}</span>
                           </span>
-
                           <span className="ml-3.5 text-[8px] uppercase tracking-[0.12em] text-[#718f80]">
                             {tier} · {equipment.name}
                           </span>
                         </span>
-
                         <span className="shrink-0 font-mono text-[#859f99]">
                           {equipment.mass.toLocaleString()} kg
                         </span>
@@ -816,10 +777,7 @@ export function MissionLoadout() {
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
-
-                {confirmed
-                  ? "Mission deployed"
-                  : "Deploy Mission"}
+                {confirmed ? "Mission deployed" : "Deploy Mission"}
               </button>
 
               {confirmed && (
@@ -840,30 +798,23 @@ export function MissionLoadout() {
           </div>
 
           <section className="border border-[#29434a] bg-[#0d2028] p-5">
-            <SectionLabel>
-              Payload progression
-            </SectionLabel>
-
+            <SectionLabel>Payload progression</SectionLabel>
             <div className="space-y-3">
               {payloadProgression.map((step, index) => (
                 <div
                   key={step.phase}
                   className={`flex items-center justify-between border-b border-[#29434a] pb-3 last:border-0 last:pb-0 ${
-                    index === 0
-                      ? "text-[#dfeacb]"
-                      : "text-[#718b8c]"
+                    index === 0 ? "text-[#dfeacb]" : "text-[#718b8c]"
                   }`}
                 >
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-[0.16em]">
                       {step.phase}
                     </p>
-
                     <p className="mt-1 text-[9px] uppercase tracking-[0.1em]">
                       {step.unlock}
                     </p>
                   </div>
-
                   <span className="font-mono text-xs">
                     {step.capacity.toLocaleString()} kg
                   </span>
