@@ -221,7 +221,7 @@ function TierOption({
           ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${requirement.tokens} RT in Technology Lab`
           : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
         : status === "funds"
-          ? "INSUFFICIENT MISSION FUNDS"
+          ? "INSUFFICIENT FUNDS / MISSION ALLOCATION"
           : status === "mass"
             ? "EXCEEDS MISSION PAYLOAD CAPACITY"
             : "AVAILABLE";
@@ -465,7 +465,7 @@ export function MissionLoadout() {
         availableCredits,
         availableMass,
       );
-      return status === "locked" || status === "mass";
+      return status !== "available";
     });
   }
 
@@ -602,9 +602,18 @@ export function MissionLoadout() {
                           ? track.tiers[previousTier]
                           : null;
 
-                        const availableCredits =
+                        const availableTreasury =
                           gameState.credits -
                           (spend - (previousEquipment?.cost ?? 0));
+
+                        const availableMissionBudget =
+                          missionBudget -
+                          (spend - (previousEquipment?.cost ?? 0));
+
+                        const availableCredits = Math.min(
+                          availableTreasury,
+                          availableMissionBudget,
+                        );
 
                         const availableMass =
                           missionCapacity -
