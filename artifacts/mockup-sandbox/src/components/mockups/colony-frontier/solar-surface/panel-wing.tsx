@@ -24,7 +24,6 @@ interface WingProps {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
   boomMaterial: THREE.Material;
-  dustMaterial: THREE.Material;
   terrain: "moon" | "mars";
   wingIndex: number;
   dustGenerationKey: number;
@@ -123,7 +122,6 @@ function Highlight({
 function PanelSegment({
   pvMaterial,
   frameMaterial,
-  dustMaterial,
   terrain,
   wingIndex,
   dustGenerationKey,
@@ -350,7 +348,6 @@ export function PanelWing({
         <PanelSegment
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
-          dustMaterial={dustMaterial}
           terrain={terrain}
           wingIndex={wingIndex}
           dustGenerationKey={dustGenerationKey}
