@@ -150,7 +150,7 @@ export function makeTerrainTexture(kind: "moon" | "mars", size = 1024) {
   return texture;
 }
 
-export function makeDustTexture(kind: "moon" | "mars", size = 512) {
+export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: number) {
   /*
    * Dense particulate dust layer.
    *
@@ -170,7 +170,11 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512) {
       ? { r: 177, g: 101, b: 63 }
       : { r: 171, g: 167, b: 158 };
 
-  let seed = kind === "mars" ? 0x4f1bbcdc : 0x91e2a5d7;
+  // Keep the hub deterministic, while panel arrays can request a fresh seed.
+  let seed = Math.floor(
+    seedInput ?? (kind === "mars" ? 0x4f1bbcdc : 0x91e2a5d7),
+  ) | 0;
+  if (seed === 0) seed = 0x6d2b79f5;
   const random = () => {
     seed |= 0;
     seed ^= seed << 13;
@@ -180,6 +184,24 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512) {
   };
 
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  const phase = {
+    ax: random() * 90,
+    ay: random() * 90,
+    bx: random() * 90,
+    by: random() * 90,
+    cx: random() * 90,
+    cy: random() * 90,
+    wx: random() * 90,
+    wy: random() * 90,
+    vx: random() * 90,
+    vy: random() * 90,
+    mx: random() * 90,
+    my: random() * 90,
+    fx: random() * 90,
+    fy: random() * 90,
+    qx: random() * 90,
+    qy: random() * 90,
+  };
   const hash = (x: number, y: number) => {
     const s = Math.sin(x * 127.1 + y * 311.7 + (kind === "mars" ? 17.3 : 41.9)) * 43758.5453;
     return s - Math.floor(s);
@@ -190,17 +212,17 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512) {
       const nx = x / size;
       const ny = y / size;
 
-      const broadA = fbm(nx * 2.2 + 3.7, ny * 2.7 + 11.4, 5);
-      const broadB = fbm(nx * 4.9 + 37.0, ny * 3.6 + 23.0, 4);
-      const broadC = fbm(nx * 9.5 + 71.0, ny * 7.0 + 5.0, 3);
+      const broadA = fbm(nx * 2.2 + 3.7 + phase.ax, ny * 2.7 + 11.4 + phase.ay, 5);
+      const broadB = fbm(nx * 4.9 + 37.0 + phase.bx, ny * 3.6 + 23.0 + phase.by, 4);
+      const broadC = fbm(nx * 9.5 + 71.0 + phase.cx, ny * 7.0 + 5.0 + phase.cy, 3);
 
-      const windA = fbm(nx * 2.5 + ny * 7.0 + 101, ny * 18.0 + nx * 1.2 + 19, 4);
-      const windB = fbm(nx * 4.0 + ny * 13.0 + 211, ny * 32.0 + nx * 2.0 + 31, 3);
+      const windA = fbm(nx * 2.5 + ny * 7.0 + 101 + phase.wx, ny * 18.0 + nx * 1.2 + 19 + phase.wy, 4);
+      const windB = fbm(nx * 4.0 + ny * 13.0 + 211 + phase.vx, ny * 32.0 + nx * 2.0 + 31 + phase.vy, 3);
 
-      const mediumA = fbm(nx * 16.0 + 43, ny * 14.0 + 17, 3);
-      const mediumB = fbm(nx * 31.0 + 83, ny * 27.0 + 29, 2);
-      const fine = fbm(nx * 78.0 + 109, ny * 72.0 + 53, 2);
-      const micro = fbm(nx * 170.0 + 401, ny * 145.0 + 197, 1);
+      const mediumA = fbm(nx * 16.0 + 43 + phase.mx, ny * 14.0 + 17 + phase.my, 3);
+      const mediumB = fbm(nx * 31.0 + 83 + phase.fx, ny * 27.0 + 29 + phase.fy, 2);
+      const fine = fbm(nx * 78.0 + 109 + phase.qx, ny * 72.0 + 53 + phase.qy, 2);
+      const micro = fbm(nx * 170.0 + 401 + phase.cx + phase.qx, ny * 145.0 + 197 + phase.cy + phase.qy, 1);
       const grain = hash(Math.floor(nx * size * 0.75), Math.floor(ny * size * 0.75));
 
       const broadField = clamp01(
