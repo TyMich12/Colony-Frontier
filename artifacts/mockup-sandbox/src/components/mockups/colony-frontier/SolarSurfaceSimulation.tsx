@@ -393,7 +393,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
         <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/35">
           <Gauge className="h-3.5 w-3.5" />
           {terrain === "mars"
-            ? "Mars: array dust loss is calibrated to the documented InSight severe-dust state (~27% of dust-free capacity remaining)."
+            ? "Mars: array dust loss is calibrated to the an extreme Martian dust-storm endpoint (~12% of dust-free capacity remaining in this simulation)."
             : "Moon: severe loading is a major power penalty; NASA testing shows exponential degradation and about 50% loss at only a few mg/cm²."}
           {" · "}
           Index 100 is a severe reference loading, not literal surface coverage.
