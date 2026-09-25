@@ -247,11 +247,22 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
           Math.max(0, grain - 0.69) * 0.14,
       );
 
-      // Keep the layer particulate: strong density changes create visible
-      // islands, feathered edges and thin translucent gaps instead of a flat tint.
-      // Push the high end toward a storm-like, nearly continuous deposit while retaining
-      // irregular holes, streaks and grains so it still reads as real particulate dust.
-      const density = Math.pow(powder, 0.52);
+      // Keep the layer strongly particulate: broad deposits, swirls and streaks
+      // obscure the panel without turning the whole surface into one uniform colour.
+      // The high end uses a structured mask so some cell edges remain faintly visible
+      // through thinner dust while heavier islands become almost opaque.
+      const density = Math.pow(powder, 0.78);
+      const swirl = clamp01(
+        windA * 0.48 +
+          windB * 0.32 +
+          mediumA * 0.20,
+      );
+      const exposure = clamp01(
+        0.10 +
+          (1 - broadField) * 0.28 +
+          (1 - clumpField) * 0.16 +
+          Math.max(0, 0.42 - fine) * 0.18,
+      );
       const localShade =
         (mediumA - 0.5) * 30 +
         (mediumB - 0.5) * 24 +
@@ -267,10 +278,15 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
       const g = Math.round(clamp01((base.g + localShade * 0.78 + warmShift * 0.48) / 255) * 255);
       const b = Math.round(clamp01((base.b + localShade * 0.62 + warmShift * 0.28) / 255) * 255);
 
-      // At full dust this becomes visually near-opaque, while the procedural texture
-      // still preserves irregular particulate structure rather than a flat colour wash.
+      // Layered opacity preserves the dust swirls and exposed pockets at maximum loading.
+      // The result reads as accumulated material sitting over the cells, not as a grey filter.
       const alpha = Math.round(
-        (0.015 + Math.pow(density, 0.98) * 1.0) * 255,
+        clamp01(
+          0.025 +
+            Math.pow(density, 1.18) * 0.78 +
+            swirl * 0.16 -
+            exposure * 0.20,
+        ) * 255,
       );
 
       const i = (y * size + x) * 4;
