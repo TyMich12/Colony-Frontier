@@ -17,7 +17,15 @@ export const SOLAR_IRRADIANCE_W_M2: Record<TerrainKind, number> = {
   mars: 586.2,
 };
 
-export const MARS_CLEAR_SKY_TRANSMISSION = 0.80;
+// Mars surface solar power is atmosphere-limited.
+// NASA describes normal/quiescent Martian optical depth as approximately 0.5.
+// The model below uses the NASA Beer-Lambert direct-beam relationship
+// G_b = G_0 exp(-tau * airmass), with a horizontal-surface projection term.
+export const MARS_DEFAULT_OPTICAL_DEPTH = 0.5;
+export const MARS_AIRMASS_LIMIT_ZENITH_DEG = 80;
+export const MARS_AIRMASS_LIMIT_COS_ZENITH =
+  Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
+
 export const ARRAY_DERATING = 0.92;
 export const DUST_MAX_LOSS = 0.45;
 
@@ -36,6 +44,9 @@ export interface SolarLiveState {
   sunElevation: number;
   irradiance: number;
   activeAreaM2: number;
+  atmosphericTau: number;
+  atmosphericTransmission: number;
+  surfaceIrradiance: number;
 }
 
 export const solarLive: SolarLiveState = {
@@ -46,6 +57,9 @@ export const solarLive: SolarLiveState = {
   sunElevation: 32,
   irradiance: SOLAR_IRRADIANCE_W_M2.moon,
   activeAreaM2: 0,
+  atmosphericTau: 0,
+  atmosphericTransmission: 1,
+  surfaceIrradiance: 0,
 };
 
 export function dustEfficiency(dustPct: number): number {
@@ -66,6 +80,38 @@ export function activeAreaForTerrain(terrain: TerrainKind): number {
   return BASE_ACTIVE_AREA_M2 * scale * scale;
 }
 
+export function marsAirmass(sunElevation: number): number {
+  const elevation = Math.max(0, Math.min(90, sunElevation));
+  const cosZenith = Math.sin((elevation * Math.PI) / 180);
+
+  // NASA's Mars airmass approximation is 1/cos(z) for zenith angles
+  // up to about 80°. Below 10° elevation we cap the value rather than
+  // allowing the plane-parallel approximation to diverge.
+  return 1 / Math.max(cosZenith, MARS_AIRMASS_LIMIT_COS_ZENITH);
+}
+
+export function marsDirectTransmission(sunElevation: number): number {
+  if (sunElevation <= 0) return 0;
+  return Math.exp(-MARS_DEFAULT_OPTICAL_DEPTH * marsAirmass(sunElevation));
+}
+
+export function surfaceIrradianceForTerrain(
+  terrain: TerrainKind,
+  sunElevation: number,
+): number {
+  const elevationRad = (Math.max(0, Math.min(90, sunElevation)) * Math.PI) / 180;
+  const projection = Math.max(0, Math.sin(elevationRad));
+
+  if (terrain === "moon") {
+    return SOLAR_IRRADIANCE_W_M2.moon * projection;
+  }
+
+  // Horizontal-array direct-beam term:
+  // G_bh = G_0 * cos(z) * exp(-tau * m(z))
+  // and cos(z) = sin(elevation).
+  return SOLAR_IRRADIANCE_W_M2.mars * projection * marsDirectTransmission(sunElevation);
+}
+
 export function calculatePowerKW({
   terrain,
   tier,
@@ -79,20 +125,16 @@ export function calculatePowerKW({
   sunElevation: number;
   dust: number;
 }): number {
-  const irradiance = SOLAR_IRRADIANCE_W_M2[terrain];
-  const atmosphericFactor = terrain === "mars" ? MARS_CLEAR_SKY_TRANSMISSION : 1;
   const area = activeAreaForTerrain(terrain);
-  const incidenceFactor = Math.max(0, Math.sin((sunElevation * Math.PI) / 180));
+  const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
   const dustFactor = dustEfficiency(dust);
 
   const watts =
-    irradiance *
-    atmosphericFactor *
+    surfaceIrradiance *
     area *
     CELL_EFFICIENCY[tier] *
     ARRAY_DERATING *
     Math.max(0, Math.min(1, deployment)) *
-    incidenceFactor *
     dustFactor;
 
   return watts / 1000;
