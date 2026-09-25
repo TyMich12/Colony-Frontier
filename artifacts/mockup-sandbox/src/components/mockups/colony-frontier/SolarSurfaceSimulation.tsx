@@ -150,9 +150,9 @@ function SolarScene({
       <OrbitControls
         enablePan={false}
         minDistance={10}
-        maxDistance={80}
-        minPolarAngle={0.08}
-        maxPolarAngle={Math.PI - 0.08}
+        maxDistance={32}
+        minPolarAngle={0.12}
+        maxPolarAngle={1.63}
         target={[0, 3, 0]}
         enableDamping
         dampingFactor={0.08}
@@ -394,7 +394,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           <Gauge className="h-3.5 w-3.5" />
           {terrain === "mars"
             ? "Mars: array dust loss is calibrated to the documented InSight severe-dust state (~27% of dust-free capacity remaining)."
-            : "Moon: lunar dust power loss follows an exponential loading model calibrated to NASA test data (~50% power remaining at 3 mg/cm²)."}
+            : "Moon: severe loading is a major power penalty; NASA testing shows exponential degradation and about 50% loss at only a few mg/cm²."}
           {" · "}
           Index 100 is a severe reference loading, not literal surface coverage.
         </p>
