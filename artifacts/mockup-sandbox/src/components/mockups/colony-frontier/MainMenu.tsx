@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  resetGameState,
   saveGameState,
   STARTING_GAME_STATE,
 } from "./gameState";
@@ -34,6 +35,9 @@ const routes = {
 export function MainMenu() {
   const [showMarsBrief, setShowMarsBrief] = useState(false);
   const [showStartingPopup, setShowStartingPopup] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
 
   useEffect(() => {
     const existing = localStorage.getItem("colony-frontier-game-state");
@@ -43,6 +47,13 @@ export function MainMenu() {
       setShowStartingPopup(true);
     }
   }, []);
+
+  const confirmReset = () => {
+    resetGameState();
+    saveGameState(STARTING_GAME_STATE);
+    setShowResetConfirm(false);
+    setResetComplete(true);
+  };
 
   return (
     <GameShell
@@ -279,7 +290,10 @@ export function MainMenu() {
 
         <button
           type="button"
-          onClick={() => alert("Settings are not available yet.")}
+          onClick={() => {
+            setResetComplete(false);
+            setShowSettings(true);
+          }}
           className="flex items-center gap-4 p-2 text-[#9bb3aa] transition hover:text-[#efb658]"
         >
           <span className="text-[10px] font-bold uppercase tracking-[0.2em]">
@@ -289,6 +303,132 @@ export function MainMenu() {
           <ChevronRight className="ml-auto h-4 w-4" />
         </button>
       </div>
+
+      {showSettings && (
+        <div
+          className="fixed inset-0 z-30 grid place-items-center bg-[#050d12]/80 p-5 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-title"
+        >
+          <div className="w-full max-w-lg border border-[#52655b] bg-[#102229] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3 text-[#efb658]">
+                <SlidersHorizontal className="h-5 w-5" />
+
+                <span className="text-[10px] font-bold uppercase tracking-[0.25em]">
+                  Command settings
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close settings"
+                className="text-[#78938f] transition hover:text-[#f0f1dc]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <h2
+              id="settings-title"
+              className="mt-8 text-2xl font-semibold uppercase tracking-[0.1em] text-[#eff1dc]"
+            >
+              Settings
+            </h2>
+
+            <p className="mt-4 text-sm leading-7 text-[#a8bbb1]">
+              Manage your local campaign data and program preferences.
+            </p>
+
+            <div className="mt-7 border border-[#594a35] bg-[#1a2020] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-[#e8e9d9]">
+                    Reset campaign data
+                  </h3>
+
+                  <p className="mt-2 text-xs leading-5 text-[#9ca9a2]">
+                    Return Colony-Frontier to its original starting state.
+                    Your credits, XP, research, mission progress, and
+                    technology unlocks will be cleared.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="shrink-0 border border-[#9b6c45] bg-[#2a2220] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.18em] text-[#e6b078] transition hover:border-[#efb658] hover:text-[#efb658]"
+                >
+                  Reset Campaign
+                </button>
+              </div>
+            </div>
+
+            {resetComplete && (
+              <div className="mt-5 border border-[#477466] bg-[#19362f] p-4 text-xs leading-5 text-[#a9d4b8]">
+                Campaign data has been reset. Starting resources are restored
+                to $30M, 0 XP, and 0 RT.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showResetConfirm && (
+        <div
+          className="fixed inset-0 z-40 grid place-items-center bg-[#03090c]/90 p-5 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-confirm-title"
+        >
+          <div className="w-full max-w-md border border-[#8a6549] bg-[#111e24] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+            <div className="flex items-center gap-3 text-[#efb658]">
+              <ShieldCheck className="h-5 w-5" />
+
+              <span className="text-[10px] font-bold uppercase tracking-[0.25em]">
+                Confirmation required
+              </span>
+            </div>
+
+            <h2
+              id="reset-confirm-title"
+              className="mt-7 text-xl font-semibold uppercase tracking-[0.1em] text-[#eff1dc]"
+            >
+              Reset campaign data?
+            </h2>
+
+            <p className="mt-4 text-sm leading-6 text-[#aabbb2]">
+              Are you sure you want to start over? This will permanently
+              clear your current credits, XP, research tokens, completed
+              missions, and technology unlocks.
+            </p>
+
+            <p className="mt-4 text-xs uppercase tracking-[0.14em] text-[#d09a6a]">
+              This action cannot be undone.
+            </p>
+
+            <div className="mt-7 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="border border-[#40565a] bg-[#17282d] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#a9bbb3] transition hover:border-[#668078] hover:text-[#e6eee4]"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmReset}
+                className="border border-[#a06f47] bg-[#493027] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#f0c19a] transition hover:border-[#efb658] hover:text-[#efb658]"
+              >
+                Reset & Start Over
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMarsBrief && (
         <div
