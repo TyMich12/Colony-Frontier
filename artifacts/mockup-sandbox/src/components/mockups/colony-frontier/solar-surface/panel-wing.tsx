@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { solarLive, smoothstep, lerp } from "./state";
+import { solarLive, smoothstep, lerp, type TerrainKind } from "./state";
 
 const BOOM_LEN = 3.4;
 const SEG_LEN = 2.8;
@@ -16,14 +16,23 @@ interface WingProps {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
   boomMaterial: THREE.Material;
+  dustMaterial: THREE.Material;
+  terrain: TerrainKind;
+  onSelect?: (name: string, role: string, explanation: string) => void;
 }
 
 function PanelSegment({
   pvMaterial,
   frameMaterial,
+  dustMaterial,
+  segmentIndex,
+  onSelect,
 }: {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
+  dustMaterial: THREE.Material;
+  segmentIndex: number;
+  onSelect?: (name: string, role: string, explanation: string) => void;
 }) {
   return (
     <group>
@@ -41,7 +50,20 @@ function PanelSegment({
         material={pvMaterial}
         castShadow
         receiveShadow
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect?.(
+            "Solar panel segment " + (segmentIndex + 1),
+            "Converts sunlight into electrical power for the colony.",
+            "Photovoltaic cells absorb photons and create charge carriers. The panel strings combine many cells so generated DC power can be routed into the colony power system. Dust progressively blocks and scatters incoming light, reducing output.",
+          );
+        }}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = ""; }}
       >
+        <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
+      </mesh>
+      <mesh position={[SEG_LEN / 2, 0.091, 0]} rotation={[-Math.PI / 2, 0, 0]} material={dustMaterial}>
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
       {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
@@ -64,6 +86,8 @@ export function PanelWing({
   pvMaterial,
   frameMaterial,
   boomMaterial,
+  dustMaterial,
+  onSelect,
 }: WingProps) {
   const liftRef = useRef<THREE.Group>(null);
   const segRefs = useRef<(THREE.Group | null)[]>([]);
@@ -101,7 +125,13 @@ export function PanelWing({
         }}
         position={i === 0 ? [BOOM_LEN, 0, 0] : [SEG_LEN, 0, 0]}
       >
-        <PanelSegment pvMaterial={pvMaterial} frameMaterial={frameMaterial} />
+        <PanelSegment
+          pvMaterial={pvMaterial}
+          frameMaterial={frameMaterial}
+          dustMaterial={dustMaterial}
+          segmentIndex={i}
+          onSelect={onSelect}
+        />
         {buildChain(i + 1)}
       </group>
     );
@@ -110,7 +140,21 @@ export function PanelWing({
   return (
     <group rotation={[0, angle, 0]}>
       <group ref={liftRef} position={[ATTACH_RADIUS, ATTACH_HEIGHT, 0]}>
-        <mesh position={[BOOM_LEN / 2, 0, 0]} material={boomMaterial} castShadow>
+        <mesh
+          position={[BOOM_LEN / 2, 0, 0]}
+          material={boomMaterial}
+          castShadow
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect?.(
+              "Array deployment boom",
+              "Supports and deploys the solar wing.",
+              "The boom carries the panel blanket away from the central hub and provides structural support during deployment and operation. Its geometry transfers bending and torsional loads back into the spacecraft structure.",
+            );
+          }}
+          onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+          onPointerOut={() => { document.body.style.cursor = ""; }}
+        >
           <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
         </mesh>
         {[0.6, 1.5, 2.4].map((x) => (
