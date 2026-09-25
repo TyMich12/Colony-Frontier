@@ -1,0 +1,349 @@
+import { useState } from "react";
+import type { PointerEvent } from "react";
+import { ArrowLeft, Rotate3D, ChevronRight } from "lucide-react";
+import { GameShell, SectionLabel } from "./_shared/GameShell";
+import { formatCredits, tierMeta, type TechnologyTrack, type Tier } from "./_shared/gameData";
+
+type Part = {
+  name: string;
+  role: string;
+  principle: string;
+  explanation: string;
+};
+
+const systems: Record<string, { title: string; basis: string; flow: string[]; parts: Part[] }> = {
+  solar: {
+    title: "Photovoltaic Power System",
+    basis: "Based on real spacecraft photovoltaic arrays, power conditioning, deployment and battery-backed power architectures.",
+    flow: ["Sunlight", "PV cells", "Power conditioning", "DC bus", "Loads / storage"],
+    parts: [
+      { name: "PV cell array", role: "Converts sunlight into DC electrical power.", principle: "Photovoltaic effect", explanation: "Semiconductor junctions absorb photons and generate charge carriers. Interconnected cells deliver the resulting current as DC power." },
+      { name: "Array substrate", role: "Supports cells and electrical connections.", principle: "Structural + electrical integration", explanation: "Space arrays combine lightweight structural members, conductors, connectors and protective materials." },
+      { name: "Power conditioning", role: "Regulates array output.", principle: "DC power conversion", explanation: "Power electronics regulate voltage and current and route power to the distribution system." },
+      { name: "Storage interface", role: "Connects generation to storage.", principle: "Energy balance", explanation: "Surplus generation can charge storage while stored energy supports loads when generation falls." },
+      { name: "Pointing / deployment", role: "Positions or deploys the array.", principle: "Solar incidence", explanation: "Power depends strongly on the angle between sunlight and the array surface normal." }
+    ]
+  },
+  battery: {
+    title: "Rechargeable Space Battery",
+    basis: "Based on rechargeable aerospace battery cells, battery-management electronics and thermal control.",
+    flow: ["Power input", "Electrochemical cells", "Battery management", "Power interface", "Loads"],
+    parts: [
+      { name: "Cell stack", role: "Stores and releases electrical energy.", principle: "Redox reactions", explanation: "Discharge drives electrons through the external circuit; charging reverses the electrochemical process." },
+      { name: "Separator", role: "Keeps electrodes electrically apart.", principle: "Ion conduction", explanation: "A porous separator permits ionic transport while helping prevent direct electrical contact between electrodes." },
+      { name: "Battery management", role: "Monitors voltage, current and temperature.", principle: "Feedback control", explanation: "Monitoring and protection keep cells within operating limits and help maintain balanced state of charge." },
+      { name: "Thermal interface", role: "Moves heat away from cells.", principle: "Heat transfer", explanation: "Battery performance and lifetime depend strongly on temperature." },
+      { name: "Power interface", role: "Connects storage to the electrical bus.", principle: "Power conversion", explanation: "Converters and switching hardware match battery voltage to the spacecraft or surface bus." }
+    ]
+  },
+  oxygen: {
+    title: "Oxygen Generation System",
+    basis: "Based on NASA ECLSS oxygen generation and air-revitalization technology, with Mars oxygen production informed by MOXIE.",
+    flow: ["Feed", "Pump", "Electrochemical stack", "Conditioning", "O₂ storage / cabin"],
+    parts: [
+      { name: "Feed pump", role: "Moves gas or water through the system.", principle: "Pressure-driven flow", explanation: "Pumps establish the pressure difference required to move process fluid through filters, valves and reaction hardware." },
+      { name: "Electrochemical stack", role: "Separates a feed stream into products.", principle: "Electrochemistry", explanation: "Water electrolysis produces oxygen and hydrogen. MOXIE-style solid-oxide electrolysis processes CO₂ to produce oxygen." },
+      { name: "Gas conditioning", role: "Controls product quality.", principle: "Separation", explanation: "Produced gas can require drying, filtering, compression and purity monitoring." },
+      { name: "Sensors", role: "Measure process conditions.", principle: "Instrumentation", explanation: "Pressure, temperature and composition measurements provide feedback to controllers." },
+      { name: "O₂ buffer", role: "Smooths production and demand.", principle: "Mass balance", explanation: "A buffer decouples instantaneous production from instantaneous oxygen demand." }
+    ]
+  },
+  water: {
+    title: "Closed-Loop Water Recovery",
+    basis: "Based on NASA spacecraft water-recovery research and environmental control and life-support systems.",
+    flow: ["Wastewater", "Pretreatment", "Separation", "Polishing", "Recovered water"],
+    parts: [
+      { name: "Pretreatment", role: "Protects the recovery process.", principle: "Chemical conditioning", explanation: "Pretreatment can reduce biological activity, corrosion and fouling before the main recovery stages." },
+      { name: "Membrane / filter", role: "Removes contaminants.", principle: "Mass separation", explanation: "Filters and membranes separate suspended and dissolved contaminants from the water stream." },
+      { name: "Polishing reactor", role: "Breaks down remaining organics.", principle: "Chemical oxidation", explanation: "Advanced treatment can oxidize dissolved organic compounds into simpler products." },
+      { name: "Product tank", role: "Stores recovered water.", principle: "Mass balance", explanation: "Recovered water is stored and monitored before being supplied to crew systems." },
+      { name: "Quality sensors", role: "Verify the output stream.", principle: "Process control", explanation: "Measurements such as temperature, pressure and conductivity help verify water quality." }
+    ]
+  },
+  "co2": {
+    title: "Carbon-Dioxide Removal",
+    basis: "Based on NASA ECLSS air-revitalization systems that remove CO₂ from crew cabin air.",
+    flow: ["Cabin air", "Sorbent bed", "Regeneration", "CO₂ stream", "Downstream processing"],
+    parts: [
+      { name: "Cabin blower", role: "Circulates cabin air.", principle: "Forced convection", explanation: "Fans maintain the airflow needed to expose cabin air to the separation material." },
+      { name: "Sorbent bed", role: "Captures carbon dioxide.", principle: "Adsorption", explanation: "Molecular-sieve materials can capture CO₂ molecules and release them during regeneration." },
+      { name: "Regeneration valves", role: "Switch capture and regeneration modes.", principle: "Cyclic adsorption", explanation: "Valves and pressure control allow a sorbent bed to be reused." },
+      { name: "CO₂ interface", role: "Routes recovered CO₂.", principle: "Resource recovery", explanation: "Recovered CO₂ can be sent to downstream processing instead of being treated only as waste." }
+    ]
+  },
+  thermal: {
+    title: "Spacecraft Thermal-Control Loop",
+    basis: "Based on spacecraft cold plates, pumped thermal loops, insulation and radiators.",
+    flow: ["Heat source", "Cold plate", "Fluid loop", "Radiator", "Space"],
+    parts: [
+      { name: "Equipment cold plate", role: "Collects heat from equipment.", principle: "Conduction", explanation: "Heat flows from warmer equipment into a conductive thermal interface." },
+      { name: "Pump", role: "Circulates working fluid.", principle: "Convection", explanation: "A pump maintains mass flow so heat can be transported to the radiator." },
+      { name: "Fluid lines", role: "Transport thermal energy.", principle: "Energy transport", explanation: "The circulating fluid carries sensible heat from sources toward heat-rejection hardware." },
+      { name: "Radiator", role: "Rejects heat to space.", principle: "Thermal radiation", explanation: "In vacuum, a radiator rejects energy primarily through electromagnetic radiation." },
+      { name: "Thermal insulation", role: "Limits unwanted heat transfer.", principle: "Thermal resistance", explanation: "Insulation reduces conductive and radiative heat exchange with the environment." }
+    ]
+  },
+  comms: {
+    title: "Deep-Space Communications Link",
+    basis: "Based on spacecraft communications architectures, directional antennas, transceivers and link-budget engineering.",
+    flow: ["Onboard data", "Transceiver", "Antenna", "Space link", "Ground receiver"],
+    parts: [
+      { name: "Data interface", role: "Packages science and engineering data.", principle: "Digital communications", explanation: "Onboard computers format, packetize and prepare data for transmission." },
+      { name: "Transceiver", role: "Creates and receives the communications signal.", principle: "Modulation", explanation: "A transceiver maps information onto a carrier, amplifies transmission and processes received signals." },
+      { name: "High-gain antenna", role: "Directs electromagnetic energy.", principle: "Antenna gain", explanation: "A directional antenna concentrates transmitted and received energy into a narrower angular region." },
+      { name: "Pointing system", role: "Maintains link alignment.", principle: "Attitude control", explanation: "Spacecraft attitude knowledge and control maintain the required communications geometry." },
+      { name: "Ground station", role: "Receives and decodes the signal.", principle: "Link budget", explanation: "Performance depends on power, antenna gains, distance, frequency, losses and receiver sensitivity." }
+    ]
+  },
+  habitat: {
+    title: "Pressurized Surface Habitat",
+    basis: "Based on NASA lunar habitation concepts, pressure-vessel engineering and ECLSS.",
+    flow: ["External environment", "Structure / shielding", "Pressure vessel", "ECLSS", "Crew"],
+    parts: [
+      { name: "Pressure shell", role: "Contains the breathable atmosphere.", principle: "Pressure containment", explanation: "The pressure vessel carries stresses caused by the pressure difference between inside and outside." },
+      { name: "Airlock", role: "Separates cabin atmosphere from the outside.", principle: "Pressure isolation", explanation: "An airlock permits transfer without directly exposing the main pressure volume to vacuum." },
+      { name: "ECLSS interface", role: "Controls atmosphere, water and waste.", principle: "Closed-loop life support", explanation: "ECLSS manages pressure, oxygen, CO₂, water, ventilation and waste streams." },
+      { name: "Thermal control", role: "Manages internal and external heat.", principle: "Heat transfer", explanation: "Habitat heat loads must be transported and rejected while external thermal inputs are controlled." },
+      { name: "External shielding", role: "Adds environmental protection.", principle: "Mass attenuation", explanation: "Additional material can reduce exposure to radiation and micrometeoroid-related hazards." }
+    ]
+  },
+  radiation: {
+    title: "Radiation Protection System",
+    basis: "Based on spacecraft radiation monitoring and research into lunar regolith, water and hydrogen-rich shielding.",
+    flow: ["Radiation field", "Shielding", "Protected volume", "Sensors", "Crew / electronics"],
+    parts: [
+      { name: "Shielding layer", role: "Reduces radiation reaching protected systems.", principle: "Attenuation", explanation: "Material between a source and a protected volume can reduce transmitted radiation." },
+      { name: "Hydrogen-rich layer", role: "Provides useful shielding for some radiation.", principle: "Particle interactions", explanation: "Hydrogen-rich materials are investigated for protection against energetic particle radiation and secondary neutrons." },
+      { name: "Radiation sensor", role: "Measures the radiation environment.", principle: "Particle detection", explanation: "Detectors convert radiation interactions into measurable electrical signals." },
+      { name: "Protected volume", role: "Defines the shielded region.", principle: "Geometry", explanation: "Performance depends on material, thickness, geometry, source direction and radiation spectrum." }
+    ]
+  },
+  "power-grid": {
+    title: "Surface Power Distribution Network",
+    basis: "Based on NASA lunar surface power concepts involving generation, storage, management and distribution.",
+    flow: ["Generation", "Conditioning", "Distribution bus", "Protection", "Loads / storage"],
+    parts: [
+      { name: "Power source", role: "Generates electrical power.", principle: "Energy conversion", explanation: "Generation can use photovoltaic, fission or other mission-dependent technologies." },
+      { name: "Power converter", role: "Matches sources to the distribution bus.", principle: "Power electronics", explanation: "Converters regulate voltage and current so sources, storage and loads operate together." },
+      { name: "Distribution cable", role: "Transfers power across the surface.", principle: "Electrical conduction", explanation: "Conductors carry current between nodes; resistive losses depend on current and resistance." },
+      { name: "Protection unit", role: "Isolates faults.", principle: "Circuit protection", explanation: "Switching and protection hardware can disconnect abnormal branches while preserving healthy parts of the network." },
+      { name: "Storage node", role: "Buffers generation and demand.", principle: "Load balancing", explanation: "Storage can absorb surplus generation and supply loads when generation falls." }
+    ]
+  },
+  science: {
+    title: "Planetary Science Instrument Suite",
+    basis: "Based on real planetary instruments that convert optical, thermal, chemical or particle interactions into calibrated measurements.",
+    flow: ["Target", "Collection", "Analyzer", "Detector", "Digital data"],
+    parts: [
+      { name: "Sensor aperture", role: "Admits the measured signal.", principle: "Signal collection", explanation: "Optics or sampling interfaces define what portion of the environment reaches the detector." },
+      { name: "Filter / analyzer", role: "Selects useful signal information.", principle: "Physical filtering", explanation: "Filters or analyzers can isolate wavelengths, energies, masses or other properties." },
+      { name: "Detector", role: "Converts an interaction into a signal.", principle: "Transduction", explanation: "Detectors transform photons, particles, heat or other interactions into electrical measurements." },
+      { name: "Readout electronics", role: "Amplify and digitize signals.", principle: "Signal processing", explanation: "Low-level detector signals are conditioned and converted into digital data." },
+      { name: "Calibration reference", role: "Provides a known reference.", principle: "Metrology", explanation: "Calibration establishes the relationship between instrument output and a known physical quantity." }
+    ]
+  },
+  navigation: {
+    title: "Autonomous Navigation System",
+    basis: "Based on spacecraft and rover guidance, navigation and control systems using inertial, optical and other measurements.",
+    flow: ["Sensors", "State estimate", "Guidance", "Controller", "Vehicle motion"],
+    parts: [
+      { name: "Inertial measurement unit", role: "Measures acceleration and angular motion.", principle: "Inertial sensing", explanation: "Accelerometers and gyroscopes propagate an estimate of vehicle state between external observations." },
+      { name: "Optical navigation sensor", role: "Measures terrain or landmarks.", principle: "Computer vision", explanation: "Images provide geometric information about terrain, landmarks or celestial bodies." },
+      { name: "Navigation computer", role: "Combines measurements into a state estimate.", principle: "State estimation", explanation: "Algorithms combine imperfect measurements with a motion model to estimate position, velocity and attitude." },
+      { name: "Guidance planner", role: "Selects a safe path.", principle: "Guidance", explanation: "Guidance converts mission objectives and constraints into a desired trajectory or local path." },
+      { name: "Control actuators", role: "Apply steering or motion commands.", principle: "Feedback control", explanation: "Controllers compare desired and estimated states and command actuators to reduce error." }
+    ]
+  },
+  rover: {
+    title: "Planetary Rover Mobility System",
+    basis: "Based on NASA planetary rover mobility engineering, wheel-soil interaction testing and active suspension concepts.",
+    flow: ["Electrical power", "Motor", "Geartrain", "Wheel", "Regolith / terrain"],
+    parts: [
+      { name: "Mobility wheel", role: "Transmits drive force to terrain.", principle: "Traction", explanation: "Wheel geometry, grousers, soil properties, slip and normal force determine how torque becomes motion." },
+      { name: "Drive actuator", role: "Provides wheel torque.", principle: "Electromechanical conversion", explanation: "An electric motor converts electrical power into mechanical torque." },
+      { name: "Suspension / steering", role: "Maintains wheel contact.", principle: "Kinematics", explanation: "Suspension geometry distributes loads and helps the rover negotiate uneven terrain." },
+      { name: "Wheel encoder", role: "Measures wheel rotation.", principle: "Odometry", explanation: "Wheel rotation provides a motion estimate, although slip can make it differ from actual ground motion." },
+      { name: "Mobility controller", role: "Coordinates wheel torque and steering.", principle: "Feedback control", explanation: "Control software can adapt wheel commands using estimated vehicle and terrain state." }
+    ]
+  },
+  extraction: {
+    title: "Regolith / Ice Excavation System",
+    basis: "Based on NASA excavation and drilling technology for lunar and planetary regolith, including rotary-percussive drilling.",
+    flow: ["Terrain / ice", "Cutting tool", "Transport", "Collector", "Processor"],
+    parts: [
+      { name: "Cutting / drill tool", role: "Applies force to planetary material.", principle: "Soil mechanics", explanation: "Cutting geometry and applied force determine how material fractures, shears or moves." },
+      { name: "Drive actuator", role: "Supplies rotational or percussive energy.", principle: "Mechanical power", explanation: "Actuators convert electrical energy into torque, rotation or impact motion." },
+      { name: "Fluted transport path", role: "Moves cuttings away from the tool.", principle: "Granular transport", explanation: "Helical flutes can carry excavated material upward as a drill rotates." },
+      { name: "Subsurface sensor", role: "Measures conditions during excavation.", principle: "Instrumentation", explanation: "Sensors can measure depth, temperature or other properties during collection." },
+      { name: "Collector", role: "Contains excavated material.", principle: "Material handling", explanation: "Collected material must be transferred while limiting loss and contamination." }
+    ]
+  },
+  isru: {
+    title: "In-Situ Resource Utilization Processor",
+    basis: "Based on NASA ISRU concepts for using local water, oxygen-bearing minerals, CO₂ and other resources.",
+    flow: ["Local resource", "Feed system", "Reactor", "Separation", "Useful product"],
+    parts: [
+      { name: "Resource feed", role: "Introduces local material.", principle: "Material handling", explanation: "Regolith, ice, atmospheric gas or another local resource enters a controlled processing path." },
+      { name: "Process reactor", role: "Separates or transforms the resource.", principle: "Thermochemistry / electrochemistry", explanation: "ISRU processes can use heat, electrochemical reactions or mechanical separation to release products." },
+      { name: "Product separator", role: "Separates useful products.", principle: "Mass separation", explanation: "Useful product must be separated from unwanted solids, gases or liquids." },
+      { name: "Product storage", role: "Buffers production.", principle: "Mass balance", explanation: "Storage decouples production rate from the rate at which a habitat, vehicle or process consumes the product." },
+      { name: "Process controller", role: "Regulates temperature, pressure and flow.", principle: "Feedback control", explanation: "Sensors and control logic keep the process inside operating limits." }
+    ]
+  },
+  agriculture: {
+    title: "Controlled-Environment Agriculture",
+    basis: "Based on controlled-environment plant growth, hydroponic systems and closed-loop life-support research.",
+    flow: ["Power / light", "Root zone", "Plant canopy", "Air control", "Food / biomass"],
+    parts: [
+      { name: "Plant lighting", role: "Provides photons for photosynthesis.", principle: "Photosynthesis", explanation: "Plants use absorbed light energy to drive photosynthetic reactions." },
+      { name: "Root-zone system", role: "Delivers water and nutrients.", principle: "Mass transport", explanation: "Hydroponic systems deliver water and dissolved nutrients directly to the root zone." },
+      { name: "Atmosphere control", role: "Controls CO₂, humidity and airflow.", principle: "Gas exchange", explanation: "Airflow, humidity and CO₂ affect transpiration and photosynthetic performance." },
+      { name: "Thermal / humidity control", role: "Maintains growth conditions.", principle: "Energy and mass balance", explanation: "Temperature and humidity affect metabolism, water loss and condensation risk." },
+      { name: "Growth sensors", role: "Measure the environment.", principle: "Feedback control", explanation: "Sensors monitor variables such as temperature, humidity, light and water conditions." }
+    ]
+  },
+  maintenance: {
+    title: "Robotic Maintenance System",
+    basis: "Based on robotic servicing, spacecraft maintenance concepts, sensors, actuators and fault-detection systems.",
+    flow: ["Inspection", "Diagnosis", "Manipulation", "Verification", "Return to service"],
+    parts: [
+      { name: "Inspection camera", role: "Provides visual condition data.", principle: "Machine vision", explanation: "Cameras can identify visible changes, alignment issues, contamination or component states." },
+      { name: "Robotic manipulator", role: "Moves tools and components.", principle: "Robot kinematics", explanation: "A manipulator uses joints and actuators to place an end effector at a desired pose." },
+      { name: "Tool interface", role: "Performs maintenance work.", principle: "Mechanical work", explanation: "Tools transfer force or torque to fasteners, connectors, covers or service interfaces." },
+      { name: "Force / torque sensor", role: "Measures interaction with hardware.", principle: "Feedback control", explanation: "Force feedback helps detect contact and prevent excessive loads." },
+      { name: "Maintenance controller", role: "Plans and verifies the operation.", principle: "Autonomy + fault detection", explanation: "Control software can sequence actions, compare sensor data with expected states and stop when conditions become abnormal." }
+    ]
+  }
+};
+
+function TechnicalModel({ track, tier, parts, selected, setSelected }: {
+  track: TechnologyTrack;
+  tier: Tier;
+  parts: Part[];
+  selected: number;
+  setSelected: (index: number) => void;
+}) {
+  const [rotation, setRotation] = useState({ x: -16, y: -28 });
+  const [zoom, setZoom] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const [last, setLast] = useState({ x: 0, y: 0 });
+  const level = ["Foundation", "Frontier", "Apex", "Research"].indexOf(tier);
+  const accent = tierMeta[tier].color;
+
+  function down(e: PointerEvent<HTMLDivElement>) {
+    setDragging(true);
+    setLast({ x: e.clientX, y: e.clientY });
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function move(e: PointerEvent<HTMLDivElement>) {
+    if (!dragging) return;
+    const dx = e.clientX - last.x;
+    const dy = e.clientY - last.y;
+    setRotation((r) => ({ x: Math.max(-60, Math.min(60, r.x - dy * 0.35)), y: r.y + dx * 0.35 }));
+    setLast({ x: e.clientX, y: e.clientY });
+  }
+
+  return (
+    <div className="overflow-hidden border border-[#29434a] bg-[radial-gradient(circle_at_50%_35%,#17343a_0%,#0a171e_55%,#071017_100%)]">
+      <div className="flex items-center justify-between border-b border-[#29434a] bg-[#08151b]/95 px-4 py-3">
+        <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.16em] text-[#9bb4ad]"><Rotate3D className="h-4 w-4 text-[#efb658]" />Drag to rotate · scroll to zoom</div>
+        <div className="text-[9px] uppercase tracking-[0.14em]" style={{ color: accent }}>Interactive systems model · {track.tiers[tier].name}</div>
+      </div>
+      <div
+        className="flex h-[480px] touch-none items-center justify-center [perspective:1200px]"
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={() => setDragging(false)}
+        onPointerCancel={() => setDragging(false)}
+        onWheel={(e) => { e.preventDefault(); setZoom((z) => Math.max(0.65, Math.min(1.55, z - e.deltaY * 0.001))); }}
+      >
+        <div className="relative h-[270px] w-[370px] [transform-style:preserve-3d]" style={{ transform: "scale(" + zoom + ") rotateX(" + rotation.x + "deg) rotateY(" + rotation.y + "deg)" }}>
+          <div className="absolute left-[55px] top-[95px] h-[150px] w-[260px] border border-[#526c6d] bg-[#183038] shadow-[0_35px_60px_rgba(0,0,0,0.55)]" style={{ transform: "translateZ(10px) rotateX(12deg)" }} />
+          {parts.map((part, index) => {
+            const active = selected === index;
+            const angle = (index / Math.max(1, parts.length)) * Math.PI * 2;
+            const x = Math.cos(angle) * 105;
+            const y = Math.sin(angle) * 60;
+            const z = 35 + index * 8 + level * 10;
+            const w = 78 + (index % 2) * 28 + level * 6;
+            const h = 54 + (index % 3) * 9 + level * 5;
+            return (
+              <button
+                key={part.name}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setSelected(index); }}
+                className="absolute text-left [transform-style:preserve-3d]"
+                style={{ left: "calc(50% + " + x + "px)", top: "calc(50% + " + y + "px)", width: w, height: h, transform: "translate3d(-50%,-50%," + z + "px)" }}
+              >
+                <div className={"h-full w-full border " + (active ? "border-[#efb658] bg-[#8b7135]/95 shadow-[0_0_25px_rgba(239,182,88,0.32)]" : "border-[#5c7777] bg-[#27434a]/95 hover:border-[#b7d0c1]")}>
+                  <div className="h-2 border-b border-[#77908c]/60 bg-[#3a5d61]" />
+                  {index <= level && <div className="ml-2 mt-2 h-2 w-2 rounded-full bg-[#9fce82] shadow-[0_0_9px_rgba(159,206,130,0.8)]" />}
+                  <span className="absolute bottom-2 left-2 right-2 truncate text-[7px] font-bold uppercase tracking-[0.1em] text-[#e3ece3]">{part.name}</span>
+                </div>
+              </button>
+            );
+          })}
+          {level >= 1 && <div className="absolute left-1/2 top-1/2 h-3 w-[280px] -translate-x-1/2 -translate-y-1/2 border border-[#72b9d4]/60 bg-[#72b9d4]/15" style={{ transform: "translate(-50%,-50%) rotateZ(-18deg) translateZ(115px)" }} />}
+          {level >= 2 && <div className="absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#b68ee6]/60" style={{ transform: "translate(-50%,-50%) translateZ(125px)" }} />}
+          {level >= 3 && <div className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#e9a15d] bg-[#e9a15d]/35 shadow-[0_0_25px_rgba(233,161,93,0.45)]" style={{ transform: "translate(-50%,-50%) translateZ(145px)" }} />}
+        </div>
+      </div>
+      <div className="grid border-t border-[#29434a] bg-[#09151b] sm:grid-cols-5">
+        {parts.map((part, index) => (
+          <button key={part.name} type="button" onClick={() => setSelected(index)} className={"border-r border-[#29434a] px-3 py-3 text-left last:border-r-0 " + (selected === index ? "bg-[#172a2d]" : "hover:bg-[#0f2228]")}>
+            <p className="text-[8px] font-bold uppercase tracking-[0.15em]" style={{ color: accent }}>0{index + 1}</p>
+            <p className="mt-1 truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-[#dce7df]">{part.name}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function TechnicalViewer({ track, tier, onBack }: { track: TechnologyTrack; tier: Tier; onBack: () => void }) {
+  const system = systems[track.id] || systems.solar;
+  const [selected, setSelected] = useState(0);
+  const part = system.parts[selected];
+  return (
+    <GameShell active="lab" eyebrow="Engineering visualization / systems knowledge" title="Technical Viewer">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border border-[#3a5559] bg-[#0c1a21] px-4 py-3">
+        <button type="button" onClick={onBack} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#b8d1c5] hover:text-[#f0f4e8]"><ArrowLeft className="h-4 w-4" />Back to Technology Lab</button>
+        <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: tierMeta[tier].color }}>{track.category} · {tier}</span>
+      </div>
+      <div className="mb-6">
+        <SectionLabel>How it works</SectionLabel>
+        <h2 className="mt-2 text-2xl font-semibold uppercase tracking-[0.12em] text-[#f0f4e8]">{track.tiers[tier].name}</h2>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-[#91aaa3]">{system.title} · {system.basis}</p>
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <TechnicalModel track={track} tier={tier} parts={system.parts} selected={selected} setSelected={setSelected} />
+          <div className="mt-5 border border-[#29434a] bg-[#0b1a21] p-5">
+            <SectionLabel>System flow</SectionLabel>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {system.flow.map((step, i) => <div key={step} className="flex items-center gap-2"><div className="border border-[#3c5a60] bg-[#10232a] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.13em] text-[#c6d7cf]">{step}</div>{i < system.flow.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-[#efb658]" />}</div>)}
+            </div>
+          </div>
+        </div>
+        <aside className="space-y-4">
+          <section className="border border-[#3d5b50] bg-[#0d2028] p-5">
+            <SectionLabel>Selected component</SectionLabel>
+            <h3 className="mt-2 text-xl font-semibold uppercase tracking-[0.08em] text-[#eef3e7]">{part.name}</h3>
+            <p className="mt-2 text-xs uppercase tracking-[0.14em] text-[#72b9d4]">{part.role}</p>
+            <div className="mt-5 border-l-2 border-[#efb658] bg-[#15262b] px-4 py-3"><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#efb658]">Engineering principle</p><p className="mt-1 text-sm font-semibold text-[#e5eadf]">{part.principle}</p></div>
+            <p className="mt-4 text-sm leading-6 text-[#aebeb7]">{part.explanation}</p>
+          </section>
+          <section className="border border-[#29434a] bg-[#0b1a21] p-5">
+            <SectionLabel>Tier hardware</SectionLabel>
+            <div className="mt-3 space-y-3 text-[9px] uppercase tracking-[0.14em]">
+              <div className="flex justify-between gap-4"><span className="text-[#87958c]">Technology</span><span className="text-right text-[#e4eadf]">{track.tiers[tier].name}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-[#87958c]">Mass</span><span className="font-mono text-[#d9e5d8]">{track.tiers[tier].mass.toLocaleString()} kg</span></div>
+              <div className="flex justify-between gap-4"><span className="text-[#87958c]">Mission cost</span><span className="font-mono text-[#d9e5d8]">{formatCredits(track.tiers[tier].cost)}</span></div>
+            </div>
+          </section>
+          <div className="border border-[#29434a] bg-[#08151b] p-4 text-[9px] leading-5 uppercase tracking-[0.12em] text-[#718b86]">Educational model: the geometry is intentionally simplified, while the subsystem relationships and engineering principles are based on real spacecraft, lunar-surface and planetary technology. It is not flight-certified CAD.</div>
+        </aside>
+      </div>
+    </GameShell>
+  );
+}
