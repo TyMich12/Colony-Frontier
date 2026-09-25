@@ -223,7 +223,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             <p className="mt-1 text-[9px] text-white/35">
               Surface irradiance: {live.surfaceIrradiance.toFixed(0)} W/m²
             </p>
-          )
+          )}
         </div>
       </div>
 
