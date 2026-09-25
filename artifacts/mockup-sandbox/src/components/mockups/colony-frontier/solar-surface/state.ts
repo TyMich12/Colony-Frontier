@@ -21,7 +21,7 @@ export const MARS_AIRMASS_LIMIT_ZENITH_DEG = 80;
 export const MARS_AIRMASS_LIMIT_COS_ZENITH =
   Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
 
-export const ARRAY_DERATING = 0.92;
+// The power model uses P = G × A × η. No arbitrary extra derating is applied.\nexport const ARRAY_DERATING = 1.0;
 export const MARS_SEVERE_DUST_REMAINING = 0.05;
 export const LUNAR_DUST_REFERENCE_MG_CM2 = 3.0;
 export const LUNAR_DUST_REFERENCE_REMAINING = 0.08;
@@ -69,17 +69,13 @@ export function dustRemainingFraction(
 ): number {
   const x = Math.max(0, Math.min(100, dustPct)) / 100;
 
-  if (terrain === "mars") {
-    // Calibrated so the severe end reproduces the documented InSight state:
-    // about 12% of dust-free solar-array capacity remains at the extreme storm endpoint in this simulation.
-    return Math.pow(MARS_SEVERE_DUST_REMAINING, Math.pow(x, 1.35));
-  }
+  const opticalDepth =
+    (terrain === "mars"
+      ? MARS_PANEL_DUST_MAX_OPTICAL_DEPTH
+      : LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH) * x;
 
-  // Lunar tests found maximum cell power to degrade exponentially with
-  // accumulated dust; the reference point used here is 50% remaining at
-  // 3 mg/cm². The slider is a normalized dust-loading index, not literal
-  // percent surface coverage.
-  return Math.pow(LUNAR_DUST_REFERENCE_REMAINING, Math.pow(x, 1.35));
+  // Beer-Lambert transmission: T = e^(-τ).
+  return Math.exp(-opticalDepth);
 }
 
 export function dustEfficiency(
