@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import {
@@ -267,7 +267,7 @@ function PanelSegment({
       {segmentIndex < NUM_SEG - 1 && (
         <>
           {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
-            <React.Fragment key={z}>
+            <Fragment key={z}>
               <mesh
                 position={[SEG_LEN, 0.13, z]}
                 rotation={[Math.PI / 2, 0, 0]}
@@ -289,7 +289,7 @@ function PanelSegment({
               >
                 <cylinderGeometry args={[0.125, 0.125, 0.52, 16]} />
               </mesh>
-            </React.Fragment>
+            </Fragment>
           ))}
           {selectedComponentName === "Panel hinge · between segments " + (segmentIndex + 1) + "–" + (segmentIndex + 2) && (
             <>
