@@ -125,9 +125,9 @@ export function SolarFarm({
     solarLive.atmosphericTransmission =
       terrain === "mars" ? marsDirectTransmission(sunElevation) : 1;
     solarLive.surfaceIrradiance = surfaceIrradiance;
-    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, Math.pow(dustFrac, 0.52) * 1.35));
-    pvMaterial.roughness = 0.32 + dustFrac * 0.68;
-    pvMaterial.metalness = 0.55 * (1 - dustFrac * 0.6);
+    pvMaterial.color.copy(CLEAN);
+    pvMaterial.roughness = 0.32;
+    pvMaterial.metalness = 0.55;
     pvMaterial.emissiveIntensity =
       0.15 + (1 - dustFrac) * Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) * solarLive.deploy * 0.7;
   });
