@@ -17,7 +17,7 @@ import {
   type SolarTier,
   type TerrainKind,
 } from "./state";
-import { makeCellEmissiveTexture, makeSolarCellTexture } from "./textures";
+import { makeCellEmissiveTexture, makeSolarCellTexture, makeDustTexture } from "./textures";
 
 const CLEAN = new THREE.Color("#ffffff");
 const DUST_COLOR: Record<TerrainKind, THREE.Color> = {
@@ -31,6 +31,7 @@ interface FarmProps {
   sunElevation: number;
   terrain: TerrainKind;
   tier: SolarTier;
+  onComponentSelect?: (name: string, role: string, explanation: string) => void;
 }
 
 export function SolarFarm({
@@ -39,9 +40,11 @@ export function SolarFarm({
   sunElevation,
   terrain,
   tier,
+  onComponentSelect,
 }: FarmProps) {
   const cellMap = useMemo(() => makeSolarCellTexture(), []);
   const cellEmissive = useMemo(() => makeCellEmissiveTexture(), []);
+  const dustTexture = useMemo(() => makeDustTexture(terrain), [terrain]);
 
   const pvMaterial = useMemo(
     () =>
@@ -55,6 +58,19 @@ export function SolarFarm({
         color: CLEAN.clone(),
       }),
     [cellMap, cellEmissive],
+  );
+
+  const dustMaterial = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: dustTexture,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        roughness: 0.95,
+        metalness: 0,
+      }),
+    [dustTexture],
   );
 
   const frameMaterial = useMemo(
@@ -97,6 +113,9 @@ export function SolarFarm({
     const surfaceResourceFactor =
       topOfAtmosphereIrradiance > 0 ? surfaceIrradiance / topOfAtmosphereIrradiance : 0;
 
+    dustMaterial.opacity = Math.min(0.94, Math.max(0, solarLive.dust / 100) * 0.9);
+    dustMaterial.needsUpdate = true;
+
     solarLive.efficiency =
       CELL_EFFICIENCY[tier] *
       0.92 *
@@ -123,7 +142,7 @@ export function SolarFarm({
 
   return (
     <group scale={INSTALLATION_LINEAR_SCALE[terrain]}>
-      <CentralHub />
+      <CentralHub onSelect={onComponentSelect} />
       {Array.from({ length: 4 }, (_, i) => (
         <PanelWing
           key={i}
@@ -131,6 +150,8 @@ export function SolarFarm({
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
           boomMaterial={boomMaterial}
+          dustMaterial={dustMaterial}
+          onSelect={onComponentSelect}
         />
       ))}
     </group>
