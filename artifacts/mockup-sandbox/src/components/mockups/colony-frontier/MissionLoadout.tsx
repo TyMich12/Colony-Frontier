@@ -225,12 +225,14 @@ function TierOption({
   selected,
   status,
   onSelect,
+  hoverEnabled,
 }: {
   track: TechnologyTrack;
   tier: Tier;
   selected: boolean;
   status: "locked" | "funds" | "mass" | "available";
   onSelect: () => void;
+  hoverEnabled: boolean;
 }) {
   const equipment = track.tiers[tier];
   const meta = tierMeta[tier];
@@ -341,7 +343,9 @@ function TierOption({
         {statusLabel}
       </div>
 
-      <div className="pointer-events-none absolute left-4 right-4 top-[calc(100%-1px)] z-50 hidden border border-[#6f8058] bg-[#162d30] p-4 shadow-[0_18px_38px_rgba(0,0,0,0.42)] group-hover:block">
+      <div className={`pointer-events-none absolute left-4 right-4 top-[calc(100%-1px)] z-50 hidden border border-[#6f8058] bg-[#162d30] p-4 shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
+        hoverEnabled ? "group-hover:block" : ""
+      }`}>
         <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#efb658]">
           {tier} field brief
         </p>
@@ -373,7 +377,8 @@ export function MissionLoadout() {
   );
 
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const [notice, setNotice] = useState(
+  const [hoverEnabled, setHoverEnabled] = useState(true);
+  const [notice, setNotice=(
     "Mission 01 begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
   const [confirmed, setConfirmed] = useState(false);
@@ -507,6 +512,7 @@ export function MissionLoadout() {
 
     if (!closing) {
       catalogScrollY.current = window.scrollY;
+      setHoverEnabled(false);
     }
 
     setOpenCategory(closing ? null : track.id);
@@ -534,6 +540,11 @@ export function MissionLoadout() {
           Math.max(400, Math.abs(distance) * 0.7),
         );
 
+        if (distance === 0) {
+          setHoverEnabled(true);
+          return;
+        }
+
         const startTime = performance.now();
 
         const animateScroll = (currentTime: number) => {
@@ -549,6 +560,8 @@ export function MissionLoadout() {
 
           if (progress < 1) {
             requestAnimationFrame(animateScroll);
+          } else {
+            setHoverEnabled(true);
           }
         };
 
@@ -732,6 +745,7 @@ export function MissionLoadout() {
                             selected={selectedTier === tier}
                             status={status}
                             onSelect={() => selectTier(track, tier)}
+                            hoverEnabled={hoverEnabled}
                           />
                         );
                       })}
