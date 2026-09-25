@@ -117,7 +117,6 @@ function PanelSegment({
 }: {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
-  dustMaterial: THREE.Material;
   segmentIndex: number;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
@@ -214,7 +213,6 @@ export function PanelWing({
   pvMaterial,
   frameMaterial,
   boomMaterial,
-  dustMaterial,
   onSelect,
   selectedComponentName,
 }: WingProps) {
@@ -252,7 +250,6 @@ export function PanelWing({
         <PanelSegment
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
-          dustMaterial={dustMaterial}
           segmentIndex={i}
           onSelect={onSelect}
           selectedComponentName={selectedComponentName}
