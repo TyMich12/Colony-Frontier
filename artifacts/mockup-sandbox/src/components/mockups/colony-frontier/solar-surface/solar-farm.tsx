@@ -87,14 +87,14 @@ export function SolarFarm({
     });
 
     solarLive.powerKW = currentPower;
+    const atmosphericFactor = terrain === "mars" ? 0.8 : 1;
     solarLive.efficiency =
-      (CELL_EFFICIENCY[tier] *
-        INSTALLATION_LINEAR_SCALE[terrain] ** 2 *
-        (terrain === "mars" ? 0.8 : 1) *
-        solarLive.deploy *
-        Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) *
-        dustFactor *
-        0.92);
+      CELL_EFFICIENCY[tier] *
+      0.92 *
+      atmosphericFactor *
+      solarLive.deploy *
+      Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) *
+      dustFactor;
 
     solarLive.sunElevation = sunElevation;
     solarLive.irradiance =
