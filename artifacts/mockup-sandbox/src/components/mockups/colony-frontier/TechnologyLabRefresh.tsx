@@ -206,7 +206,6 @@ export function TechnologyLabRefresh() {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       selectTier(tier);
-                      setViewer({ trackId: selectedTrack.id, tier });
                     }
                   }}
                   className={`relative w-full border p-4 text-left transition ${
