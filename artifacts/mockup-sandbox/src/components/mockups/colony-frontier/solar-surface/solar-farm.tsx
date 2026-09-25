@@ -117,9 +117,12 @@ export function SolarFarm({
     const surfaceResourceFactor =
       topOfAtmosphereIrradiance > 0 ? surfaceIrradiance / topOfAtmosphereIrradiance : 0;
 
-    // Visual loading is deliberately not treated as literal area coverage: real dust forms
-    // irregular patches, streaks and clumps, while panels can remain optically translucent.
-    dustMaterial.opacity = 0.06 + Math.pow(Math.max(0, dustFrac), 0.72) * 0.78;
+    // Dust is visually severe because real lunar and Martian arrays can become heavily
+    // contaminated over time. The texture remains irregular rather than becoming a flat
+    // colour wash, while opacity ramps strongly at moderate loading.
+    dustMaterial.opacity = dustFrac <= 0
+      ? 0
+      : 0.08 + Math.pow(Math.max(0, dustFrac), 0.55) * 0.92;
     dustMaterial.needsUpdate = true;
 
     solarLive.efficiency =
@@ -139,7 +142,7 @@ export function SolarFarm({
     solarLive.atmosphericTransmission =
       terrain === "mars" ? marsDirectTransmission(sunElevation) : 1;
     solarLive.surfaceIrradiance = surfaceIrradiance;
-    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, dustFrac * 1.05));
+    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, Math.pow(dustFrac, 0.78) * 1.18));
     pvMaterial.roughness = 0.32 + dustFrac * 0.6;
     pvMaterial.metalness = 0.55 * (1 - dustFrac * 0.6);
     pvMaterial.emissiveIntensity =
