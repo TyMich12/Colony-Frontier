@@ -12,6 +12,7 @@ import {
   marsDirectTransmission,
   MARS_DEFAULT_OPTICAL_DEPTH,
   SOLAR_IRRADIANCE_W_M2,
+  SYSTEM_ELECTRICAL_EFFICIENCY,
   surfaceIrradianceForTerrain,
   solarLive,
   type SolarTier,
@@ -99,10 +100,14 @@ export function SolarFarm({
     solarLive.deploy = THREE.MathUtils.damp(solarLive.deploy, deployTarget, 2.2, delta);
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
-    const dustFrac = solarLive.dust / 100;
-    dustMaterial.opacity = dustFrac <= 0 ? 0 : Math.min(1, Math.pow(dustFrac, 0.52) * 1.18);
+    const dustFrac = Math.max(0, Math.min(100, solarLive.dust)) / 100;
+    // Visual density is intentionally nonlinear and separate from the power model:
+    // a little dust is patchy, while severe accumulation becomes visually dominant.
+    dustMaterial.opacity =
+      dustFrac <= 0
+        ? 0
+        : Math.min(0.98, 0.055 + Math.pow(dustFrac, 0.74) * 0.925);
     dustMaterial.alphaTest = 0.01;
-    dustMaterial.needsUpdate = true;
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
     const currentPower = calculatePowerKW({
@@ -121,7 +126,7 @@ export function SolarFarm({
 
     solarLive.efficiency =
       CELL_EFFICIENCY[tier] *
-      0.92 *
+      SYSTEM_ELECTRICAL_EFFICIENCY *
       surfaceResourceFactor *
       solarLive.deploy *
       dustRemaining;
@@ -140,7 +145,11 @@ export function SolarFarm({
     pvMaterial.roughness = 0.32;
     pvMaterial.metalness = 0.55;
     pvMaterial.emissiveIntensity =
-      0.15 + (1 - dustFrac) * Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) * solarLive.deploy * 0.7;
+      0.08 +
+      dustRemaining *
+        Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) *
+        solarLive.deploy *
+        0.72;
   });
 
   return (
