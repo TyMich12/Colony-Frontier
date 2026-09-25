@@ -100,7 +100,7 @@ export function SolarFarm({
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
     const dustFrac = solarLive.dust / 100;
-    dustMaterial.opacity = Math.min(1, Math.pow(dustFrac, 0.72) * 1.08);
+    dustMaterial.opacity = dustFrac <= 0 ? 0 : Math.min(1, Math.pow(dustFrac, 0.52) * 1.18);
     dustMaterial.alphaTest = 0.01;
     dustMaterial.needsUpdate = true;
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
