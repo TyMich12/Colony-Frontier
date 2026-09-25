@@ -18,6 +18,7 @@ interface WingProps {
   boomMaterial: THREE.Material;
   dustMaterial: THREE.Material;
   onSelect?: (name: string, role: string, explanation: string) => void;
+  selectedComponentName?: string | null;
 }
 
 function PanelSegment({
@@ -26,12 +27,14 @@ function PanelSegment({
   dustMaterial,
   segmentIndex,
   onSelect,
+  selectedComponentName,
 }: {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
   dustMaterial: THREE.Material;
   segmentIndex: number;
   onSelect?: (name: string, role: string, explanation: string) => void;
+  selectedComponentName?: string | null;
 }) {
   return (
     <group>
@@ -62,8 +65,14 @@ function PanelSegment({
       >
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
+      {selectedComponentName === "Solar panel segment " + (segmentIndex + 1) && (
+        <mesh position={[SEG_LEN / 2, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[SEG_LEN * 0.94, SEG_WIDTH * 0.94]} />
+          <meshBasicMaterial color="#45f3ff" transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      )}
       <mesh
-        position={[SEG_LEN / 2, 0.091, 0]}
+        position={[SEG_LEN / 2, 0.091, 0]
         rotation={[-Math.PI / 2, 0, 0]}
         material={dustMaterial}
         onClick={(event) => {
@@ -142,6 +151,7 @@ export function PanelWing({
           dustMaterial={dustMaterial}
           segmentIndex={i}
           onSelect={onSelect}
+          selectedComponentName={selectedComponentName}
         />
         {buildChain(i + 1)}
       </group>
@@ -168,6 +178,12 @@ export function PanelWing({
         >
           <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
         </mesh>
+        {selectedComponentName === "Array deployment boom" && (
+          <mesh position={[BOOM_LEN / 2, 0, 0]}>
+            <boxGeometry args={[BOOM_LEN + 0.12, 0.34, 0.34]} />
+            <meshBasicMaterial color="#45f3ff" transparent opacity={0.28} depthWrite={false} wireframe />
+          </mesh>
+        )}
         {[0.6, 1.5, 2.4].map((x) => (
           <mesh key={x} position={[x, 0, 0]} material={boomMaterial} castShadow>
             <boxGeometry args={[0.06, 0.34, 0.34]} />
