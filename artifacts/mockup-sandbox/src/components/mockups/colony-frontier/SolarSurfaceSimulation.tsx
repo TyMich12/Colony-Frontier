@@ -102,7 +102,9 @@ function DustStormCoating({ dust, terrain }: { dust: number; terrain: TerrainKin
   const amount = Math.max(0, Math.min(1, dust / 100));
   if (amount <= 0.001) return null;
 
-  const opacity = terrain === "moon"\n    ? 0.10 + Math.pow(amount, 0.7) * 0.72\n    : 0.04 + Math.pow(amount, 0.7) * 0.58;
+  const opacity = terrain === "moon"
+    ? 0.10 + Math.pow(amount, 0.7) * 0.72
+    : 0.04 + Math.pow(amount, 0.7) * 0.58;
   const material = (
     <meshStandardMaterial
       color="#b48762"
