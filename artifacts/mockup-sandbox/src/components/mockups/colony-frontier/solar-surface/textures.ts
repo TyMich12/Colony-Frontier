@@ -213,7 +213,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512) {
       image.data[i] = r;
       image.data[i + 1] = g;
       image.data[i + 2] = b;
-      image.data[i + 3] = Math.round((0.12 + powder * 0.88) * 255);
+      image.data[i + 3] = Math.round((0.015 + Math.pow(powder, 0.58) * 0.985) * 255);
     }
   }
 
