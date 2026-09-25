@@ -44,15 +44,29 @@ export function makeDustAwareMaterial(
       .replace(
         "#include <color_fragment>",
         "#include <color_fragment>\n" +
-          "float dustScale = 0.18;\n" +
+          "float dustStrength = clamp(uDustStrength, 0.0, 1.0);\n" +
+          "vec3 dustNormal = normalize(vDustWorldNormal);\n" +
+          "vec3 dustWeights = abs(dustNormal);\n" +
+          "float weightSum = max(dustWeights.x + dustWeights.y + dustWeights.z, 0.0001);\n" +
+          "dustWeights /= weightSum;\n" +
+          "float dustScale = 0.23;\n" +
+          "float detailScale = 0.58;\n" +
           "vec3 dustPos = vDustWorldPosition * dustScale;\n" +
-          "vec3 dustNormal = abs(normalize(vDustWorldNormal));\n" +
-          "float maskX = texture2D(uDustMap, dustPos.yz).a;\n" +
-          "float maskY = texture2D(uDustMap, dustPos.xz).a;\n" +
-          "float maskZ = texture2D(uDustMap, dustPos.xy).a;\n" +
-          "float dustMask = maskX * dustNormal.x + maskY * dustNormal.y + maskZ * dustNormal.z;\n" +
-          "dustMask = smoothstep(0.08, 0.78, dustMask);\n" +
-          "float dustMix = clamp(dustMask * uDustStrength * 1.18, 0.0, 1.0);\n" +
+          "vec3 detailPos = vDustWorldPosition * detailScale + vec3(2.7, 5.1, 1.9);\n" +
+          "float coarseX = texture2D(uDustMap, dustPos.yz).a;\n" +
+          "float coarseY = texture2D(uDustMap, dustPos.xz).a;\n" +
+          "float coarseZ = texture2D(uDustMap, dustPos.xy).a;\n" +
+          "float detailX = texture2D(uDustMap, detailPos.yz).a;\n" +
+          "float detailY = texture2D(uDustMap, detailPos.xz).a;\n" +
+          "float detailZ = texture2D(uDustMap, detailPos.xy).a;\n" +
+          "float coarseMask = coarseX * dustWeights.x + coarseY * dustWeights.y + coarseZ * dustWeights.z;\n" +
+          "float detailMask = detailX * dustWeights.x + detailY * dustWeights.y + detailZ * dustWeights.z;\n" +
+          "float dustPattern = clamp(coarseMask * 0.82 + detailMask * 0.18, 0.0, 1.0);\n" +
+          "float threshold = mix(0.34, 0.11, dustStrength);\n" +
+          "float edge = mix(0.045, 0.075, dustStrength);\n" +
+          "float patchMask = smoothstep(threshold - edge, threshold + edge, dustPattern);\n" +
+          "float surfaceExposure = 0.70 + 0.30 * smoothstep(-0.15, 0.75, dustNormal.y);\n" +
+          "float dustMix = clamp(patchMask * dustStrength * surfaceExposure, 0.0, 0.92);\n" +
           "diffuseColor.rgb = mix(diffuseColor.rgb, uDustColor, dustMix);",
       );
   };
