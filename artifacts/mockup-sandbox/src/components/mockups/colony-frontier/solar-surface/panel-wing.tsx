@@ -125,20 +125,45 @@ function PanelSegment({
   selectedComponentName?: string | null;
 }) {
   const info = panelInfo(segmentIndex);
+  const dustVariation = useMemo(() => {
+    // Stable per-tile variation: every physical tile gets its own coverage level.
+    // The deterministic seed keeps the pattern from changing on every render.
+    const seed = Math.sin((segmentIndex + 1) * 91.731) * 43758.5453;
+    return 0.62 + (seed - Math.floor(seed)) * 0.56;
+  }, [segmentIndex]);
+
   const localDustMaterial = useMemo(() => {
     const source = dustMaterial as THREE.MeshStandardMaterial;
     const material = source.clone();
     if (source.map) {
       material.map = source.map.clone();
       material.map.needsUpdate = true;
-      // Different UV offsets make each physical panel carry a different dust pattern.
-      material.map.offset.set(Math.random() * 4, Math.random() * 4);
-      material.map.repeat.set(1.35 + Math.random() * 0.7, 1.35 + Math.random() * 0.7);
-      material.map.rotation = (Math.random() - 0.5) * 0.18;
+      // Independent UV transforms make every tile carry a different dust pattern.
+      const seedA = Math.sin((segmentIndex + 1) * 17.17) * 43758.5453;
+      const seedB = Math.sin((segmentIndex + 1) * 43.91) * 43758.5453;
+      const seedC = Math.sin((segmentIndex + 1) * 71.33) * 43758.5453;
+      material.map.offset.set(
+        (seedA - Math.floor(seedA)) * 6,
+        (seedB - Math.floor(seedB)) * 6,
+      );
+      material.map.repeat.set(
+        1.15 + (seedC - Math.floor(seedC)) * 1.25,
+        1.15 + (1 - (seedC - Math.floor(seedC))) * 1.25,
+      );
+      material.map.rotation = ((seedA - Math.floor(seedA)) - 0.5) * 0.3;
     }
     return material;
-  }, [dustMaterial]);
-  useFrame(() => {\n    // Keep every randomized panel dust layer synchronized with the global dust slider.\n    // Cloned materials have independent opacity, so without this index 0 could still look dusty.\n    localDustMaterial.opacity = dustMaterial.opacity;\n  });\n\n  const frame = frameInfo(segmentIndex);
+  }, [dustMaterial, segmentIndex]);
+
+  useFrame(() => {
+    // Zero dust is always pristine; at higher indices each tile develops
+    // its own realistic coverage variation.
+    const globalOpacity = Math.max(0, Math.min(1, dustMaterial.opacity));
+    localDustMaterial.opacity = globalOpacity === 0
+      ? 0
+      : Math.min(1, globalOpacity * dustVariation);
+  });
+\n  const frame = frameInfo(segmentIndex);
   const bus = busInfo(segmentIndex);
   const panelSelected = selectedComponentName === info.name;
   const frameSelected = selectedComponentName === frame.name;
