@@ -32,6 +32,7 @@ interface FarmProps {
   terrain: TerrainKind;
   tier: SolarTier;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
+  selectedComponentName?: string | null;
 }
 
 export function SolarFarm({
@@ -113,7 +114,7 @@ export function SolarFarm({
     const surfaceResourceFactor =
       topOfAtmosphereIrradiance > 0 ? surfaceIrradiance / topOfAtmosphereIrradiance : 0;
 
-    dustMaterial.opacity = Math.min(0.94, Math.max(0, solarLive.dust / 100) * 0.9);
+    dustMaterial.opacity = Math.min(0.98, Math.max(0, solarLive.dust / 100) * 1.15);
     dustMaterial.needsUpdate = true;
 
     solarLive.efficiency =
@@ -133,7 +134,7 @@ export function SolarFarm({
     solarLive.surfaceIrradiance = surfaceIrradiance;
 
     const dustFrac = solarLive.dust / 100;
-    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], dustFrac * 0.85);
+    pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, dustFrac * 1.05));
     pvMaterial.roughness = 0.32 + dustFrac * 0.6;
     pvMaterial.metalness = 0.55 * (1 - dustFrac * 0.6);
     pvMaterial.emissiveIntensity =
@@ -142,7 +143,7 @@ export function SolarFarm({
 
   return (
     <group scale={INSTALLATION_LINEAR_SCALE[terrain]}>
-      <CentralHub onSelect={onComponentSelect} />
+      <CentralHub onSelect={onComponentSelect} selected={selectedComponentName === "Central power hub"} />
       {Array.from({ length: 4 }, (_, i) => (
         <PanelWing
           key={i}
@@ -152,6 +153,7 @@ export function SolarFarm({
           boomMaterial={boomMaterial}
           dustMaterial={dustMaterial}
           onSelect={onComponentSelect}
+          selectedComponentName={selectedComponentName}
         />
       ))}
     </group>
