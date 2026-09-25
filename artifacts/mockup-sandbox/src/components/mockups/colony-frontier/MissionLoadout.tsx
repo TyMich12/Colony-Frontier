@@ -520,10 +520,39 @@ export function MissionLoadout() {
       });
     } else {
       requestAnimationFrame(() => {
-        categoryRefs.current[track.id]?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
+        const element = categoryRefs.current[track.id];
+
+        if (!element) return;
+
+        const targetY =
+          element.getBoundingClientRect().top + window.scrollY - 140;
+        const startY = window.scrollY;
+        const distance = targetY - startY;
+
+        const duration = Math.min(
+          800,
+          Math.max(400, Math.abs(distance) * 0.7),
+        );
+
+        const startTime = performance.now();
+
+        const animateScroll = (currentTime: number) => {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          window.scrollTo(0, startY + distance * eased);
+
+          if (progress < 1) {
+            requestAnimationFrame(animateScroll);
+          }
+        };
+
+        requestAnimationFrame(animateScroll);
       });
     }
 
