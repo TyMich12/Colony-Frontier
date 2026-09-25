@@ -108,12 +108,14 @@ function SolarScene({
   tier,
   onComponentSelect,
   selectedComponentName,
+  dustGenerationKey,
 }: {
   terrain: TerrainKind;
   dust: number;
   sun: number;
   deployed: boolean;
   tier: SolarTier;
+  dustGenerationKey: number;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }) {
@@ -141,6 +143,7 @@ function SolarScene({
           sunElevation={sun}
           terrain={terrain}
           tier={tier}
+          dustGenerationKey={dustGenerationKey}
           onComponentSelect={onComponentSelect}
           selectedComponentName={selectedComponentName}
         />
