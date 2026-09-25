@@ -5,6 +5,14 @@ export const modules: ModuleMap = {
   "./components/mockups/colony-frontier/CampaignMapRefresh.tsx": () => import("../components/mockups/colony-frontier/CampaignMapRefresh.tsx"),
   "./components/mockups/colony-frontier/MainMenu.tsx": () => import("../components/mockups/colony-frontier/MainMenu.tsx"),
   "./components/mockups/colony-frontier/MissionLoadout.tsx": () => import("../components/mockups/colony-frontier/MissionLoadout.tsx"),
+  "./components/mockups/colony-frontier/Solar3DViewer.tsx": () => import("../components/mockups/colony-frontier/Solar3DViewer.tsx"),
+  "./components/mockups/colony-frontier/SolarSurfaceSimulation.tsx": () => import("../components/mockups/colony-frontier/SolarSurfaceSimulation.tsx"),
+  "./components/mockups/colony-frontier/TechnicalViewer.tsx": () => import("../components/mockups/colony-frontier/TechnicalViewer.tsx"),
   "./components/mockups/colony-frontier/TechnologyLab.tsx": () => import("../components/mockups/colony-frontier/TechnologyLab.tsx"),
-  "./components/mockups/colony-frontier/TechnologyLabRefresh.tsx": () => import("../components/mockups/colony-frontier/TechnologyLabRefresh.tsx")
+  "./components/mockups/colony-frontier/TechnologyLabRefresh.tsx": () => import("../components/mockups/colony-frontier/TechnologyLabRefresh.tsx"),
+  "./components/mockups/colony-frontier/solar-surface/central-hub.tsx": () => import("../components/mockups/colony-frontier/solar-surface/central-hub.tsx"),
+  "./components/mockups/colony-frontier/solar-surface/dust-particles.tsx": () => import("../components/mockups/colony-frontier/solar-surface/dust-particles.tsx"),
+  "./components/mockups/colony-frontier/solar-surface/panel-wing.tsx": () => import("../components/mockups/colony-frontier/solar-surface/panel-wing.tsx"),
+  "./components/mockups/colony-frontier/solar-surface/solar-farm.tsx": () => import("../components/mockups/colony-frontier/solar-surface/solar-farm.tsx"),
+  "./components/mockups/colony-frontier/solar-surface/terrain.tsx": () => import("../components/mockups/colony-frontier/solar-surface/terrain.tsx")
 };
