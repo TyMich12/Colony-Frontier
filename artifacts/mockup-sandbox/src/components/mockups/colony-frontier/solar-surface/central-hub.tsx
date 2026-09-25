@@ -56,7 +56,9 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
         color: "#ffffff",
         roughness: 1,
         metalness: 0,
-        alphaTest: 0.9,
+        transparent: true,
+        alphaTest: 0.01,
+        depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -1,
         polygonOffsetUnits: -1,
@@ -74,10 +76,8 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
   };
 
   useFrame((state) => {
-    dustMaterial.alphaTest = Math.max(
-      0.08,
-      0.9 - Math.pow(Math.max(0, dust / 100), 0.58) * 0.78,
-    );
+    dustMaterial.opacity = Math.min(1, Math.pow(Math.max(0, dust / 100), 0.72) * 1.12);
+    dustMaterial.alphaTest = 0.01;
     dustMaterial.needsUpdate = true;
     const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
     if (indicatorRef.current) indicatorRef.current.emissiveIntensity = 0.6 + pulse * 1.4;
