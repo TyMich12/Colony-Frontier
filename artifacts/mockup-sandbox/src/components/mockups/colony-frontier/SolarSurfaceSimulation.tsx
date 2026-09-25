@@ -8,6 +8,7 @@ import { Terrain, Rocks } from "./solar-surface/terrain";
 import { DustParticles } from "./solar-surface/dust-particles";
 import {
   CELL_EFFICIENCY,
+  dustCoverageFraction,
   solarLive,
   type SolarTier,
   type TerrainKind,
@@ -52,6 +53,7 @@ function useLive() {
     atmosphericTransmission: 1,
     surfaceIrradiance: 0,
     dustRemainingFraction: 1,
+    dustCoverageFraction: 0,
     dustLossPct: 0,
   });
 
@@ -67,6 +69,7 @@ function useLive() {
         atmosphericTransmission: solarLive.atmosphericTransmission,
         surfaceIrradiance: solarLive.surfaceIrradiance,
         dustRemainingFraction: solarLive.dustRemainingFraction,
+        dustCoverageFraction: solarLive.dustCoverageFraction,
         dustLossPct: solarLive.dustLossPct,
       });
     }, 100);
@@ -231,6 +234,12 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             unit="%"
             accent={dustLossPct > 20 ? "#ffb36a" : "#e6edf5"}
           />
+          <Readout
+            label="Dust Coverage"
+            value={(live.dustCoverageFraction * 100).toFixed(1)}
+            unit="%"
+            accent={live.dustCoverageFraction > 0.9 ? "#ffb36a" : "#e6edf5"}
+          />
         </div>
 
         <div className="absolute left-5 top-28 border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
@@ -393,10 +402,10 @@ export function SolarSurfaceSimulation({ tier }: Props) {
         <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/35">
           <Gauge className="h-3.5 w-3.5" />
           {terrain === "mars"
-            ? "Mars: array dust loss is calibrated to the an extreme Martian dust-storm endpoint (~12% of dust-free capacity remaining in this simulation)."
-            : "Moon: severe loading is a major power penalty; NASA testing shows exponential degradation and about 50% loss at only a few mg/cm²."}
+            ? "Mars: index 100 represents a severe dust-storm reference point; the electrical model leaves 25% of dust-free capacity."
+            : "Moon: index 100 represents severe loading; the electrical model leaves 8% of dust-free capacity."}
           {" · "}
-          Index 100 is a severe reference loading, not literal surface coverage.
+          Index 100 is a severe reference loading; the visual layer reaches about 99.5% coverage.
         </p>
       </div>
     </div>
