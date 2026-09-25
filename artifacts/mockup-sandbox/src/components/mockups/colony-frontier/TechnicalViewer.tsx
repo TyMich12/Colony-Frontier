@@ -893,228 +893,349 @@ function drawPart(
   else drawBox(ctx, part, rotation, zoom, width, height, offset, active);
 }
 
-function CanvasSystem({
-  architecture,
-  selected,
-  setSelected,
-  isolateIndex,
-}: {
-  architecture: Architecture;
-  selected: number;
-  setSelected: (index: number) => void;
-  isolateIndex?: number | null;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [rotation, setRotation] = useState({ x: -16, y: -28 });
-  const [zoom, setZoom] = useState(1);
-  const [dragging, setDragging] = useState(false);
-  const lastPointer = useRef({ x: 0, y: 0 });
-  const moved = useRef(false);
-  const zoomRef = useRef(1);
-  const hitTargets = useRef<{ index: number; x: number; y: number; r: number }[]>([]);
+
+type NASAImage = {
+  url: string;
+  title: string;
+  credit: string;
+  description: string;
+};
+
+const CATEGORY_SEARCH: Record<string, string> = {
+  solar: "spacecraft solar array ROSA iROSA",
+  battery: "spacecraft battery NASA Orion lithium ion",
+  oxygen: "NASA oxygen generation system MOXIE",
+  water: "NASA ISS water recovery system",
+  co2: "NASA ISS carbon dioxide removal system",
+  thermal: "NASA spacecraft radiator thermal control",
+  comms: "NASA deep space communications antenna optical communications",
+  habitat: "NASA lunar habitat inflatable habitat",
+  radiation: "NASA spacecraft radiation shielding lunar regolith",
+  grid: "NASA lunar fission surface power grid",
+  science: "NASA planetary science instrument spectrometer",
+  navigation: "NASA terrain relative navigation spacecraft camera",
+  rover: "NASA Perseverance rover mobility wheels rocker bogie",
+  extraction: "NASA planetary drilling ice excavation",
+  isru: "NASA molten regolith electrolysis ISRU",
+  agriculture: "NASA space agriculture plant growth chamber",
+  maintenance: "NASA robotic servicing arm spacecraft maintenance",
+};
+
+const STATIC_FALLBACKS: Record<string, NASAImage> = {
+  solar: {
+    url: "https://cdn.mos.cms.futurecdn.net/4eryBrRbt4Wh34zgnWooXZ.jpg",
+    title: "ROSA Roll-Out Solar Array",
+    credit: "NASA / Boeing / Deployable Space Systems",
+    description: "Real roll-out solar-array technology used as a reference for deployable spacecraft power.",
+  },
+  battery: {
+    url: "https://www.eaglepicher.com/sites/default/files/Artemis.png",
+    title: "Orion Artemis Space Battery",
+    credit: "EaglePicher / NASA Orion program",
+    description: "Spacecraft battery hardware used as a visual reference for the baseline battery architecture.",
+  },
+  oxygen: {
+    url: "https://news.mit.edu/sites/default/files/styles/news_article__image_gallery/public/images/202104/PIA24201.jpg?itok=kPK8ujgt",
+    title: "MOXIE Oxygen Generator",
+    credit: "NASA/JPL-Caltech",
+    description: "Flight hardware for NASA's Mars Oxygen ISRU Experiment.",
+  },
+  water: {
+    url: "https://assets.newatlas.com/dims4/default/efec55a/2147483647/strip/true/crop/2400x1769%2B0%2B0/resize/2400x1769%21/format/webp/quality/90/?url=https%3A%2F%2Fnewatlas-brightspot.s3.amazonaws.com%2F2c%2F8a%2F67cca78d48e38946ce763c873c40%2Fnasawater.jpg",
+    title: "ISS Water Recovery System",
+    credit: "NASA",
+    description: "Water-recovery rack hardware from the International Space Station.",
+  },
+  comms: {
+    url: "https://d2pn8kiwq2w21t.cloudfront.net/original_images/jpegPIA24569.jpg",
+    title: "DSOC Flight Laser Transceiver",
+    credit: "NASA/JPL-Caltech",
+    description: "NASA's Deep Space Optical Communications flight laser transceiver.",
+  },
+  rover: {
+    url: "https://images-assets.nasa.gov/image/PIA24429/PIA24429~large.jpg",
+    title: "Perseverance's Big Wheel",
+    credit: "NASA/JPL-Caltech",
+    description: "High-resolution Perseverance rover wheel imagery.",
+  },
+  isru: {
+    url: "https://upload.wikimedia.org/wikipedia/commons/e/e9/Molten_Regolith_Electrolysis_%28MRE%29_Testing_%28KSC-20220830-PH-KLS01_0052%29.jpeg",
+    title: "Molten Regolith Electrolysis Testing",
+    credit: "NASA/Kim Shiflett",
+    description: "Real NASA Kennedy hardware used for molten-regolith electrolysis research.",
+  },
+};
+
+function tierSearch(trackId: string, tier: Tier, component: string) {
+  const maturity =
+    tier === "Foundation"
+      ? "flight hardware"
+      : tier === "Frontier"
+        ? "advanced prototype flight technology"
+        : tier === "Apex"
+          ? "NASA technology demonstration advanced prototype"
+          : "NASA research development prototype future technology";
+  return (CATEGORY_SEARCH[trackId] ?? "NASA spacecraft technology") + " " + component + " " + maturity;
+}
+
+function useNASAImageSearch(query: string, fallback?: NASAImage) {
+  const [images, setImages] = useState<NASAImage[]>(fallback ? [fallback] : []);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
+    let alive = true;
+    setLoading(true);
+    setFailed(false);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    fetch(
+      "https://images-api.nasa.gov/search?q=" +
+      encodeURIComponent(query) +
+      "&media_type=image&page_size=10",
+    )
+      .then((response) => {
+        if (!response.ok) throw new Error("NASA image search failed");
+        return response.json();
+      })
+      .then((payload) => {
+        if (!alive) return;
 
-    const draw = () => {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const width = rect.width;
-      const height = rect.height;
+        const next: NASAImage[] = (payload?.collection?.items ?? [])
+          .map((item: any) => {
+            const data = item?.data?.[0];
+            const links = item?.links ?? [];
+            const imageLink =
+              links.find((link: any) => link?.render === "image" && /large|medium/.test(link?.href ?? "")) ??
+              links.find((link: any) => link?.render === "image");
+            if (!data || !imageLink?.href) return null;
+            return {
+              url: imageLink.href,
+              title: data.title ?? "NASA image",
+              credit: data.secondary_creator ?? data.center ?? "NASA",
+              description: data.description ?? "",
+            };
+          })
+          .filter(Boolean)
+          .slice(0, 6);
 
-      const bg = ctx.createRadialGradient(width * 0.5, height * 0.42, 15, width * 0.5, height * 0.5, Math.max(width, height) * 0.74);
-      bg.addColorStop(0, "#173b45");
-      bg.addColorStop(0.44, "#0a1c24");
-      bg.addColorStop(1, "#03090d");
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, width, height);
+        const combined = next.length
+          ? fallback
+            ? [fallback, ...next.filter((image) => image.url !== fallback.url)]
+            : next
+          : fallback
+            ? [fallback]
+            : [];
 
-      ctx.strokeStyle = "rgba(126,174,169,.10)";
-      ctx.lineWidth = 1;
-      for (let x = 0; x < width; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < height; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-
-      const all = architecture.parts
-        .map((part, index) => ({ part, index }))
-        .filter((item) => isolateIndex == null || item.index === isolateIndex);
-
-      const explodeFactor = isolateIndex == null ? 1 : 0.42;
-      hitTargets.current = [];
-
-      const ordered = [...all].sort((a, b) => {
-        return rotatePoint(a.part.center, rotation).z - rotatePoint(b.part.center, rotation).z;
+        setImages(combined);
+        setLoading(false);
+        setFailed(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setImages(fallback ? [fallback] : []);
+        setLoading(false);
+        setFailed(true);
       });
-
-      ordered.forEach(({ part, index }) => {
-        const radial = rotatePoint(part.center, { x: 0, y: 0 });
-        const offset = isolateIndex == null
-          ? v(radial.x * 0.03 * (TIER_LEVELFromArchitecture(architecture) - 1), radial.y * 0.02 * (TIER_LEVELFromArchitecture(architecture) - 1), radial.z * 0.03 * (TIER_LEVELFromArchitecture(architecture) - 1))
-          : v((part.center.x - radial.x) * explodeFactor, (part.center.y - radial.y) * explodeFactor, (part.center.z - radial.z) * explodeFactor);
-
-        const center = project(
-          v(part.center.x + offset.x, part.center.y + offset.y, part.center.z + offset.z),
-          rotation,
-          zoom,
-          width,
-          height,
-        );
-        const targetRadius = Math.max(
-          20,
-          Math.min(58, Math.max(part.size.x, part.size.y, part.size.z) * 0.21 * center.scale * zoom),
-        );
-        hitTargets.current.push({ index, x: center.x, y: center.y, r: targetRadius });
-        drawPart(ctx, part, rotation, zoom, width, height, offset, index === selected);
-      });
-
-      ctx.fillStyle = "#9bd6d5";
-      ctx.font = "700 10px monospace";
-      ctx.fillText(isolateIndex == null ? "SYSTEM / INTERACTIVE 3D" : "COMPONENT / ISOLATED 3D", 18, 23);
-      ctx.fillStyle = "rgba(220,235,230,.58)";
-      ctx.font = "10px monospace";
-      ctx.fillText("DRAG ROTATE   •   WHEEL ZOOM   •   CLICK A PART", 18, height - 18);
-
-      if (isolateIndex != null) {
-        ctx.fillStyle = rgba(P.gold, 0.88);
-        ctx.font = "700 11px monospace";
-        ctx.fillText(architecture.parts[isolateIndex]?.name.toUpperCase() ?? "COMPONENT", 18, 44);
-      }
-    };
-
-    draw();
-    const observer = new ResizeObserver(draw);
-    observer.observe(canvas);
-
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setZoom((value) => Math.max(0.45, Math.min(2.15, value - event.deltaY * 0.00115)));
-    };
-    canvas.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      observer.disconnect();
-      canvas.removeEventListener("wheel", onWheel);
+      alive = false;
     };
-  }, [architecture, selected, rotation, zoom, isolateIndex]);
+  }, [query, fallback?.url]);
 
-  function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
+  return { images, loading, failed };
+}
+
+function RealHardwareImageViewer({
+  trackId,
+  tier,
+  component,
+  architecture,
+}: {
+  trackId: string;
+  tier: Tier;
+  component: ComponentSpec;
+  architecture: Architecture;
+}) {
+  const fallback = STATIC_FALLBACKS[trackId];
+  const query = tierSearch(trackId, tier, component.name);
+  const { images, loading, failed } = useNASAImageSearch(query, fallback);
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragging = useRef(false);
+  const last = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
+
+  useEffect(() => {
+    setSelectedImage(0);
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  }, [query]);
+
+  useEffect(() => {
+    if (selectedImage >= images.length) setSelectedImage(0);
+  }, [images.length, selectedImage]);
+
+  const image = images[selectedImage];
+
+  function resetView() {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  }
+
+  function pointerDown(event: PointerEvent<HTMLDivElement>) {
+    dragging.current = true;
     moved.current = false;
-    setDragging(true);
-    lastPointer.current = { x: event.clientX, y: event.clientY };
+    last.current = { x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
-    if (!dragging) return;
-    const dx = event.clientX - lastPointer.current.x;
-    const dy = event.clientY - lastPointer.current.y;
+  function pointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!dragging.current) return;
+    const dx = event.clientX - last.current.x;
+    const dy = event.clientY - last.current.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true;
-    setRotation((value) => ({
-      x: Math.max(-78, Math.min(78, value.x - dy * 0.34)),
-      y: value.y + dx * 0.34,
-    }));
-    lastPointer.current = { x: event.clientX, y: event.clientY };
+    if (zoom > 1) {
+      setOffset((value) => ({ x: value.x + dx, y: value.y + dy }));
+    }
+    last.current = { x: event.clientX, y: event.clientY };
   }
 
-  function pointerUp(event: PointerEvent<HTMLCanvasElement>) {
-    setDragging(false);
+  function pointerUp(event: PointerEvent<HTMLDivElement>) {
+    dragging.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   }
 
-  function click(event: PointerEvent<HTMLCanvasElement>) {
-    if (moved.current || isolateIndex != null) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const hits = hitTargets.current
-      .map((target) => ({
-        ...target,
-        distance: Math.hypot(target.x - x, target.y - y),
-      }))
-      .sort((a, b) => a.distance - b.distance);
-    const hit = hits.find((target) => target.distance <= target.r);
-    if (hit) setSelected(hit.index);
+  function wheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    // Explicitly normal: wheel up = zoom in, wheel down = zoom out.
+    setZoom((value) => {
+      const next = value - event.deltaY * 0.0012;
+      return Math.max(1, Math.min(3.2, next));
+    });
   }
 
   return (
-    <div className="overflow-hidden border border-[#29434a] bg-[#061017]">
-      <div className="flex items-center justify-between border-b border-[#29434a] bg-[#08151b] px-4 py-3">
-        <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.16em] text-[#a8bdb7]">
-          <Rotate3D className="h-4 w-4" style={{ color: tierMeta[getTierFromArchitecture(architecture)].color }} />
-          Category-specific engineering assembly
+    <div className="overflow-hidden border border-[#29434a] bg-[#040b0f]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#29434a] bg-[#07151b] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Scan className="h-4 w-4" style={{ color: tierMeta[tier].color }} />
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[.17em] text-[#d9e7e0]">Real hardware reference</p>
+            <p className="text-[8px] uppercase tracking-[.13em] text-[#66827c]">NASA image library · category-specific · {tier}</p>
+          </div>
         </div>
-        <div className="text-[9px] uppercase tracking-[.13em]" style={{ color: tierMeta[getTierFromArchitecture(architecture)].color }}>
-          {TIER_LEVELFromArchitecture(architecture)}/4 · {getTierFromArchitecture(architecture)}
+        <div className="flex items-center gap-2 text-[8px] uppercase tracking-[.13em] text-[#768f89]">
+          <span>{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={resetView} className="border border-[#38514f] px-2 py-1 hover:border-[#efb658]">RESET</button>
         </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        className="block h-[570px] w-full touch-none cursor-grab active:cursor-grabbing"
+
+      <div
+        className="relative h-[570px] overflow-hidden touch-none bg-[#02070a] cursor-grab active:cursor-grabbing"
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}
         onPointerCancel={pointerUp}
-        onClick={click}
-      />
-      {!isolateIndex && (
-        <div className="grid border-t border-[#29434a] bg-[#09151b] sm:grid-cols-2 lg:grid-cols-3">
-          {architecture.parts.map((part, index) => (
-            <button
-              key={part.name}
-              type="button"
-              onClick={() => setSelected(index)}
-              className={
-                "border-r border-b border-[#29434a] px-3 py-3 text-left transition-colors " +
-                (selected === index ? "bg-[#162d31]" : "hover:bg-[#0e2228]")
-              }
-            >
-              <p className="text-[8px] font-bold uppercase tracking-[.16em]" style={{ color: tierMeta[getTierFromArchitecture(architecture)].color }}>
-                COMPONENT {String(index + 1).padStart(2, "0")}
+        onWheel={wheel}
+        onDoubleClick={resetView}
+      >
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#040b0f]/85">
+            <div className="text-center">
+              <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[#314a4c] border-t-[#efb658]" />
+              <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#9bb3aa]">Acquiring reference imagery</p>
+            </div>
+          </div>
+        )}
+
+        {!image && !loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle,#16323a,#03090d_72%)] p-8">
+            <div className="max-w-md text-center">
+              <p className="text-[9px] font-bold uppercase tracking-[.2em]" style={{ color: tierMeta[tier].color }}>IMAGE FALLBACK</p>
+              <h3 className="mt-2 text-xl font-semibold uppercase tracking-[.09em] text-[#e5ede7]">{component.name}</h3>
+              <p className="mt-3 text-sm leading-6 text-[#819a94]">
+                The NASA image service did not return a matching photograph. The engineering information remains available, and the viewer is staying operational rather than blanking the screen.
               </p>
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[.06em] text-[#dce7df]">{part.name}</p>
-              <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-[#718c87]">{part.role}</p>
+            </div>
+          </div>
+        )}
+
+        {image && (
+          <img
+            src={image.url}
+            alt={image.title}
+            draggable={false}
+            className="absolute left-1/2 top-1/2 max-h-none max-w-none select-none object-contain"
+            style={{
+              width: "min(980px, 165%)",
+              transform: "translate(-50%, -50%) translate(" + offset.x + "px, " + offset.y + "px) scale(" + zoom + ")",
+              filter: "contrast(1.08) saturate(1.06) brightness(.93)",
+            }}
+            onError={() => {
+              if (selectedImage < images.length - 1) setSelectedImage((value) => value + 1);
+              else setSelectedImage(images.length ? 0 : value => value);
+            }}
+          />
+        )}
+
+        <div className="pointer-events-none absolute left-4 top-4 border border-[#49605d] bg-[#071218]/85 px-3 py-2 backdrop-blur-sm">
+          <p className="text-[8px] font-bold uppercase tracking-[.17em]" style={{ color: tierMeta[tier].color }}>SELECTED COMPONENT</p>
+          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[.07em] text-[#e3ebe5]">{component.name}</p>
+          <p className="mt-1 max-w-xs text-[8px] uppercase tracking-[.1em] text-[#78918b]">{component.role}</p>
+        </div>
+
+        <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2">
+          <span className="border border-[#38514f] bg-[#071218]/85 px-3 py-2 text-[8px] uppercase tracking-[.13em] text-[#829992] backdrop-blur-sm">
+            DRAG TO PAN · WHEEL UP TO ZOOM IN · WHEEL DOWN TO ZOOM OUT
+          </span>
+          {failed && (
+            <span className="border border-[#694d43] bg-[#1b1110]/90 px-3 py-2 text-[8px] uppercase tracking-[.13em] text-[#d7a176]">
+              LIVE SEARCH UNAVAILABLE · FALLBACK REFERENCE
+            </span>
+          )}
+        </div>
+      </div>
+
+      {images.length > 1 && (
+        <div className="grid grid-cols-2 gap-px border-t border-[#29434a] bg-[#29434a] sm:grid-cols-3 lg:grid-cols-6">
+          {images.map((item, index) => (
+            <button
+              type="button"
+              key={item.url}
+              onClick={() => {
+                setSelectedImage(index);
+                resetView();
+              }}
+              className={"relative h-20 overflow-hidden bg-[#071117] text-left " + (index === selectedImage ? "ring-2 ring-inset ring-[#efb658]" : "hover:ring-1 hover:ring-inset hover:ring-[#6a8d86]")}
+            >
+              <img src={item.url} alt="" className="h-full w-full object-cover opacity-80" />
+              <span className="absolute inset-x-0 bottom-0 bg-[#02080c]/85 px-2 py-1 text-[7px] font-bold uppercase tracking-[.08em] text-[#d9e4df]">
+                {item.title.slice(0, 30)}
+              </span>
             </button>
           ))}
         </div>
       )}
+
+      {image && (
+        <div className="border-t border-[#29434a] bg-[#071218] px-4 py-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[8px] font-bold uppercase tracking-[.16em] text-[#efb658]">{image.title}</p>
+              <p className="mt-1 text-[8px] uppercase tracking-[.12em] text-[#728a84]">Credit: {image.credit}</p>
+            </div>
+            <p className="max-w-xl text-right text-[8px] leading-4 text-[#718a84]">
+              Real reference imagery is used for the visual study; the game technology is an educational abstraction, not a literal copy of the photographed hardware.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-function TIER_LEVELFromArchitecture(architecture: Architecture) {
-  return architecture.tierNote === TIER_NAMES.Foundation ? 1
-    : architecture.tierNote === TIER_NAMES.Frontier ? 2
-    : architecture.tierNote === TIER_NAMES.Apex ? 3
-    : 4;
-}
-
-function getTierFromArchitecture(architecture: Architecture): Tier {
-  return architecture.tierNote === TIER_NAMES.Foundation ? "Foundation"
-    : architecture.tierNote === TIER_NAMES.Frontier ? "Frontier"
-    : architecture.tierNote === TIER_NAMES.Apex ? "Apex"
-    : "Research";
 }
 
 function ComponentDetail({
@@ -1122,48 +1243,39 @@ function ComponentDetail({
   part,
   index,
   tier,
+  trackId,
   onClose,
 }: {
   architecture: Architecture;
   part: ComponentSpec;
   index: number;
   tier: Tier;
+  trackId: string;
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#010609]/95 p-4 backdrop-blur-md" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#010609]/96 p-4 backdrop-blur-md" onClick={onClose}>
       <div
-        className="max-h-[94vh] w-full max-w-6xl overflow-y-auto border border-[#4f6965] bg-[#08161d] shadow-[0_35px_120px_rgba(0,0,0,.88)]"
+        className="max-h-[95vh] w-full max-w-6xl overflow-y-auto border border-[#4f6965] bg-[#08161d] shadow-[0_35px_120px_rgba(0,0,0,.9)]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-[#29434a] bg-[#0b2027] p-5 md:p-7">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[.22em]" style={{ color: tierMeta[tier].color }}>
-              Component {String(index + 1).padStart(2, "0")} · {tier} · Isolated engineering view
+              Component {String(index + 1).padStart(2, "0")} · {tier} · deep inspection
             </p>
             <h2 className="mt-2 text-2xl font-semibold uppercase tracking-[.1em] text-[#eef3e7]">{part.name}</h2>
-            <p className="mt-2 max-w-3xl text-sm text-[#72b9d4]">{part.role}</p>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-[#72b9d4]">{part.role}</p>
           </div>
           <button type="button" onClick={onClose} className="border border-[#435d5a] p-2 text-[#b8cbc4] hover:border-[#efb658]" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="grid gap-6 p-5 md:grid-cols-[minmax(0,1.2fr)_360px] md:p-7">
-          <div>
-            <CanvasSystem
-              architecture={architecture}
-              selected={index}
-              setSelected={() => undefined}
-              isolateIndex={index}
-            />
-            <div className="mt-4 flex items-center gap-2 border border-[#334e52] bg-[#0c1a21] px-4 py-3 text-[9px] uppercase tracking-[.13em] text-[#819a94]">
-              <ZoomIn className="h-4 w-4" style={{ color: tierMeta[tier].color }} />
-              This view is isolated. Drag to rotate and place the cursor over the model before using the wheel to zoom.
-            </div>
-          </div>
+        <div className="grid gap-6 p-5 md:p-7">
+          <RealHardwareImageViewer trackId={trackId} tier={tier} component={part} architecture={architecture} />
 
-          <div className="space-y-4">
+          <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
             <section className="border border-[#3d5b50] bg-[#0d2028] p-5">
               <SectionLabel>Engineering principle</SectionLabel>
               <h3 className="mt-2 text-lg font-semibold text-[#e5eadf]">{part.principle}</h3>
@@ -1171,30 +1283,14 @@ function ComponentDetail({
             </section>
 
             <section className="border border-[#29434a] bg-[#0b1a21] p-5">
-              <SectionLabel>Why this tier is different</SectionLabel>
+              <SectionLabel>Tier context</SectionLabel>
               <p className="mt-3 text-sm leading-6 text-[#aabdb6]">{architecture.tierNote}</p>
               <p className="mt-3 text-sm leading-6 text-[#aabdb6]">{architecture.basis}</p>
             </section>
+          </div>
 
-            <section className="border border-[#29434a] bg-[#08151b] p-5">
-              <SectionLabel>Hardware record</SectionLabel>
-              <dl className="mt-3 space-y-3 text-[9px] uppercase tracking-[.13em]">
-                <div className="flex justify-between gap-5">
-                  <dt className="text-[#748c86]">Physical form</dt>
-                  <dd className="text-right text-[#d8e4de]">{part.shape}</dd>
-                </div>
-                <div className="flex justify-between gap-5">
-                  <dt className="text-[#748c86]">Model envelope</dt>
-                  <dd className="font-mono text-right text-[#d8e4de]">
-                    {Math.round(part.size.x)} × {Math.round(part.size.y)} × {Math.round(part.size.z)} model units
-                  </dd>
-                </div>
-              </dl>
-            </section>
-
-            <div className="border border-[#29434a] bg-[#08151b] p-4 text-[9px] leading-5 uppercase tracking-[.11em] text-[#718b86]">
-              The model is educational, not a flight-certified CAD drawing. The subsystem choices and physical principles are grounded in real aerospace hardware or documented research concepts; dimensions, packaging and some integration details are intentionally simplified.
-            </div>
+          <div className="border border-[#29434a] bg-[#08151b] p-4 text-[9px] leading-5 uppercase tracking-[.11em] text-[#718b86]">
+            This is an educational engineering viewer. Photographs are real hardware or documented research references. The in-game technology names, packaging, performance progression and exact integration are part of the game design and should not be read as NASA-certified designs.
           </div>
         </div>
       </div>
@@ -1215,12 +1311,13 @@ export function TechnicalViewer({
   const accent = tierMeta[tier].color;
   const [selected, setSelected] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
-  const selectedPart = architecture.parts[selected] ?? architecture.parts[0];
 
   useEffect(() => {
     setSelected(0);
     setDetailOpen(false);
   }, [track.id, tier]);
+
+  const selectedPart = architecture.parts[selected] ?? architecture.parts[0];
 
   return (
     <GameShell active="lab" eyebrow="Engineering visualization / systems knowledge" title="Technical Viewer">
@@ -1237,7 +1334,7 @@ export function TechnicalViewer({
       <div className="mb-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <SectionLabel>How it works</SectionLabel>
+            <SectionLabel>Engineering study</SectionLabel>
             <h2 className="mt-2 text-2xl font-semibold uppercase tracking-[.11em] text-[#f0f4e8]">{track.tiers[tier].name}</h2>
             <p className="mt-2 max-w-5xl text-sm leading-6 text-[#91aaa3]">{architecture.title} · {architecture.basis}</p>
           </div>
@@ -1250,10 +1347,11 @@ export function TechnicalViewer({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div>
-          <CanvasSystem
+          <RealHardwareImageViewer
+            trackId={track.id}
+            tier={tier}
+            component={selectedPart}
             architecture={architecture}
-            selected={selected}
-            setSelected={setSelected}
           />
 
           <button
@@ -1262,8 +1360,8 @@ export function TechnicalViewer({
             className="mt-4 flex w-full items-center justify-between border border-[#536d61] bg-[#11252a] px-5 py-4 text-left hover:border-[#efb658]"
           >
             <span>
-              <span className="block text-[9px] font-bold uppercase tracking-[.2em]" style={{ color: accent }}>Isolate selected component</span>
-              <span className="mt-1 block text-[10px] uppercase tracking-[.12em] text-[#789690]">{selectedPart.name} · full engineering detail</span>
+              <span className="block text-[9px] font-bold uppercase tracking-[.2em]" style={{ color: accent }}>Open deep component inspection</span>
+              <span className="mt-1 block text-[10px] uppercase tracking-[.12em] text-[#789690]">{selectedPart.name} · real reference imagery + engineering explanation</span>
             </span>
             <Scan className="h-5 w-5 text-[#efb658]" />
           </button>
@@ -1283,6 +1381,29 @@ export function TechnicalViewer({
 
         <aside className="space-y-4">
           <section className="border border-[#3d5b50] bg-[#0d2028] p-5">
+            <SectionLabel>System components</SectionLabel>
+            <div className="mt-3 space-y-2">
+              {architecture.parts.map((part, index) => (
+                <button
+                  type="button"
+                  key={part.name}
+                  onClick={() => setSelected(index)}
+                  className={"w-full border px-3 py-3 text-left transition-colors " +
+                    (selected === index ? "border-[#efb658] bg-[#162a2f]" : "border-[#29434a] bg-[#09171e] hover:border-[#4a6662]")}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 font-mono text-[9px]" style={{ color: accent }}>{String(index + 1).padStart(2, "0")}</span>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[.07em] text-[#dfe8e2]">{part.name}</p>
+                      <p className="mt-1 text-[8px] leading-4 text-[#718b85]">{part.role}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="border border-[#29434a] bg-[#0b1a21] p-5">
             <SectionLabel>Selected component</SectionLabel>
             <h3 className="mt-2 text-xl font-semibold uppercase tracking-[.07em] text-[#eef3e7]">{selectedPart.name}</h3>
             <p className="mt-2 text-xs uppercase tracking-[.14em] text-[#72b9d4]">{selectedPart.role}</p>
@@ -1292,7 +1413,7 @@ export function TechnicalViewer({
             </div>
             <p className="mt-4 text-sm leading-6 text-[#aebeb7]">{selectedPart.explanation}</p>
             <button type="button" onClick={() => setDetailOpen(true)} className="mt-5 w-full border border-[#536d61] bg-[#11252a] px-4 py-3 text-[9px] font-bold uppercase tracking-[.17em] text-[#cfe1d7] hover:border-[#efb658]">
-              Inspect component in full detail
+              Inspect component
             </button>
           </section>
 
@@ -1302,12 +1423,12 @@ export function TechnicalViewer({
               <div className="flex justify-between gap-4"><span className="text-[#87958c]">Technology</span><span className="text-right text-[#e4eadf]">{track.tiers[tier].name}</span></div>
               <div className="flex justify-between gap-4"><span className="text-[#87958c]">Mass</span><span className="font-mono text-[#d9e5d8]">{track.tiers[tier].mass.toLocaleString()} kg</span></div>
               <div className="flex justify-between gap-4"><span className="text-[#87958c]">Mission cost</span><span className="font-mono text-[#d9e5d8]">{formatCredits(track.tiers[tier].cost)}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-[#87958c]">Components modeled</span><span className="font-mono text-[#d9e5d8]">{architecture.parts.length}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-[#87958c]">Study components</span><span className="font-mono text-[#d9e5d8]">{architecture.parts.length}</span></div>
             </div>
           </section>
 
           <div className="border border-[#29434a] bg-[#08151b] p-4 text-[9px] leading-5 uppercase tracking-[.11em] text-[#718b86]">
-            Cursor-over-canvas wheel zoom is captured by the 3D viewer itself. Page scrolling remains available everywhere else.
+            The photo layer is real-world reference material. The game layer explains how the photographed principle maps onto the selected Colony-Frontier technology.
           </div>
         </aside>
       </div>
@@ -1318,6 +1439,7 @@ export function TechnicalViewer({
           part={selectedPart}
           index={selected}
           tier={tier}
+          trackId={track.id}
           onClose={() => setDetailOpen(false)}
         />
       )}
