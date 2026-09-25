@@ -100,7 +100,8 @@ export function SolarFarm({
     solarLive.deploy = THREE.MathUtils.damp(solarLive.deploy, deployTarget, 2.2, delta);
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
-    const dustFactor = dustEfficiency(terrain, solarLive.dust);
+    const dustFrac = solarLive.dust / 100;
+    const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
     const currentPower = calculatePowerKW({
       terrain,
@@ -138,9 +139,6 @@ export function SolarFarm({
     solarLive.atmosphericTransmission =
       terrain === "mars" ? marsDirectTransmission(sunElevation) : 1;
     solarLive.surfaceIrradiance = surfaceIrradiance;
-
-    const dustFrac = solarLive.dust / 100;
-    const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, dustFrac * 1.05));
     pvMaterial.roughness = 0.32 + dustFrac * 0.6;
     pvMaterial.metalness = 0.55 * (1 - dustFrac * 0.6);
