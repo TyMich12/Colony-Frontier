@@ -124,11 +124,15 @@ function CategoryHeader({
   track,
   selectedTier,
   open,
+  required,
+  categoryBlocked,
   onClick,
 }: {
   track: TechnologyTrack;
   selectedTier?: Tier;
   open: boolean;
+  required: boolean;
+  categoryBlocked: boolean;
   onClick: () => void;
 }) {
   const Icon =
@@ -139,11 +143,15 @@ function CategoryHeader({
       type="button"
       onClick={onClick}
       className={`flex w-full items-center justify-between border p-4 text-left transition ${
-        open
-          ? "border-[#afc78f] bg-[#172c2d] shadow-[inset_3px_0_0_#efb658]"
-          : selectedTier
-            ? "border-[#3e5b55] bg-[#102228] hover:border-[#718f80]"
-            : "border-[#2d4648] bg-[#0c1a22] hover:border-[#718f80] hover:bg-[#10252a]"
+        categoryBlocked
+          ? "border-[#9a4b4b] bg-[#261719] hover:border-[#c96767]"
+          : required
+            ? "border-[#3f83a8] bg-[#102936] hover:border-[#5ca8d1]"
+            : open
+              ? "border-[#afc78f] bg-[#172c2d] shadow-[inset_3px_0_0_#efb658]"
+              : selectedTier
+                ? "border-[#3e5b55] bg-[#102228] hover:border-[#718f80]"
+                : "border-[#2d4648] bg-[#0c1a22] hover:border-[#718f80] hover:bg-[#10252a]"
       }`}
       aria-expanded={open}
     >
@@ -213,8 +221,10 @@ function TierOption({
           ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${requirement.tokens} RT in Technology Lab`
           : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
         : status === "funds"
-          ? "INSUFFICIENT COLONY FUNDS"
-          : "AVAILABLE";
+          ? "INSUFFICIENT MISSION FUNDS"
+          : status === "mass"
+            ? "EXCEEDS MISSION PAYLOAD CAPACITY"
+            : "AVAILABLE";
 
   return (
     <button
@@ -227,7 +237,7 @@ function TierOption({
           ? "border-[#efb658] bg-[#26332c] shadow-[inset_3px_0_0_#efb658]"
           : status === "available"
             ? "border-[#2d4648] bg-[#0c1a22] hover:border-[#718f80] hover:bg-[#10252a]"
-            : "border-[#4a3030] bg-[#0c1a22] opacity-75"
+            : "border-[#8b4545] bg-[#241719]"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -368,6 +378,11 @@ export function MissionLoadout() {
     const previousTier = selected[track.id];
 
     if (previousTier === tier) {
+      if (starterCategories.has(track.id)) {
+        setNotice(`${track.category} is required for Mission 01 and cannot be deselected.`);
+        return;
+      }
+
       setSelected((current) => {
         const next = { ...current };
         delete next[track.id];
@@ -432,6 +447,26 @@ export function MissionLoadout() {
     setNotice(
       `${nextEquipment.name} selected for the ${track.category} slot. XP and Research Tokens are not spent in Loadout.`,
     );
+  }
+
+  function categoryIsBlocked(track: TechnologyTrack) {
+    const previousTier = selected[track.id];
+    const previousEquipment = previousTier ? track.tiers[previousTier] : null;
+    const availableCredits =
+      gameState.credits - (spend - (previousEquipment?.cost ?? 0));
+    const availableMass =
+      missionCapacity - (mass - (previousEquipment?.mass ?? 0));
+
+    return tierOrder.every((tier) => {
+      const status = getTierStatus(
+        track,
+        tier,
+        gameState,
+        availableCredits,
+        availableMass,
+      );
+      return status === "locked" || status === "mass";
+    });
   }
 
   function openTrack(track: TechnologyTrack) {
@@ -554,6 +589,8 @@ export function MissionLoadout() {
                     track={track}
                     selectedTier={selectedTier}
                     open={openCategory === track.id}
+                    required={requiredCategories.has(track.id)}
+                    categoryBlocked={categoryIsBlocked(track)}
                     onClick={() => openTrack(track)}
                   />
 
