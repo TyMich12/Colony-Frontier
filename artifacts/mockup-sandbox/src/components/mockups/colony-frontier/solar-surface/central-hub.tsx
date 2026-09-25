@@ -48,7 +48,14 @@ export function CentralHub({ onSelect }: { onSelect?: (name: string, role: strin
   });
 
   return (
-    <group onClick={(event) => {\n      event.stopPropagation();\n      onSelect?.(\n        "Central power hub",\n        "Collects, conditions and distributes the array output.",\n        "The central hub connects the solar wings to the colony electrical system. It houses structural interfaces, power routing, monitoring hardware and deployment mechanisms that keep the four array wings operating as one power plant.",\n      );\n    }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
+    <group onClick={(event) => {
+      event.stopPropagation();
+      onSelect?.(
+        "Central power hub",
+        "Collects, conditions and distributes the array output.",
+        "The central hub connects the solar wings to the colony electrical system. It houses structural interfaces, power routing, monitoring hardware and deployment mechanisms that keep the four array wings operating as one power plant.",
+      );
+    }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
       <mesh position={[0, 0.05, 0]} receiveShadow material={dark}>
         <cylinderGeometry args={[3.4, 3.8, 0.3, 40]} />
       </mesh>
