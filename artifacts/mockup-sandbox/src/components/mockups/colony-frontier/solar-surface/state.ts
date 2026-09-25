@@ -1,10 +1,21 @@
 export type TerrainKind = "moon" | "mars";
 export type SolarTier = "Foundation" | "Frontier" | "Apex" | "Research";
 
-export const BASE_SEGMENT_AREA_M2 = (2.8 * 0.9) * (3.2 * 0.9);
+// Physical geometry used by the 3D model. These are deliberately explicit so the
+// visual scale and the electrical area calculation cannot silently drift apart.
+export const PANEL_SEGMENT_LENGTH_M = 2.8;
+export const PANEL_SEGMENT_WIDTH_M = 3.2;
 export const NUM_SEGMENTS = 5;
 export const NUM_WINGS = 4;
-export const BASE_ACTIVE_AREA_M2 = BASE_SEGMENT_AREA_M2 * NUM_SEGMENTS * NUM_WINGS;
+export const ACTIVE_WIDTH_FRACTION = 0.9;
+export const ACTIVE_LENGTH_FRACTION = 0.9;
+
+export const BASE_SEGMENT_PHYSICAL_AREA_M2 =
+  PANEL_SEGMENT_LENGTH_M * PANEL_SEGMENT_WIDTH_M;
+export const BASE_PHYSICAL_AREA_M2 =
+  BASE_SEGMENT_PHYSICAL_AREA_M2 * NUM_SEGMENTS * NUM_WINGS;
+export const BASE_ACTIVE_AREA_M2 =
+  BASE_PHYSICAL_AREA_M2 * ACTIVE_WIDTH_FRACTION * ACTIVE_LENGTH_FRACTION;
 
 export const INSTALLATION_LINEAR_SCALE: Record<TerrainKind, number> = {
   moon: 1.2,
@@ -12,6 +23,7 @@ export const INSTALLATION_LINEAR_SCALE: Record<TerrainKind, number> = {
 };
 
 export const SOLAR_IRRADIANCE_W_M2: Record<TerrainKind, number> = {
+  // NASA planetary fact sheets: solar irradiance at the top of each body's atmosphere.
   moon: 1361.0,
   mars: 586.2,
 };
@@ -21,13 +33,14 @@ export const MARS_AIRMASS_LIMIT_ZENITH_DEG = 80;
 export const MARS_AIRMASS_LIMIT_COS_ZENITH =
   Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
 
-// Dust attenuation is modeled exponentially, matching laboratory observations that PV
-// output falls approximately exponentially as dust loading increases. The endpoints
-// represent severe, heavily dust-loaded panels rather than a universal measured value.
-export const MARS_PANEL_DUST_MAX_OPTICAL_DEPTH = Math.log(10); // 10% power remains at 100% dust.
-export const LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH = Math.log(12.5); // 8% power remains at 100% dust.
+// Dust loading is represented by the 0–100 simulation index. The rendering coverage
+// is a separate visual quantity; the power model uses an empirical exponential
+// transmission curve, as observed for dust-covered PV cells.
+export const MARS_PANEL_DUST_MAX_OPTICAL_DEPTH = Math.log(4); // 25% dust transmission at index 100.
+export const LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH = Math.log(12.5); // 8% dust transmission at index 100.
 
-// Explicit non-dust electrical losses so displayed efficiency and calculated power agree.
+// 92% is an explicit balance-of-system/electrical-loss assumption for this simulation.
+// Cell conversion efficiency remains separate and visible in the model.
 export const SYSTEM_ELECTRICAL_EFFICIENCY = 0.92;
 export const ARRAY_DERATING = 1.0;
 
@@ -43,9 +56,11 @@ export interface SolarLiveState {
   powerKW: number;
   efficiency: number;
   dust: number;
+  dustCoverageFraction: number;
   sunElevation: number;
   irradiance: number;
   activeAreaM2: number;
+  physicalAreaM2: number;
   atmosphericTau: number;
   atmosphericTransmission: number;
   surfaceIrradiance: number;
@@ -58,15 +73,27 @@ export const solarLive: SolarLiveState = {
   powerKW: 0,
   efficiency: 0,
   dust: 0,
+  dustCoverageFraction: 0,
   sunElevation: 32,
   irradiance: SOLAR_IRRADIANCE_W_M2.moon,
   activeAreaM2: 0,
+  physicalAreaM2: 0,
   atmosphericTau: 0,
   atmosphericTransmission: 1,
   surfaceIrradiance: 0,
   dustRemainingFraction: 1,
   dustLossPct: 0,
 };
+
+/**
+ * Approximate visible dust coverage represented by the 0–100 loading index.
+ * This is a visual coverage model, not a claim that pixel coverage directly
+ * determines optical transmission.
+ */
+export function dustCoverageFraction(dustPct: number): number {
+  const x = Math.max(0, Math.min(100, dustPct)) / 100;
+  return x <= 0 ? 0 : 1 - Math.exp(-4.2 * Math.pow(x, 1.15));
+}
 
 export function dustRemainingFraction(
   terrain: TerrainKind,
@@ -79,7 +106,8 @@ export function dustRemainingFraction(
       ? MARS_PANEL_DUST_MAX_OPTICAL_DEPTH
       : LUNAR_PANEL_DUST_MAX_OPTICAL_DEPTH) * x;
 
-  // Beer-Lambert transmission: T = e^(-τ).
+  // Beer-Lambert form: T = exp(-tau). NASA testing reports approximately
+  // exponential power degradation as dust loading increases on PV cells.
   return Math.exp(-opticalDepth);
 }
 
@@ -102,6 +130,11 @@ export function lerp(a: number, b: number, t: number): number {
 export function activeAreaForTerrain(terrain: TerrainKind): number {
   const scale = INSTALLATION_LINEAR_SCALE[terrain];
   return BASE_ACTIVE_AREA_M2 * scale * scale;
+}
+
+export function physicalAreaForTerrain(terrain: TerrainKind): number {
+  const scale = INSTALLATION_LINEAR_SCALE[terrain];
+  return BASE_PHYSICAL_AREA_M2 * scale * scale;
 }
 
 export function marsAirmass(sunElevation: number): number {
@@ -146,6 +179,7 @@ export function calculatePowerKW({
   const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
   const dustFactor = dustEfficiency(terrain, dust);
 
+  // P = G_surface × A_active × eta_cell × eta_system × deployment × T_dust.
   const watts =
     surfaceIrradiance *
     area *
