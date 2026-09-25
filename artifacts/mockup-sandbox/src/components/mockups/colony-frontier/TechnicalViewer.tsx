@@ -460,7 +460,7 @@ function CanvasModel({ track, tier, parts, selected, setSelected }: {
   function pointerMove(e:PointerEvent<HTMLCanvasElement>){if(!dragging)return;const dx=e.clientX-last.current.x,dy=e.clientY-last.current.y;setRotation(r=>({x:Math.max(-75,Math.min(75,r.x-dy*.35)),y:r.y+dx*.35}));last.current={x:e.clientX,y:e.clientY};}
   function pointerUp(){setDragging(false);}
   function click(e:PointerEvent<HTMLCanvasElement>){if(dragging)return;const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hitTargets.current.slice().sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y)).find(t=>Math.hypot(t.x-x,t.y-y)<=t.r);if(hit)setSelected(hit.index);}
-  function wheel(e:ReactWheelEvent<HTMLCanvasElement>){e.preventDefault();e.stopPropagation();setZoom(z=>Math.max(.55,Math.min(1.8,z-e.deltaY*.001));}
+  function wheel(e:ReactWheelEvent<HTMLCanvasElement>){e.preventDefault();e.stopPropagation();setZoom(z=>Math.max(.55,Math.min(1.8,z-e.deltaY*.001)));}
   return <div className="relative overflow-hidden border border-[#29434a] bg-[#061017]">
     <div className="flex items-center justify-between border-b border-[#29434a] bg-[#08151b] px-4 py-3">
       <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.16em] text-[#a8bdb7]"><Rotate3D className="h-4 w-4" style={{color:accent}}/>Real-time 3D engineering model</div>
