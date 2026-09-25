@@ -42,27 +42,60 @@ const busInfo = (segmentIndex: number) => ({
     "Metal interconnects and bus paths join cell strings and route generated current toward the array harness. Their resistance matters because electrical losses become heat and reduce the net power delivered to the spacecraft bus.",
 });
 
-function Highlight({ type }: { type: "box" | "panel" | "cylinder"; }) {
+function Highlight({
+  type,
+  position = [0, 0, 0],
+}: {
+  type: "panel" | "cylinder" | "frame" | "bus";
+  position?: [number, number, number];
+}) {
+  const material = (
+    <meshBasicMaterial
+      color="#45f3ff"
+      transparent
+      opacity={0.24}
+      depthWrite={false}
+      blending={THREE.AdditiveBlending}
+    />
+  );
+
   if (type === "panel") {
     return (
       <mesh position={[SEG_LEN / 2, 0.105, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[SEG_LEN * 0.94, SEG_WIDTH * 0.94]} />
-        <meshBasicMaterial color="#45f3ff" transparent opacity={0.28} depthWrite={false} blending={THREE.AdditiveBlending} />
+        {material}
       </mesh>
     );
   }
-  if (type === "cylinder") {
+
+  if (type === "frame") {
     return (
-      <mesh position={[0.1, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.34, 0.34, 0.76, 16]} />
-        <meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe />
-      </mesh>
+      <group>
+        <mesh position={[SEG_LEN / 2, 0.055, SEG_WIDTH / 2 - 0.05]}>{material}<boxGeometry args={[SEG_LEN - 0.08, 0.13, 0.10]} /></mesh>
+        <mesh position={[SEG_LEN / 2, 0.055, -SEG_WIDTH / 2 + 0.05]}>{material}<boxGeometry args={[SEG_LEN - 0.08, 0.13, 0.10]} /></mesh>
+        <mesh position={[0.05, 0.055, 0]}>{material}<boxGeometry args={[0.10, 0.13, SEG_WIDTH]} /></mesh>
+        <mesh position={[SEG_LEN - 0.05, 0.055, 0]}>{material}<boxGeometry args={[0.10, 0.13, SEG_WIDTH]} /></mesh>
+      </group>
     );
   }
+
+  if (type === "bus") {
+    return (
+      <group>
+        {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
+          <mesh key={z} position={[SEG_LEN / 2, 0.015, z]}>
+            <boxGeometry args={[SEG_LEN - 0.2, 0.16, 0.11]} />
+            {material}
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
   return (
-    <mesh position={[SEG_LEN / 2, 0, 0]}>
-      <boxGeometry args={[SEG_LEN + 0.12, 0.34, SEG_WIDTH + 0.12]} />
-      <meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe />
+    <mesh position={position} rotation={[Math.PI / 2, 0, 0]}>
+      <cylinderGeometry args={[0.15, 0.15, 0.54, 16]} />
+      {material}
     </mesh>
   );
 }
@@ -104,7 +137,7 @@ function PanelSegment({
         <boxGeometry args={[SEG_LEN - 0.08, 0.1, SEG_WIDTH]} />
       </mesh>
 
-      {frameSelected && <Highlight type="box" />}
+      {frameSelected && <Highlight type="frame" />}
 
       {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
         <mesh
@@ -149,17 +182,12 @@ function PanelSegment({
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
 
-      {busSelected && (
-        <mesh position={[SEG_LEN / 2, -0.18, 0]}>
-          <boxGeometry args={[SEG_LEN - 0.12, 0.24, SEG_WIDTH + 0.05]} />
-          <meshBasicMaterial color="#45f3ff" transparent opacity={0.28} depthWrite={false} wireframe />
-        </mesh>
-      )}
+      {busSelected && <Highlight type="bus" />}
 
       {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
         <mesh
           key={z}
-          position={[0, 0, z]}
+          position={[0, 0.13, z]}
           rotation={[Math.PI / 2, 0, 0]}
           material={frameMaterial}
           castShadow
@@ -172,9 +200,9 @@ function PanelSegment({
         </mesh>
       ))}
 
-      {selectedComponentName === "Panel hinge · segment " + (segmentIndex + 1) && (
-        <Highlight type="cylinder" />
-      )}
+      {selectedComponentName === "Panel hinge · segment " + (segmentIndex + 1) &&
+        <Highlight type="cylinder" position={[0, 0.13, 0]} />
+      }
     </group>
   );
 }
@@ -271,7 +299,7 @@ export function PanelWing({
         >
           <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
         </mesh>
-        {selectedComponentName === "Array deployment actuator" && <Highlight type="cylinder" />}
+        {selectedComponentName === "Array deployment actuator" && <Highlight type="cylinder" position={[0.1, 0, 0]} />}
 
         <mesh position={[BOOM_LEN / 2, -0.14, 0.09]} material={boomMaterial}>
           <boxGeometry args={[BOOM_LEN, 0.05, 0.05]} />
