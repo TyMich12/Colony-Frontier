@@ -167,6 +167,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
   const [deployed, setDeployed] = useState(false);
   const [terrain, setTerrain] = useState<TerrainKind>("moon");
   const [dust, setDust] = useState(0);
+  const [dustGenerationKey, setDustGenerationKey] = useState(0);
   const [autoDust, setAutoDust] = useState(false);
   const [sun, setSun] = useState(32);
   const [selectedComponent, setSelectedComponent] = useState<{
@@ -275,6 +276,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           sun={sun}
           deployed={deployed}
           tier={tier}
+          dustGenerationKey={dustGenerationKey}
           onComponentSelect={(name, role, explanation) => setSelectedComponent({ name, role, explanation })}
           selectedComponentName={selectedComponent?.name ?? null}
         />
@@ -352,6 +354,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             type="button"
             onClick={() => {
               setDust(0);
+              setDustGenerationKey((value) => value + 1);
               setAutoDust(false);
             }}
             className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10"
