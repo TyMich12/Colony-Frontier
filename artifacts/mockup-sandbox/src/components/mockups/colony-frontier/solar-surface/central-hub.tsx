@@ -76,10 +76,12 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
   };
 
   useFrame((state) => {
-    const dustFrac = Math.max(0, Math.min(100, dust)) / 100;
-    dustMaterial.opacity = dustFrac <= 0 ? 0 : Math.min(1, Math.pow(dustFrac, 0.52) * 1.18);
+    const dustFrac = Math.max(0, Math.min(100, solarLive.dust)) / 100;
+    dustMaterial.opacity =
+      dustFrac <= 0
+        ? 0
+        : Math.min(0.98, 0.055 + Math.pow(dustFrac, 0.74) * 0.925);
     dustMaterial.alphaTest = 0.01;
-    dustMaterial.needsUpdate = true;
     const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
     if (indicatorRef.current) indicatorRef.current.emissiveIntensity = 0.6 + pulse * 1.4;
     if (gridRef.current) gridRef.current.emissiveIntensity = 0.15 + (solarLive.powerKW / 100) * 0.9;
