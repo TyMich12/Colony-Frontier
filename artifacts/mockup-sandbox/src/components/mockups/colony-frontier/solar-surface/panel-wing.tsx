@@ -126,8 +126,10 @@ function PanelSegment({
 }) {
   const info = panelInfo(segmentIndex);
   const dustVariation = useMemo(() => {
+    // Tiny per-segment variation prevents identical opacity while keeping
+    // overall dust coverage consistent across the five linked panels.
     const seed = Math.sin((segmentIndex + 1) * 91.731) * 43758.5453;
-    return 0.35 + (seed - Math.floor(seed)) * 1.15;
+    return 0.92 + (seed - Math.floor(seed)) * 0.16;
   }, [segmentIndex]);
 
   const localDustMaterial = useMemo(() => {
