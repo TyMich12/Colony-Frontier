@@ -105,7 +105,7 @@ export function SolarFarm({
       deployment: solarLive.deploy,
       sunElevation,
       dust: solarLive.dust,
-    }, [dustMaterial, pvMaterial, terrain, tier, sunElevation]);
+    });
 
     solarLive.powerKW = currentPower;
 
@@ -151,7 +151,6 @@ export function SolarFarm({
           frameMaterial={frameMaterial}
           boomMaterial={boomMaterial}
           dustMaterial={dustMaterial}
-          terrain={terrain}
           onSelect={onComponentSelect}
         />
       ))}
