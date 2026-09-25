@@ -22,6 +22,7 @@ import {
   Zap,
   Rotate3D,
 } from "lucide-react";
+import { TechnicalViewer } from "./TechnicalViewer";
 import {
   GameShell,
   ProgressBar,
@@ -86,6 +87,17 @@ export function TechnologyLabRefresh() {
 
   function selectTier(tier: Tier) {
     if (canBuy(tier)) setSelectedTier(tier);
+  }
+
+  if (viewer) {
+    const viewerTrack = technologyTracks.find((track) => track.id === viewer.trackId) ?? technologyTracks[0];
+    return (
+      <TechnicalViewer
+        track={viewerTrack}
+        tier={viewer.tier}
+        onBack={() => setViewer(null)}
+      />
+    );
   }
 
   return (
