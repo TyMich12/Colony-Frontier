@@ -1330,6 +1330,11 @@ export function TechnicalViewer({
   const [selected, setSelected] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
 
+  useEffect(() => {
+    setSelected(0);
+    setDetailOpen(false);
+  }, [track.id, tier]);
+
   if (track.id === "solar") {
     return (
       <GameShell active="lab" eyebrow="Engineering visualization / systems knowledge" title="Technical Viewer">
@@ -1355,11 +1360,6 @@ export function TechnicalViewer({
       </GameShell>
     );
   }
-
-  useEffect(() => {
-    setSelected(0);
-    setDetailOpen(false);
-  }, [track.id, tier]);
 
   const selectedPart = architecture.parts[selected] ?? architecture.parts[0];
 
