@@ -101,6 +101,7 @@ function SolarScene({
   deployed,
   tier,
   onComponentSelect,
+  selectedComponentName,
 }: {
   terrain: TerrainKind;
   dust: number;
