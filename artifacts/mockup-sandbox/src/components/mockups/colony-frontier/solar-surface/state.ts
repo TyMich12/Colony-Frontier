@@ -86,13 +86,13 @@ export const solarLive: SolarLiveState = {
 };
 
 /**
- * Approximate visible dust coverage represented by the 0–100 loading index.
+ * Approximate visible dust coverage represented by the 0–100 loading index; the severe endpoint approaches near-total panel obscuration.
  * This is a visual coverage model, not a claim that pixel coverage directly
  * determines optical transmission.
  */
 export function dustCoverageFraction(dustPct: number): number {
   const x = Math.max(0, Math.min(100, dustPct)) / 100;
-  return x <= 0 ? 0 : 1 - Math.exp(-4.2 * Math.pow(x, 1.15));
+  return x <= 0 ? 0 : 1 - Math.exp(-5.3 * Math.pow(x, 1.15));
 }
 
 export function dustRemainingFraction(
