@@ -133,6 +133,9 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
         <planeGeometry args={[0.9, 0.9]} />
         <meshStandardMaterial ref={gridRef} color="#0b2a55" emissive="#2f7bff" emissiveIntensity={0.3} metalness={0.3} roughness={0.4} />
       </mesh>
+      <mesh position={[0, 4.2, 0.626]} material={dustMaterial}>
+        <planeGeometry args={[0.9, 0.9]} />
+      </mesh>
 
       {[-0.5, 0, 0.5].map((x, i) => (
         <mesh key={i} position={[x, 4.85, 0.4]} onClick={(e) => select(e, details.avionics)}>
@@ -186,9 +189,14 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
               <boxGeometry args={[2.6, 1.6, 0.05]} />
             </mesh>
             {[-0.6, -0.2, 0.2, 0.6].map((y, j) => (
-              <mesh key={j} position={[2.4, 2.6 + y, 0.05]} material={dark}>
-                <boxGeometry args={[2.5, 0.06, 0.06]} />
-              </mesh>
+              <group key={j}>
+                <mesh position={[2.4, 2.6 + y, 0.05]} material={dark}>
+                  <boxGeometry args={[2.5, 0.06, 0.06]} />
+                </mesh>
+                <mesh position={[2.4, 2.6 + y, 0.05]} scale={[1.01, 1.01, 1.01]} material={dustMaterial}>
+                  <boxGeometry args={[2.5, 0.06, 0.06]} />
+                </mesh>
+              </group>
             ))}
           </group>
         );
