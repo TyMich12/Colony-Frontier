@@ -42,6 +42,7 @@ export function SolarFarm({
   terrain,
   tier,
   onComponentSelect,
+  selectedComponentName,
 }: FarmProps) {
   const cellMap = useMemo(() => makeSolarCellTexture(), []);
   const cellEmissive = useMemo(() => makeCellEmissiveTexture(), []);
