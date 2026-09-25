@@ -126,8 +126,6 @@ function PanelSegment({
 }) {
   const info = panelInfo(segmentIndex);
   const dustVariation = useMemo(() => {
-    // Stable per-tile variation: every physical tile gets its own coverage level.
-    // The deterministic seed keeps the pattern from changing on every render.
     const seed = Math.sin((segmentIndex + 1) * 91.731) * 43758.5453;
     return 0.62 + (seed - Math.floor(seed)) * 0.56;
   }, [segmentIndex]);
@@ -138,7 +136,6 @@ function PanelSegment({
     if (source.map) {
       material.map = source.map.clone();
       material.map.needsUpdate = true;
-      // Independent UV transforms make every tile carry a different dust pattern.
       const seedA = Math.sin((segmentIndex + 1) * 17.17) * 43758.5453;
       const seedB = Math.sin((segmentIndex + 1) * 43.91) * 43758.5453;
       const seedC = Math.sin((segmentIndex + 1) * 71.33) * 43758.5453;
@@ -156,14 +153,13 @@ function PanelSegment({
   }, [dustMaterial, segmentIndex]);
 
   useFrame(() => {
-    // Zero dust is always pristine; at higher indices each tile develops
-    // its own realistic coverage variation.
     const globalOpacity = Math.max(0, Math.min(1, dustMaterial.opacity));
     localDustMaterial.opacity = globalOpacity === 0
       ? 0
       : Math.min(1, globalOpacity * dustVariation);
   });
-\n  const frame = frameInfo(segmentIndex);
+
+  const frame = frameInfo(segmentIndex);
   const bus = busInfo(segmentIndex);
   const panelSelected = selectedComponentName === info.name;
   const frameSelected = selectedComponentName === frame.name;
@@ -238,7 +234,7 @@ function PanelSegment({
           key={`dust-bus-${z}`}
           position={[SEG_LEN / 2, -0.037, z]}
           scale={[1.002, 1.02, 1.04]}
-          material={dustMaterial}
+          material={localDustMaterial}
         >
           <boxGeometry args={[SEG_LEN - 0.2, 0.14, 0.08]} />
         </mesh>
