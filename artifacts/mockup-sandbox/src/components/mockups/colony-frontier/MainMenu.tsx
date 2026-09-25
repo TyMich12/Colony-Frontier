@@ -306,12 +306,12 @@ export function MainMenu() {
 
       {showSettings && (
         <div
-          className="fixed inset-0 z-30 grid place-items-center bg-[#050d12]/80 p-5 backdrop-blur-sm"
+          className="fixed inset-0 z-30 grid place-items-center bg-[#050d12]/80 p-5 backdrop-blur-none"
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-title"
         >
-          <div className="w-full max-w-lg border border-[#52655b] bg-[#102229] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
+          <div className="w-full max-w-lg border border-[#52655b] bg-[#08171f] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 text-[#efb658]">
                 <SlidersHorizontal className="h-5 w-5" />
@@ -378,12 +378,12 @@ export function MainMenu() {
 
       {showResetConfirm && (
         <div
-          className="fixed inset-0 z-40 grid place-items-center bg-[#03090c]/90 p-5 backdrop-blur-sm"
+          className="fixed inset-0 z-40 grid place-items-center bg-[#03090c]/90 p-5 backdrop-blur-none"
           role="dialog"
           aria-modal="true"
           aria-labelledby="reset-confirm-title"
         >
-          <div className="w-full max-w-md border border-[#8a6549] bg-[#111e24] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+          <div className="w-full max-w-md border border-[#8a6549] bg-[#08171f] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
             <div className="flex items-center gap-3 text-[#efb658]">
               <ShieldCheck className="h-5 w-5" />
 
@@ -432,11 +432,11 @@ export function MainMenu() {
 
       {showMarsBrief && (
         <div
-          className="fixed inset-0 z-20 grid place-items-center bg-[#050d12]/80 p-5 backdrop-blur-sm"
+          className="fixed inset-0 z-20 grid place-items-center bg-[#050d12]/80 p-5 backdrop-blur-none"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-lg border border-[#52655b] bg-[#102229] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
+          <div className="w-full max-w-lg border border-[#52655b] bg-[#08171f] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 text-[#efb658]">
                 <ShieldCheck className="h-5 w-5" />
@@ -499,7 +499,7 @@ export function MainMenu() {
           aria-modal="true"
           aria-labelledby="starting-program-title"
         >
-          <div className="w-full max-w-lg border border-[#6f8058] bg-[#0c1a22] shadow-[0_0_40px_rgba(110,200,130,0.2)]">
+          <div className="w-full max-w-lg border border-[#6f8058] bg-[#08171f] shadow-[0_0_40px_rgba(110,200,130,0.2)]">
             <div className="border-b border-[#2d4648] bg-[#162d30] px-6 py-4">
               <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#efb658]">
                 Colony Command
