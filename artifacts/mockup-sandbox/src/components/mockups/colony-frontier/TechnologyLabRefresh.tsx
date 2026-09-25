@@ -179,13 +179,24 @@ export function TechnologyLabRefresh() {
               const selected = selectedTier === tier;
               const meta = tierMeta[tier];
               return (
-                <button
+                <div
                   key={tier}
                   type="button"
-                  disabled={!unlocked}
+                  role="button"
+                  tabIndex={unlocked ? 0 : -1}
+                  aria-disabled={!unlocked}
                   onClick={() => {
+                    if (!unlocked) return;
                     selectTier(tier);
-                    if (unlocked) setViewer({ trackId: selectedTrack.id, tier });
+                    setViewer({ trackId: selectedTrack.id, tier });
+                  }}
+                  onKeyDown={(event) => {
+                    if (!unlocked) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      selectTier(tier);
+                      setViewer({ trackId: selectedTrack.id, tier });
+                    }
                   }}
                   className={`relative w-full border p-4 text-left transition ${
                     selected
@@ -193,7 +204,7 @@ export function TechnologyLabRefresh() {
                       : unlocked
                         ? "border-[#29434a] bg-[#0d2028] hover:border-[#90b4a2]"
                         : "border-[#29434a] bg-[#0d2028] opacity-70"
-                  } disabled:cursor-not-allowed`}
+                  }`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
@@ -262,7 +273,10 @@ export function TechnologyLabRefresh() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setViewer({ trackId: selectedTrack.id, tier })}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setViewer({ trackId: selectedTrack.id, tier });
+                    }}
                     className="mt-4 flex w-full items-center justify-between border border-[#536d61] bg-[#11252a] px-4 py-3 text-left transition hover:border-[#efb658] hover:bg-[#172f32]"
                   >
                     <span>
@@ -279,7 +293,7 @@ export function TechnologyLabRefresh() {
                   <p className="mt-3 border-l-2 border-[#526c5a] bg-[#10252a] px-3 py-2 text-xs leading-5 text-[#a9c0b5]">
                     {equipment.description}
                   </p>
-                </button>
+                </div>
               );
             })}
           </div>
