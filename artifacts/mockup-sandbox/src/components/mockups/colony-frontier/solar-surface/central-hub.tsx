@@ -76,7 +76,7 @@ export function CentralHub({ dust, terrain, onSelect, selectedComponentName }: H
   };
 
   useFrame((state) => {
-    dustMaterial.opacity = Math.min(1, Math.pow(Math.max(0, dust / 100), 0.72) * 1.12);
+    const dustFrac = Math.max(0, Math.min(100, dust)) / 100;\n    dustMaterial.opacity = dustFrac <= 0 ? 0 : Math.min(1, Math.pow(dustFrac, 0.52) * 1.18);
     dustMaterial.alphaTest = 0.01;
     dustMaterial.needsUpdate = true;
     const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
