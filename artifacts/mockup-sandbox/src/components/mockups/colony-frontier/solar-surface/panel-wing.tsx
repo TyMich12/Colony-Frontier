@@ -53,7 +53,7 @@ function Highlight({
     <meshBasicMaterial
       color="#45f3ff"
       transparent
-      opacity={0.38}
+      opacity={0.72}
       depthWrite={false}
       blending={THREE.AdditiveBlending}
     />
@@ -293,7 +293,7 @@ export function PanelWing({
         {selectedComponentName === boomName && (
           <mesh position={[BOOM_LEN / 2, 0, 0]}>
             <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
-            <meshBasicMaterial color="#45f3ff" transparent opacity={0.42} depthWrite={false} blending={THREE.AdditiveBlending} />
+            <meshBasicMaterial color="#45f3ff" transparent opacity={0.78} depthWrite={false} blending={THREE.AdditiveBlending} />
           </mesh>
         )}
 
