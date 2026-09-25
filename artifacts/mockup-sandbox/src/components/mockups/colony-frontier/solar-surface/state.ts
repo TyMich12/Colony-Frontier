@@ -6,7 +6,6 @@ export const NUM_SEGMENTS = 5;
 export const NUM_WINGS = 4;
 export const BASE_ACTIVE_AREA_M2 = BASE_SEGMENT_AREA_M2 * NUM_SEGMENTS * NUM_WINGS;
 
-// The Moon installation is intentionally larger in Colony Frontier.
 export const INSTALLATION_LINEAR_SCALE: Record<TerrainKind, number> = {
   moon: 1.2,
   mars: 1.0,
@@ -17,17 +16,15 @@ export const SOLAR_IRRADIANCE_W_M2: Record<TerrainKind, number> = {
   mars: 586.2,
 };
 
-// Mars surface solar power is atmosphere-limited.
-// NASA describes normal/quiescent Martian optical depth as approximately 0.5.
-// The model below uses the NASA Beer-Lambert direct-beam relationship
-// G_b = G_0 exp(-tau * airmass), with a horizontal-surface projection term.
 export const MARS_DEFAULT_OPTICAL_DEPTH = 0.5;
 export const MARS_AIRMASS_LIMIT_ZENITH_DEG = 80;
 export const MARS_AIRMASS_LIMIT_COS_ZENITH =
   Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
 
 export const ARRAY_DERATING = 0.92;
-export const DUST_MAX_LOSS = 0.45;
+export const MARS_SEVERE_DUST_REMAINING = 0.27;
+export const LUNAR_DUST_REFERENCE_MG_CM2 = 3.0;
+export const LUNAR_DUST_REFERENCE_REMAINING = 0.50;
 
 export const CELL_EFFICIENCY: Record<SolarTier, number> = {
   Foundation: 0.28,
@@ -47,6 +44,8 @@ export interface SolarLiveState {
   atmosphericTau: number;
   atmosphericTransmission: number;
   surfaceIrradiance: number;
+  dustRemainingFraction: number;
+  dustLossPct: number;
 }
 
 export const solarLive: SolarLiveState = {
@@ -60,10 +59,34 @@ export const solarLive: SolarLiveState = {
   atmosphericTau: 0,
   atmosphericTransmission: 1,
   surfaceIrradiance: 0,
+  dustRemainingFraction: 1,
+  dustLossPct: 0,
 };
 
-export function dustEfficiency(dustPct: number): number {
-  return 1 - (Math.max(0, Math.min(100, dustPct)) / 100) * DUST_MAX_LOSS;
+export function dustRemainingFraction(
+  terrain: TerrainKind,
+  dustPct: number,
+): number {
+  const x = Math.max(0, Math.min(100, dustPct)) / 100;
+
+  if (terrain === "mars") {
+    // Calibrated so the severe end reproduces the documented InSight state:
+    // about 27% of dust-free solar-array capacity remained.
+    return Math.pow(MARS_SEVERE_DUST_REMAINING, x);
+  }
+
+  // Lunar tests found maximum cell power to degrade exponentially with
+  // accumulated dust; the reference point used here is 50% remaining at
+  // 3 mg/cm². The slider is a normalized dust-loading index, not literal
+  // percent surface coverage.
+  return Math.pow(LUNAR_DUST_REFERENCE_REMAINING, x);
+}
+
+export function dustEfficiency(
+  terrain: TerrainKind,
+  dustPct: number,
+): number {
+  return dustRemainingFraction(terrain, dustPct);
 }
 
 export function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -83,10 +106,6 @@ export function activeAreaForTerrain(terrain: TerrainKind): number {
 export function marsAirmass(sunElevation: number): number {
   const elevation = Math.max(0, Math.min(90, sunElevation));
   const cosZenith = Math.sin((elevation * Math.PI) / 180);
-
-  // NASA's Mars airmass approximation is 1/cos(z) for zenith angles
-  // up to about 80°. Below 10° elevation we cap the value rather than
-  // allowing the plane-parallel approximation to diverge.
   return 1 / Math.max(cosZenith, MARS_AIRMASS_LIMIT_COS_ZENITH);
 }
 
@@ -106,9 +125,6 @@ export function surfaceIrradianceForTerrain(
     return SOLAR_IRRADIANCE_W_M2.moon * projection;
   }
 
-  // Horizontal-array direct-beam term:
-  // G_bh = G_0 * cos(z) * exp(-tau * m(z))
-  // and cos(z) = sin(elevation).
   return SOLAR_IRRADIANCE_W_M2.mars * projection * marsDirectTransmission(sunElevation);
 }
 
@@ -127,7 +143,7 @@ export function calculatePowerKW({
 }): number {
   const area = activeAreaForTerrain(terrain);
   const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
-  const dustFactor = dustEfficiency(dust);
+  const dustFactor = dustEfficiency(terrain, dust);
 
   const watts =
     surfaceIrradiance *

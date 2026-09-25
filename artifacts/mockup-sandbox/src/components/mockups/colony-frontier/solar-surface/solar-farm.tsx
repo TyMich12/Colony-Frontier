@@ -8,6 +8,7 @@ import {
   calculatePowerKW,
   CELL_EFFICIENCY,
   dustEfficiency,
+  dustRemainingFraction,
   INSTALLATION_LINEAR_SCALE,
   marsDirectTransmission,
   MARS_DEFAULT_OPTICAL_DEPTH,
@@ -99,7 +100,7 @@ export function SolarFarm({
     solarLive.deploy = THREE.MathUtils.damp(solarLive.deploy, deployTarget, 2.2, delta);
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
-    const dustFactor = dustEfficiency(solarLive.dust);
+    const dustFactor = dustEfficiency(terrain, solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
     const currentPower = calculatePowerKW({
       terrain,
@@ -115,7 +116,9 @@ export function SolarFarm({
     const surfaceResourceFactor =
       topOfAtmosphereIrradiance > 0 ? surfaceIrradiance / topOfAtmosphereIrradiance : 0;
 
-    dustMaterial.opacity = Math.min(0.98, Math.max(0, solarLive.dust / 100) * 1.15);
+    // Visual loading is deliberately not treated as literal area coverage: real dust forms
+    // irregular patches, streaks and clumps, while panels can remain optically translucent.
+    dustMaterial.opacity = 0.06 + Math.pow(Math.max(0, dustFrac), 0.72) * 0.78;
     dustMaterial.needsUpdate = true;
 
     solarLive.efficiency =
@@ -123,7 +126,9 @@ export function SolarFarm({
       0.92 *
       surfaceResourceFactor *
       solarLive.deploy *
-      dustFactor;
+      dustRemaining;
+    solarLive.dustRemainingFraction = dustRemaining;
+    solarLive.dustLossPct = (1 - dustRemaining) * 100;
 
     solarLive.sunElevation = sunElevation;
     solarLive.irradiance = topOfAtmosphereIrradiance;
@@ -135,6 +140,7 @@ export function SolarFarm({
     solarLive.surfaceIrradiance = surfaceIrradiance;
 
     const dustFrac = solarLive.dust / 100;
+    const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], Math.min(1, dustFrac * 1.05));
     pvMaterial.roughness = 0.32 + dustFrac * 0.6;
     pvMaterial.metalness = 0.55 * (1 - dustFrac * 0.6);
@@ -144,7 +150,7 @@ export function SolarFarm({
 
   return (
     <group scale={INSTALLATION_LINEAR_SCALE[terrain]}>
-      <CentralHub onSelect={onComponentSelect} selected={selectedComponentName === "Central power hub"} />
+      <CentralHub onSelect={onComponentSelect} selectedComponentName={selectedComponentName} />
       {Array.from({ length: 4 }, (_, i) => (
         <PanelWing
           key={i}

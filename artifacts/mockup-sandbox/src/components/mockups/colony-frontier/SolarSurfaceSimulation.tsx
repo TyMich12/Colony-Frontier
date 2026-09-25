@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
-import { Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
+import { ArrowRight, Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
 import { SolarFarm } from "./solar-surface/solar-farm";
 import { Terrain, Rocks } from "./solar-surface/terrain";
 import { DustParticles } from "./solar-surface/dust-particles";
@@ -51,6 +51,8 @@ function useLive() {
     atmosphericTau: 0,
     atmosphericTransmission: 1,
     surfaceIrradiance: 0,
+    dustRemainingFraction: 1,
+    dustLossPct: 0,
   });
 
   useEffect(() => {
@@ -64,6 +66,8 @@ function useLive() {
         atmosphericTau: solarLive.atmosphericTau,
         atmosphericTransmission: solarLive.atmosphericTransmission,
         surfaceIrradiance: solarLive.surfaceIrradiance,
+        dustRemainingFraction: solarLive.dustRemainingFraction,
+        dustLossPct: solarLive.dustLossPct,
       });
     }, 100);
     return () => window.clearInterval(id);
@@ -169,13 +173,33 @@ export function SolarSurfaceSimulation({ tier }: Props) {
   } | null>(null);
   const live = useLive();
 
+  const solarComponents = [
+    { name: "PV cell matrix · segment 1", role: "Converts incident sunlight into DC electrical power.", explanation: "The photovoltaic cell matrix contains semiconductor junctions that convert absorbed photons into electrical current. Cells are interconnected in series and parallel to achieve the required voltage and current, while the protective front layer and substrate protect the cells from the surface environment." },
+    { name: "Composite panel frame · segment 1", role: "Carries mechanical loads around the photovoltaic surface.", explanation: "The lightweight frame and stiffeners keep the photovoltaic surface within its allowable strain while resisting bending, torsion, launch vibration and thermal cycling." },
+    { name: "Cell interconnect / bus network · segment 1", role: "Collects and routes current from the cell strings.", explanation: "Metal interconnects and bus paths combine the current produced by many cells and route it toward the array harness. Electrical resistance in these paths becomes a real power loss and heat source." },
+    { name: "Panel hinge · segment 1", role: "Allows controlled folding and deployment between segments.", explanation: "The hinge transfers deployment and operational loads while allowing the blanket to fold for launch and unfold on the surface. Real mechanisms must tolerate repeated thermal cycling and the local dust environment." },
+    { name: "Array deployment boom", role: "Carries the structural load path from the hub to the PV wing.", explanation: "The boom transfers bending and torsional loads from the deployed wing back to the central structure. Its mass and stiffness are important because launch loads and deployment transients must be controlled without making the array excessively heavy." },
+    { name: "Array deployment actuator", role: "Drives or controls controlled deployment.", explanation: "The actuator provides controlled motion as the array changes from its launch configuration to its operating geometry. Interfaces must survive launch vibration, vacuum, thermal cycling and long periods without maintenance." },
+    { name: "Central structural base", role: "Anchors the four array wings and transfers loads into the installation.", explanation: "The central base distributes bending moments, deployment loads and thermal-mechanical stresses from the four wings into the colony structure or lander foundation." },
+    { name: "Power conditioning enclosure", role: "Regulates and protects the electrical output.", explanation: "Power electronics regulate the photovoltaic output and protect the DC bus. Maximum-power-point tracking can keep the array near its useful operating point while converters manage voltage compatibility with storage and loads." },
+    { name: "Avionics and monitoring unit", role: "Monitors electrical, thermal and deployment health.", explanation: "Sensors and flight electronics monitor voltage, current, temperature and actuator state. Those measurements allow the controller to detect degraded strings, abnormal temperatures and deployment faults." },
+    { name: "Thermal radiator panel", role: "Rejects waste heat from the power electronics.", explanation: "Power conversion and electronics produce waste heat. In vacuum there is no convective cooling, so radiator surfaces reject heat primarily by thermal infrared radiation." },
+    { name: "Wing deployment drive", role: "Provides controlled mechanical motion at the hub.", explanation: "The deployment drive controls the transition between stowed and deployed states and transfers actuator torque into the wing structure. Its bearings, gears or flexures must remain reliable through thermal cycling and dust exposure." },
+  ];
+
+  const selectNextComponent = () => {
+    const currentIndex = solarComponents.findIndex((component) => component.name === selectedComponent?.name);
+    const next = solarComponents[(currentIndex + 1 + solarComponents.length) % solarComponents.length];
+    setSelectedComponent(next);
+  };
+
   useEffect(() => {
     if (!autoDust) return;
     const id = window.setInterval(() => setDust((value) => Math.min(100, value + 1)), 350);
     return () => window.clearInterval(id);
   }, [autoDust]);
 
-  const dustLossPct = Math.round((dust / 100) * 45);
+  const dustLossPct = live.dustLossPct;
   const nominalCellEfficiency = CELL_EFFICIENCY[tier] * 100;
 
   return (
@@ -196,7 +220,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           <Readout label="Deployment" value={(live.deploy * 100).toFixed(0)} unit="%" />
           <Readout
             label="Dust Loss"
-            value={"-" + dustLossPct}
+            value={"-" + dustLossPct.toFixed(0)}
             unit="%"
             accent={dustLossPct > 20 ? "#ffb36a" : "#e6edf5"}
           />
@@ -259,7 +283,16 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           </div>
           <p className="mt-3 text-xs font-medium text-cyan-100">{selectedComponent.role}</p>
           <p className="mt-2 text-xs leading-5 text-white/65">{selectedComponent.explanation}</p>
-          <p className="mt-3 text-[9px] uppercase tracking-[0.14em] text-white/35">Click another physical component to inspect it</p>
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <span className="text-[9px] uppercase tracking-[0.12em] text-white/30">Next component</span>
+            <button
+              type="button"
+              onClick={selectNextComponent}
+              className="inline-flex items-center gap-2 border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200 hover:bg-cyan-400/15"
+            >
+              Next <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -344,10 +377,10 @@ export function SolarSurfaceSimulation({ tier }: Props) {
         <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/35">
           <Gauge className="h-3.5 w-3.5" />
           {terrain === "mars"
-            ? "Mars: P uses G₀ × sin(e) × exp(−τ / sin(e)) × A × η × deployment × dust × 0.92"
-            : "Moon: P uses G₀ × sin(e) × A × η × deployment × dust × 0.92"}
+            ? "Mars: array dust loss is calibrated to the documented InSight severe-dust state (~27% of dust-free capacity remaining)."
+            : "Moon: lunar dust power loss follows an exponential loading model calibrated to NASA test data (~50% power remaining at 3 mg/cm²)."}
           {" · "}
-          τ = 0.50 is the normal/quiescent Mars atmosphere model; panel dust is modelled separately.
+          Dust index 100 is a severe reference loading, not literal 100% surface coverage.
         </p>
       </div>
     </div>

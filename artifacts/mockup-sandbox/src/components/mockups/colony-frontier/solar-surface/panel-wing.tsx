@@ -21,6 +21,52 @@ interface WingProps {
   selectedComponentName?: string | null;
 }
 
+const panelInfo = (segmentIndex: number) => ({
+  name: "PV cell matrix · segment " + (segmentIndex + 1),
+  role: "Converts incident sunlight into DC electrical power.",
+  explanation:
+    "The dark blue surface represents an interconnected photovoltaic cell matrix. Individual semiconductor cells generate current when photons create electron-hole pairs; cells are wired in series and parallel to produce the required array voltage and current. The front surface is covered by a protective cover layer in real spacecraft arrays, while the backplane supports wiring and mechanical loads.",
+});
+
+const frameInfo = (segmentIndex: number) => ({
+  name: "Composite panel frame · segment " + (segmentIndex + 1),
+  role: "Carries mechanical loads around the photovoltaic surface.",
+  explanation:
+    "The frame and stiffening members resist bending and torsion while keeping the photovoltaic substrate within its allowable strain. Space arrays are designed around extremely low mass, thermal cycling and launch vibration, so the structural members are not simply cosmetic borders.",
+});
+
+const busInfo = (segmentIndex: number) => ({
+  name: "Cell interconnect / bus network · segment " + (segmentIndex + 1),
+  role: "Collects current from many photovoltaic cells.",
+  explanation:
+    "Metal interconnects and bus paths join cell strings and route generated current toward the array harness. Their resistance matters because electrical losses become heat and reduce the net power delivered to the spacecraft bus.",
+});
+
+function Highlight({ type }: { type: "box" | "panel" | "cylinder"; }) {
+  if (type === "panel") {
+    return (
+      <mesh position={[SEG_LEN / 2, 0.105, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[SEG_LEN * 0.94, SEG_WIDTH * 0.94]} />
+        <meshBasicMaterial color="#45f3ff" transparent opacity={0.28} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+    );
+  }
+  if (type === "cylinder") {
+    return (
+      <mesh position={[0.1, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.34, 0.34, 0.76, 16]} />
+        <meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe />
+      </mesh>
+    );
+  }
+  return (
+    <mesh position={[SEG_LEN / 2, 0, 0]}>
+      <boxGeometry args={[SEG_LEN + 0.12, 0.34, SEG_WIDTH + 0.12]} />
+      <meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe />
+    </mesh>
+  );
+}
+
 function PanelSegment({
   pvMaterial,
   frameMaterial,
@@ -36,16 +82,45 @@ function PanelSegment({
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }) {
+  const info = panelInfo(segmentIndex);
+  const frame = frameInfo(segmentIndex);
+  const bus = busInfo(segmentIndex);
+  const panelSelected = selectedComponentName === info.name;
+  const frameSelected = selectedComponentName === frame.name;
+  const busSelected = selectedComponentName === bus.name;
+
   return (
     <group>
-      <mesh position={[SEG_LEN / 2, 0, 0]} material={frameMaterial} castShadow receiveShadow>
+      <mesh
+        position={[SEG_LEN / 2, 0, 0]}
+        material={frameMaterial}
+        castShadow
+        receiveShadow
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect?.(frame.name, frame.role, frame.explanation);
+        }}
+      >
         <boxGeometry args={[SEG_LEN - 0.08, 0.1, SEG_WIDTH]} />
       </mesh>
+
+      {frameSelected && <Highlight type="box" />}
+
       {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
-        <mesh key={z} position={[SEG_LEN / 2, -0.11, z]} material={frameMaterial} castShadow>
+        <mesh
+          key={z}
+          position={[SEG_LEN / 2, -0.11, z]}
+          material={frameMaterial}
+          castShadow
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect?.(bus.name, bus.role, bus.explanation);
+          }}
+        >
           <boxGeometry args={[SEG_LEN - 0.2, 0.14, 0.08]} />
         </mesh>
       ))}
+
       <mesh
         position={[SEG_LEN / 2, 0.075, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -54,38 +129,33 @@ function PanelSegment({
         receiveShadow
         onClick={(event) => {
           event.stopPropagation();
-          onSelect?.(
-            "Solar panel segment " + (segmentIndex + 1),
-            "Converts sunlight into electrical power for the colony.",
-            "Photovoltaic cells absorb photons and create charge carriers. The panel strings combine many cells so generated DC power can be routed into the colony power system. Dust progressively blocks and scatters incoming light, reducing output.",
-          );
+          onSelect?.(info.name, info.role, info.explanation);
         }}
-        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { document.body.style.cursor = ""; }}
       >
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
-      {selectedComponentName === "Solar panel segment " + (segmentIndex + 1) && (
-        <mesh position={[SEG_LEN / 2, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[SEG_LEN * 0.94, SEG_WIDTH * 0.94]} />
-          <meshBasicMaterial color="#45f3ff" transparent opacity={0.24} depthWrite={false} blending={THREE.AdditiveBlending} />
-        </mesh>
-      )}
+
+      {panelSelected && <Highlight type="panel" />}
+
       <mesh
         position={[SEG_LEN / 2, 0.091, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         material={dustMaterial}
         onClick={(event) => {
           event.stopPropagation();
-          onSelect?.(
-            "Solar panel segment " + (segmentIndex + 1),
-            "Converts sunlight into electrical power for the colony.",
-            "Photovoltaic cells absorb photons and create charge carriers. The panel strings combine many cells so generated DC power can be routed into the colony power system. Dust progressively blocks and scatters incoming light, reducing output.",
-          );
+          onSelect?.(info.name, info.role, info.explanation);
         }}
       >
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
+
+      {busSelected && (
+        <mesh position={[SEG_LEN / 2, -0.18, 0]}>
+          <boxGeometry args={[SEG_LEN - 0.12, 0.24, SEG_WIDTH + 0.05]} />
+          <meshBasicMaterial color="#45f3ff" transparent opacity={0.28} depthWrite={false} wireframe />
+        </mesh>
+      )}
+
       {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
         <mesh
           key={z}
@@ -93,10 +163,18 @@ function PanelSegment({
           rotation={[Math.PI / 2, 0, 0]}
           material={frameMaterial}
           castShadow
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect?.("Panel hinge · segment " + (segmentIndex + 1), "Controls folding between panel segments.", "The hinge transfers deployment loads while allowing the blanket to fold for launch and unfold on the surface. Bearings, flexures or geared joints must survive repeated thermal cycling and dust exposure.");
+          }}
         >
           <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
         </mesh>
       ))}
+
+      {selectedComponentName === "Panel hinge · segment " + (segmentIndex + 1) && (
+        <Highlight type="cylinder" />
+      )}
     </group>
   );
 }
@@ -114,10 +192,7 @@ export function PanelWing({
   const segRefs = useRef<(THREE.Group | null)[]>([]);
 
   const stowedAngles = useMemo(
-    () =>
-      Array.from({ length: NUM_SEG }, (_, i) =>
-        (i % 2 === 0 ? 1 : -1) * Math.PI * 0.95,
-      ),
+    () => Array.from({ length: NUM_SEG }, (_, i) => (i % 2 === 0 ? 1 : -1) * Math.PI * 0.95),
     [],
   );
 
@@ -125,25 +200,23 @@ export function PanelWing({
     const t = solarLive.deploy;
     const phaseLift = smoothstep(0, 0.4, t);
     const phaseUnfold = smoothstep(0.4, 1, t);
-
-    if (liftRef.current) {
-      liftRef.current.rotation.z = lerp(STOWED_LIFT, 0, phaseLift);
-    }
-
+    if (liftRef.current) liftRef.current.rotation.z = lerp(STOWED_LIFT, 0, phaseLift);
     for (let i = 0; i < NUM_SEG; i += 1) {
       const g = segRefs.current[i];
       if (g) g.rotation.z = stowedAngles[i] * (1 - phaseUnfold);
     }
   });
 
+  const boomName = "Array deployment boom";
+  const boomRole = "Supports, deploys and carries the solar wing load path.";
+  const boomExplanation =
+    "The deployment boom is the primary structural member between the hub and the photovoltaic blanket. It carries bending and torsional loads generated by the panel mass, solar-pressure forces, deployment transients and spacecraft motion. Real deployable arrays use lightweight high-stiffness structures and controlled deployment mechanisms.";
+
   const buildChain = (i: number): React.ReactNode => {
     if (i >= NUM_SEG) return null;
-
     return (
       <group
-        ref={(element) => {
-          segRefs.current[i] = element;
-        }}
+        ref={(element) => { segRefs.current[i] = element; }}
         position={i === 0 ? [BOOM_LEN, 0, 0] : [SEG_LEN, 0, 0]}
       >
         <PanelSegment
@@ -168,39 +241,42 @@ export function PanelWing({
           castShadow
           onClick={(event) => {
             event.stopPropagation();
-            onSelect?.(
-              "Array deployment boom",
-              "Supports and deploys the solar wing.",
-              "The boom carries the panel blanket away from the central hub and provides structural support during deployment and operation. Its geometry transfers bending and torsional loads back into the spacecraft structure.",
-            );
+            onSelect?.(boomName, boomRole, boomExplanation);
           }}
-          onPointerOver={() => { document.body.style.cursor = "pointer"; }}
-          onPointerOut={() => { document.body.style.cursor = ""; }}
         >
           <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
         </mesh>
-        {selectedComponentName === "Array deployment boom" && (
+        {selectedComponentName === boomName && (
           <mesh position={[BOOM_LEN / 2, 0, 0]}>
             <boxGeometry args={[BOOM_LEN + 0.14, 0.36, 0.36]} />
             <meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe />
           </mesh>
         )}
+
         {[0.6, 1.5, 2.4].map((x) => (
           <mesh key={x} position={[x, 0, 0]} material={boomMaterial} castShadow>
             <boxGeometry args={[0.06, 0.34, 0.34]} />
           </mesh>
         ))}
+
         <mesh
           position={[0.1, 0, 0]}
           rotation={[Math.PI / 2, 0, 0]}
           material={boomMaterial}
           castShadow
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect?.("Array deployment actuator", "Drives or controls controlled deployment.", "A deployment actuator or stored-energy mechanism provides controlled motion during unfolding. Real mechanisms must tolerate launch vibration, repeated thermal cycles and vacuum lubrication constraints.");
+          }}
         >
           <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
         </mesh>
+        {selectedComponentName === "Array deployment actuator" && <Highlight type="cylinder" />}
+
         <mesh position={[BOOM_LEN / 2, -0.14, 0.09]} material={boomMaterial}>
           <boxGeometry args={[BOOM_LEN, 0.05, 0.05]} />
         </mesh>
+
         {buildChain(0)}
       </group>
     </group>
