@@ -1,7 +1,14 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import {\n  PANEL_SEGMENT_LENGTH_M,\n  PANEL_SEGMENT_WIDTH_M,\n  NUM_SEGMENTS,\n  solarLive,\n  smoothstep,\n  lerp,\n} from "./state";
+import {
+  PANEL_SEGMENT_LENGTH_M,
+  PANEL_SEGMENT_WIDTH_M,
+  NUM_SEGMENTS,
+  solarLive,
+  smoothstep,
+  lerp,
+} from "./state";
 
 const BOOM_LEN = 3.4;
 const SEG_LEN = 2.8;
