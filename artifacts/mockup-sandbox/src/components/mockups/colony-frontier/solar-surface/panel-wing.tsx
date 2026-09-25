@@ -62,7 +62,19 @@ function PanelSegment({
       >
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
-      <mesh position={[SEG_LEN / 2, 0.091, 0]} rotation={[-Math.PI / 2, 0, 0]} material={dustMaterial}>
+      <mesh
+        position={[SEG_LEN / 2, 0.091, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        material={dustMaterial}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect?.(
+            "Solar panel segment " + (segmentIndex + 1),
+            "Converts sunlight into electrical power for the colony.",
+            "Photovoltaic cells absorb photons and create charge carriers. The panel strings combine many cells so generated DC power can be routed into the colony power system. Dust progressively blocks and scatters incoming light, reducing output.",
+          );
+        }}
+      >
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
       {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
