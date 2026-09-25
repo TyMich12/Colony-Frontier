@@ -148,6 +148,14 @@ function PanelSegment({
 
       {frameSelected && <Highlight type="frame" />}
 
+      <mesh
+        position={[SEG_LEN / 2, 0.052, 0]}
+        scale={[1.002, 1.02, 1.002]}
+        material={dustMaterial}
+      >
+        <boxGeometry args={[SEG_LEN - 0.08, 0.1, SEG_WIDTH]} />
+      </mesh>
+
       {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
         <mesh
           key={z}
@@ -186,6 +194,17 @@ function PanelSegment({
       >
         <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
       </mesh>
+
+      {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
+        <mesh
+          key={`dust-bus-${z}`}
+          position={[SEG_LEN / 2, -0.037, z]}
+          scale={[1.002, 1.02, 1.04]}
+          material={dustMaterial}
+        >
+          <boxGeometry args={[SEG_LEN - 0.2, 0.14, 0.08]} />
+        </mesh>
+      ))}
 
       {busSelected && <Highlight type="bus" />}
 
