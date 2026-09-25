@@ -425,7 +425,7 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string) {
 }
 
 function createProgram(gl: WebGLRenderingContext) {
-  const vertex = createShader(gl, gl.VERTEX_SHADER, \`
+  const vertex = createShader(gl, gl.VERTEX_SHADER, `
     attribute vec3 aPosition;
     attribute vec3 aNormal;
     uniform mat4 uMVP;
@@ -438,8 +438,8 @@ function createProgram(gl: WebGLRenderingContext) {
       vDepth = -world.z;
       gl_Position = uMVP * vec4(aPosition, 1.0);
     }
-  \`);
-  const fragment = createShader(gl, gl.FRAGMENT_SHADER, \`
+  `);
+  const fragment = createShader(gl, gl.FRAGMENT_SHADER, `
     precision mediump float;
     uniform vec3 uColor;
     uniform float uSelected;
@@ -455,7 +455,7 @@ function createProgram(gl: WebGLRenderingContext) {
       if (uSelected > 0.5) lit += vec3(0.26, 0.22, 0.06);
       gl_FragColor = vec4(lit, 1.0);
     }
-  \`);
+  `);
   const program = gl.createProgram();
   if (!program) throw new Error("Could not create WebGL program");
   gl.attachShader(program, vertex);
