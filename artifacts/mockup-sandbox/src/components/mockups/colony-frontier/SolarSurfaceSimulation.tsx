@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
-import { ArrowRight, Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
+import { ArrowLeft, ArrowRight, Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
 import { SolarFarm } from "./solar-surface/solar-farm";
 import { Terrain, Rocks } from "./solar-surface/terrain";
 import { DustParticles } from "./solar-surface/dust-particles";
@@ -151,7 +151,8 @@ function SolarScene({
         enablePan={false}
         minDistance={10}
         maxDistance={80}
-        maxPolarAngle={Math.PI / 2.05}
+        minPolarAngle={0.08}
+        maxPolarAngle={Math.PI - 0.08}
         target={[0, 3, 0]}
         enableDamping
         dampingFactor={0.08}
@@ -191,6 +192,12 @@ export function SolarSurfaceSimulation({ tier }: Props) {
     const currentIndex = solarComponents.findIndex((component) => component.name === selectedComponent?.name);
     const next = solarComponents[(currentIndex + 1 + solarComponents.length) % solarComponents.length];
     setSelectedComponent(next);
+  };
+
+  const selectPreviousComponent = () => {
+    const currentIndex = solarComponents.findIndex((component) => component.name === selectedComponent?.name);
+    const previous = solarComponents[(currentIndex - 1 + solarComponents.length) % solarComponents.length];
+    setSelectedComponent(previous);
   };
 
   useEffect(() => {
@@ -284,14 +291,23 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           <p className="mt-3 text-xs font-medium text-cyan-100">{selectedComponent.role}</p>
           <p className="mt-2 text-xs leading-5 text-white/65">{selectedComponent.explanation}</p>
           <div className="mt-4 flex items-center justify-between gap-2">
-            <span className="text-[9px] uppercase tracking-[0.12em] text-white/30">Next component</span>
-            <button
-              type="button"
-              onClick={selectNextComponent}
-              className="inline-flex items-center gap-2 border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200 hover:bg-cyan-400/15"
-            >
-              Next <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            <span className="text-[9px] uppercase tracking-[0.12em] text-white/30">Browse components</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={selectPreviousComponent}
+                className="inline-flex items-center gap-2 border border-white/15 bg-white/5 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-white/70 hover:bg-white/10"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back
+              </button>
+              <button
+                type="button"
+                onClick={selectNextComponent}
+                className="inline-flex items-center gap-2 border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200 hover:bg-cyan-400/15"
+              >
+                Next <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -347,7 +363,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/50">
-              <Wind className="h-3.5 w-3.5" /> Dust Coverage · {Math.round(dust)}%
+              <Wind className="h-3.5 w-3.5" /> Dust Loading Index · {Math.round(dust)}
             </span>
             <input
               type="range"
@@ -380,7 +396,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             ? "Mars: array dust loss is calibrated to the documented InSight severe-dust state (~27% of dust-free capacity remaining)."
             : "Moon: lunar dust power loss follows an exponential loading model calibrated to NASA test data (~50% power remaining at 3 mg/cm²)."}
           {" · "}
-          Dust index 100 is a severe reference loading, not literal 100% surface coverage.
+          Index 100 is a severe reference loading, not literal surface coverage.
         </p>
       </div>
     </div>
