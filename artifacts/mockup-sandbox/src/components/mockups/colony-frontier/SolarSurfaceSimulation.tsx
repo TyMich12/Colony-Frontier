@@ -100,7 +100,15 @@ function SolarScene({
   sun,
   deployed,
   tier,
+  onComponentSelect,
 }: {
+  terrain: TerrainKind;
+  dust: number;
+  sun: number;
+  deployed: boolean;
+  tier: SolarTier;
+  onComponentSelect?: (name: string, role: string, explanation: string) => void;
+}
   terrain: TerrainKind;
   dust: number;
   sun: number;
@@ -141,6 +149,7 @@ function SolarScene({
           sunElevation={sun}
           terrain={terrain}
           tier={tier}
+          onComponentSelect={onComponentSelect}
         />
         <Terrain kind={terrain} />
         <Rocks kind={terrain} />
@@ -166,6 +175,11 @@ export function SolarSurfaceSimulation({ tier }: Props) {
   const [dust, setDust] = useState(8);
   const [autoDust, setAutoDust] = useState(false);
   const [sun, setSun] = useState(32);
+  const [selectedComponent, setSelectedComponent] = useState<{
+    name: string;
+    role: string;
+    explanation: string;
+  } | null>(null);
   const live = useLive();
 
   useEffect(() => {
@@ -229,8 +243,37 @@ export function SolarSurfaceSimulation({ tier }: Props) {
       </div>
 
       <div className="h-[650px] w-full">
-        <SolarScene terrain={terrain} dust={dust} sun={sun} deployed={deployed} tier={tier} />
+        <SolarScene
+          terrain={terrain}
+          dust={dust}
+          sun={sun}
+          deployed={deployed}
+          tier={tier}
+          onComponentSelect={(name, role, explanation) => setSelectedComponent({ name, role, explanation })}
+        />
       </div>
+
+      {selectedComponent && (
+        <div className="pointer-events-auto absolute left-5 bottom-28 z-30 w-[min(92vw,390px)] border border-cyan-400/30 bg-black/80 p-4 shadow-2xl backdrop-blur-md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.22em] text-cyan-300/70">Component selected</p>
+              <h2 className="mt-1 text-base font-semibold uppercase tracking-[0.08em] text-white">{selectedComponent.name}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedComponent(null)}
+              className="border border-white/15 px-2 py-1 text-xs text-white/60 hover:bg-white/10"
+              aria-label="Close component information"
+            >
+              ×
+            </button>
+          </div>
+          <p className="mt-3 text-xs font-medium text-cyan-100">{selectedComponent.role}</p>
+          <p className="mt-2 text-xs leading-5 text-white/65">{selectedComponent.explanation}</p>
+          <p className="mt-3 text-[9px] uppercase tracking-[0.14em] text-white/35">Click another physical component to inspect it</p>
+        </div>
+      )}
 
       <div className="absolute bottom-5 left-1/2 z-20 w-[min(94vw,760px)] -translate-x-1/2 rounded-xl border border-white/10 bg-black/55 p-4 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-3">
