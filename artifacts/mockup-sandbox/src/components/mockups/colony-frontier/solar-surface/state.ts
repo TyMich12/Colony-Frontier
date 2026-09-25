@@ -22,7 +22,7 @@ export const MARS_AIRMASS_LIMIT_COS_ZENITH =
   Math.cos((MARS_AIRMASS_LIMIT_ZENITH_DEG * Math.PI) / 180);
 
 export const ARRAY_DERATING = 0.92;
-export const MARS_SEVERE_DUST_REMAINING = 0.27;
+export const MARS_SEVERE_DUST_REMAINING = 0.12;
 export const LUNAR_DUST_REFERENCE_MG_CM2 = 3.0;
 export const LUNAR_DUST_REFERENCE_REMAINING = 0.18;
 
@@ -71,7 +71,7 @@ export function dustRemainingFraction(
 
   if (terrain === "mars") {
     // Calibrated so the severe end reproduces the documented InSight state:
-    // about 27% of dust-free solar-array capacity remained.
+    // about 12% of dust-free solar-array capacity remains at the extreme storm endpoint in this simulation.
     return Math.pow(MARS_SEVERE_DUST_REMAINING, x);
   }
 
