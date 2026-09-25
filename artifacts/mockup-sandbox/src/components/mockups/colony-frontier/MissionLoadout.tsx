@@ -378,7 +378,7 @@ export function MissionLoadout() {
 
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [hoverEnabled, setHoverEnabled] = useState(true);
-  const [notice, setNotice=(
+  const [notice, setNotice] = useState(
     "Mission 01 begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
   const [confirmed, setConfirmed] = useState(false);
