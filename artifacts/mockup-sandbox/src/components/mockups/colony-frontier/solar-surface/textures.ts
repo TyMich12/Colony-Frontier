@@ -156,25 +156,30 @@ export function makeDustTexture(kind: "moon" | "mars", size = 384) {
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
   const image = ctx.createImageData(size, size);
-  const base = kind === "mars" ? [178, 111, 72] : [165, 160, 151];
+  const base = kind === "mars" ? [184, 116, 76] : [176, 171, 163];
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const nx = x / size;
       const ny = y / size;
-      const coarse = fbm(nx * 5.5, ny * 5.5, 5);
-      const fine = fbm(nx * 28 + 7, ny * 28 + 11, 3);
-      const streak = fbm(nx * 2.2 + ny * 5, ny * 14, 3);
-      // Dense, irregular deposition: dust should become visibly widespread rather
-      // than looking like a few isolated transparent patches at moderate loading.
-      const deposit = Math.max(0, (coarse * 0.60 + fine * 0.15 + streak * 0.25) - 0.34) / 0.66;
-      const clumps = Math.pow(Math.max(0, Math.min(1, deposit)), 0.80);
-      const alpha = Math.max(0, Math.min(255, clumps * 255));
-      const grain = (fine - 0.5) * 28 + (coarse - 0.5) * 14;
+      const coarse = fbm(nx * 3.4, ny * 3.4, 5);
+      const medium = fbm(nx * 13 + 5, ny * 13 + 9, 4);
+      const fine = fbm(nx * 46 + 17, ny * 46 + 23, 2);
+      const streak = fbm(nx * 2.4 + ny * 5.8, ny * 18 + nx * 2.2, 4);
+
+      const broadDeposit = coarse * 0.48 + medium * 0.22 + streak * 0.22 + fine * 0.08;
+      const largePatches = Math.max(0, Math.min(1, (broadDeposit - 0.52) / 0.30));
+      const smallClumps = Math.max(0, Math.min(1, (fine * 0.78 + medium * 0.22 - 0.60) / 0.30));
+      const deposit = Math.max(0, Math.min(1, largePatches * 0.90 + smallClumps * 0.34));
+      const softened = Math.pow(deposit, 0.68);
+      const alpha = Math.max(0, Math.min(255, softened * 255));
+
+      const grain = (fine - 0.5) * 22 + (medium - 0.5) * 16;
+      const patchShade = (coarse - 0.5) * 12;
       const i = (y * size + x) * 4;
-      image.data[i] = Math.max(0, Math.min(255, base[0] + grain));
-      image.data[i + 1] = Math.max(0, Math.min(255, base[1] + grain));
-      image.data[i + 2] = Math.max(0, Math.min(255, base[2] + grain));
+      image.data[i] = Math.max(0, Math.min(255, base[0] + grain + patchShade));
+      image.data[i + 1] = Math.max(0, Math.min(255, base[1] + grain + patchShade));
+      image.data[i + 2] = Math.max(0, Math.min(255, base[2] + grain + patchShade));
       image.data[i + 3] = alpha;
     }
   }
