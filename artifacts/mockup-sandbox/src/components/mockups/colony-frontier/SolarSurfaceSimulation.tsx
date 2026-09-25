@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Environment, Lightformer, OrbitControls, Stars } from "@react-three/drei";
+import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
 import { SolarFarm } from "./solar-surface/solar-farm";
@@ -114,9 +114,9 @@ function SolarScene({
   return (
     <Canvas
       shadows
-      dpr={[1, 1.75]}
+      dpr={[1, 1.25]}
       camera={{ position: [24, 14, 24], fov: 42, near: 0.1, far: 400 }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={["#000004"]} />
       <fog attach="fog" args={["#050608", 70, 150]} />
@@ -124,17 +124,7 @@ function SolarScene({
       <ambientLight intensity={0.06} color="#93a7c4" />
       <hemisphereLight args={[0x0a0e18, terrain === "moon" ? "#2a2825" : "#3a1c12", 0.35]} />
 
-      <Environment resolution={256} background={false}>
-        <Lightformer intensity={2.4} color="#fff3e0" position={[10, 12, 6]} scale={[10, 10, 1]} />
-        <Lightformer
-          intensity={0.35}
-          color={terrain === "moon" ? "#2a2825" : "#3a1c12"}
-          rotation={[Math.PI / 2, 0, 0]}
-          position={[0, -2, 0]}
-          scale={[30, 30, 1]}
-        />
-        <Lightformer intensity={0.25} color="#22304a" position={[-12, 4, -10]} scale={[10, 10, 1]} />
-      </Environment>
+
 
       <Stars radius={200} depth={80} count={2600} factor={4} saturation={0} fade speed={0.5} />
 
