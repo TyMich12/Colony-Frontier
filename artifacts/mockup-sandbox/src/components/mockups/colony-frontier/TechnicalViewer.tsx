@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { PointerEvent } from "react";
+import type { PointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { ArrowLeft, ChevronRight, Rotate3D, Scan, X, ZoomIn } from "lucide-react";
 import { GameShell, SectionLabel } from "./_shared/GameShell";
 import { formatCredits, tierMeta, type TechnologyTrack, type Tier } from "./_shared/gameData";
@@ -978,7 +978,7 @@ function tierSearch(trackId: string, tier: Tier, component: string) {
   return (CATEGORY_SEARCH[trackId] ?? "NASA spacecraft technology") + " " + component + " " + maturity;
 }
 
-function useNASAImageSearch(query: string, fallback?: NASAImage) {
+function useNASAImageSearch(query: string, fallback?: NASAImage, broadQuery?: string) {
   const [images, setImages] = useState<NASAImage[]>(fallback ? [fallback] : []);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -993,30 +993,46 @@ function useNASAImageSearch(query: string, fallback?: NASAImage) {
       encodeURIComponent(query) +
       "&media_type=image&page_size=10",
     )
-      .then((response) => {
+      .then(async (response) => {
         if (!response.ok) throw new Error("NASA image search failed");
-        return response.json();
-      })
-      .then((payload) => {
-        if (!alive) return;
 
-        const next: NASAImage[] = (payload?.collection?.items ?? [])
-          .map((item: any) => {
-            const data = item?.data?.[0];
-            const links = item?.links ?? [];
-            const imageLink =
-              links.find((link: any) => link?.render === "image" && /large|medium/.test(link?.href ?? "")) ??
-              links.find((link: any) => link?.render === "image");
-            if (!data || !imageLink?.href) return null;
-            return {
-              url: imageLink.href,
-              title: data.title ?? "NASA image",
-              credit: data.secondary_creator ?? data.center ?? "NASA",
-              description: data.description ?? "",
-            };
-          })
-          .filter(Boolean)
-          .slice(0, 6);
+        const parse = (source: any): NASAImage[] =>
+          (source?.collection?.items ?? [])
+            .map((item: any) => {
+              const data = item?.data?.[0];
+              const links = item?.links ?? [];
+              const imageLink =
+                links.find((link: any) => link?.render === "image" && /large|medium/.test(link?.href ?? "")) ??
+                links.find((link: any) => link?.render === "image");
+              if (!data || !imageLink?.href) return null;
+              return {
+                url: imageLink.href,
+                title: data.title ?? "NASA image",
+                credit: data.secondary_creator ?? data.center ?? "NASA",
+                description: data.description ?? "",
+              };
+            })
+            .filter(Boolean)
+            .slice(0, 6);
+
+        let next = parse(await response.json());
+
+        if (!next.length && broadQuery) {
+          try {
+            const broadResponse = await fetch(
+              "https://images-api.nasa.gov/search?q=" +
+              encodeURIComponent(broadQuery) +
+              "&media_type=image&page_size=10",
+            );
+            if (broadResponse.ok) {
+              next = parse(await broadResponse.json());
+            }
+          } catch {
+            // Keep the supplied fallback.
+          }
+        }
+
+        if (!alive) return;
 
         const combined = next.length
           ? fallback
@@ -1028,7 +1044,7 @@ function useNASAImageSearch(query: string, fallback?: NASAImage) {
 
         setImages(combined);
         setLoading(false);
-        setFailed(false);
+        setFailed(!next.length);
       })
       .catch(() => {
         if (!alive) return;
@@ -1040,7 +1056,7 @@ function useNASAImageSearch(query: string, fallback?: NASAImage) {
     return () => {
       alive = false;
     };
-  }, [query, fallback?.url]);
+  }, [query, broadQuery, fallback?.url]);
 
   return { images, loading, failed };
 }
@@ -1058,7 +1074,8 @@ function RealHardwareImageViewer({
 }) {
   const fallback = STATIC_FALLBACKS[trackId];
   const query = tierSearch(trackId, tier, component.name);
-  const { images, loading, failed } = useNASAImageSearch(query, fallback);
+  const broadQuery = (CATEGORY_SEARCH[trackId] ?? "NASA spacecraft technology") + " " + component.name;
+  const { images, loading, failed } = useNASAImageSearch(query, fallback, broadQuery);
   const [selectedImage, setSelectedImage] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -1108,7 +1125,7 @@ function RealHardwareImageViewer({
     }
   }
 
-  function wheel(event: React.WheelEvent<HTMLDivElement>) {
+  function wheel(event: ReactWheelEvent<HTMLDivElement>) {
     event.preventDefault();
     event.stopPropagation();
     // Explicitly normal: wheel up = zoom in, wheel down = zoom out.
