@@ -267,28 +267,29 @@ function PanelSegment({
       {segmentIndex < NUM_SEG - 1 && (
         <>
           {[-SEG_WIDTH / 2 + 0.3, SEG_WIDTH / 2 - 0.3].map((z) => (
-            <mesh
-              key={z}
-              position={[SEG_LEN, 0.13, z]}
-              rotation={[Math.PI / 2, 0, 0]}
-              material={frameMaterial}
-              castShadow
-              onClick={(event) => {
-                event.stopPropagation();
-                const hingeName = "Panel hinge · between segments " + (segmentIndex + 1) + "–" + (segmentIndex + 2);
-                onSelect?.(hingeName, "Controls folding between panel segments.", "The hinge transfers deployment loads while allowing the blanket to fold for launch and unfold on the surface. Bearings, flexures or geared joints must survive repeated thermal cycling and dust exposure.");
-              }}
-            >
-              <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
-            </mesh>
-            <mesh
-              position={[SEG_LEN, 0.13, z]}
-              rotation={[Math.PI / 2, 0, 0]}
-              scale={[1.025, 1.025, 1.025]}
-              material={localDustMaterial}
-            >
-              <cylinderGeometry args={[0.125, 0.125, 0.52, 16]} />
-            </mesh>
+            <React.Fragment key={z}>
+              <mesh
+                position={[SEG_LEN, 0.13, z]}
+                rotation={[Math.PI / 2, 0, 0]}
+                material={frameMaterial}
+                castShadow
+                onClick={(event) => {
+                  event.stopPropagation();
+                  const hingeName = "Panel hinge · between segments " + (segmentIndex + 1) + "–" + (segmentIndex + 2);
+                  onSelect?.(hingeName, "Controls folding between panel segments.", "The hinge transfers deployment loads while allowing the blanket to fold for launch and unfold on the surface. Bearings, flexures or geared joints must survive repeated thermal cycling and dust exposure.");
+                }}
+              >
+                <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
+              </mesh>
+              <mesh
+                position={[SEG_LEN, 0.13, z]}
+                rotation={[Math.PI / 2, 0, 0]}
+                scale={[1.025, 1.025, 1.025]}
+                material={localDustMaterial}
+              >
+                <cylinderGeometry args={[0.125, 0.125, 0.52, 16]} />
+              </mesh>
+            </React.Fragment>
           ))}
           {selectedComponentName === "Panel hinge · between segments " + (segmentIndex + 1) + "–" + (segmentIndex + 2) && (
             <>
