@@ -41,7 +41,7 @@ export function CentralHub({ onSelect, selectedComponentName }: HubProps) {
   const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3d44", metalness: 0.7, roughness: 0.5 }), []);
   const gold = useMemo(() => new THREE.MeshStandardMaterial({ color: "#caa14a", metalness: 0.9, roughness: 0.25 }), []);
 
-  const select = (event: THREE.Event, info: string[]) => {
+  const select = (event: { stopPropagation: () => void }, info: string[]) => {
     event.stopPropagation();
     onSelect?.(info[0], info[1], info[2]);
   };
