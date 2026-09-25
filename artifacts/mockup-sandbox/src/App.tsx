@@ -36,7 +36,7 @@ function PreviewRenderer({
     setError(null);
 
     async function loadComponent(): Promise<void> {
-      const key = `./components/mockups/${componentPath}.tsx`;
+      const key = `./components/mockups/colony-frontier/${componentPath}.tsx`;
       const loader = modules[key];
       if (!loader) {
         setError(`No component found at ${componentPath}.tsx`);
@@ -124,7 +124,7 @@ function getPreviewPath(): string | null {
     basePath && pathname.startsWith(basePath)
       ? pathname.slice(basePath.length) || "/"
       : pathname;
-  const match = local.match(/^\/preview\/(.+)$/);
+  const match = local.match(/^\/preview\/(.+?)(?:\.tsx)?$/);
   return match ? match[1] : null;
 }
 

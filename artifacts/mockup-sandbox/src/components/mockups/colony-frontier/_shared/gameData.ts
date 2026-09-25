@@ -270,4 +270,4 @@ export const payloadProgression = [
 export const tierUnlockRequirements = tierUnlocks;
 
 export const formatCredits = (value: number) =>
-  `$${value.toFixed(value % 1 === 0 ? 1 : 1)}M`;
+  `$${value.toFixed(value % 1 === 0 ? 0 : 1)}M`;

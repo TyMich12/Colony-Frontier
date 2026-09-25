@@ -688,7 +688,7 @@ export function CampaignMapRefresh() {
                   </div>
                 </div>
                 <a
-                  href="/__mockup/preview/colony-frontier/MissionLoadout"
+                  href="/preview/MissionLoadout"
                   className="flex w-full items-center justify-between bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#1a211d] transition hover:bg-[#f6cb7b]"
                 >
                   Prepare Mission 01 <Target className="h-4 w-4" />

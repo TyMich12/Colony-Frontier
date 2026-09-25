@@ -56,8 +56,8 @@ const categoryIcons = {
 } as const;
 
 const tiers: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
-const currentXp = 4500;
-const currentTokens = 3;
+const currentXp = 0;
+const currentTokens = 0;
 
 function requirementCopy(tier: Tier) {
   const requirement = tierUnlockRequirements[tier];

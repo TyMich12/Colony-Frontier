@@ -8,14 +8,15 @@ import {
   Map,
   Settings,
 } from "lucide-react";
+import { loadGameState } from "../gameState";
 
 type ScreenKey = "menu" | "campaign" | "lab" | "loadout";
 
 const routes: Record<ScreenKey, string> = {
-  menu: "/__mockup/preview/colony-frontier/MainMenu",
-  campaign: "/__mockup/preview/colony-frontier/CampaignMap",
-  lab: "/__mockup/preview/colony-frontier/TechnologyLab",
-  loadout: "/__mockup/preview/colony-frontier/MissionLoadout",
+  menu: "/preview/MainMenu",
+  campaign: "/preview/CampaignMapRefresh",
+  lab: "/preview/TechnologyLabRefresh",
+  loadout: "/preview/MissionLoadout",
 };
 
 const navItems: Array<{
@@ -40,38 +41,83 @@ export function GameShell({
   title: string;
   children: ReactNode;
 }) {
+  const gameState = loadGameState();
+
   return (
     <div className="min-h-screen bg-[#071018] text-[#edf4ec] [font-family:Arial,sans-serif]">
       <div className="relative mx-auto min-h-screen max-w-[1380px] overflow-hidden bg-[radial-gradient(circle_at_80%_5%,rgba(67,164,173,0.11),transparent_26%),linear-gradient(125deg,#071018_0%,#0a1720_62%,#0c2024_100%)]">
         <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(154,199,190,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(154,199,190,0.06)_1px,transparent_1px)] [background-size:44px_44px]" />
-        <header className="relative flex items-center justify-between border-b border-[#284047] px-8 py-5 md:px-12">
-          <a href={routes.menu} className="group flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center border border-[#9cae8d] bg-[#15272b] text-[#d5e6bd] shadow-[0_0_24px_rgba(164,204,153,0.12)]">
-              <span className="h-3 w-3 rounded-full bg-[#efb658] shadow-[0_0_14px_#efb658]" />
-            </span>
-            <span>
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.35em] text-[#a6b8a2]">
-                Colony
+
+        <header className="relative border-b border-[#284047]">
+          <div className="flex items-center justify-between px-8 py-5 md:px-12">
+            <a href={routes.menu} className="group flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center border border-[#9cae8d] bg-[#15272b] text-[#d5e6bd] shadow-[0_0_24px_rgba(164,204,153,0.12)]">
+                <span className="h-3 w-3 rounded-full bg-[#efb658] shadow-[0_0_14px_#efb658]" />
               </span>
-              <span className="block text-sm font-semibold uppercase tracking-[0.22em] text-[#edf4ec]">
-                Frontier Program
+
+              <span>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.35em] text-[#a6b8a2]">
+                  Colony
+                </span>
+
+                <span className="block text-sm font-semibold uppercase tracking-[0.22em] text-[#edf4ec]">
+                  Frontier Program
+                </span>
               </span>
-            </span>
-          </a>
-          <div className="hidden items-center gap-7 text-[10px] uppercase tracking-[0.28em] text-[#7c9a9a] md:flex">
-            <span>Cycle 03 / 2049</span>
-            <span className="flex items-center gap-2 text-[#b6d2b0]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#66c69e]" />
-              Systems nominal
-            </span>
+            </a>
+
+            <div className="hidden items-center gap-7 text-[10px] uppercase tracking-[0.28em] text-[#7c9a9a] md:flex">
+              <span>Cycle 03 / 2049</span>
+
+              <span className="flex items-center gap-2 text-[#b6d2b0]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#66c69e]" />
+                Systems nominal
+              </span>
+            </div>
+
+            <a
+              href={routes.menu}
+              className="grid h-9 w-9 place-items-center border border-[#284047] text-[#88a3a2] transition hover:border-[#b3c98f] hover:text-[#d7e8bd]"
+              aria-label="Return to command"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </a>
           </div>
-          <a
-            href={routes.menu}
-            className="grid h-9 w-9 place-items-center border border-[#284047] text-[#88a3a2] transition hover:border-[#b3c98f] hover:text-[#d7e8bd]"
-            aria-label="Return to command"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </a>
+
+          <div className="grid grid-cols-3 border-t border-[#1d343b] bg-[#08151c]/90">
+            <div className="border-r border-[#1d343b] px-6 py-3 md:px-12">
+              <div className="text-[8px] font-bold uppercase tracking-[0.24em] text-[#718f80]">
+                Colony Treasury
+              </div>
+
+              <div className="mt-1 font-mono text-lg font-bold text-[#efb658]">
+                ${gameState.credits % 1 === 0
+                  ? gameState.credits.toFixed(0)
+                  : gameState.credits.toFixed(1)}
+                M
+              </div>
+            </div>
+
+            <div className="border-r border-[#1d343b] px-6 py-3 md:px-12">
+              <div className="text-[8px] font-bold uppercase tracking-[0.24em] text-[#718f80]">
+                Experience
+              </div>
+
+              <div className="mt-1 font-mono text-lg font-bold text-[#d7e8bd]">
+                {gameState.xp.toLocaleString()} XP
+              </div>
+            </div>
+
+            <div className="px-6 py-3 md:px-12">
+              <div className="text-[8px] font-bold uppercase tracking-[0.24em] text-[#718f80]">
+                Research
+              </div>
+
+              <div className="mt-1 font-mono text-lg font-bold text-[#d7e8bd]">
+                {gameState.researchTokens} RT
+              </div>
+            </div>
+          </div>
         </header>
 
         <main className="relative px-6 pb-24 pt-10 md:px-12 md:pt-14">
@@ -81,18 +127,22 @@ export function GameShell({
                 <span className="h-px w-7 bg-[#efb658]" />
                 {eyebrow}
               </p>
+
               <h1 className="text-3xl font-semibold uppercase tracking-[0.16em] text-[#eef4e9] md:text-5xl">
                 {title}
               </h1>
             </div>
+
             <div className="hidden items-center gap-2 text-right text-[10px] uppercase tracking-[0.22em] text-[#759091] sm:block">
               <span className="block text-[#adc5ab]">Mission Control</span>
+
               <span className="flex items-center justify-end gap-2">
                 <CircleHelp className="h-3.5 w-3.5" />
                 Briefing channel 07
               </span>
             </div>
           </div>
+
           {children}
         </main>
 
@@ -109,7 +159,9 @@ export function GameShell({
                 }`}
               >
                 <Icon className="h-4 w-4" />
+
                 <span className="hidden sm:inline">{label}</span>
+
                 {active === key && (
                   <span className="ml-1 h-1 w-1 rounded-full bg-[#f0bc61]" />
                 )}
@@ -142,7 +194,10 @@ export function ProgressBar({
     <div className="h-1.5 overflow-hidden bg-[#1b3136]">
       <div
         className="h-full transition-all"
-        style={{ width: `${value}%`, backgroundColor: color }}
+        style={{
+          width: `${value}%`,
+          backgroundColor: color,
+        }}
       />
     </div>
   );
