@@ -111,7 +111,7 @@ export function SolarFarm({
     dustMaterial.opacity =
       dustFrac <= 0
         ? 0
-        : Math.min(0.98, 0.055 + Math.pow(dustFrac, 0.74) * 0.925);
+        : Math.min(0.995, 0.02 + Math.pow(dustFrac, 0.68) * 0.975);
     dustMaterial.alphaTest = 0.01;
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const dustCoverage = dustCoverageFraction(solarLive.dust);
