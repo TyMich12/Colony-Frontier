@@ -404,7 +404,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             ? "Mars: index 100 represents a severe dust-storm reference point; the electrical model leaves 25% of dust-free capacity."
             : "Moon: index 100 represents severe loading; the electrical model leaves 8% of dust-free capacity."}
           {" · "}
-          Index 100 is a severe reference loading; the visual layer reaches about 99.5% coverage.
+          Index 100 is a severe reference loading; the visual layer reaches about 99.9% coverage.
         </p>
       </div>
     </div>
