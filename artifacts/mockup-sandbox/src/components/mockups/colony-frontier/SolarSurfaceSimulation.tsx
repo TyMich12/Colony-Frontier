@@ -98,6 +98,79 @@ function Readout({
   );
 }
 
+function DustStormCoating({ dust }: { dust: number }) {
+  const amount = Math.max(0, Math.min(1, dust / 100));
+  if (amount <= 0.001) return null;
+
+  const opacity = 0.04 + Math.pow(amount, 0.7) * 0.58;
+  const material = (
+    <meshStandardMaterial
+      color="#b48762"
+      transparent
+      opacity={opacity}
+      roughness={1}
+      metalness={0}
+      depthWrite={false}
+    />
+  );
+
+  return (
+    <group>
+      {/* Dust settling over the central base and equipment stack */}
+      <mesh position={[0, 0.12, 0]} scale={[1.02, 1.02, 1.02]}>
+        <cylinderGeometry args={[3.55, 3.95, 0.36, 40]} />
+        {material}
+      </mesh>
+      <mesh position={[0, 1.7, 0]} scale={[1.06, 1.04, 1.06]}>
+        <cylinderGeometry args={[1.56, 1.86, 3.18, 16]} />
+        {material}
+      </mesh>
+      <mesh position={[0, 4.2, 0]} scale={1.08}>
+        <boxGeometry args={[1.25, 1.25, 1.25]} />
+        {material}
+      </mesh>
+
+      {/* Dust coats the four hub drives */}
+      {[0, 1, 2, 3].map((i) => {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        return (
+          <group key={i} rotation={[0, a, 0]}>
+            <mesh position={[2.6, 0.75, 0]} scale={1.08}>
+              <boxGeometry args={[1.16, 1.36, 1.66]} />
+              {material}
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Dust settles along every deployment arm */}
+      {[0, 1, 2, 3].map((i) => {
+        const a = (i / 4) * Math.PI * 2;
+        return (
+          <group key={i} rotation={[0, a, 0]}>
+            <mesh position={[3.9, 3.2, 0]} scale={[1, 1, 1]}>
+              <boxGeometry args={[3.8, 0.34, 0.34]} />
+              {material}
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* A thin dusty veil around the whole installation at storm intensity */}
+      <mesh position={[0, 2.1, 0]} scale={[1, 0.72, 1]}>
+        <sphereGeometry args={[5.2, 32, 20]} />
+        <meshStandardMaterial
+          color="#9b7658"
+          transparent
+          opacity={Math.pow(amount, 1.6) * 0.16}
+          roughness={1}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 function SolarScene({
   terrain,
   dust,
@@ -145,6 +218,7 @@ function SolarScene({
         <Terrain kind={terrain} />
         <Rocks kind={terrain} />
         <DustParticles kind={terrain} dust={dust} />
+        <DustStormCoating dust={dust} />
       </group>
 
       <OrbitControls
@@ -164,7 +238,7 @@ function SolarScene({
 export function SolarSurfaceSimulation({ tier }: Props) {
   const [deployed, setDeployed] = useState(false);
   const [terrain, setTerrain] = useState<TerrainKind>("moon");
-  const [dust, setDust] = useState(8);
+  const [dust, setDust] = useState(0);
   const [autoDust, setAutoDust] = useState(false);
   const [sun, setSun] = useState(32);
   const [selectedComponent, setSelectedComponent] = useState<{
@@ -348,7 +422,7 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             }}
             className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10"
           >
-            <Sparkles className="h-4 w-4" /> Clean Panels
+            <Sparkles className="h-4 w-4" /> Clear Dust
           </button>
 
           <button
