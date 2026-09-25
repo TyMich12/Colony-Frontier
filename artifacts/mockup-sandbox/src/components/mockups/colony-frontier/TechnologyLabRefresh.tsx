@@ -200,7 +200,6 @@ export function TechnologyLabRefresh() {
                   onClick={() => {
                     if (!unlocked) return;
                     selectTier(tier);
-                    setViewer({ trackId: selectedTrack.id, tier });
                   }}
                   onKeyDown={(event) => {
                     if (!unlocked) return;
@@ -283,24 +282,7 @@ export function TechnologyLabRefresh() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setViewer({ trackId: selectedTrack.id, tier });
-                    }}
-                    className="mt-4 flex w-full items-center justify-between border border-[#536d61] bg-[#11252a] px-4 py-3 text-left transition hover:border-[#efb658] hover:bg-[#172f32]"
-                  >
-                    <span>
-                      <span className="block text-[9px] font-bold uppercase tracking-[0.2em] text-[#efb658]">
-                        View how it works
-                      </span>
-                      <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-[#789690]">
-                        Interactive 3D technical model · clickable components
-                      </span>
-                    </span>
-                    <Rotate3D className="h-5 w-5 text-[#9fce82]" />
-                  </button>
+
 
                   <p className="mt-3 border-l-2 border-[#526c5a] bg-[#10252a] px-3 py-2 text-xs leading-5 text-[#a9c0b5]">
                     {equipment.description}
