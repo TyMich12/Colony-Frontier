@@ -183,6 +183,22 @@ export function TechnologyLabRefresh() {
             </div>
           </div>
 
+             <button
+               type="button"
+               onClick={() => setViewer({ trackId: selectedTrack.id, tier: selectedTier })}
+               className="flex items-center gap-3 border border-[#536d61] bg-[#11252a] px-4 py-3 text-left transition hover:border-[#efb658] hover:bg-[#172f32]"
+             >
+               <Rotate3D className="h-5 w-5 text-[#9fce82]" />
+               <span>
+                 <span className="block text-[9px] font-bold uppercase tracking-[0.2em] text-[#efb658]">
+                   View {selectedTrack.category}
+                 </span>
+                 <span className="mt-1 block text-[9px] uppercase tracking-[0.12em] text-[#789690]">
+                   3D viewer · {selectedTier} configuration
+                 </span>
+               </span>
+             </button>
+
           <div className="relative space-y-3">
             <div className="absolute bottom-7 left-5 top-7 w-px bg-gradient-to-b from-[#9fce82] via-[#72b9d4] to-[#e9a15d]" />
             {tiers.map((tier) => {
