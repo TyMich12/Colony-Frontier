@@ -72,7 +72,7 @@ function PanelSegment({
         </mesh>
       )}
       <mesh
-        position={[SEG_LEN / 2, 0.091, 0]
+        position={[SEG_LEN / 2, 0.091, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         material={dustMaterial}
         onClick={(event) => {
