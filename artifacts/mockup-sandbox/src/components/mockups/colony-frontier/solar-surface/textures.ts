@@ -251,7 +251,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
       // islands, feathered edges and thin translucent gaps instead of a flat tint.
       // Push the high end toward a storm-like, nearly continuous deposit while retaining
       // irregular holes, streaks and grains so it still reads as real particulate dust.
-      const density = Math.pow(powder, 0.58);
+      const density = Math.pow(powder, 0.52);
       const localShade =
         (mediumA - 0.5) * 30 +
         (mediumB - 0.5) * 24 +
@@ -270,7 +270,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
       // At full dust this becomes visually near-opaque, while the procedural texture
       // still preserves irregular particulate structure rather than a flat colour wash.
       const alpha = Math.round(
-        (0.012 + Math.pow(density, 1.02) * 0.998) * 255,
+        (0.015 + Math.pow(density, 0.98) * 1.0) * 255,
       );
 
       const i = (y * size + x) * 4;
@@ -284,14 +284,14 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
   ctx.putImageData(image, 0, 0);
 
   // Large, irregular dust islands.
-  const clumpCount = kind === "mars" ? 700 : 620;
+  const clumpCount = kind === "mars" ? 1100 : 950;
   for (let i = 0; i < clumpCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
-    const rx = 4 + random() * (kind === "mars" ? 42 : 36);
-    const ry = 3 + random() * (kind === "mars" ? 28 : 24);
+    const rx = 5 + random() * (kind === "mars" ? 56 : 48);
+    const ry = 4 + random() * (kind === "mars" ? 36 : 32);
     const rotation = random() * Math.PI;
-    const alpha = 0.12 + random() * 0.34;
+    const alpha = 0.16 + random() * 0.42;
     const tone = kind === "mars"
       ? 192 + Math.floor(random() * 22)
       : 184 + Math.floor(random() * 22);
@@ -315,14 +315,14 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
   }
 
   // Wind-driven streaks with broken opacity.
-  const streakCount = kind === "mars" ? 420 : 360;
+  const streakCount = kind === "mars" ? 600 : 520;
   for (let i = 0; i < streakCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
-    const length = 10 + random() * 72;
-    const width = 1.0 + random() * 5.2;
+    const length = 12 + random() * 92;
+    const width = 1.2 + random() * 6.5;
     const angle = (random() - 0.5) * Math.PI;
-    const alpha = 0.08 + random() * 0.20;
+    const alpha = 0.10 + random() * 0.26;
 
     ctx.save();
     ctx.translate(x, y);
@@ -348,12 +348,12 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
 
   // Thousands of distinct grains make the surface read as accumulated particles
   // rather than a material recolour.
-  const grainCount = kind === "mars" ? 18000 : 15500;
+  const grainCount = kind === "mars" ? 24000 : 21000;
   for (let i = 0; i < grainCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
-    const radius = 0.3 + random() * (kind === "mars" ? 2.5 : 2.1);
-    const alpha = 0.05 + random() * 0.22;
+    const radius = 0.35 + random() * (kind === "mars" ? 3.0 : 2.6);
+    const alpha = 0.06 + random() * 0.27;
     const tone = kind === "mars"
       ? `rgba(${190 + Math.floor(random() * 35)}, ${118 + Math.floor(random() * 32)}, ${78 + Math.floor(random() * 26)}, ${alpha})`
       : `rgba(${190 + Math.floor(random() * 28)}, ${186 + Math.floor(random() * 27)}, ${178 + Math.floor(random() * 25)}, ${alpha})`;
