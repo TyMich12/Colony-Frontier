@@ -51,6 +51,8 @@ function useLive() {
     atmosphericTau: 0,
     atmosphericTransmission: 1,
     surfaceIrradiance: 0,
+    dustRemainingFraction: 1,
+    dustLossPct: 0,
   });
 
   useEffect(() => {
@@ -64,6 +66,8 @@ function useLive() {
         atmosphericTau: solarLive.atmosphericTau,
         atmosphericTransmission: solarLive.atmosphericTransmission,
         surfaceIrradiance: solarLive.surfaceIrradiance,
+        dustRemainingFraction: solarLive.dustRemainingFraction,
+        dustLossPct: solarLive.dustLossPct,
       });
     }, 100);
     return () => window.clearInterval(id);
