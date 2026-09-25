@@ -136,7 +136,7 @@ function PanelSegment({
     // Tiny per-segment variation prevents identical opacity while keeping
     // overall dust coverage consistent across the five linked panels.
     const seed = Math.sin((segmentIndex + 1) * 91.731) * 43758.5453;
-    return 0.92 + (seed - Math.floor(seed)) * 0.16;
+    return 0.96 + (seed - Math.floor(seed)) * 0.08;
   }, [segmentIndex]);
 
   const localDustMaterial = useMemo(() => {
@@ -196,7 +196,7 @@ function PanelSegment({
         scale={[1.002, 1.02, 1.002]}
         material={localDustMaterial}
       >
-        <boxGeometry args={[SEG_LEN - 0.08, 0.1, SEG_WIDTH]} />
+        <boxGeometry args={[SEG_LEN - 0.28, 0.1, SEG_WIDTH]} />
       </mesh>
 
       {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
@@ -210,7 +210,7 @@ function PanelSegment({
             onSelect?.(bus.name, bus.role, bus.explanation);
           }}
         >
-          <boxGeometry args={[SEG_LEN - 0.2, 0.14, 0.08]} />
+          <boxGeometry args={[SEG_LEN - 0.32, 0.14, 0.08]} />
         </mesh>
       ))}
 
