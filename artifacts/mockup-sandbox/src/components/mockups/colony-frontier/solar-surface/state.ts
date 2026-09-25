@@ -24,7 +24,7 @@ export const MARS_AIRMASS_LIMIT_COS_ZENITH =
 export const ARRAY_DERATING = 0.92;
 export const MARS_SEVERE_DUST_REMAINING = 0.27;
 export const LUNAR_DUST_REFERENCE_MG_CM2 = 3.0;
-export const LUNAR_DUST_REFERENCE_REMAINING = 0.50;
+export const LUNAR_DUST_REFERENCE_REMAINING = 0.18;
 
 export const CELL_EFFICIENCY: Record<SolarTier, number> = {
   Foundation: 0.28,
