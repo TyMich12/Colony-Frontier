@@ -125,6 +125,19 @@ function PanelSegment({
   selectedComponentName?: string | null;
 }) {
   const info = panelInfo(segmentIndex);
+  const localDustMaterial = useMemo(() => {
+    const source = dustMaterial as THREE.MeshStandardMaterial;
+    const material = source.clone();
+    if (source.map) {
+      material.map = source.map.clone();
+      material.map.needsUpdate = true;
+      // Different UV offsets make each physical panel carry a different dust pattern.
+      material.map.offset.set(Math.random() * 4, Math.random() * 4);
+      material.map.repeat.set(1.35 + Math.random() * 0.7, 1.35 + Math.random() * 0.7);
+      material.map.rotation = (Math.random() - 0.5) * 0.18;
+    }
+    return material;
+  }, [dustMaterial]);
   const frame = frameInfo(segmentIndex);
   const bus = busInfo(segmentIndex);
   const panelSelected = selectedComponentName === info.name;
@@ -151,7 +164,7 @@ function PanelSegment({
       <mesh
         position={[SEG_LEN / 2, 0.052, 0]}
         scale={[1.002, 1.02, 1.002]}
-        material={dustMaterial}
+        material={localDustMaterial}
       >
         <boxGeometry args={[SEG_LEN - 0.08, 0.1, SEG_WIDTH]} />
       </mesh>
