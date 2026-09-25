@@ -138,6 +138,12 @@ function CategoryHeader({
   const Icon =
     categoryIcons[track.category as keyof typeof categoryIcons] ?? Zap;
 
+  const categoryColor = categoryBlocked
+    ? "#d87979"
+    : required
+      ? "#72b9d4"
+      : "#9fce82";
+
   return (
     <button
       type="button"
@@ -156,20 +162,32 @@ function CategoryHeader({
       aria-expanded={open}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center border border-[#3d5552] bg-[#0a171e] text-[#9fce82]">
+        <div
+          className="grid h-10 w-10 shrink-0 place-items-center border bg-[#0a171e]"
+          style={{ borderColor: categoryColor, color: categoryColor }}
+        >
           <Icon className="h-4 w-4" />
         </div>
 
         <div className="min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#9fce82]">
+          <p
+            className="text-[9px] font-bold uppercase tracking-[0.2em]"
+            style={{ color: categoryColor }}
+          >
             Technology category
           </p>
 
-          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-[#eef4e9]">
+          <h3
+            className="mt-1 text-sm font-semibold uppercase tracking-[0.12em]"
+            style={{ color: categoryColor }}
+          >
             {track.category}
           </h3>
 
-          <p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-[#779390]">
+          <p
+            className="mt-1 text-[9px] uppercase tracking-[0.13em]"
+            style={{ color: categoryColor }}
+          >
             {selectedTier
               ? `${selectedTier} tier selected`
               : "No system loaded"}
@@ -179,7 +197,10 @@ function CategoryHeader({
 
       <div className="flex items-center gap-3">
         {selectedTier && (
-          <span className="hidden border border-[#49615d] bg-[#0a171e] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#9fce82] sm:inline">
+          <span
+            className="hidden border bg-[#0a171e] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] sm:inline"
+            style={{ borderColor: categoryColor, color: categoryColor }}
+          >
             Loaded
           </span>
         )}
@@ -452,8 +473,14 @@ export function MissionLoadout() {
   function categoryIsBlocked(track: TechnologyTrack) {
     const previousTier = selected[track.id];
     const previousEquipment = previousTier ? track.tiers[previousTier] : null;
-    const availableCredits =
+    const availableTreasury =
       gameState.credits - (spend - (previousEquipment?.cost ?? 0));
+    const availableMissionBudget =
+      missionBudget - (spend - (previousEquipment?.cost ?? 0));
+    const availableCredits = Math.min(
+      availableTreasury,
+      availableMissionBudget,
+    );
     const availableMass =
       missionCapacity - (mass - (previousEquipment?.mass ?? 0));
 
