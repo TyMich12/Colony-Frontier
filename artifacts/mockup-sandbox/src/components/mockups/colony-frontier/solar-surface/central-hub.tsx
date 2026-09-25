@@ -18,19 +18,28 @@ const details = {
 
 function HubHighlight({ name, selected }: { name: string; selected: boolean }) {
   if (!selected) return null;
+  const material = (
+    <meshBasicMaterial
+      color="#45f3ff"
+      transparent
+      opacity={0.18}
+      depthWrite={false}
+      blending={THREE.AdditiveBlending}
+    />
+  );
   if (name === details.radiator[0]) {
-    return <mesh position={[2.4, 2.6, 0]}><boxGeometry args={[2.8, 1.8, 0.12]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+    return <mesh position={[2.4, 2.6, 0]} scale={1.025}>{material}<boxGeometry args={[2.6, 1.6, 0.05]} /></mesh>;
   }
   if (name === details.drive[0]) {
-    return <mesh position={[2.6, 0.75, 0]}><boxGeometry args={[1.25, 1.45, 1.75]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+    return <mesh position={[2.6, 0.75, 0]} scale={1.04}>{material}<boxGeometry args={[1.1, 1.3, 1.6]} /></mesh>;
   }
   if (name === details.power[0]) {
-    return <mesh position={[0, 1.7, 0]}><cylinderGeometry args={[1.85, 2.1, 3.3, 16]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.25} depthWrite={false} wireframe /></mesh>;
+    return <mesh position={[0, 1.7, 0]} scale={1.025}>{material}<cylinderGeometry args={[1.5, 1.8, 3.1, 12]} /></mesh>;
   }
   if (name === details.avionics[0]) {
-    return <mesh position={[0, 4.2, 0]}><boxGeometry args={[1.4, 1.4, 1.4]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+    return <mesh position={[0, 4.2, 0]} scale={1.04}>{material}<boxGeometry args={[1.2, 1.2, 1.2]} /></mesh>;
   }
-  return <mesh position={[0, 0.05, 0]}><cylinderGeometry args={[3.55, 3.95, 0.38, 40]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+  return <mesh position={[0, 0.05, 0]} scale={1.015}>{material}<cylinderGeometry args={[3.4, 3.8, 0.3, 40]} /></mesh>;
 }
 
 export function CentralHub({ onSelect, selectedComponentName }: HubProps) {
