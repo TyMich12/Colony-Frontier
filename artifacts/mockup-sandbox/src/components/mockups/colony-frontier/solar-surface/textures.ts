@@ -251,7 +251,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
       // islands, feathered edges and thin translucent gaps instead of a flat tint.
       // Push the high end toward a storm-like, nearly continuous deposit while retaining
       // irregular holes, streaks and grains so it still reads as real particulate dust.
-      const density = Math.pow(powder, 0.72);
+      const density = Math.pow(powder, 0.68);
       const localShade =
         (mediumA - 0.5) * 30 +
         (mediumB - 0.5) * 24 +
@@ -267,10 +267,10 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
       const g = Math.round(clamp01((base.g + localShade * 0.78 + warmShift * 0.48) / 255) * 255);
       const b = Math.round(clamp01((base.b + localShade * 0.62 + warmShift * 0.28) / 255) * 255);
 
-      // At full dust this can become visually dense, but the floor keeps
-      // tiny gaps between grains so the panel never becomes a solid paint layer.
+      // At full dust this becomes visually near-opaque, while the procedural texture
+      // still preserves irregular particulate structure rather than a flat colour wash.
       const alpha = Math.round(
-        (0.008 + Math.pow(density, 1.05) * 0.965) * 255,
+        (0.01 + Math.pow(density, 1.05) * 0.985) * 255,
       );
 
       const i = (y * size + x) * 4;
