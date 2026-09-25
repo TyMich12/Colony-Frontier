@@ -811,19 +811,19 @@ export function Solar3DViewer({ tier }: { tier: Tier }) {
         <div className="absolute right-5 top-56 w-52 border border-[#30494f] bg-[#061118]/72 p-3 backdrop-blur-md md:right-7 md:top-60">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[8px] font-bold uppercase tracking-[.16em] text-[#708a83]">Game loadout</span>
-            <span className="text-[9px] font-mono text-[#dde7df]">{gameTier.cost{'}'}M</span>
+            <span className="text-[9px] font-mono text-[#dde7df]">{gameTier.cost}M</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-[8px] uppercase tracking-[.1em]">
             <div>
               <p className="text-[#708a83]">Mass</p>
-              <p className="mt-1 font-mono text-[#dde7df]">{gameTier.mass.toLocaleString(){'}'} kg</p>
+              <p className="mt-1 font-mono text-[#dde7df]">{gameTier.mass.toLocaleString()} kg</p>
             </div>
             <div>
               <p className="text-[#708a83]">Tier</p>
-              <p className="mt-1 text-[#dde7df]">{tier{'}'}</p>
+              <p className="mt-1 text-[#dde7df]">{tier}</p>
             </div>
           </div>
-          <p className="mt-2 text-[8px] leading-4 text-[#78918b]">{gameTier.efficiency{'}'}</p>
+          <p className="mt-2 text-[8px] leading-4 text-[#78918b]">{gameTier.efficiency}</p>
         </div>
         <div className="absolute bottom-24 left-5 border border-[#30494f] bg-[#061118]/75 px-3 py-2 text-[8px] uppercase tracking-[.14em] text-[#78918b] backdrop-blur-md md:left-7">
           {selectedComponent
