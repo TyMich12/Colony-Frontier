@@ -7,7 +7,6 @@ import {
   activeAreaForTerrain,
   calculatePowerKW,
   CELL_EFFICIENCY,
-  dustEfficiency,
   dustRemainingFraction,
   INSTALLATION_LINEAR_SCALE,
   marsDirectTransmission,
@@ -22,11 +21,6 @@ import { makeCellEmissiveTexture, makeSolarCellTexture, makeDustTexture } from "
 import { makeDustAwareMaterial, updateDustStrength } from "./dust-material";
 
 const CLEAN = new THREE.Color("#ffffff");
-const DUST_COLOR: Record<TerrainKind, THREE.Color> = {
-  moon: new THREE.Color("#b7b1a4"),
-  mars: new THREE.Color("#c08a5c"),
-};
-
 interface FarmProps {
   deployTarget: number;
   dust: number;
