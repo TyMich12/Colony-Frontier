@@ -108,12 +108,6 @@ function SolarScene({
   deployed: boolean;
   tier: SolarTier;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
-}
-  terrain: TerrainKind;
-  dust: number;
-  sun: number;
-  deployed: boolean;
-  tier: SolarTier;
 }) {
   return (
     <Canvas
