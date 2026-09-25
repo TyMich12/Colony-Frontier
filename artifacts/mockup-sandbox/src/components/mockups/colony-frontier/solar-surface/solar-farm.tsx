@@ -9,6 +9,10 @@ import {
   CELL_EFFICIENCY,
   dustEfficiency,
   INSTALLATION_LINEAR_SCALE,
+  marsDirectTransmission,
+  MARS_DEFAULT_OPTICAL_DEPTH,
+  SOLAR_IRRADIANCE_W_M2,
+  surfaceIrradianceForTerrain,
   solarLive,
   type SolarTier,
   type TerrainKind,
@@ -78,6 +82,7 @@ export function SolarFarm({
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
     const dustFactor = dustEfficiency(solarLive.dust);
+    const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
     const currentPower = calculatePowerKW({
       terrain,
       tier,
@@ -87,19 +92,26 @@ export function SolarFarm({
     });
 
     solarLive.powerKW = currentPower;
-    const atmosphericFactor = terrain === "mars" ? 0.8 : 1;
+
+    const topOfAtmosphereIrradiance = SOLAR_IRRADIANCE_W_M2[terrain];
+    const surfaceResourceFactor =
+      topOfAtmosphereIrradiance > 0 ? surfaceIrradiance / topOfAtmosphereIrradiance : 0;
+
     solarLive.efficiency =
       CELL_EFFICIENCY[tier] *
       0.92 *
-      atmosphericFactor *
+      surfaceResourceFactor *
       solarLive.deploy *
-      Math.max(0, Math.sin((sunElevation * Math.PI) / 180)) *
       dustFactor;
 
     solarLive.sunElevation = sunElevation;
-    solarLive.irradiance =
-      terrain === "moon" ? 1361 : 586.2;
+    solarLive.irradiance = topOfAtmosphereIrradiance;
     solarLive.activeAreaM2 = activeAreaForTerrain(terrain);
+    solarLive.atmosphericTau =
+      terrain === "mars" ? MARS_DEFAULT_OPTICAL_DEPTH : 0;
+    solarLive.atmosphericTransmission =
+      terrain === "mars" ? marsDirectTransmission(sunElevation) : 1;
+    solarLive.surfaceIrradiance = surfaceIrradiance;
 
     const dustFrac = solarLive.dust / 100;
     pvMaterial.color.copy(CLEAN).lerp(DUST_COLOR[terrain], dustFrac * 0.85);
