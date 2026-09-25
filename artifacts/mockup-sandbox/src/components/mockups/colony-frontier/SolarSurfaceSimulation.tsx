@@ -8,7 +8,6 @@ import { Terrain, Rocks } from "./solar-surface/terrain";
 import { DustParticles } from "./solar-surface/dust-particles";
 import {
   CELL_EFFICIENCY,
-  dustCoverageFraction,
   solarLive,
   type SolarTier,
   type TerrainKind,
