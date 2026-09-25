@@ -149,3 +149,37 @@ export function makeTerrainTexture(kind: "moon" | "mars", size = 1024) {
   texture.anisotropy = 8;
   return texture;
 }
+
+export function makeDustTexture(kind: "moon" | "mars", size = 384) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const image = ctx.createImageData(size, size);
+  const base = kind === "mars" ? [178, 111, 72] : [165, 160, 151];
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const nx = x / size;
+      const ny = y / size;
+      const coarse = fbm(nx * 5.5, ny * 5.5, 5);
+      const fine = fbm(nx * 28 + 7, ny * 28 + 11, 3);
+      const streak = fbm(nx * 2.2 + ny * 5, ny * 14, 3);
+      const deposit = Math.max(0, (coarse * 0.62 + fine * 0.2 + streak * 0.18) - 0.42) / 0.58;
+      const alpha = Math.max(0, Math.min(255, deposit * 235));
+      const grain = (fine - 0.5) * 18;
+      const i = (y * size + x) * 4;
+      image.data[i] = Math.max(0, Math.min(255, base[0] + grain));
+      image.data[i + 1] = Math.max(0, Math.min(255, base[1] + grain));
+      image.data[i + 2] = Math.max(0, Math.min(255, base[2] + grain));
+      image.data[i + 3] = alpha;
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
