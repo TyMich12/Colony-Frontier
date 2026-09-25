@@ -19,6 +19,7 @@ import {
   type TerrainKind,
 } from "./state";
 import { makeCellEmissiveTexture, makeSolarCellTexture, makeDustTexture } from "./textures";
+import { makeDustAwareMaterial, updateDustStrength } from "./dust-material";
 
 const CLEAN = new THREE.Color("#ffffff");
 const DUST_COLOR: Record<TerrainKind, THREE.Color> = {
@@ -51,7 +52,7 @@ export function SolarFarm({
 
   const pvMaterial = useMemo(
     () =>
-      new THREE.MeshStandardMaterial({
+      makeDustAwareMaterial({
         map: cellMap,
         emissiveMap: cellEmissive,
         emissive: new THREE.Color("#2f6bff"),
@@ -59,41 +60,28 @@ export function SolarFarm({
         metalness: 0.55,
         roughness: 0.32,
         color: CLEAN.clone(),
-      }),
-    [cellMap, cellEmissive],
-  );
-
-  const dustMaterial = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map: dustTexture,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        roughness: 0.95,
-        metalness: 0,
-      }),
-    [dustTexture],
+      }, dustTexture, terrain === "moon" ? "#b7b1a4" : "#c08a5c"),
+    [cellMap, cellEmissive, dustTexture, terrain],
   );
 
   const frameMaterial = useMemo(
     () =>
-      new THREE.MeshStandardMaterial({
-        color: "#b9bcc3",
-        metalness: 0.8,
-        roughness: 0.4,
-      }),
-    [],
+      makeDustAwareMaterial(
+        { color: "#b9bcc3", metalness: 0.8, roughness: 0.4 },
+        dustTexture,
+        terrain === "moon" ? "#b7b1a4" : "#c08a5c",
+      ),
+    [dustTexture, terrain],
   );
 
   const boomMaterial = useMemo(
     () =>
-      new THREE.MeshStandardMaterial({
-        color: "#8d9098",
-        metalness: 0.85,
-        roughness: 0.45,
-      }),
-    [],
+      makeDustAwareMaterial(
+        { color: "#8d9098", metalness: 0.85, roughness: 0.45 },
+        dustTexture,
+        terrain === "moon" ? "#b7b1a4" : "#c08a5c",
+      ),
+    [dustTexture, terrain],
   );
 
   useFrame((_, delta) => {
@@ -101,6 +89,9 @@ export function SolarFarm({
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
     const dustFrac = solarLive.dust / 100;
+    updateDustStrength(pvMaterial, solarLive.dust);
+    updateDustStrength(frameMaterial, solarLive.dust);
+    updateDustStrength(boomMaterial, solarLive.dust);
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
     const currentPower = calculatePowerKW({
@@ -116,14 +107,6 @@ export function SolarFarm({
     const topOfAtmosphereIrradiance = SOLAR_IRRADIANCE_W_M2[terrain];
     const surfaceResourceFactor =
       topOfAtmosphereIrradiance > 0 ? surfaceIrradiance / topOfAtmosphereIrradiance : 0;
-
-    // Dust is visually severe because real lunar and Martian arrays can become heavily
-    // contaminated over time. The texture remains irregular rather than becoming a flat
-    // colour wash, while opacity ramps strongly at moderate loading.
-    dustMaterial.opacity = dustFrac <= 0
-      ? 0
-      : 0.12 + Math.pow(Math.max(0, dustFrac), 0.38) * 0.88;
-    dustMaterial.needsUpdate = true;
 
     solarLive.efficiency =
       CELL_EFFICIENCY[tier] *
@@ -151,7 +134,7 @@ export function SolarFarm({
 
   return (
     <group scale={INSTALLATION_LINEAR_SCALE[terrain]}>
-      <CentralHub onSelect={onComponentSelect} selectedComponentName={selectedComponentName} />
+      <CentralHub dust={dust} terrain={terrain} onSelect={onComponentSelect} selectedComponentName={selectedComponentName} />
       {Array.from({ length: 4 }, (_, i) => (
         <PanelWing
           key={i}
@@ -159,7 +142,6 @@ export function SolarFarm({
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
           boomMaterial={boomMaterial}
-          dustMaterial={dustMaterial}
           onSelect={onComponentSelect}
           selectedComponentName={selectedComponentName}
         />
