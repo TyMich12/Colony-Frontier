@@ -108,6 +108,7 @@ export function PanelWing({
   boomMaterial,
   dustMaterial,
   onSelect,
+  selectedComponentName,
 }: WingProps) {
   const liftRef = useRef<THREE.Group>(null);
   const segRefs = useRef<(THREE.Group | null)[]>([]);
