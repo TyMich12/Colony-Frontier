@@ -3,100 +3,87 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { solarLive } from "./state";
 
-export function CentralHub({ onSelect, selected = false }: { onSelect?: (name: string, role: string, explanation: string) => void; selected?: boolean }) {
+type HubProps = {
+  onSelect?: (name: string, role: string, explanation: string) => void;
+  selectedComponentName?: string | null;
+};
+
+const details = {
+  base: ["Central structural base", "Anchors the four array wings and transfers loads into the installation.", "The base plate and primary structure distribute array bending moments, deployment loads and thermal-mechanical stresses into the foundation or spacecraft/lander structure."],
+  power: ["Power conditioning enclosure", "Contains the electrical power-management hardware.", "Power electronics perform regulation and protection between the photovoltaic strings and the DC distribution bus. Maximum-power-point tracking can keep the array near its useful operating point while converters manage voltage compatibility."],
+  avionics: ["Avionics and monitoring unit", "Monitors array health, temperatures, voltage and current.", "Flight computers and instrumentation monitor electrical and thermal telemetry, detect abnormal conditions and command safe operating states. Current, voltage and temperature are key observables for diagnosing array performance."],
+  radiator: ["Thermal radiator panel", "Rejects waste heat from electronics.", "Electrical conversion is not lossless. Radiator surfaces provide a path for heat to leave through infrared radiation, which is essential in vacuum because there is no convective cooling."],
+  drive: ["Wing deployment drive", "Provides controlled mechanical motion during array deployment.", "The deployment drive or actuator controls the transition from stowed to deployed geometry. Its interfaces must handle launch restraints, deployment loads and long-term thermal cycling."],
+};
+
+function HubHighlight({ name, selected }: { name: string; selected: boolean }) {
+  if (!selected) return null;
+  if (name === details.radiator[0]) {
+    return <mesh position={[2.4, 2.6, 0]}><boxGeometry args={[2.8, 1.8, 0.12]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+  }
+  if (name === details.drive[0]) {
+    return <mesh position={[2.6, 0.75, 0]}><boxGeometry args={[1.25, 1.45, 1.75]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+  }
+  if (name === details.power[0]) {
+    return <mesh position={[0, 1.7, 0]}><cylinderGeometry args={[1.85, 2.1, 3.3, 16]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.25} depthWrite={false} wireframe /></mesh>;
+  }
+  if (name === details.avionics[0]) {
+    return <mesh position={[0, 4.2, 0]}><boxGeometry args={[1.4, 1.4, 1.4]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+  }
+  return <mesh position={[0, 0.05, 0]}><cylinderGeometry args={[3.55, 3.95, 0.38, 40]} /><meshBasicMaterial color="#45f3ff" transparent opacity={0.3} depthWrite={false} wireframe /></mesh>;
+}
+
+export function CentralHub({ onSelect, selectedComponentName }: HubProps) {
   const indicatorRef = useRef<THREE.MeshStandardMaterial>(null);
   const gridRef = useRef<THREE.MeshStandardMaterial>(null);
 
-  const metal = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#c9ccd2",
-        metalness: 0.85,
-        roughness: 0.35,
-      }),
-    [],
-  );
-  const dark = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#3a3d44",
-        metalness: 0.7,
-        roughness: 0.5,
-      }),
-    [],
-  );
-  const gold = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#caa14a",
-        metalness: 0.9,
-        roughness: 0.25,
-      }),
-    [],
-  );
+  const metal = useMemo(() => new THREE.MeshStandardMaterial({ color: "#c9ccd2", metalness: 0.85, roughness: 0.35 }), []);
+  const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3d44", metalness: 0.7, roughness: 0.5 }), []);
+  const gold = useMemo(() => new THREE.MeshStandardMaterial({ color: "#caa14a", metalness: 0.9, roughness: 0.25 }), []);
+
+  const select = (event: THREE.Event, info: string[]) => {
+    event.stopPropagation();
+    onSelect?.(info[0], info[1], info[2]);
+  };
 
   useFrame((state) => {
     const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
-
-    if (indicatorRef.current) {
-      indicatorRef.current.emissiveIntensity = 0.6 + pulse * 1.4;
-    }
-
-    if (gridRef.current) {
-      gridRef.current.emissiveIntensity = 0.15 + (solarLive.powerKW / 100) * 0.9;
-    }
+    if (indicatorRef.current) indicatorRef.current.emissiveIntensity = 0.6 + pulse * 1.4;
+    if (gridRef.current) gridRef.current.emissiveIntensity = 0.15 + (solarLive.powerKW / 100) * 0.9;
   });
 
   return (
-    <group onClick={(event) => {
-      event.stopPropagation();
-      onSelect?.(
-        "Central power hub",
-        "Collects, conditions and distributes the array output.",
-        "The central hub connects the solar wings to the colony electrical system. It houses structural interfaces, power routing, monitoring hardware and deployment mechanisms that keep the four array wings operating as one power plant.",
-      );
-    }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
-      {selected && (
-        <mesh position={[0, 2.1, 0]}>
-          <cylinderGeometry args={[3.95, 3.95, 4.7, 32, 1, true]} />
-          <meshBasicMaterial color="#45f3ff" transparent opacity={0.18} depthWrite={false} wireframe />
-        </mesh>
-      )}
-
-      <mesh position={[0, 0.05, 0]} receiveShadow material={dark}>
+    <group>
+      <mesh position={[0, 0.05, 0]} receiveShadow material={dark} onClick={(e) => select(e, details.base)}>
         <cylinderGeometry args={[3.4, 3.8, 0.3, 40]} />
       </mesh>
+      <HubHighlight name={details.base[0]} selected={selectedComponentName === details.base[0]} />
 
-      <mesh position={[0, 1.7, 0]} castShadow receiveShadow material={metal}>
+      <mesh position={[0, 1.7, 0]} castShadow receiveShadow material={metal} onClick={(e) => select(e, details.power)}>
         <cylinderGeometry args={[1.5, 1.8, 3.1, 12]} />
       </mesh>
+      <HubHighlight name={details.power[0]} selected={selectedComponentName === details.power[0]} />
 
-      <mesh position={[0, 0.9, 0]} castShadow material={gold}>
+      <mesh position={[0, 0.9, 0]} castShadow material={gold} onClick={(e) => select(e, details.power)}>
         <cylinderGeometry args={[1.85, 1.85, 0.9, 12]} />
       </mesh>
 
-      <mesh position={[0, 3.35, 0]} castShadow material={metal}>
+      <mesh position={[0, 3.35, 0]} castShadow material={metal} onClick={(e) => select(e, details.power)}>
         <cylinderGeometry args={[2.15, 1.6, 0.5, 12]} />
       </mesh>
 
-      <mesh position={[0, 4.2, 0]} castShadow material={metal}>
+      <mesh position={[0, 4.2, 0]} castShadow material={metal} onClick={(e) => select(e, details.avionics)}>
         <boxGeometry args={[1.2, 1.2, 1.2]} />
       </mesh>
+      <HubHighlight name={details.avionics[0]} selected={selectedComponentName === details.avionics[0]} />
 
-      <mesh position={[0, 4.2, 0.62]}>
+      <mesh position={[0, 4.2, 0.62]} onClick={(e) => select(e, details.avionics)}>
         <planeGeometry args={[0.9, 0.9]} />
-        <meshStandardMaterial
-          ref={gridRef}
-          color="#0b2a55"
-          emissive="#2f7bff"
-          emissiveIntensity={0.3}
-          metalness={0.3}
-          roughness={0.4}
-        />
+        <meshStandardMaterial ref={gridRef} color="#0b2a55" emissive="#2f7bff" emissiveIntensity={0.3} metalness={0.3} roughness={0.4} />
       </mesh>
 
       {[-0.5, 0, 0.5].map((x, i) => (
-        <mesh key={i} position={[x, 4.85, 0.4]}>
+        <mesh key={i} position={[x, 4.85, 0.4]} onClick={(e) => select(e, details.avionics)}>
           <sphereGeometry args={[0.07, 12, 12]} />
           <meshStandardMaterial
             ref={i === 1 ? indicatorRef : undefined}
@@ -111,17 +98,15 @@ export function CentralHub({ onSelect, selected = false }: { onSelect?: (name: s
         const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
         return (
           <group key={i} rotation={[0, a, 0]}>
-            <mesh position={[2.6, 0.75, 0]} castShadow receiveShadow material={dark}>
+            <mesh position={[2.6, 0.75, 0]} castShadow receiveShadow material={dark} onClick={(e) => select(e, details.drive)}>
               <boxGeometry args={[1.1, 1.3, 1.6]} />
             </mesh>
+            <HubHighlight name={details.drive[0]} selected={selectedComponentName === details.drive[0]} />
             {[-0.5, -0.17, 0.17, 0.5].map((z, j) => (
               <mesh key={j} position={[3.18, 0.75, z]} castShadow material={metal}>
                 <boxGeometry args={[0.06, 1.1, 0.22]} />
               </mesh>
             ))}
-            <mesh position={[1.9, 0.35, 0]} material={dark}>
-              <boxGeometry args={[0.5, 0.08, 0.08]} />
-            </mesh>
           </group>
         );
       })}
@@ -130,9 +115,10 @@ export function CentralHub({ onSelect, selected = false }: { onSelect?: (name: s
         const a = i === 0 ? Math.PI / 4 : -Math.PI / 4 + Math.PI;
         return (
           <group key={i} rotation={[0, a, 0]}>
-            <mesh position={[2.4, 2.6, 0]} castShadow material={metal}>
+            <mesh position={[2.4, 2.6, 0]} castShadow material={metal} onClick={(e) => select(e, details.radiator)}>
               <boxGeometry args={[2.6, 1.6, 0.05]} />
             </mesh>
+            <HubHighlight name={details.radiator[0]} selected={selectedComponentName === details.radiator[0]} />
             {[-0.6, -0.2, 0.2, 0.6].map((y, j) => (
               <mesh key={j} position={[2.4, 2.6 + y, 0.05]} material={dark}>
                 <boxGeometry args={[2.5, 0.06, 0.06]} />
@@ -146,12 +132,8 @@ export function CentralHub({ onSelect, selected = false }: { onSelect?: (name: s
         const a = (i / 4) * Math.PI * 2;
         return (
           <group key={i} rotation={[0, a, 0]}>
-            <mesh position={[2.4, 0.0, 0]} rotation={[0, 0, Math.PI / 5]} castShadow material={metal}>
-              <cylinderGeometry args={[0.12, 0.12, 2.2, 10]} />
-            </mesh>
-            <mesh position={[3.2, -0.85, 0]} castShadow material={dark}>
-              <cylinderGeometry args={[0.4, 0.5, 0.25, 14]} />
-            </mesh>
+            <mesh position={[2.4, 0.0, 0]} rotation={[0, 0, Math.PI / 5]} castShadow material={metal} />
+            <mesh position={[3.2, -0.85, 0]} castShadow material={dark} />
           </group>
         );
       })}
