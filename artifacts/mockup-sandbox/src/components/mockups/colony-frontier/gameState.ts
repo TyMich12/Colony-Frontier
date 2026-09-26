@@ -5,6 +5,13 @@ export type GameState = {
   completedMissions: string[];
   unlockedTechnologies: string[];
   devMode: boolean;
+  lastMissionReward?: {
+    missionId: string;
+    title: string;
+    credits: number;
+    xp: number;
+    researchTokens: number;
+  };
 };
 
 export const STARTING_GAME_STATE: GameState = {
