@@ -398,7 +398,11 @@ export function MissionLoadout() {
     "The current mission begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
   const [confirmed, setConfirmed] = useState(false);
-  const [completionNotice, setCompletionNotice] = useState<string | null>(null);
+  const [completionNotice, setCompletionNotice] = useState<string | null>(() => {
+    const reward = gameState.lastMissionReward;
+    if (!reward) return null;
+    return `MISSION COMPLETE — ${reward.title} · ${formatCredits(reward.credits)} Credits · +${reward.xp.toLocaleString()} XP · +${reward.researchTokens} Research Token${reward.researchTokens === 1 ? "" : "s"}`;
+  });
 
   const selectedTracks = useMemo(
     () =>
@@ -655,6 +659,17 @@ export function MissionLoadout() {
       researchTokens:
         gameState.researchTokens +
         (gameState.devMode && !alreadyCompleted ? missionResearch : 0),
+      ...(gameState.devMode && !alreadyCompleted
+        ? {
+            lastMissionReward: {
+              missionId,
+              title: mission.title,
+              credits: missionCredits,
+              xp: missionXp,
+              researchTokens: missionResearch,
+            },
+          }
+        : {}),
       ...(gameState.devMode
         ? {
             completedMissions: Array.from(
