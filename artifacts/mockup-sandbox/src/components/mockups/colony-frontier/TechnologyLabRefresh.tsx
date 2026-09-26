@@ -80,6 +80,12 @@ export function TechnologyLabRefresh() {
   const [selectedTier, setSelectedTier] = useState<Tier>("Foundation");
   const [viewer, setViewer] = useState<{ trackId: string; tier: Tier } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sellConfirmation, setSellConfirmation] = useState<{
+    tier: Tier;
+    equipmentName: string;
+    xpRefund: number;
+    researchRefund: number;
+  } | null>(null);
   const selectedTrack =
     technologyTracks.find((track) => track.id === selectedTrackId) ??
     technologyTracks[0];
@@ -147,12 +153,13 @@ export function TechnologyLabRefresh() {
     const researchRefund = equipment.researchTokens;
     const xpRefund = Math.floor(requirement.xp * 0.5);
 
-    if (!window.confirm(
-      `Sell ${equipment.name}? You will receive ${xpRefund.toLocaleString()} XP and ${researchRefund} Research Token${researchRefund === 1 ? "" : "s"} back (full Research Token cost).`,
-    )) {
-      return;
-    }
+    setSellConfirmation({ tier, equipmentName: equipment.name, xpRefund, researchRefund });
+  }
 
+  function confirmSellTechnology() {
+    if (!sellConfirmation) return;
+
+    const { tier, equipmentName, xpRefund, researchRefund } = sellConfirmation;
     const key = technologyKey(tier);
     const nextState: GameState = {
       ...gameState,
@@ -167,8 +174,9 @@ export function TechnologyLabRefresh() {
     setGameState(nextState);
     setSelectedTier(tier);
     setNotice(
-      `${equipment.name} sold. ${xpRefund.toLocaleString()} XP and ${researchRefund} Research Token${researchRefund === 1 ? "" : "s"} returned.`,
+      `${equipmentName} sold. ${xpRefund.toLocaleString()} XP and ${researchRefund} Research Token${researchRefund === 1 ? "" : "s"} returned.`,
     );
+    setSellConfirmation(null);
   }
 
   function unlockTechnology(tier: Tier) {
@@ -240,6 +248,35 @@ export function TechnologyLabRefresh() {
       eyebrow="Research terminal / capability ladder"
       title="Technology Lab"
     >
+      {sellConfirmation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#02080c]/80 p-5 backdrop-blur-[2px]">
+          <div className="w-full max-w-md border-2 border-[#d77a5a] bg-[#101b20] shadow-[0_0_40px_rgba(215,122,90,0.22)]">
+            <div className="border-b border-[#5c3f38] bg-[#241a19] px-5 py-4">
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#d77a5a]">Technology transaction</p>
+              <h2 className="mt-2 text-lg font-semibold uppercase tracking-[0.1em] text-[#f1eee5]">Confirm sale</h2>
+            </div>
+            <div className="px-5 py-5">
+              <p className="text-sm leading-6 text-[#d8e3dc]">Sell <span className="font-bold text-[#f0d49b]">{sellConfirmation.equipmentName}</span>?</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="border border-[#34545a] bg-[#0b171d] p-3">
+                  <p className="text-[8px] uppercase tracking-[0.18em] text-[#76908e]">XP returned</p>
+                  <p className="mt-1 font-mono text-sm text-[#9fce82]">+{sellConfirmation.xpRefund.toLocaleString()}</p>
+                </div>
+                <div className="border border-[#34545a] bg-[#0b171d] p-3">
+                  <p className="text-[8px] uppercase tracking-[0.18em] text-[#76908e]">Research Tokens returned</p>
+                  <p className="mt-1 font-mono text-sm text-[#efb658]">+{sellConfirmation.researchRefund}</p>
+                </div>
+              </div>
+              <p className="mt-4 text-[9px] uppercase tracking-[0.12em] leading-5 text-[#819b96]">Full Research Token cost is refunded. XP refund is 50% of the tier requirement.</p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-[#29434a] bg-[#0b171d] px-5 py-4">
+              <button type="button" onClick={() => setSellConfirmation(null)} className="border border-[#42575b] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[#9ab0ad] hover:border-[#789293] hover:text-[#dce9dc]">Cancel</button>
+              <button type="button" onClick={confirmSellTechnology} className="border border-[#d77a5a] bg-[#d77a5a] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[#171515] hover:bg-[#e39a80]">Confirm sale</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#47553d] bg-[#172a2a] px-5 py-4">
         <div className="flex items-center gap-3">
           <Check className="h-4 w-4 text-[#9fce82]" />
