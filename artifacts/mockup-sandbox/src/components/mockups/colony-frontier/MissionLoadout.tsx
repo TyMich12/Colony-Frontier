@@ -154,16 +154,18 @@ function CategoryHeader({
   const Icon =
     categoryIcons[track.category as keyof typeof categoryIcons] ?? Zap;
 
-  const categoryColor = essentialBlocked || categoryBlocked
+  const categoryColor = essentialBlocked
     ? "#ff4d4d"
-    : required
-      ? "#72b9d4"
-      : "#9fce82";
+    : categoryBlocked
+      ? "#d87979"
+      : required
+        ? "#72b9d4"
+        : "#9fce82";
 
   const categoryStatus = essentialBlocked
     ? "MISSION BLOCKED — ESSENTIAL SYSTEM UNAVAILABLE"
     : categoryBlocked
-      ? "NOTHING AVAILABLE"
+      ? "INSUFFICIENT FUNDS — NOTHING AVAILABLE"
       : required
         ? "REQUIRED SYSTEM"
         : "OPTIONAL SYSTEM";
