@@ -761,6 +761,10 @@ export function MissionLoadout() {
                           availableMissionBudget,
                         );
 
+                        const previousEquipment = previousTier
+                          ? track.tiers[previousTier]
+                          : null;
+
                         const availableMass =
                           missionCapacity -
                           (mass - (previousEquipment?.mass ?? 0));
