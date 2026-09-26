@@ -22,6 +22,7 @@ import {
   Wrench,
   Zap,
   Rotate3D,
+  RefreshCw,
 } from "lucide-react";
 import { TechnicalViewer } from "./TechnicalViewer";
 import {
@@ -124,6 +125,43 @@ export function TechnologyLabRefresh() {
 
     setSelectedTier(tier);
     setNotice(`${selectedTrack.tiers[tier].name} is ready to unlock.`);
+  }
+
+  function sellTechnology(tier: Tier) {
+    if (tier === "Foundation") {
+      setNotice("Foundation technology cannot be sold.");
+      return;
+    }
+
+    if (!isOwned(tier)) {
+      setNotice("This technology tier is not currently owned.");
+      return;
+    }
+
+    const equipment = selectedTrack.tiers[tier];
+    const refund = Math.floor(equipment.researchTokens * 0.5);
+
+    if (!window.confirm(
+      `Sell ${equipment.name}? You will receive ${refund} Research Token${refund === 1 ? "" : "s"} back (50% refund, rounded down).`,
+    )) {
+      return;
+    }
+
+    const key = technologyKey(tier);
+    const nextState: GameState = {
+      ...gameState,
+      researchTokens: gameState.researchTokens + refund,
+      unlockedTechnologies: gameState.unlockedTechnologies.filter(
+        (technology) => technology !== key,
+      ),
+    };
+
+    saveGameState(nextState);
+    setGameState(nextState);
+    setSelectedTier(tier);
+    setNotice(
+      `${equipment.name} sold. ${refund} Research Token${refund === 1 ? "" : "s"} returned.`,
+    );
   }
 
   function unlockTechnology(tier: Tier) {
@@ -387,6 +425,20 @@ export function TechnologyLabRefresh() {
                       >
                         {owned ? "Owned" : tier === "Foundation" ? "Installed" : "Unlock"}
                       </button>
+                      {owned && tier !== "Foundation" && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            sellTechnology(tier);
+                          }}
+                          className="flex items-center gap-1 border border-[#6b4c42] bg-[#241b1a] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#d9a08d] hover:border-[#d77a5a] hover:bg-[#30201e]"
+                          title="Sell this technology for a 50% Research Token refund"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Sell
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[#29434a] pt-4 sm:grid-cols-4">
@@ -481,7 +533,8 @@ export function TechnologyLabRefresh() {
           </section>
           <p className="border border-[#29434a] bg-[#0c1b23] p-4 text-[10px] leading-5 uppercase tracking-[0.14em] text-[#7f9c96]">
             No hover popup in the lab. All field details remain visible in each
-            tier row.
+            tier row. Research tiers can be sold for a 50% Research Token refund,
+            rounded down to a whole token.
           </p>
         </aside>
       </div>
