@@ -38,7 +38,7 @@ import {
   type Tier,
 } from "./_shared/gameData";
 import { loadGameState, saveGameState } from "./gameState";
-import { moonMissions } from "./CampaignMapRefresh";
+import { marsMissions, moonMissions } from "./CampaignMapRefresh";
 
 const categoryIcons = {
   Solar: Sun,
@@ -71,7 +71,26 @@ const starterCategories = new Set([
   "radiation",
 ]);
 
-const missionCapacity = payloadProgression[0].capacity;
+function getMissionCapacity(campaign: "moon" | "mars", completedCount: number) {
+  if (campaign === "moon") {
+    if (completedCount >= 6) return payloadProgression[2].capacity;
+    if (completedCount >= 3) return payloadProgression[1].capacity;
+    return payloadProgression[0].capacity;
+  }
+
+  if (completedCount >= 6) return payloadProgression[5].capacity;
+  if (completedCount >= 3) return payloadProgression[4].capacity;
+  return payloadProgression[3].capacity;
+}
+
+function getNextMission(
+  campaign: "moon" | "mars",
+  gameState: ReturnType<typeof loadGameState>,
+) {
+  const missions = campaign === "moon" ? moonMissions : marsMissions;
+  return missions.find((mission) => !gameState.completedMissions.includes(campaign + "-" + mission.number)) ?? missions[missions.length - 1];
+}
+
 const tierOrder: Tier[] = [
   "Foundation",
   "Frontier",
@@ -415,6 +434,7 @@ function getAutomaticTier(
 
 function createInitialSelection(
   gameState: ReturnType<typeof loadGameState>,
+  missionCapacity: number,
 ) {
   const selection: Record<string, Tier> = {};
   let availableCredits = gameState.credits;
