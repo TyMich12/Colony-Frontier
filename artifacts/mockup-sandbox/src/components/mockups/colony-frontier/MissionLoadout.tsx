@@ -395,7 +395,7 @@ export function MissionLoadout() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [hoverEnabled, setHoverEnabled] = useState(true);
   const [notice, setNotice] = useState(
-    "Mission 01 begins with reliable Foundation systems. Open a category to choose its technology tier.",
+    "The current mission begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
   const [confirmed, setConfirmed] = useState(false);
   const [completionNotice, setCompletionNotice] = useState<string | null>(null);
@@ -427,7 +427,7 @@ export function MissionLoadout() {
 
     if (previousTier === tier) {
       if (starterCategories.has(track.id)) {
-        setNotice(`${track.category} is required for Mission 01 and cannot be deselected.`);
+        setNotice(`${track.category} is required for the current mission and cannot be deselected.`);
         return;
       }
 
@@ -524,7 +524,7 @@ export function MissionLoadout() {
         availableCredits,
         availableMass,
       );
-      return status !== "available";
+      return status === "locked" || status === "mass";
     });
   }
 
@@ -597,7 +597,7 @@ export function MissionLoadout() {
     );
   }
 
-  function confirmManifest() {
+  function confirmMission() {
     if (selectedTracks.length === 0) {
       setNotice("No systems are loaded. Mission cannot deploy.");
       return;
@@ -613,13 +613,13 @@ export function MissionLoadout() {
     }
 
     if (mass > missionCapacity) {
-      setNotice("Manifest exceeds the Early Moon payload capacity.");
+      setNotice("Mission exceeds the payload capacity.");
       return;
     }
 
     if (spend > gameState.credits) {
       setNotice(
-        `Manifest requires ${formatCredits(
+        `Mission requires ${formatCredits(
           spend,
         )}, but the Colony Treasury contains only ${formatCredits(
           gameState.credits,
@@ -682,7 +682,7 @@ export function MissionLoadout() {
       );
     } else {
       setNotice(
-        `Mission ${mission.number} manifest deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
+        `Mission ${mission.number} mission deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
       );
     }
   }
@@ -974,7 +974,7 @@ export function MissionLoadout() {
 
               <button
                 type="button"
-                onClick={confirmManifest}
+                onClick={confirmMission}
                 disabled={confirmed}
                 className={`flex w-full items-center justify-center gap-2 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.24em] transition ${
                   confirmed
