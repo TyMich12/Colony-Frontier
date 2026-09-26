@@ -260,7 +260,7 @@ function TierOption({
       ? "SELECTED — CLICK TO DESELECT"
       : status === "locked"
         ? tier === "Research"
-          ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${requirement.tokens} RT in Technology Lab`
+          ? `LOCKED — Requires ${requirement.xp.toLocaleString()} XP + ${equipment.researchTokens} RT in Technology Lab`
           : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
         : status === "funds"
           ? "INSUFFICIENT FUNDS / MISSION ALLOCATION"
@@ -381,6 +381,8 @@ function TierOption({
 
 export function MissionLoadout() {
   const gameState = loadGameState();
+  const moonCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("moon-")).length;
+  const currentMissionNumber = Math.min(8, moonCompletedCount + 1);
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const catalogScrollY = useRef(0);
 
@@ -646,14 +648,26 @@ export function MissionLoadout() {
       return;
     }
 
-    saveGameState({
+    const nextState = {
       ...gameState,
       credits: gameState.credits - spend,
-    });
+      ...(gameState.devMode
+        ? {
+            completedMissions: Array.from(
+              new Set([
+                ...gameState.completedMissions,
+                `moon-${String(currentMissionNumber).padStart(2, "0")}`,
+              ]),
+            ),
+          }
+        : {}),
+    };
+
+    saveGameState(nextState);
 
     setConfirmed(true);
     setNotice(
-      `Mission 01 manifest deployed. ${formatCredits(
+      `Mission ${String(currentMissionNumber).padStart(2, "0")} manifest deployed. ${formatCredits(
         spend,
       )} transferred from the Colony Treasury.`,
     );
@@ -666,7 +680,7 @@ export function MissionLoadout() {
   return (
     <GameShell
       active="loadout"
-      eyebrow="Moon Mission 01 / Survival"
+      eyebrow={`Moon Mission ${String(currentMissionNumber).padStart(2, "0")} / Mission Loadout`}
       title="Mission Loadout"
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -682,7 +696,7 @@ export function MissionLoadout() {
                   Early Moon / 8,000 kg payload
                 </p>
                 <p className="mt-1 text-xs text-[#9cb2aa]">
-                  Mission 01 · Survival · choose one technology tier per category
+                  Mission ${String(currentMissionNumber).padStart(2, "0")} · choose one technology tier per category
                 </p>
               </div>
             </div>
