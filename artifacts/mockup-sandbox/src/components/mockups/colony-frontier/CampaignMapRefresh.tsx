@@ -398,10 +398,21 @@ function difficultyStars(difficulty: number, max: number) {
   );
 }
 
+function getNextMissionNumber(campaign: CampaignId, gameState: ReturnType<typeof loadGameState>) {
+  const missions = campaign === "moon" ? moonMissions : marsMissions;
+  return (
+    missions.find(
+      (mission) => !gameState.completedMissions.includes(`${campaign}-${mission.number}`),
+    )?.number ?? missions[missions.length - 1].number
+  );
+}
+
 export function CampaignMapRefresh() {
   const [campaign, setCampaign] = useState<CampaignId>("moon");
-  const [selected, setSelected] = useState("01");
   const [gameState, setGameState] = useState(loadGameState());
+  const [selected, setSelected] = useState(() =>
+    getNextMissionNumber("moon", loadGameState()),
+  );
   const completed = new Set(gameState.completedMissions);
   const moonComplete = moonMissions.every((mission) => completed.has(`moon-${mission.number}`));
   const missions = campaign === "moon" ? moonMissions : marsMissions;
@@ -443,7 +454,7 @@ export function CampaignMapRefresh() {
 
   function switchCampaign(id: CampaignId) {
     setCampaign(id);
-    setSelected("01");
+    setSelected(getNextMissionNumber(id, gameState));
   }
 
   return (
