@@ -140,11 +140,11 @@ export function TechnologyLabRefresh() {
 
     const equipment = selectedTrack.tiers[tier];
     const requirement = tierUnlockRequirements[tier];
-    const researchRefund = Math.floor(equipment.researchTokens * 0.5);
+    const researchRefund = equipment.researchTokens;
     const xpRefund = Math.floor(requirement.xp * 0.5);
 
     if (!window.confirm(
-      `Sell ${equipment.name}? You will receive ${xpRefund.toLocaleString()} XP and ${researchRefund} Research Token${researchRefund === 1 ? "" : "s"} back (50% refund, rounded down).`,
+      `Sell ${equipment.name}? You will receive ${xpRefund.toLocaleString()} XP and ${researchRefund} Research Token${researchRefund === 1 ? "" : "s"} back (full Research Token cost).`,
     )) {
       return;
     }
@@ -436,7 +436,7 @@ export function TechnologyLabRefresh() {
                             sellTechnology(tier);
                           }}
                           className="flex items-center gap-1 border border-[#6b4c42] bg-[#241b1a] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#d9a08d] hover:border-[#d77a5a] hover:bg-[#30201e]"
-                          title="Sell this technology for a 50% XP and Research Token refund"
+                          title="Sell this technology for a 50% XP and full Research Token refund"
                         >
                           <RefreshCw className="h-3 w-3" />
                           Sell
@@ -536,8 +536,8 @@ export function TechnologyLabRefresh() {
           </section>
           <p className="border border-[#29434a] bg-[#0c1b23] p-4 text-[10px] leading-5 uppercase tracking-[0.14em] text-[#7f9c96]">
             No hover popup in the lab. All field details remain visible in each
-            tier row. Research tiers can be sold for a 50% XP and Research Token refund,
-            with both refunds rounded down to whole units.
+            tier row. Research tiers can be sold for a 50% XP refund and the full Research Token cost,
+            so the technology can be repurchased later.
           </p>
         </aside>
       </div>
