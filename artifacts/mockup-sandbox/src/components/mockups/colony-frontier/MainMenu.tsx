@@ -41,6 +41,10 @@ export function MainMenu() {
   const [resetComplete, setResetComplete] = useState(false);
   const [devCode, setDevCode] = useState("");
   const [devMessage, setDevMessage] = useState("");
+  const [showDevConsole, setShowDevConsole] = useState(false);
+  const [devCredits, setDevCredits] = useState(String(loadGameState().credits));
+  const [devXp, setDevXp] = useState(String(loadGameState().xp));
+  const [devResearch, setDevResearch] = useState(String(loadGameState().researchTokens));
 
   useEffect(() => {
     const existing = localStorage.getItem("colony-frontier-game-state");
@@ -373,13 +377,18 @@ export function MainMenu() {
                   type="button"
                   onClick={() => {
                     if (devCode === "DevTyson") {
+                      const current = loadGameState();
                       const nextState = {
-                        ...loadGameState(),
+                        ...current,
                         devMode: true,
                       };
                       saveGameState(nextState);
-                      setDevMessage("Developer mode enabled. Mission progression is now unlocked for testing.");
+                      setDevMessage("Developer mode enabled.");
+                      setDevCredits(String(nextState.credits));
+                      setDevXp(String(nextState.xp));
+                      setDevResearch(String(nextState.researchTokens));
                       setDevCode("");
+                      setShowDevConsole(true);
                     } else {
                       setDevMessage("Invalid developer code.");
                     }
@@ -543,6 +552,104 @@ export function MainMenu() {
             >
               Acknowledge briefing
             </button>
+          </div>
+        </div>
+      )}
+
+      {showDevConsole && (
+        <div
+          className="fixed inset-0 z-[110] grid place-items-center bg-[#02080c]/85 p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dev-console-title"
+        >
+          <div className="w-full max-w-lg border-2 border-[#efb658] bg-[#08171f] shadow-[0_0_50px_rgba(239,182,88,0.18)]">
+            <div className="flex items-start justify-between border-b border-[#3d5148] bg-[#172a2a] px-6 py-5">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#efb658]">Developer access</p>
+                <h2 id="dev-console-title" className="mt-2 text-xl font-bold uppercase tracking-[0.12em] text-[#edf2df]">Resource console</h2>
+                <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-[#819b96]">Edit test resources and apply them to the saved campaign.</p>
+              </div>
+              <button type="button" onClick={() => setShowDevConsole(false)} aria-label="Close developer console" className="text-[#78938f] hover:text-[#f0f1dc]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-6 sm:grid-cols-3">
+              <label className="border border-[#334d50] bg-[#0d2027] p-4">
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#78938f]">Credits (M)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={devCredits}
+                  onChange={(event) => setDevCredits(event.target.value)}
+                  className="mt-3 w-full border border-[#40565a] bg-[#08171f] px-3 py-2 font-mono text-lg text-[#efb658] outline-none focus:border-[#efb658]"
+                />
+              </label>
+              <label className="border border-[#334d50] bg-[#0d2027] p-4">
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#78938f]">XP</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={devXp}
+                  onChange={(event) => setDevXp(event.target.value)}
+                  className="mt-3 w-full border border-[#40565a] bg-[#08171f] px-3 py-2 font-mono text-lg text-[#e7eee5] outline-none focus:border-[#efb658]"
+                />
+              </label>
+              <label className="border border-[#334d50] bg-[#0d2027] p-4">
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#78938f]">Research Tokens</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={devResearch}
+                  onChange={(event) => setDevResearch(event.target.value)}
+                  className="mt-3 w-full border border-[#40565a] bg-[#08171f] px-3 py-2 font-mono text-lg text-[#b9d5a9] outline-none focus:border-[#efb658]"
+                />
+              </label>
+            </div>
+
+            <div className="border-t border-[#29434a] bg-[#0b171d] px-6 py-5">
+              <p className="text-[9px] uppercase tracking-[0.14em] leading-5 text-[#78938f]">
+                Values are saved immediately. Credits are stored in millions, matching the campaign economy.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => setShowDevConsole(false)} className="border border-[#40565a] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#a9bbb3] hover:border-[#789293] hover:text-[#e6eee4]">
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = loadGameState();
+                    const credits = Number(devCredits);
+                    const xp = Number(devXp);
+                    const researchTokens = Number(devResearch);
+                    if (![credits, xp, researchTokens].every(Number.isFinite) || credits < 0 || xp < 0 || researchTokens < 0) {
+                      setDevMessage("Enter valid non-negative values.");
+                      return;
+                    }
+                    const nextState = {
+                      ...current,
+                      devMode: true,
+                      credits,
+                      xp: Math.floor(xp),
+                      researchTokens: Math.floor(researchTokens),
+                    };
+                    saveGameState(nextState);
+                    setDevCredits(String(nextState.credits));
+                    setDevXp(String(nextState.xp));
+                    setDevResearch(String(nextState.researchTokens));
+                    setDevMessage("Developer resources updated.");
+                    setShowDevConsole(false);
+                  }}
+                  className="border border-[#efb658] bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#17201b] hover:bg-[#f6cb7b]"
+                >
+                  Apply values
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
