@@ -560,8 +560,12 @@ export function CampaignMapRefresh() {
               )}
             </div>
 
-            <div className="overflow-x-auto pb-3">
-              <div className={campaign === "mars" ? "relative min-h-[420px] min-w-[1500px]" : "relative min-h-[420px] min-w-full"}>
+            <div className="overflow-x-auto pb-4">
+              <div
+                className={`relative min-h-[420px] ${
+                  campaign === "mars" ? "min-w-[1900px]" : "min-w-[1100px]"
+                }`}
+              >
                 <svg
                   className="pointer-events-none absolute inset-x-0 top-8 h-[220px] w-full overflow-visible"
                   preserveAspectRatio="none"
@@ -570,10 +574,10 @@ export function CampaignMapRefresh() {
                 >
                   <path
                     d={missions.map((mission, index) => {
-                      const x = 2 + (index / Math.max(missions.length - 1, 1)) * 96;
+                      const x = 5 + (index / Math.max(missions.length - 1, 1)) * 90;
                       const y = Number(mission.number) % 2 ? 34 : 17;
                       if (index === 0) return `M ${x} ${y}`;
-                      const previousX = 2 + ((index - 1) / Math.max(missions.length - 1, 1)) * 96;
+                      const previousX = 5 + ((index - 1) / Math.max(missions.length - 1, 1)) * 90;
                       const previousY = Number(missions[index - 1].number) % 2 ? 34 : 17;
                       const mid = (previousX + x) / 2;
                       return ` C ${mid} ${previousY}, ${mid} ${y}, ${x} ${y}`;
@@ -585,11 +589,11 @@ export function CampaignMapRefresh() {
                   />
                   <path
                     d={missions.slice(0, Math.max(completedCount + 1, 1)).map((mission, index, points) => {
-                      const x = 2 + (Number(mission.number) - 1) / Math.max(missions.length - 1, 1) * 96;
+                      const x = 5 + (Number(mission.number) - 1) / Math.max(missions.length - 1, 1) * 90;
                       const y = Number(mission.number) % 2 ? 34 : 17;
                       if (index === 0) return `M ${x} ${y}`;
                       const previous = points[index - 1];
-                      const previousX = 2 + (Number(previous.number) - 1) / Math.max(missions.length - 1, 1) * 96;
+                      const previousX = 5 + (Number(previous.number) - 1) / Math.max(missions.length - 1, 1) * 90;
                       const previousY = Number(previous.number) % 2 ? 34 : 17;
                       const mid = (previousX + x) / 2;
                       return ` C ${mid} ${previousY}, ${mid} ${y}, ${x} ${y}`;
@@ -604,7 +608,7 @@ export function CampaignMapRefresh() {
                   const isSelected = mission.number === selected;
                   const isNextUnlocked = mission.number === nextMissionNumber;
                   const count = missions.length;
-                  const leftPct = 2 + ((Number(mission.number) - 1) / Math.max(count - 1, 1)) * 96;
+                  const leftPct = 5 + ((Number(mission.number) - 1) / Math.max(count - 1, 1)) * 90;
                   return (
                     <button
                       key={mission.number}
