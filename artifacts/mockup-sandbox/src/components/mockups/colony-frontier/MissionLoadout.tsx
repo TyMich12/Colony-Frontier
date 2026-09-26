@@ -513,12 +513,12 @@ export function MissionLoadout() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [hoverEnabled, setHoverEnabled] = useState(true);
   const [notice, setNotice] = useState(
-    "The current mission begins with reliable Foundation systems. Open a category to choose its technology tier.",
+    "Required systems start with the highest affordable owned technology tiers. Open a category to adjust its loadout.",
   );
   const [confirmed, setConfirmed] = useState(false);
   const [completionNotice, setCompletionNotice] = useState<string | null>(() => {
     const reward = gameState.lastMissionReward;
-    if (!reward) return null;
+    if (!reward || reward.missionId !== campaign + "-" + currentMission.number) return null;
     return `MISSION COMPLETE — ${reward.title} · ${formatCredits(reward.credits)} Credits · +${reward.xp.toLocaleString()} XP · +${reward.researchTokens} Research Token${reward.researchTokens === 1 ? "" : "s"}`;
   });
 
