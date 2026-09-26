@@ -867,9 +867,8 @@ export function MissionLoadout() {
                     onClick={() => {
                       if (categoryIsBlocked(track)) {
                         setNotice(
-                          `${track.category} has no affordable or available technology for this mission. You cannot select anything from this category.`,
+                          `${track.category} has no affordable technology right now. You can still open the category to view the available tiers.`,
                         );
-                        return;
                       }
 
                       openTrack(track);
