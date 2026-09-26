@@ -549,7 +549,9 @@ export function CampaignMapRefresh() {
                           : "border-[#324b50] bg-[#102128] text-[#5e7778]"
                       }`}
                     >
-                      {isSelected ? (
+                      {getMissionStatus(mission.number) === "complete" ? (
+                        <Check className="h-4 w-4" />
+                      ) : getMissionStatus(mission.number) === "current" ? (
                         <span className="text-xs font-bold">{mission.number}</span>
                       ) : (
                         <LockKeyhole className="h-4 w-4" />
@@ -620,6 +622,16 @@ export function CampaignMapRefresh() {
                   <span className="text-[#d0dec4]">
                     {activeMission.prerequisite}
                   </span>
+                </p>
+              </div>
+            ) : activeStatus === "complete" ? (
+              <div className="border border-[#405c4e] bg-[#102822] p-4">
+                <Check className="mb-4 h-5 w-5 text-[#8fc8a7]" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#8fc8a7]">
+                  Mission complete
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#9bb3aa]">
+                  This mission has been completed. The next mission is now available.
                 </p>
               </div>
             ) : (
