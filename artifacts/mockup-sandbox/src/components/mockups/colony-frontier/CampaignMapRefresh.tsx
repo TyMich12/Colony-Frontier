@@ -20,7 +20,7 @@ import { loadGameState } from "./gameState";
 type MissionStatus = "current" | "locked";
 type CampaignId = "moon" | "mars";
 
-type Mission = {
+export type Mission = {
   number: string;
   title: string;
   status: MissionStatus;
@@ -35,7 +35,7 @@ type Mission = {
   prerequisite?: string;
 };
 
-const moonMissions: Mission[] = [
+export const moonMissions: Mission[] = [
   {
     number: "01",
     title: "First Light",
@@ -149,7 +149,7 @@ const moonMissions: Mission[] = [
   },
 ];
 
-const marsMissions: Mission[] = [
+export const marsMissions: Mission[] = [
   {
     number: "01",
     title: "Red Horizon",
