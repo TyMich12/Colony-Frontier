@@ -96,6 +96,18 @@ function isTierUnlocked(
   return unlockedTechnologies.includes(technologyKey(track.id, tier));
 }
 
+function deploymentCost(
+  track: TechnologyTrack,
+  tier: Tier,
+  unlockedTechnologies: string[],
+) {
+  if (tier !== "Foundation" && isTierUnlocked(track, tier, unlockedTechnologies)) {
+    return 0;
+  }
+
+  return track.tiers[tier].cost;
+}
+
 function getTierStatus(
   track: TechnologyTrack,
   tier: Tier,
@@ -108,8 +120,13 @@ function getTierStatus(
   }
 
   const equipment = track.tiers[tier];
+  const cost = deploymentCost(
+    track,
+    tier,
+    gameState.unlockedTechnologies,
+  );
 
-  if (equipment.cost > availableCredits) {
+  if (cost > availableCredits) {
     return "funds";
   }
 
@@ -398,7 +415,7 @@ export function MissionLoadout() {
 
   const spend = selectedTracks.reduce((total, track) => {
     const tier = selected[track.id];
-    return total + track.tiers[tier].cost;
+    return total + deploymentCost(track, tier, gameState.unlockedTechnologies);
   }, 0);
 
   const remainingMass = missionCapacity - mass;
@@ -439,7 +456,19 @@ export function MissionLoadout() {
       : null;
     const nextEquipment = track.tiers[tier];
 
-    const newSpend = spend - (previousEquipment?.cost ?? 0) + nextEquipment.cost;
+    const previousCost = previousTier
+      ? deploymentCost(
+          track,
+          previousTier,
+          gameState.unlockedTechnologies,
+        )
+      : 0;
+    const nextCost = deploymentCost(
+      track,
+      tier,
+      gameState.unlockedTechnologies,
+    );
+    const newSpend = spend - previousCost + nextCost;
     const newMass =
       mass - (previousEquipment?.mass ?? 0) + nextEquipment.mass;
 
@@ -708,17 +737,19 @@ export function MissionLoadout() {
                     <div className="grid gap-2 border border-[#29434a] bg-[#09161d] p-2 md:grid-cols-2">
                       {tierOrder.map((tier) => {
                         const previousTier = selected[track.id];
-                        const previousEquipment = previousTier
-                          ? track.tiers[previousTier]
-                          : null;
+                        const previousCost = previousTier
+                          ? deploymentCost(
+                              track,
+                              previousTier,
+                              gameState.unlockedTechnologies,
+                            )
+                          : 0;
 
                         const availableTreasury =
-                          gameState.credits -
-                          (spend - (previousEquipment?.cost ?? 0));
+                          gameState.credits - (spend - previousCost);
 
                         const availableMissionBudget =
-                          missionBudget -
-                          (spend - (previousEquipment?.cost ?? 0));
+                          missionBudget - (spend - previousCost);
 
                         const availableCredits = Math.min(
                           availableTreasury,
