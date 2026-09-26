@@ -778,17 +778,15 @@ export function MissionLoadout() {
       credits: gameState.credits - spend + rewardCredits,
       xp: gameState.xp + rewardXp,
       researchTokens: gameState.researchTokens + rewardResearch,
-      ...(replay
-        ? {}
+      lastMissionReward: replay
+        ? undefined
         : {
-            lastMissionReward: {
-              missionId,
-              title: mission.title,
-              credits: missionCredits,
-              xp: missionXp,
-              researchTokens: missionResearch,
-            },
-          }),
+            missionId,
+            title: mission.title,
+            credits: missionCredits,
+            xp: missionXp,
+            researchTokens: missionResearch,
+          },
       completedMissions: Array.from(new Set([...gameState.completedMissions, missionId])),
     };
 
