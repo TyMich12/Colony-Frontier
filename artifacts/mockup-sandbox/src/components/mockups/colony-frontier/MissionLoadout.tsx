@@ -809,7 +809,7 @@ export function MissionLoadout() {
   return (
     <GameShell
       active="loadout"
-      eyebrow={`Moon Mission ${String(currentMissionNumber).padStart(2, "0")} / Mission Loadout`}
+      eyebrow={`${campaign === "moon" ? "Moon" : "Mars"} Mission ${currentMission.number} / Mission Loadout`}
       title="Mission Loadout"
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -817,15 +817,19 @@ export function MissionLoadout() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border border-[#344a47] bg-[#102128] px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center border border-[#8f6a42] bg-[#34271e] text-[#efb658]">
-                <Sun className="h-4 w-4" />
+                {campaign === "moon" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <span className="text-sm font-black text-[#d77a5a]">M</span>
+                )}
               </div>
 
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#efb658]">
-                  Early Moon / 8,000 kg payload
+                  {campaign === "moon" ? "Lunar" : "Martian"} operations / {missionCapacity.toLocaleString()} kg payload
                 </p>
                 <p className="mt-1 text-xs text-[#9cb2aa]">
-                  Mission {String(currentMissionNumber).padStart(2, "0")} · choose one technology tier per category
+                  Mission {currentMission.number} · {currentMission.title} · choose one technology tier per category
                 </p>
               </div>
             </div>
@@ -985,13 +989,17 @@ export function MissionLoadout() {
             <div className="flex items-start justify-between border-b border-[#76583c] bg-[#392b20] px-5 py-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#efb658]">
-                  Mission
+                  {campaign} mission
                 </p>
                 <h2 className="mt-1 text-lg font-semibold uppercase tracking-[0.12em] text-[#fff0ca]">
-                  Survival
+                  {currentMission.title}
                 </h2>
               </div>
-              <LockKeyhole className="h-4 w-4 text-[#efb658]" />
+              {alreadyCompleted ? (
+                <Check className="h-4 w-4 text-[#78bb92]" />
+              ) : (
+                <LockKeyhole className="h-4 w-4 text-[#efb658]" />
+              )}
             </div>
 
             <div className="space-y-6 p-5">
@@ -1127,9 +1135,13 @@ export function MissionLoadout() {
                 )}
                 {confirmed
                   ? "Mission deployed"
-                  : missionBlocked
-                    ? "Mission blocked"
-                    : "Deploy Mission"}
+                  : missionLocked
+                    ? "Mission locked"
+                    : blockedEssentialCategories.length > 0
+                      ? "Mission blocked"
+                      : alreadyCompleted
+                        ? "Replay Mission"
+                        : "Deploy Mission"}
               </button>
 
               {confirmed && (
