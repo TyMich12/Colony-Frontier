@@ -45,6 +45,17 @@ export function MainMenu() {
   const [devCredits, setDevCredits] = useState(String(loadGameState().credits));
   const [devXp, setDevXp] = useState(String(loadGameState().xp));
   const [devResearch, setDevResearch] = useState(String(loadGameState().researchTokens));
+  const liveState = loadGameState();
+  const moonCompletedCount = liveState.completedMissions.filter((id) => id.startsWith("moon-")).length;
+  const marsCompletedCount = liveState.completedMissions.filter((id) => id.startsWith("mars-")).length;
+  const moonComplete = moonCompletedCount >= 8;
+  const marsComplete = marsCompletedCount >= 15;
+  const activeCampaign = moonComplete ? "Mars" : "Moon";
+  const activeCompleted = moonComplete ? marsCompletedCount : moonCompletedCount;
+  const activeTotal = moonComplete ? 15 : 8;
+  const activeMissionNumber = Math.min(activeTotal, activeCompleted + 1);
+  const activeProgress = Math.round((activeCompleted / activeTotal) * 100);
+
 
   useEffect(() => {
     const existing = localStorage.getItem("colony-frontier-game-state");
@@ -130,16 +141,16 @@ export function MainMenu() {
           <div className="mb-7 flex items-end justify-between border-b border-[#284047] pb-5">
             <div>
               <p className="text-3xl font-semibold tracking-[0.08em] text-[#f0f1dc]">
-                01
+                {String(activeMissionNumber).padStart(2, "0")}
               </p>
 
               <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-[#789690]">
-                Starting mission
+                {activeCampaign} mission
               </p>
             </div>
 
             <span className="border border-[#477466] bg-[#19362f] px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-[#91d0ad]">
-              In progress
+              {marsComplete ? "Complete" : "In progress"}
             </span>
           </div>
 
@@ -147,18 +158,20 @@ export function MainMenu() {
             <div>
               <div className="mb-2 flex justify-between text-[10px] uppercase tracking-[0.19em]">
                 <span className="text-[#d9e4cd]">
-                  Moon / Mission 01 — Survival
+                  {activeCampaign} / Mission {String(activeMissionNumber).padStart(2, "0")}
                 </span>
 
-                <span className="text-[#efb658]">0%</span>
+                <span className="text-[#efb658]">{activeProgress}%</span>
               </div>
 
-              <ProgressBar value={0} />
+              <ProgressBar value={activeProgress} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="border border-[#263f45] bg-[#0d2228] p-4">
-                <p className="font-mono text-xl text-[#d6e2c7]">00</p>
+                <p className="font-mono text-xl text-[#d6e2c7]">
+                  {String(moonCompletedCount + marsCompletedCount).padStart(2, "0")}
+                </p>
 
                 <p className="mt-2 text-[9px] uppercase tracking-[0.15em] text-[#78938f]">
                   Missions secured
@@ -166,7 +179,9 @@ export function MainMenu() {
               </div>
 
               <div className="border border-[#263f45] bg-[#0d2228] p-4">
-                <p className="font-mono text-xl text-[#d6e2c7]">0</p>
+                <p className="font-mono text-xl text-[#d6e2c7]">
+                  {liveState.researchTokens}
+                </p>
 
                 <p className="mt-2 text-[9px] uppercase tracking-[0.15em] text-[#78938f]">
                   Research tokens
@@ -216,31 +231,52 @@ export function MainMenu() {
             </div>
           </a>
 
-          <button
-            type="button"
-            onClick={() => setShowMarsBrief(true)}
-            className="group flex min-h-[180px] flex-col justify-between border border-[#32474a] bg-[#0d1b22] p-6 text-left transition hover:border-[#66776c]"
-          >
-            <div className="flex items-start justify-between">
-              <div className="grid h-10 w-10 place-items-center border border-[#3c5151] bg-[#17282c] text-[#7c9390]">
-                <LockKeyhole className="h-5 w-5" />
+          {moonComplete ? (
+            <a
+              href="/preview/CampaignMapRefresh?campaign=mars"
+              className="group flex min-h-[180px] flex-col justify-between border border-[#6d7651] bg-[#182c2a] p-6 text-left transition hover:border-[#efb658]"
+            >
+              <div className="flex items-start justify-between">
+                <div className="grid h-10 w-10 place-items-center border border-[#849e76] bg-[#263c31] text-[#d7e8bd]">
+                  <Target className="h-5 w-5" />
+                </div>
+                <span className="text-[9px] uppercase tracking-[0.2em] text-[#b5d39e]">
+                  {marsComplete ? "Complete" : "Unlocked"}
+                </span>
               </div>
-
-              <span className="text-[9px] uppercase tracking-[0.2em] text-[#788c88]">
-                Locked
-              </span>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-semibold uppercase tracking-[0.12em] text-[#b6c4bb]">
-                Mars campaign
-              </h3>
-
-              <p className="mt-2 text-xs leading-5 text-[#7d9692]">
-                Unlock after completing the Moon campaign.
-              </p>
-            </div>
-          </button>
+              <div>
+                <h3 className="text-xl font-semibold uppercase tracking-[0.12em] text-[#edf2dc]">
+                  Mars campaign
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-[#a8bca7]">
+                  {marsComplete ? "Planetary independence achieved." : "Continue the colony beyond the Moon."}
+                </p>
+              </div>
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowMarsBrief(true)}
+              className="group flex min-h-[180px] flex-col justify-between border border-[#32474a] bg-[#0d1b22] p-6 text-left transition hover:border-[#66776c]"
+            >
+              <div className="flex items-start justify-between">
+                <div className="grid h-10 w-10 place-items-center border border-[#3c5151] bg-[#17282c] text-[#7c9390]">
+                  <LockKeyhole className="h-5 w-5" />
+                </div>
+                <span className="text-[9px] uppercase tracking-[0.2em] text-[#788c88]">
+                  Locked
+                </span>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold uppercase tracking-[0.12em] text-[#b6c4bb]">
+                  Mars campaign
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-[#7d9692]">
+                  Unlock after completing the Moon campaign.
+                </p>
+              </div>
+            </button>
+          )}
 
           <a
             href={routes.lab}
@@ -356,7 +392,7 @@ export function MainMenu() {
                     Developer access
                   </h3>
                   <p className="mt-2 text-xs leading-5 text-[#9ca9a2]">
-                    Enter the developer code to unlock mission progression for testing.
+                    Enter the developer code to open the resource console for testing.
                   </p>
                 </div>
                 <span className="shrink-0 border border-[#405c4e] bg-[#102822] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#8fc8a7]">
