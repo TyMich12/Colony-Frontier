@@ -308,7 +308,7 @@ export function MainMenu() {
 
       <div className="mt-10 grid gap-4 border-t border-[#284047] pt-7 sm:grid-cols-3">
         <a
-          href={routes.loadout}
+          href={moonComplete ? `${routes.loadout}?campaign=mars` : routes.loadout}
           className="flex items-center gap-4 p-2 text-[#9bb3aa] transition hover:text-[#efb658]"
         >
           <SlidersHorizontal className="h-4 w-4" />
