@@ -408,10 +408,18 @@ function getNextMissionNumber(campaign: CampaignId, gameState: ReturnType<typeof
 }
 
 export function CampaignMapRefresh() {
-  const [campaign, setCampaign] = useState<CampaignId>("moon");
-  const [gameState, setGameState] = useState(loadGameState());
+  const initialGameState = loadGameState();
+  const initialMoonComplete = moonMissions.every((mission) =>
+    initialGameState.completedMissions.includes(`moon-${mission.number}`),
+  );
+  const initialCampaign: CampaignId =
+    new URLSearchParams(window.location.search).get("campaign") === "mars" && initialMoonComplete
+      ? "mars"
+      : "moon";
+  const [campaign, setCampaign] = useState<CampaignId>(initialCampaign);
+  const [gameState, setGameState] = useState(initialGameState);
   const [selected, setSelected] = useState(() =>
-    getNextMissionNumber("moon", loadGameState()),
+    getNextMissionNumber(initialCampaign, initialGameState),
   );
   const completed = new Set(gameState.completedMissions);
   const moonComplete = moonMissions.every((mission) => completed.has(`moon-${mission.number}`));
@@ -704,8 +712,14 @@ export function CampaignMapRefresh() {
                   Mission complete
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[#9bb3aa]">
-                  This mission has been completed. The next mission is now available.
+                  This mission has been completed. You can replay it for 20% of its original Credits and XP, with no Research Tokens.
                 </p>
+                <a
+                  href={`/preview/MissionLoadout?campaign=${campaign}&mission=${activeMission.number}`}
+                  className="mt-4 flex w-full items-center justify-between bg-[#172d2a] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#efb658] transition hover:bg-[#203b36]"
+                >
+                  Replay Mission {activeMission.number} <Target className="h-4 w-4" />
+                </a>
               </div>
             ) : (
               <>
@@ -793,7 +807,7 @@ export function CampaignMapRefresh() {
                   </div>
                 </div>
                 <a
-                  href="/preview/MissionLoadout"
+                  href={`/preview/MissionLoadout?campaign=${campaign}&mission=${activeMission.number}`}
                   className="flex w-full items-center justify-between bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#1a211d] transition hover:bg-[#f6cb7b]"
                 >
                   Prepare Mission {activeMission.number} <Target className="h-4 w-4" />
