@@ -100,7 +100,13 @@ export function TechnologyLabRefresh() {
     return tier === "Foundation" || gameState.unlockedTechnologies.includes(technologyKey(tier));
   }
 
+  function isPreviousTierOwned(tier: Tier) {
+    const index = tiers.indexOf(tier);
+    return index <= 0 || isOwned(tiers[index - 1]);
+  }
+
   function isTierEligible(tier: Tier) {
+    if (!isPreviousTierOwned(tier)) return false;
     const requirement = tierUnlockRequirements[tier];
     const requiredTokens =
       tier === "Research" ? selectedTrack.tiers[tier].researchTokens : 0;
@@ -111,6 +117,12 @@ export function TechnologyLabRefresh() {
   }
 
   function selectTier(tier: Tier) {
+    if (!isPreviousTierOwned(tier)) {
+      const previousTier = tiers[tiers.indexOf(tier) - 1];
+      setNotice(`${tier} requires ${previousTier} to be unlocked first.`);
+      return;
+    }
+
     if (isOwned(tier)) {
       setSelectedTier(tier);
       setNotice(null);
@@ -145,6 +157,12 @@ export function TechnologyLabRefresh() {
 
     if (!isOwned(tier)) {
       setNotice("This technology tier is not currently owned.");
+      return;
+    }
+
+    const higherTier = tiers[tiers.indexOf(tier) + 1];
+    if (higherTier && isOwned(higherTier)) {
+      setNotice(`Sell ${higherTier} before selling ${tier}.`);
       return;
     }
 
@@ -191,6 +209,12 @@ export function TechnologyLabRefresh() {
     if (isOwned(tier)) {
       setSelectedTier(tier);
       setNotice(`${selectedTrack.tiers[tier].name} is already owned.`);
+      return;
+    }
+
+    if (!isPreviousTierOwned(tier)) {
+      const previousTier = tiers[tiers.indexOf(tier) - 1];
+      setNotice(`Cannot unlock ${selectedTrack.tiers[tier].name}: unlock ${previousTier} first.`);
       return;
     }
 
