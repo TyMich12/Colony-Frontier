@@ -37,6 +37,7 @@ export function MainMenu() {
   const [showMarsBrief, setShowMarsBrief] = useState(false);
   const [showStartingPopup, setShowStartingPopup] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProgramRecord, setShowProgramRecord] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
   const [devCode, setDevCode] = useState("");
@@ -114,10 +115,10 @@ export function MainMenu() {
             </p>
 
             <a
-              href={routes.moon}
+              href={moonComplete ? `${routes.moon}?campaign=mars` : routes.moon}
               className="group mt-9 inline-flex items-center gap-5 border border-[#efb658] bg-[#efb658] px-5 py-4 text-[11px] font-bold uppercase tracking-[0.23em] text-[#142127] transition hover:bg-[#f8cc79]"
             >
-              Begin moon campaign
+              {moonComplete ? "Continue Mars campaign" : "Begin Moon campaign"}
               <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </a>
 
@@ -321,7 +322,7 @@ export function MainMenu() {
 
         <button
           type="button"
-          onClick={() => alert("Program record is not available yet.")}
+          onClick={() => setShowProgramRecord(true)}
           className="flex items-center gap-4 p-2 text-[#9bb3aa] transition hover:text-[#efb658]"
         >
           <span className="text-[10px] font-bold uppercase tracking-[0.2em]">
@@ -472,6 +473,67 @@ export function MainMenu() {
                 to $30M, 0 XP, and 0 RT.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showProgramRecord && (
+        <div
+          className="fixed inset-0 z-30 grid place-items-center bg-[#050d12]/80 p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="program-record-title"
+        >
+          <div className="w-full max-w-lg border border-[#52655b] bg-[#08171f] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-start justify-between border-b border-[#2d4648] bg-[#10242a] px-6 py-5">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#efb658]">Colony record</p>
+                <h2 id="program-record-title" className="mt-2 text-xl font-bold uppercase tracking-[0.12em] text-[#edf2df]">Program record</h2>
+              </div>
+              <button type="button" onClick={() => setShowProgramRecord(false)} aria-label="Close program record" className="text-[#78938f] hover:text-[#f0f1dc]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 p-6 sm:grid-cols-2">
+              <div className="border border-[#334d50] bg-[#0d2027] p-4">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-[#78938f]">Treasury</p>
+                <p className="mt-2 font-mono text-xl text-[#efb658]">{liveState.credits.toFixed(1)}M Credits</p>
+              </div>
+              <div className="border border-[#334d50] bg-[#0d2027] p-4">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-[#78938f]">Experience</p>
+                <p className="mt-2 font-mono text-xl text-[#e7eee5]">{liveState.xp.toLocaleString()} XP</p>
+              </div>
+              <div className="border border-[#334d50] bg-[#0d2027] p-4">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-[#78938f]">Research Tokens</p>
+                <p className="mt-2 font-mono text-xl text-[#b9d5a9]">{liveState.researchTokens} RT</p>
+              </div>
+              <div className="border border-[#334d50] bg-[#0d2027] p-4">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-[#78938f]">Technology tiers</p>
+                <p className="mt-2 font-mono text-xl text-[#d7e8bd]">{liveState.unlockedTechnologies.length}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 px-6 pb-6">
+              <div className="border border-[#334d50] bg-[#0d2027] p-4">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-[#78938f]">Moon</p>
+                <p className="mt-2 font-mono text-lg text-[#d7e8bd]">{moonCompletedCount} / 8</p>
+              </div>
+              <div className="border border-[#334d50] bg-[#0d2027] p-4">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-[#78938f]">Mars</p>
+                <p className="mt-2 font-mono text-lg text-[#d7e8bd]">{marsCompletedCount} / 15</p>
+              </div>
+            </div>
+
+            <div className="border-t border-[#29434a] bg-[#0b171d] px-6 py-5">
+              <button
+                type="button"
+                onClick={() => setShowProgramRecord(false)}
+                className="w-full border border-[#40565a] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#a9bbb3] hover:border-[#efb658] hover:text-[#efb658]"
+              >
+                Close record
+              </button>
+            </div>
           </div>
         </div>
       )}
