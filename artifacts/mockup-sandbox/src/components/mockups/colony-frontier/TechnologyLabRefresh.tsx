@@ -207,6 +207,7 @@ export function TechnologyLabRefresh() {
 
     const nextState: GameState = {
       ...gameState,
+      xp: gameState.xp - requirement.xp,
       researchTokens: gameState.researchTokens - requiredTokens,
       unlockedTechnologies: [
         ...gameState.unlockedTechnologies,
