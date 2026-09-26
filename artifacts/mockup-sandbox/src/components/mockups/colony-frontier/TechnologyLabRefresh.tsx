@@ -219,7 +219,7 @@ export function TechnologyLabRefresh() {
     setGameState(nextState);
     setSelectedTier(tier);
     setNotice(
-      `${equipment.name} unlocked for mission deployment. No Credits were spent.`,
+      `${equipment.name} unlocked for mission deployment. ${requirement.xp.toLocaleString()} XP${requiredTokens > 0 ? ` and ${requiredTokens} Research Token${requiredTokens === 1 ? "" : "s"}` : ""} spent. No Credits were spent.`,
     );
   }
 
