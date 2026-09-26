@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  loadGameState,
   resetGameState,
   saveGameState,
   STARTING_GAME_STATE,
@@ -38,6 +39,8 @@ export function MainMenu() {
   const [showSettings, setShowSettings] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
+  const [devCode, setDevCode] = useState("");
+  const [devMessage, setDevMessage] = useState("");
 
   useEffect(() => {
     const existing = localStorage.getItem("colony-frontier-game-state");
@@ -342,7 +345,59 @@ export function MainMenu() {
               Manage your local campaign data and program preferences.
             </p>
 
-            <div className="mt-7 border border-[#594a35] bg-[#1a2020] p-5">
+            <div className="mt-7 border border-[#3e5550] bg-[#101f23] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-[#e8e9d9]">
+                    Developer access
+                  </h3>
+                  <p className="mt-2 text-xs leading-5 text-[#9ca9a2]">
+                    Enter the developer code to unlock mission progression for testing.
+                  </p>
+                </div>
+                <span className="shrink-0 border border-[#405c4e] bg-[#102822] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#8fc8a7]">
+                  {loadGameState().devMode ? "Active" : "Locked"}
+                </span>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <input
+                  type="text"
+                  value={devCode}
+                  onChange={(event) => setDevCode(event.target.value)}
+                  placeholder="Developer code"
+                  autoComplete="off"
+                  className="min-w-0 flex-1 border border-[#40565a] bg-[#08171f] px-3 py-3 font-mono text-sm text-[#e7eee5] outline-none placeholder:text-[#536a69] focus:border-[#efb658]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (devCode === "DevTyson") {
+                      const nextState = {
+                        ...loadGameState(),
+                        devMode: true,
+                      };
+                      saveGameState(nextState);
+                      setDevMessage("Developer mode enabled. Mission progression is now unlocked for testing.");
+                      setDevCode("");
+                    } else {
+                      setDevMessage("Invalid developer code.");
+                    }
+                  }}
+                  className="shrink-0 border border-[#6d7651] bg-[#182c2a] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.18em] text-[#c9debc] transition hover:border-[#efb658] hover:text-[#efb658]"
+                >
+                  Activate
+                </button>
+              </div>
+
+              {devMessage && (
+                <p className="mt-3 text-xs leading-5 text-[#9bb3aa]">
+                  {devMessage}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 border border-[#594a35] bg-[#1a2020] p-5">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-[#e8e9d9]">
