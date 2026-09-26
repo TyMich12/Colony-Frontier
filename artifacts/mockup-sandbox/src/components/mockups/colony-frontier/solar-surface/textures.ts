@@ -50,7 +50,7 @@ export function makeSolarCellTexture(cols = 8, rows = 4) {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.anisotropy = 8;
+  texture.anisotropy = 2;
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
@@ -150,7 +150,7 @@ export function makeTerrainTexture(kind: "moon" | "mars", size = 1024) {
   return texture;
 }
 
-export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: number) {
+export function makeDustTexture(kind: "moon" | "mars", size = 192, seedInput?: number) {
   /*
    * Dense particulate dust layer.
    *
@@ -212,16 +212,16 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
       const nx = x / size;
       const ny = y / size;
 
-      const broadA = fbm(nx * 2.2 + 3.7 + phase.ax, ny * 2.7 + 11.4 + phase.ay, 5);
-      const broadB = fbm(nx * 4.9 + 37.0 + phase.bx, ny * 3.6 + 23.0 + phase.by, 4);
-      const broadC = fbm(nx * 9.5 + 71.0 + phase.cx, ny * 7.0 + 5.0 + phase.cy, 3);
+      const broadA = fbm(nx * 2.2 + 3.7 + phase.ax, ny * 2.7 + 11.4 + phase.ay, 3);
+      const broadB = fbm(nx * 4.9 + 37.0 + phase.bx, ny * 3.6 + 23.0 + phase.by, 3);
+      const broadC = fbm(nx * 9.5 + 71.0 + phase.cx, ny * 7.0 + 5.0 + phase.cy, 2);
 
-      const windA = fbm(nx * 2.5 + ny * 7.0 + 101 + phase.wx, ny * 18.0 + nx * 1.2 + 19 + phase.wy, 4);
-      const windB = fbm(nx * 4.0 + ny * 13.0 + 211 + phase.vx, ny * 32.0 + nx * 2.0 + 31 + phase.vy, 3);
+      const windA = fbm(nx * 2.5 + ny * 7.0 + 101 + phase.wx, ny * 18.0 + nx * 1.2 + 19 + phase.wy, 3);
+      const windB = fbm(nx * 4.0 + ny * 13.0 + 211 + phase.vx, ny * 32.0 + nx * 2.0 + 31 + phase.vy, 2);
 
-      const mediumA = fbm(nx * 16.0 + 43 + phase.mx, ny * 14.0 + 17 + phase.my, 3);
+      const mediumA = fbm(nx * 16.0 + 43 + phase.mx, ny * 14.0 + 17 + phase.my, 2);
       const mediumB = fbm(nx * 31.0 + 83 + phase.fx, ny * 27.0 + 29 + phase.fy, 2);
-      const fine = fbm(nx * 78.0 + 109 + phase.qx, ny * 72.0 + 53 + phase.qy, 2);
+      const fine = fbm(nx * 78.0 + 109 + phase.qx, ny * 72.0 + 53 + phase.qy, 1);
       const micro = fbm(nx * 170.0 + 401 + phase.cx + phase.qx, ny * 145.0 + 197 + phase.cy + phase.qy, 1);
       const grain = hash(Math.floor(nx * size * 0.75), Math.floor(ny * size * 0.75));
 
@@ -300,7 +300,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
   ctx.putImageData(image, 0, 0);
 
   // Large, irregular dust islands.
-  const clumpCount = kind === "mars" ? 1100 : 950;
+  const clumpCount = kind === "mars" ? 260 : 220;
   for (let i = 0; i < clumpCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
@@ -331,7 +331,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
   }
 
   // Wind-driven streaks with broken opacity.
-  const streakCount = kind === "mars" ? 600 : 520;
+  const streakCount = kind === "mars" ? 180 : 160;
   for (let i = 0; i < streakCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
@@ -364,7 +364,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
 
   // Thousands of distinct grains make the surface read as accumulated particles
   // rather than a material recolour.
-  const grainCount = kind === "mars" ? 24000 : 21000;
+  const grainCount = kind === "mars" ? 3500 : 3000;
   for (let i = 0; i < grainCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
@@ -391,7 +391,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 512, seedInput?: n
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
+  texture.anisotropy = 2;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
