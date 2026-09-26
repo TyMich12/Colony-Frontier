@@ -60,11 +60,15 @@ const categoryIcons = {
 
 const tiers: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
 
-function requirementCopy(tier: Tier) {
+function requirementCopy(
+  track: TechnologyTrack,
+  tier: Tier,
+) {
   const requirement = tierUnlockRequirements[tier];
   if (tier === "Foundation") return "Starting technology";
   if (tier === "Research") {
-    return `${requirement.xp.toLocaleString()} XP + required Research Tokens`;
+    const researchTokens = track.tiers[tier].researchTokens;
+    return `${requirement.xp.toLocaleString()} XP + ${researchTokens} RT`;
   }
   return `${requirement.xp.toLocaleString()} XP`;
 }
@@ -356,7 +360,7 @@ export function TechnologyLabRefresh() {
                           {equipment.name}
                         </h3>
                         <p className="mt-1 text-[10px] uppercase tracking-[0.13em] text-[#789491]">
-                          Unlock: {requirementCopy(tier)}
+                          Unlock: {requirementCopy(selectedTrack, tier)}
                         </p>
                       </div>
                     </div>
@@ -469,7 +473,7 @@ export function TechnologyLabRefresh() {
                     {tier}
                   </span>
                   <span className="text-right text-[9px] uppercase tracking-[0.12em] text-[#829b96]">
-                    {requirementCopy(tier)}
+                    {requirementCopy(selectedTrack, tier)}
                   </span>
                 </div>
               ))}
