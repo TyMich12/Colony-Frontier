@@ -4,6 +4,7 @@ export type GameState = {
   researchTokens: number;
   completedMissions: string[];
   unlockedTechnologies: string[];
+  devMode: boolean;
 };
 
 export const STARTING_GAME_STATE: GameState = {
@@ -12,6 +13,7 @@ export const STARTING_GAME_STATE: GameState = {
   researchTokens: 0,
   completedMissions: [],
   unlockedTechnologies: [],
+  devMode: false,
 };
 
 const STORAGE_KEY = "colony-frontier-game-state";
