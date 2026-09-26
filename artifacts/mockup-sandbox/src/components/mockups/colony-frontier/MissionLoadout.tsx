@@ -140,6 +140,7 @@ function CategoryHeader({
   open,
   required,
   categoryBlocked,
+  essentialBlocked,
   onClick,
 }: {
   track: TechnologyTrack;
@@ -147,31 +148,36 @@ function CategoryHeader({
   open: boolean;
   required: boolean;
   categoryBlocked: boolean;
+  essentialBlocked: boolean;
   onClick: () => void;
 }) {
   const Icon =
     categoryIcons[track.category as keyof typeof categoryIcons] ?? Zap;
 
-  const categoryColor = categoryBlocked
-    ? "#d87979"
+  const categoryColor = essentialBlocked || categoryBlocked
+    ? "#ff4d4d"
     : required
       ? "#72b9d4"
       : "#9fce82";
 
-  const categoryStatus = categoryBlocked
-    ? "INSUFFICIENT FUNDS — NOTHING AVAILABLE"
-    : required
-      ? "REQUIRED SYSTEM"
-      : "OPTIONAL SYSTEM";
+  const categoryStatus = essentialBlocked
+    ? "MISSION BLOCKED — ESSENTIAL SYSTEM UNAVAILABLE"
+    : categoryBlocked
+      ? "NOTHING AVAILABLE"
+      : required
+        ? "REQUIRED SYSTEM"
+        : "OPTIONAL SYSTEM";
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={`flex w-full items-center justify-between border p-4 text-left transition ${
-        categoryBlocked
-          ? "border-[#9a4b4b] bg-[#261719] hover:border-[#c96767]"
-          : required
+        essentialBlocked
+          ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_22px_rgba(255,47,47,0.32)] hover:border-[#ff6666]"
+          : categoryBlocked
+            ? "border-[#9a4b4b] bg-[#261719] hover:border-[#c96767]"
+            : required
             ? "border-[#3f83a8] bg-[#102936] hover:border-[#5ca8d1]"
             : open
               ? "border-[#afc78f] bg-[#172c2d] shadow-[inset_3px_0_0_#efb658]"
@@ -219,7 +225,7 @@ function CategoryHeader({
             className="hidden border bg-[#0a171e] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] sm:inline"
             style={{ borderColor: categoryColor, color: categoryColor }}
           >
-            Loaded
+            {selectedTier}
           </span>
         )}
 
@@ -378,6 +384,77 @@ function TierOption({
   );
 }
 
+
+function getAutomaticTier(
+  track: TechnologyTrack,
+  gameState: ReturnType<typeof loadGameState>,
+  availableCredits: number,
+  availableMass: number,
+) {
+  for (let index = tierOrder.length - 1; index >= 0; index -= 1) {
+    const tier = tierOrder[index];
+
+    if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
+      continue;
+    }
+
+    const equipment = track.tiers[tier];
+
+    if (
+      equipment.cost <= availableCredits &&
+      equipment.mass <= availableMass
+    ) {
+      return tier;
+    }
+  }
+
+  return undefined;
+}
+
+function createInitialSelection(
+  gameState: ReturnType<typeof loadGameState>,
+) {
+  const selection: Record<string, Tier> = {};
+  let availableCredits = gameState.credits;
+  let availableMass = missionCapacity;
+
+  const requiredTracks = technologyTracks.filter((track) =>
+    starterCategories.has(track.id),
+  );
+
+  for (let index = 0; index < requiredTracks.length; index += 1) {
+    const track = requiredTracks[index];
+    const remainingTracks = requiredTracks.slice(index + 1);
+    const reservedFoundationCost = remainingTracks.reduce(
+      (total, remainingTrack) =>
+        total + remainingTrack.tiers.Foundation.cost,
+      0,
+    );
+    const reservedFoundationMass = remainingTracks.reduce(
+      (total, remainingTrack) =>
+        total + remainingTrack.tiers.Foundation.mass,
+      0,
+    );
+
+    const tier = getAutomaticTier(
+      track,
+      gameState,
+      Math.max(0, availableCredits - reservedFoundationCost),
+      Math.max(0, availableMass - reservedFoundationMass),
+    );
+
+    if (tier === undefined) {
+      continue;
+    }
+
+    selection[track.id] = tier;
+    availableCredits -= track.tiers[tier].cost;
+    availableMass -= track.tiers[tier].mass;
+  }
+
+  return selection;
+}
+
 export function MissionLoadout() {
   const gameState = loadGameState();
   const moonCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("moon-")).length;
@@ -385,11 +462,8 @@ export function MissionLoadout() {
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const catalogScrollY = useRef(0);
 
-  const [selected, setSelected] = useState<Record<string, Tier>>(
-    () =>
-      Object.fromEntries(
-        [...starterCategories].map((id) => [id, "Foundation"]),
-      ) as Record<string, Tier>,
+  const [selected, setSelected] = useState<Record<string, Tier>>(() =>
+    createInitialSelection(gameState),
   );
 
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -425,6 +499,11 @@ export function MissionLoadout() {
   const remainingMass = missionCapacity - mass;
   const remainingTreasury = gameState.credits - spend;
   const requiredCategories = starterCategories;
+  const blockedEssentialCategories = technologyTracks.filter(
+    (track) =>
+      requiredCategories.has(track.id) && selected[track.id] === undefined,
+  );
+  const missionBlocked = blockedEssentialCategories.length > 0;
 
   function selectTier(track: TechnologyTrack, tier: Tier) {
     const previousTier = selected[track.id];
@@ -602,6 +681,13 @@ export function MissionLoadout() {
   }
 
   function confirmMission() {
+    if (missionBlocked) {
+      setNotice(
+        "MISSION BLOCKED — one or more essential systems cannot be afforded at any purchased technology tier. Downgrade another system or increase the Colony Treasury before launch.",
+      );
+      return;
+    }
+
     if (selectedTracks.length === 0) {
       setNotice("No systems are loaded. Mission cannot deploy.");
       return;
@@ -769,6 +855,9 @@ export function MissionLoadout() {
                     open={openCategory === track.id}
                     required={requiredCategories.has(track.id)}
                     categoryBlocked={categoryIsBlocked(track)}
+                    essentialBlocked={
+                      requiredCategories.has(track.id) && !selectedTier
+                    }
                     onClick={() => {
                       if (categoryIsBlocked(track)) {
                         setNotice(
@@ -846,6 +935,25 @@ export function MissionLoadout() {
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+          {missionBlocked && (
+            <div className="border-2 border-[#ff2f2f] bg-[#3a0808] p-5 shadow-[0_0_30px_rgba(255,47,47,0.28)]">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 h-3 w-3 shrink-0 rounded-full bg-[#ff2f2f] shadow-[0_0_12px_#ff2f2f]" />
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#ff5c5c]">
+                    Mission blocked
+                  </p>
+                  <p className="mt-2 text-sm font-black uppercase tracking-[0.08em] text-[#fff0f0]">
+                    Essential systems cannot be fully funded.
+                  </p>
+                  <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.14em] leading-5 text-[#ff9b9b]">
+                    Every required system must have a selected tier before launch. Downgrade a system or increase the Colony Treasury.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {completionNotice && (
             <div className="border border-[#78bb92] bg-[#102b25] p-5 shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#78bb92]">
@@ -990,11 +1098,13 @@ export function MissionLoadout() {
               <button
                 type="button"
                 onClick={confirmMission}
-                disabled={confirmed}
+                disabled={confirmed || missionBlocked}
                 className={`flex w-full items-center justify-center gap-2 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.24em] transition ${
                   confirmed
                     ? "cursor-default bg-[#65bd94] text-[#0a1b1c]"
-                    : "bg-[#efb658] text-[#172126] hover:bg-[#f6ca76]"
+                    : missionBlocked
+                      ? "cursor-not-allowed border-2 border-[#ff2f2f] bg-[#4a0b0b] text-[#ff8a8a]"
+                      : "bg-[#efb658] text-[#172126] hover:bg-[#f6ca76]"
                 }`}
               >
                 {confirmed ? (
@@ -1002,7 +1112,11 @@ export function MissionLoadout() {
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
-                {confirmed ? "Mission deployed" : "Deploy Mission"}
+                {confirmed
+                  ? "Mission deployed"
+                  : missionBlocked
+                    ? "Mission blocked"
+                    : "Deploy Mission"}
               </button>
 
               {confirmed && (
