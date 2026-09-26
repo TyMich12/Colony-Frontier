@@ -38,6 +38,7 @@ import {
   type Tier,
 } from "./_shared/gameData";
 import { loadGameState, saveGameState } from "./gameState";
+import { moonMissions } from "./CampaignMapRefresh";
 
 const categoryIcons = {
   Solar: Sun,
@@ -648,15 +649,39 @@ export function MissionLoadout() {
       return;
     }
 
+    const missionId = `moon-${String(currentMissionNumber).padStart(2, "0")}`;
+    const mission = moonMissions.find(
+      (entry) => entry.number === String(currentMissionNumber).padStart(2, "0"),
+    );
+
+    if (!mission) {
+      setNotice(`Mission ${String(currentMissionNumber).padStart(2, "0")} reward data is unavailable.`);
+      return;
+    }
+
+    const missionCredits = Number.parseFloat(
+      mission.credits.replace(/[$,M]/g, ""),
+    );
+    const missionXp = Number.parseInt(mission.xp.replace(/[,]/g, ""), 10);
+    const missionResearch = Number.parseInt(
+      mission.research.replace(/[^0-9-]/g, ""),
+      10,
+    );
+    const alreadyCompleted = gameState.completedMissions.includes(missionId);
+
     const nextState = {
       ...gameState,
-      credits: gameState.credits - spend,
+      credits: gameState.credits - spend + (gameState.devMode && !alreadyCompleted ? missionCredits : 0),
+      xp: gameState.xp + (gameState.devMode && !alreadyCompleted ? missionXp : 0),
+      researchTokens:
+        gameState.researchTokens +
+        (gameState.devMode && !alreadyCompleted ? missionResearch : 0),
       ...(gameState.devMode
         ? {
             completedMissions: Array.from(
               new Set([
                 ...gameState.completedMissions,
-                `moon-${String(currentMissionNumber).padStart(2, "0")}`,
+                missionId,
               ]),
             ),
           }
@@ -666,11 +691,20 @@ export function MissionLoadout() {
     saveGameState(nextState);
 
     setConfirmed(true);
-    setNotice(
-      gameState.devMode
-        ? `DEV MODE: Mission ${String(currentMissionNumber).padStart(2, "0")} completed. ${formatCredits(spend)} transferred from the Colony Treasury. The next mission is now unlocked.`
-        : `Mission ${String(currentMissionNumber).padStart(2, "0")} manifest deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
-    );
+
+    if (gameState.devMode && !alreadyCompleted) {
+      setNotice(
+        `MISSION COMPLETE — ${mission.title}: ${formatCredits(missionCredits)} Credits · +${missionXp.toLocaleString()} XP · +${missionResearch} Research Token${missionResearch === 1 ? "" : "s"}. The next mission is now unlocked.`,
+      );
+    } else if (gameState.devMode && alreadyCompleted) {
+      setNotice(
+        `Mission ${mission.number} was already completed. No duplicate rewards issued.`,
+      );
+    } else {
+      setNotice(
+        `Mission ${mission.number} manifest deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
+      );
+    }
   }
 
   const visibleTracks = openCategory
