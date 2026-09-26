@@ -15,6 +15,7 @@ import {
   ProgressBar,
   SectionLabel,
 } from "./_shared/GameShell";
+import { loadGameState } from "./gameState";
 
 type MissionStatus = "current" | "locked";
 type CampaignId = "moon" | "mars";
@@ -395,10 +396,29 @@ function difficultyStars(difficulty: number, max: number) {
 export function CampaignMapRefresh() {
   const [campaign, setCampaign] = useState<CampaignId>("moon");
   const [selected, setSelected] = useState("01");
+  const gameState = loadGameState();
+  const completed = new Set(gameState.completedMissions);
+  const moonComplete = moonMissions.every((mission) => completed.has(`moon-${mission.number}`));
   const missions = campaign === "moon" ? moonMissions : marsMissions;
   const meta = campaignMeta[campaign];
   const activeMission =
     missions.find((mission) => mission.number === selected) ?? missions[0];
+
+  function missionKey(number: string) {
+    return `${campaign}-${number}`;
+  }
+
+  function getMissionStatus(number: string): "current" | "locked" | "complete" {
+    if (completed.has(missionKey(number))) return "complete";
+    const index = missions.findIndex((mission) => mission.number === number);
+    if (campaign === "mars" && !moonComplete) return "locked";
+    const previousComplete = missions
+      .slice(0, index)
+      .every((mission) => completed.has(missionKey(mission.number)));
+    return previousComplete ? "current" : "locked";
+  }
+
+  const activeStatus = getMissionStatus(activeMission.number);
 
   function switchCampaign(id: CampaignId) {
     setCampaign(id);
@@ -543,7 +563,7 @@ export function CampaignMapRefresh() {
                       {mission.title}
                     </span>
                     <span className="whitespace-nowrap text-[8px] uppercase tracking-[0.12em] text-[#657f80]">
-                      {isSelected ? "IN PROGRESS" : "LOCKED"}
+                      {getMissionStatus(mission.number) === "complete" ? "COMPLETE" : getMissionStatus(mission.number) === "current" ? "IN PROGRESS" : "LOCKED"}
                     </span>
                   </button>
                 );
@@ -589,7 +609,7 @@ export function CampaignMapRefresh() {
             </h2>
           </div>
           <div className="space-y-6 px-6 py-6">
-            {activeMission.status === "locked" ? (
+            {activeStatus === "locked" ? (
               <div className="border border-[#304a4e] bg-[#101f26] p-4">
                 <LockKeyhole className="mb-4 h-5 w-5 text-[#6a8585]" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#92a99e]">
@@ -691,7 +711,7 @@ export function CampaignMapRefresh() {
                   href="/preview/MissionLoadout"
                   className="flex w-full items-center justify-between bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.21em] text-[#1a211d] transition hover:bg-[#f6cb7b]"
                 >
-                  Prepare Mission 01 <Target className="h-4 w-4" />
+                  Prepare Mission {activeMission.number} <Target className="h-4 w-4" />
                 </a>
               </>
             )}
