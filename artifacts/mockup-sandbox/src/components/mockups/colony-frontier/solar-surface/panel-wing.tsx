@@ -146,7 +146,7 @@ function PanelSegment({
   // brand-new texture for every segment on every wing.
   const localDustMaterial = useMemo(() => {
     const seed = Math.floor(Math.random() * 0x7fffffff);
-    const texture = makeDustTexture(terrain, 384, seed);
+    const texture = makeDustTexture(terrain, 192, seed);
     const material = new THREE.MeshStandardMaterial({
       map: texture,
       color: "#ffffff",
@@ -178,7 +178,12 @@ function PanelSegment({
   }, [localDustMaterial]);
 
   useFrame(() => {
-    localDustMaterial.opacity = 1;
+    // The texture can exist while clean, but contributes zero visual dust until
+    // the simulation's dust loading rises above zero.
+    localDustMaterial.opacity = Math.max(
+      0,
+      Math.min(1, solarLive.dust / 100),
+    );
   });
 
   const frame = frameInfo(segmentIndex);
