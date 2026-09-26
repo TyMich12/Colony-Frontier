@@ -96,9 +96,11 @@ export function TechnologyLabRefresh() {
 
   function isTierEligible(tier: Tier) {
     const requirement = tierUnlockRequirements[tier];
+    const requiredTokens =
+      tier === "Research" ? selectedTrack.tiers[tier].researchTokens : 0;
     return (
       gameState.xp >= requirement.xp &&
-      gameState.researchTokens >= requirement.tokens
+      gameState.researchTokens >= requiredTokens
     );
   }
 
@@ -110,15 +112,17 @@ export function TechnologyLabRefresh() {
     }
 
     const requirement = tierUnlockRequirements[tier];
+    const requiredTokens =
+      tier === "Research" ? selectedTrack.tiers[tier].researchTokens : 0;
 
     if (gameState.xp < requirement.xp) {
       setNotice(`${tier} requires ${requirement.xp.toLocaleString()} XP.`);
       return;
     }
 
-    if (gameState.researchTokens < requirement.tokens) {
+    if (gameState.researchTokens < requiredTokens) {
       setNotice(
-        `${tier} requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`,
+        `${tier} requires ${requiredTokens} Research Token${requiredTokens === 1 ? "" : "s"}.`,
       );
       return;
     }
@@ -184,6 +188,8 @@ export function TechnologyLabRefresh() {
 
     const requirement = tierUnlockRequirements[tier];
     const equipment = selectedTrack.tiers[tier];
+    const requiredTokens =
+      tier === "Research" ? equipment.researchTokens : 0;
 
     if (gameState.xp < requirement.xp) {
       setNotice(
@@ -192,16 +198,16 @@ export function TechnologyLabRefresh() {
       return;
     }
 
-    if (gameState.researchTokens < requirement.tokens) {
+    if (gameState.researchTokens < requiredTokens) {
       setNotice(
-        `Cannot unlock ${equipment.name}: requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`,
+        `Cannot unlock ${equipment.name}: requires ${requiredTokens} Research Token${requiredTokens === 1 ? "" : "s"}.`,
       );
       return;
     }
 
     const nextState: GameState = {
       ...gameState,
-      researchTokens: gameState.researchTokens - requirement.tokens,
+      researchTokens: gameState.researchTokens - requiredTokens,
       unlockedTechnologies: [
         ...gameState.unlockedTechnologies,
         technologyKey(tier),
