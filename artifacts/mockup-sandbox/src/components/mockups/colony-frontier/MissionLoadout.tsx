@@ -513,10 +513,17 @@ export function MissionLoadout() {
   function categoryIsBlocked(track: TechnologyTrack) {
     const previousTier = selected[track.id];
     const previousEquipment = previousTier ? track.tiers[previousTier] : null;
+    const previousCost = previousTier
+      ? deploymentCost(
+          track,
+          previousTier,
+          gameState.unlockedTechnologies,
+        )
+      : 0;
     const availableTreasury =
-      gameState.credits - (spend - (previousEquipment?.cost ?? 0));
+      gameState.credits - (spend - previousCost);
     const availableMissionBudget =
-      missionBudget - (spend - (previousEquipment?.cost ?? 0));
+      missionBudget - (spend - previousCost);
     const availableCredits = Math.min(
       availableTreasury,
       availableMissionBudget,
