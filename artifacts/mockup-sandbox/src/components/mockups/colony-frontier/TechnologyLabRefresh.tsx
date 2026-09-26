@@ -89,6 +89,14 @@ export function TechnologyLabRefresh() {
     return tier === "Foundation" || gameState.unlockedTechnologies.includes(technologyKey(tier));
   }
 
+  function isTierEligible(tier: Tier) {
+    const requirement = tierUnlockRequirements[tier];
+    return (
+      gameState.xp >= requirement.xp &&
+      gameState.researchTokens >= requirement.tokens
+    );
+  }
+
   function selectTier(tier: Tier) {
     if (isOwned(tier)) {
       setSelectedTier(tier);
@@ -97,29 +105,29 @@ export function TechnologyLabRefresh() {
     }
 
     const requirement = tierUnlockRequirements[tier];
+
     if (gameState.xp < requirement.xp) {
       setNotice(`${tier} requires ${requirement.xp.toLocaleString()} XP.`);
       return;
     }
 
     if (gameState.researchTokens < requirement.tokens) {
-      setNotice(`${tier} requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`);
-      return;
-    }
-
-    if (gameState.credits < selectedTrack.tiers[tier].cost) {
-      setNotice(`Purchasing ${selectedTrack.tiers[tier].name} requires ${formatCredits(selectedTrack.tiers[tier].cost)}.`);
+      setNotice(
+        `${tier} requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`,
+      );
       return;
     }
 
     setSelectedTier(tier);
-    setNotice(`${selectedTrack.tiers[tier].name} is ready to purchase.`);
+    setNotice(`${selectedTrack.tiers[tier].name} is ready to unlock.`);
   }
 
-  function purchaseTechnology(tier: Tier) {
+  function unlockTechnology(tier: Tier) {
     if (tier === "Foundation") {
       setSelectedTier(tier);
-      setNotice(`${selectedTrack.tiers[tier].name} is starting technology and is already installed.`);
+      setNotice(
+        `${selectedTrack.tiers[tier].name} is starting technology and is already installed.`,
+      );
       return;
     }
 
@@ -129,27 +137,25 @@ export function TechnologyLabRefresh() {
       return;
     }
 
-    const equipment = selectedTrack.tiers[tier];
     const requirement = tierUnlockRequirements[tier];
+    const equipment = selectedTrack.tiers[tier];
 
     if (gameState.xp < requirement.xp) {
-      setNotice(`Cannot purchase ${equipment.name}: requires ${requirement.xp.toLocaleString()} XP.`);
+      setNotice(
+        `Cannot unlock ${equipment.name}: requires ${requirement.xp.toLocaleString()} XP.`,
+      );
       return;
     }
 
     if (gameState.researchTokens < requirement.tokens) {
-      setNotice(`Cannot purchase ${equipment.name}: requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`);
-      return;
-    }
-
-    if (gameState.credits < equipment.cost) {
-      setNotice(`Cannot purchase ${equipment.name}: need ${formatCredits(equipment.cost)}.`);
+      setNotice(
+        `Cannot unlock ${equipment.name}: requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`,
+      );
       return;
     }
 
     const nextState: GameState = {
       ...gameState,
-      credits: gameState.credits - equipment.cost,
       researchTokens: gameState.researchTokens - requirement.tokens,
       unlockedTechnologies: [
         ...gameState.unlockedTechnologies,
@@ -160,7 +166,9 @@ export function TechnologyLabRefresh() {
     saveGameState(nextState);
     setGameState(nextState);
     setSelectedTier(tier);
-    setNotice(`${equipment.name} purchased and unlocked for mission deployment.`);
+    setNotice(
+      `${equipment.name} unlocked for mission deployment. No Credits were spent.`,
+    );
   }
 
   if (viewer) {
@@ -188,7 +196,7 @@ export function TechnologyLabRefresh() {
           </p>
         </div>
         <p className="text-[10px] uppercase tracking-[0.16em] text-[#9fba9e]">
-          Locked tiers cannot be selected or purchased
+          Locked tiers cannot be selected or unlocked
         </p>
       </div>
 
@@ -279,12 +287,7 @@ export function TechnologyLabRefresh() {
               const equipment = selectedTrack.tiers[tier];
               const owned = isOwned(tier);
               const requirement = tierUnlockRequirements[tier];
-              const unlocked =
-                owned ||
-                (tier !== "Foundation" &&
-                  gameState.xp >= requirement.xp &&
-                  gameState.researchTokens >= requirement.tokens &&
-                  gameState.credits >= equipment.cost);
+              const unlocked = owned || isTierEligible(tier);
               const selected = selectedTier === tier;
               const meta = tierMeta[tier];
               return (
@@ -365,7 +368,7 @@ export function TechnologyLabRefresh() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          purchaseTechnology(tier);
+                          unlockTechnology(tier);
                         }}
                         disabled={owned || (tier !== "Foundation" && !unlocked)}
                         className={
@@ -378,7 +381,7 @@ export function TechnologyLabRefresh() {
                                 : "cursor-not-allowed border border-[#4a5350] bg-[#151d20] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#687c78]"
                         }
                       >
-                        {owned ? "Owned" : tier === "Foundation" ? "Installed" : `Purchase · ${formatCredits(equipment.cost)}`}
+                        {owned ? "Owned" : tier === "Foundation" ? "Installed" : "Unlock"}
                       </button>
                     </div>
                   </div>
