@@ -667,9 +667,9 @@ export function MissionLoadout() {
 
     setConfirmed(true);
     setNotice(
-      `Mission ${String(currentMissionNumber).padStart(2, "0")} manifest deployed. ${formatCredits(
-        spend,
-      )} transferred from the Colony Treasury.`,
+      gameState.devMode
+        ? `DEV MODE: Mission ${String(currentMissionNumber).padStart(2, "0")} completed. ${formatCredits(spend)} transferred from the Colony Treasury. The next mission is now unlocked.`
+        : `Mission ${String(currentMissionNumber).padStart(2, "0")} manifest deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
     );
   }
 
@@ -696,7 +696,7 @@ export function MissionLoadout() {
                   Early Moon / 8,000 kg payload
                 </p>
                 <p className="mt-1 text-xs text-[#9cb2aa]">
-                  Mission ${String(currentMissionNumber).padStart(2, "0")} · choose one technology tier per category
+                  Mission {String(currentMissionNumber).padStart(2, "0")} · choose one technology tier per category
                 </p>
               </div>
             </div>
