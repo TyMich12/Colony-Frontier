@@ -739,14 +739,18 @@ export function MissionLoadout() {
       10,
     );
     const alreadyCompleted = gameState.completedMissions.includes(missionId);
+    const repeatRewardCredits = alreadyCompleted ? missionCredits * 0.2 : missionCredits;
+    const repeatRewardXp = alreadyCompleted ? missionXp * 0.2 : missionXp;
+    const rewardCredits = gameState.devMode ? repeatRewardCredits : 0;
+    const rewardXp = gameState.devMode ? repeatRewardXp : 0;
+    const rewardResearch = gameState.devMode && !alreadyCompleted ? missionResearch : 0;
 
     const nextState = {
       ...gameState,
-      credits: gameState.credits - spend + (gameState.devMode && !alreadyCompleted ? missionCredits : 0),
-      xp: gameState.xp + (gameState.devMode && !alreadyCompleted ? missionXp : 0),
+      credits: gameState.credits - spend + rewardCredits,
+      xp: gameState.xp + rewardXp,
       researchTokens:
-        gameState.researchTokens +
-        (gameState.devMode && !alreadyCompleted ? missionResearch : 0),
+        gameState.researchTokens + rewardResearch,
       ...(gameState.devMode && !alreadyCompleted
         ? {
             lastMissionReward: {
@@ -784,9 +788,13 @@ export function MissionLoadout() {
         window.location.href = "/preview/CampaignMapRefresh";
       }, 350);
     } else if (gameState.devMode && alreadyCompleted) {
-      setNotice(
-        `Mission ${mission.number} was already completed. No duplicate rewards issued.`,
-      );
+      const repeatCreditsDisplay = formatCredits(repeatRewardCredits);
+      const repeatXpDisplay = Math.round(repeatRewardXp).toLocaleString();
+      const repeatMessage =
+        `REPLAY REWARD — ${mission.title} · +${repeatCreditsDisplay} Credits · +${repeatXpDisplay} XP · +0 Research Tokens`;
+      setCompletionNotice(repeatMessage);
+      setNotice(repeatMessage);
+    }
     } else {
       setNotice(
         `Mission ${mission.number} mission deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
