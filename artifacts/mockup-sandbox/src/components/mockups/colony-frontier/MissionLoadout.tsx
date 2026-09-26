@@ -480,11 +480,15 @@ function createInitialSelection(
 export function MissionLoadout() {
   const gameState = loadGameState();
   const params = new URLSearchParams(window.location.search);
-  const requestedCampaign = params.get("campaign") === "mars" ? "mars" : "moon";
   const moonCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("moon-")).length;
   const marsCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("mars-")).length;
   const moonComplete = moonCompletedCount >= moonMissions.length;
-  const campaign = requestedCampaign === "mars" && !moonComplete ? "moon" : requestedCampaign;
+  const requestedCampaign =
+    params.get("campaign") === "mars" || (!params.get("campaign") && moonComplete)
+      ? "mars"
+      : "moon";
+  const campaign =
+    requestedCampaign === "mars" && !moonComplete ? "moon" : requestedCampaign;
   const campaignMissions = campaign === "moon" ? moonMissions : marsMissions;
   const campaignCompletedCount = campaign === "moon" ? moonCompletedCount : marsCompletedCount;
   const requestedMissionNumber = params.get("mission");
