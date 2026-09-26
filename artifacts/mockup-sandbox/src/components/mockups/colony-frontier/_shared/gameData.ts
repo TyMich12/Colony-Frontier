@@ -99,9 +99,9 @@ export const technologyTracks: TechnologyTrack[] = [
     shortName: "CO2",
     description: "Keeps habitat air breathable and recovers useful carbon.",
     tiers: {
-      Foundation: tier("Carbon-1", 300, 1.5, "Basic CO₂ removal", "Removes CO₂ from habitat air."),
-      Frontier: tier("Carbon-2", 470, 3.2, "Lower power consumption", "Higher removal rate and lower power consumption."),
-      Apex: tier("Carbon-X", 700, 6, "Partial resource recovery", "Highly efficient CO₂ removal with partial resource recovery."),
+      Foundation: tier("Carbon-1 Scrubber", 300, 1.5, "Basic CO₂ removal", "Removes CO₂ from habitat air."),
+      Frontier: tier("Carbon-2 Scrubber", 470, 3.2, "Lower power consumption", "Higher removal rate and lower power consumption."),
+      Apex: tier("Carbon-X Scrubber", 700, 6, "Partial resource recovery", "Highly efficient CO₂ removal with partial resource recovery."),
       Research: tier("Carbon-Synthesis Cor", 600, 10, "Useful carbon compound recovery", "Removes CO₂ while recovering useful carbon compounds for colony processes.", 1)
     },
   },
@@ -135,9 +135,9 @@ export const technologyTracks: TechnologyTrack[] = [
     shortName: "HAB",
     description: "Provides pressurized, protected living space.",
     tiers: {
-      Foundation: tier("Haven-1", 2400, 8, "Basic pressurized living", "Basic pressurized living space."),
-      Frontier: tier("Haven-L", 3400, 14, "Larger + better insulated", "Larger, better insulated, and more efficient habitat."),
-      Apex: tier("Haven-X", 4800, 24, "Integrated life support + protection", "Advanced life-support integration and stronger structural protection."),
+      Foundation: tier("Haven-1 Module", 2400, 8, "Basic pressurized living", "Basic pressurized living space."),
+      Frontier: tier("Haven-L Module", 3400, 14, "Larger + better insulated", "Larger, better insulated, and more efficient habitat."),
+      Apex: tier("Haven-X Module", 4800, 24, "Integrated life support + protection", "Advanced life-support integration and stronger structural protection."),
       Research: tier("Haven-Genesis Module", 4200, 35, "Resilient automated isolation", "Highly resilient habitat with automated emergency isolation.", 10)
     },
   },
@@ -195,9 +195,9 @@ export const technologyTracks: TechnologyTrack[] = [
     shortName: "ROV",
     description: "Explores terrain and transports tools and samples.",
     tiers: {
-      Foundation: tier("Scout-1", 180, 1, "Basic transport + exploration", "Basic transport and exploration."),
-      Frontier: tier("Pathfinder-L", 350, 2.5, "Greater range + payload", "Greater range, payload, and navigation capability."),
-      Apex: tier("Odyssey-X", 650, 5.5, "Autonomous resource operations", "Highly autonomous exploration and resource operations."),
+      Foundation: tier("Scout-1 Rover", 180, 1, "Basic transport + exploration", "Basic transport and exploration."),
+      Frontier: tier("Pathfinder-L Rover", 350, 2.5, "Greater range + payload", "Greater range, payload, and navigation capability."),
+      Apex: tier("Odyssey-X Rover", 650, 5.5, "Autonomous resource operations", "Highly autonomous exploration and resource operations."),
       Research: tier("Odyssey-Titan Rover", 550, 9, "Extreme range + repair assistance", "Extreme range, autonomous navigation, resource collection, and repair assistance.", 1)
     },
   },
