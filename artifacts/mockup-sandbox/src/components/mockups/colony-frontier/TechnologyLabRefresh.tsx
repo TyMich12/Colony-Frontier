@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { loadGameState, saveGameState, type GameState } from "./gameState";
 import {
   Battery,
   Car,
@@ -58,8 +59,6 @@ const categoryIcons = {
 } as const;
 
 const tiers: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
-const currentXp = 0;
-const currentTokens = 0;
 
 function requirementCopy(tier: Tier) {
   const requirement = tierUnlockRequirements[tier];
@@ -71,22 +70,97 @@ function requirementCopy(tier: Tier) {
 }
 
 export function TechnologyLabRefresh() {
+  const [gameState, setGameState] = useState<GameState>(() => loadGameState());
   const [selectedTrackId, setSelectedTrackId] = useState("solar");
   const [selectedTier, setSelectedTier] = useState<Tier>("Foundation");
   const [viewer, setViewer] = useState<{ trackId: string; tier: Tier } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const selectedTrack =
     technologyTracks.find((track) => track.id === selectedTrackId) ??
     technologyTracks[0];
   const SelectedIcon =
     categoryIcons[selectedTrack.category as keyof typeof categoryIcons] ?? Zap;
 
-  function canBuy(tier: Tier) {
-    const requirement = tierUnlockRequirements[tier];
-    return currentXp >= requirement.xp && currentTokens >= requirement.tokens;
+  function technologyKey(tier: Tier) {
+    return `${selectedTrack.id}:${tier}`;
+  }
+
+  function isOwned(tier: Tier) {
+    return tier === "Foundation" || gameState.unlockedTechnologies.includes(technologyKey(tier));
   }
 
   function selectTier(tier: Tier) {
-    if (canBuy(tier)) setSelectedTier(tier);
+    if (isOwned(tier)) {
+      setSelectedTier(tier);
+      setNotice(null);
+      return;
+    }
+
+    const requirement = tierUnlockRequirements[tier];
+    if (gameState.xp < requirement.xp) {
+      setNotice(`${tier} requires ${requirement.xp.toLocaleString()} XP.`);
+      return;
+    }
+
+    if (gameState.researchTokens < requirement.tokens) {
+      setNotice(`${tier} requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`);
+      return;
+    }
+
+    if (gameState.credits < selectedTrack.tiers[tier].cost) {
+      setNotice(`Purchasing ${selectedTrack.tiers[tier].name} requires ${formatCredits(selectedTrack.tiers[tier].cost)}.`);
+      return;
+    }
+
+    setSelectedTier(tier);
+    setNotice(`${selectedTrack.tiers[tier].name} is ready to purchase.`);
+  }
+
+  function purchaseTechnology(tier: Tier) {
+    if (tier === "Foundation") {
+      setSelectedTier(tier);
+      setNotice(`${selectedTrack.tiers[tier].name} is starting technology and is already installed.`);
+      return;
+    }
+
+    if (isOwned(tier)) {
+      setSelectedTier(tier);
+      setNotice(`${selectedTrack.tiers[tier].name} is already owned.`);
+      return;
+    }
+
+    const equipment = selectedTrack.tiers[tier];
+    const requirement = tierUnlockRequirements[tier];
+
+    if (gameState.xp < requirement.xp) {
+      setNotice(`Cannot purchase ${equipment.name}: requires ${requirement.xp.toLocaleString()} XP.`);
+      return;
+    }
+
+    if (gameState.researchTokens < requirement.tokens) {
+      setNotice(`Cannot purchase ${equipment.name}: requires ${requirement.tokens} Research Token${requirement.tokens === 1 ? "" : "s"}.`);
+      return;
+    }
+
+    if (gameState.credits < equipment.cost) {
+      setNotice(`Cannot purchase ${equipment.name}: need ${formatCredits(equipment.cost)}.`);
+      return;
+    }
+
+    const nextState: GameState = {
+      ...gameState,
+      credits: gameState.credits - equipment.cost,
+      researchTokens: gameState.researchTokens - requirement.tokens,
+      unlockedTechnologies: [
+        ...gameState.unlockedTechnologies,
+        technologyKey(tier),
+      ],
+    };
+
+    saveGameState(nextState);
+    setGameState(nextState);
+    setSelectedTier(tier);
+    setNotice(`${equipment.name} purchased and unlocked for mission deployment.`);
   }
 
   if (viewer) {
@@ -177,8 +251,8 @@ export function TechnologyLabRefresh() {
                 Research bank
               </p>
               <p className="font-mono text-sm text-[#e8efdd]">
-                {currentXp.toLocaleString()} XP{" "}
-                <span className="text-[#76908e]">· {currentTokens} tokens</span>
+                {gameState.xp.toLocaleString()} XP{" "}
+                <span className="text-[#76908e]">· {gameState.researchTokens} tokens</span>
               </p>
             </div>
           </div>
@@ -203,7 +277,14 @@ export function TechnologyLabRefresh() {
             <div className="absolute bottom-7 left-5 top-7 w-px bg-gradient-to-b from-[#9fce82] via-[#72b9d4] to-[#e9a15d]" />
             {tiers.map((tier) => {
               const equipment = selectedTrack.tiers[tier];
-              const unlocked = canBuy(tier);
+              const owned = isOwned(tier);
+              const requirement = tierUnlockRequirements[tier];
+              const unlocked =
+                owned ||
+                (tier !== "Foundation" &&
+                  gameState.xp >= requirement.xp &&
+                  gameState.researchTokens >= requirement.tokens &&
+                  gameState.credits >= equipment.cost);
               const selected = selectedTier === tier;
               const meta = tierMeta[tier];
               return (
@@ -248,10 +329,19 @@ export function TechnologyLabRefresh() {
                           >
                             {tier}
                           </span>
-                          {unlocked ? (
+                          {owned ? (
                             <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#9cd0a8]">
                               <Check className="h-3 w-3" />
-                              {selected ? "Selected" : "Unlocked"}
+                              Owned
+                            </span>
+                          ) : tier === "Foundation" ? (
+                            <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#9cd0a8]">
+                              <Check className="h-3 w-3" />
+                              Installed
+                            </span>
+                          ) : unlocked ? (
+                            <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#efb658]">
+                              Ready to purchase
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 text-[8px] uppercase tracking-[0.16em] text-[#a6a796]">
@@ -267,9 +357,30 @@ export function TechnologyLabRefresh() {
                         </p>
                       </div>
                     </div>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.17em] text-[#92a9a0]">
-                      {selected ? "Current loadout tier" : unlocked ? "Select" : "Earn first"}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.17em] text-[#92a9a0]">
+                        {selected ? "Selected" : owned ? "Owned" : unlocked ? "Ready" : "Locked"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          purchaseTechnology(tier);
+                        }}
+                        disabled={owned || (tier !== "Foundation" && !unlocked)}
+                        className={
+                          owned
+                            ? "border border-[#426b58] bg-[#112b25] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#8fca9f]"
+                            : tier === "Foundation"
+                              ? "border border-[#485f53] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#86a598]"
+                              : unlocked
+                                ? "border border-[#efb658] bg-[#efb658] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#17201b] hover:bg-[#f6cb7b]"
+                                : "cursor-not-allowed border border-[#4a5350] bg-[#151d20] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#687c78]"
+                        }
+                      >
+                        {owned ? "Owned" : tier === "Foundation" ? "Installed" : `Purchase · ${formatCredits(equipment.cost)}`}
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[#29434a] pt-4 sm:grid-cols-4">
                     <div>
@@ -306,6 +417,12 @@ export function TechnologyLabRefresh() {
               );
             })}
           </div>
+
+          {notice && (
+            <div className="mt-4 border border-[#765d2f] bg-[#211f17] px-4 py-3 text-[10px] leading-5 uppercase tracking-[0.12em] text-[#d8c58f]">
+              {notice}
+            </div>
+          )}
         </section>
 
         <aside className="space-y-4">
