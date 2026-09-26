@@ -72,8 +72,6 @@ const starterCategories = new Set([
 ]);
 
 const missionCapacity = payloadProgression[0].capacity;
-const missionBudget = 25;
-
 const tierOrder: Tier[] = [
   "Foundation",
   "Frontier",
@@ -400,6 +398,7 @@ export function MissionLoadout() {
     "Mission 01 begins with reliable Foundation systems. Open a category to choose its technology tier.",
   );
   const [confirmed, setConfirmed] = useState(false);
+  const [completionNotice, setCompletionNotice] = useState<string | null>(null);
 
   const selectedTracks = useMemo(
     () =>
@@ -420,7 +419,6 @@ export function MissionLoadout() {
   }, 0);
 
   const remainingMass = missionCapacity - mass;
-  const remainingMissionBudget = missionBudget - spend;
   const remainingTreasury = gameState.credits - spend;
   const requiredCategories = starterCategories;
 
@@ -473,15 +471,6 @@ export function MissionLoadout() {
     const newMass =
       mass - (previousEquipment?.mass ?? 0) + nextEquipment.mass;
 
-    if (newSpend > missionBudget) {
-      setNotice(
-        `${track.category} / ${tier} exceeds the remaining Mission 01 allocation of ${formatCredits(
-          Math.max(0, missionBudget - (spend - (previousEquipment?.cost ?? 0))),
-        )}.`,
-      );
-      return;
-    }
-
     if (newSpend > gameState.credits) {
       setNotice(
         `${track.category} / ${tier} requires ${formatCredits(nextEquipment.cost)}, but your Colony Treasury only has ${formatCredits(
@@ -523,12 +512,7 @@ export function MissionLoadout() {
       : 0;
     const availableTreasury =
       gameState.credits - (spend - previousCost);
-    const availableMissionBudget =
-      missionBudget - (spend - previousCost);
-    const availableCredits = Math.min(
-      availableTreasury,
-      availableMissionBudget,
-    );
+    const availableCredits = availableTreasury;
     const availableMass =
       missionCapacity - (mass - (previousEquipment?.mass ?? 0));
 
@@ -633,11 +617,6 @@ export function MissionLoadout() {
       return;
     }
 
-    if (spend > missionBudget) {
-      setNotice("Manifest exceeds the Mission 01 allocation.");
-      return;
-    }
-
     if (spend > gameState.credits) {
       setNotice(
         `Manifest requires ${formatCredits(
@@ -693,9 +672,10 @@ export function MissionLoadout() {
     setConfirmed(true);
 
     if (gameState.devMode && !alreadyCompleted) {
-      setNotice(
-        `MISSION COMPLETE — ${mission.title}: ${formatCredits(missionCredits)} Credits · +${missionXp.toLocaleString()} XP · +${missionResearch} Research Token${missionResearch === 1 ? "" : "s"}. The next mission is now unlocked.`,
-      );
+      const rewardMessage =
+        `MISSION COMPLETE — ${mission.title} · ${formatCredits(missionCredits)} Credits · +${missionXp.toLocaleString()} XP · +${missionResearch} Research Token${missionResearch === 1 ? "" : "s"}`;
+      setCompletionNotice(rewardMessage);
+      setNotice(`${rewardMessage}. The next mission is now unlocked.`);
     } else if (gameState.devMode && alreadyCompleted) {
       setNotice(
         `Mission ${mission.number} was already completed. No duplicate rewards issued.`,
@@ -801,13 +781,7 @@ export function MissionLoadout() {
                         const availableTreasury =
                           gameState.credits - (spend - previousCost);
 
-                        const availableMissionBudget =
-                          missionBudget - (spend - previousCost);
-
-                        const availableCredits = Math.min(
-                          availableTreasury,
-                          availableMissionBudget,
-                        );
+                        const availableCredits = availableTreasury;
 
                         const previousEquipment = previousTier
                           ? track.tiers[previousTier]
@@ -857,11 +831,25 @@ export function MissionLoadout() {
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+          {completionNotice && (
+            <div className="border border-[#78bb92] bg-[#102b25] p-5 shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#78bb92]">
+                Rewards received
+              </p>
+              <p className="mt-2 text-sm font-bold uppercase tracking-[0.08em] text-[#e8f3df]">
+                {completionNotice}
+              </p>
+              <p className="mt-2 text-[9px] uppercase tracking-[0.14em] text-[#8faea0]">
+                The next mission is now unlocked.
+              </p>
+            </div>
+          )}
+
           <div className="border border-[#a47a42] bg-[#15262b] shadow-[0_18px_60px_rgba(0,0,0,0.24)]">
             <div className="flex items-start justify-between border-b border-[#76583c] bg-[#392b20] px-5 py-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#efb658]">
-                  Mission 01 manifest
+                  Mission
                 </p>
                 <h2 className="mt-1 text-lg font-semibold uppercase tracking-[0.12em] text-[#fff0ca]">
                   Survival
@@ -914,30 +902,7 @@ export function MissionLoadout() {
                 </div>
               </div>
 
-              <div>
-                <div className="mb-2 flex items-end justify-between">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-[#9ab1a8]">
-                    Mission allocation
-                  </span>
-                  <span className="font-mono text-sm text-[#f4e7c5]">
-                    {formatCredits(Math.max(0, remainingMissionBudget))}{" "}
-                    <span className="text-[#839993]">remaining</span>
-                  </span>
-                </div>
-                <ProgressBar
-                  value={Math.min(
-                    100,
-                    Math.round((spend / missionBudget) * 100),
-                  )}
-                  color="#d792e9"
-                />
-                <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.15em] text-[#758e89]">
-                  <span>{formatCredits(spend)} committed</span>
-                  <span>of {formatCredits(missionBudget)}</span>
-                </div>
-              </div>
-
-              <div className="border border-[#304949] bg-[#101f23] p-4">
+              <div className="border border-[#304949]/ bg-[#101f23] p-4">
                 <div className="mb-3 text-[9px] font-bold uppercase tracking-[0.2em] text-[#718f80]">
                   Deployment finances
                 </div>
@@ -1031,7 +996,7 @@ export function MissionLoadout() {
                   onClick={() => {
                     setConfirmed(false);
                     setNotice(
-                      "Manifest is locked after deployment. Mission execution is ready.",
+                      "Mission is locked after deployment. Mission execution is ready.",
                     );
                   }}
                   className="flex w-full items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#8fa9a2] hover:text-[#e7f0df]"
