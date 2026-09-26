@@ -15,7 +15,8 @@ import {
   ProgressBar,
   SectionLabel,
 } from "./_shared/GameShell";
-import { loadGameState } from "./gameState";
+import { formatCredits } from "./_shared/gameData";
+import { loadGameState, saveGameState } from "./gameState";
 
 type MissionStatus = "current" | "locked";
 type CampaignId = "moon" | "mars";
@@ -382,6 +383,10 @@ const campaignMeta: Record<
   },
 };
 
+function formatReward(credits: number, xp: number, researchTokens: number) {
+  return `Rewards received — ${formatCredits(credits)} Credits · +${xp.toLocaleString()} XP · +${researchTokens} Research Token${researchTokens === 1 ? "" : "s"}`;
+}
+
 function difficultyStars(difficulty: number, max: number) {
   const filled = Math.min(difficulty, max);
   const empty = Math.max(0, max - filled);
@@ -396,7 +401,7 @@ function difficultyStars(difficulty: number, max: number) {
 export function CampaignMapRefresh() {
   const [campaign, setCampaign] = useState<CampaignId>("moon");
   const [selected, setSelected] = useState("01");
-  const gameState = loadGameState();
+  const [gameState, setGameState] = useState(loadGameState());
   const completed = new Set(gameState.completedMissions);
   const moonComplete = moonMissions.every((mission) => completed.has(`moon-${mission.number}`));
   const missions = campaign === "moon" ? moonMissions : marsMissions;
@@ -420,6 +425,22 @@ export function CampaignMapRefresh() {
 
   const activeStatus = getMissionStatus(activeMission.number);
 
+  function selectMission(number: string) {
+    const rewardMissionId = gameState.lastMissionReward?.missionId;
+    const selectedMissionId = `${campaign}-${number}`;
+
+    if (rewardMissionId && rewardMissionId !== selectedMissionId) {
+      const nextState = {
+        ...gameState,
+        lastMissionReward: undefined,
+      };
+      saveGameState(nextState);
+      setGameState(nextState);
+    }
+
+    setSelected(number);
+  }
+
   function switchCampaign(id: CampaignId) {
     setCampaign(id);
     setSelected("01");
@@ -431,6 +452,28 @@ export function CampaignMapRefresh() {
       eyebrow={meta.eyebrow}
       title={meta.title}
     >
+      {gameState.lastMissionReward && (
+        <div className="mb-5 border-2 border-[#78bb92] bg-[#102b25] p-5 shadow-[0_0_24px_rgba(120,187,146,0.16)]">
+          <div className="flex items-start gap-3">
+            <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#78bb92]" />
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#78bb92]">
+                Mission complete
+              </p>
+              <p className="mt-2 text-sm font-bold uppercase tracking-[0.08em] text-[#e8f3df]">
+                {gameState.lastMissionReward.title}
+              </p>
+              <p className="mt-2 text-[10px] uppercase tracking-[0.14em] leading-5 text-[#9bb9aa]">
+                {formatReward(gameState.lastMissionReward.credits, gameState.lastMissionReward.xp, gameState.lastMissionReward.researchTokens)}
+              </p>
+              <p className="mt-2 text-[9px] uppercase tracking-[0.14em] text-[#718f80]">
+                Select the next mission to continue. Its loadout will start fresh.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#47553d] bg-[#172a2a] px-5 py-4">
         <div className="flex items-center gap-3">
           <FlaskConical className="h-4 w-4 text-[#efb658]" />
@@ -532,7 +575,7 @@ export function CampaignMapRefresh() {
                   <button
                     key={mission.number}
                     type="button"
-                    onClick={() => setSelected(mission.number)}
+                    onClick={() => selectMission(mission.number)}
                     className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center transition hover:scale-105 focus:outline-none focus:ring-1 focus:ring-[#efb658] ${
                       isSelected ? "scale-110" : ""
                     }`}
