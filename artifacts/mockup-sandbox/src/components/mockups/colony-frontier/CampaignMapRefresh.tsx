@@ -37,7 +37,7 @@ type Mission = {
 const moonMissions: Mission[] = [
   {
     number: "01",
-    title: "Survival",
+    title: "First Light",
     status: "current",
     duration: "14 Earth days",
     credits: "$10M",
@@ -50,7 +50,7 @@ const moonMissions: Mission[] = [
   },
   {
     number: "02",
-    title: "The Long Night",
+    title: "Blackout",
     status: "locked",
     duration: "21 Earth days",
     credits: "$12M",
@@ -64,7 +64,7 @@ const moonMissions: Mission[] = [
   },
   {
     number: "03",
-    title: "The Shadow",
+    title: "Echoes Below",
     status: "locked",
     duration: "30 Earth days",
     credits: "$14M",
@@ -78,7 +78,7 @@ const moonMissions: Mission[] = [
   },
   {
     number: "04",
-    title: "Contamination",
+    title: "Signal Drift",
     status: "locked",
     duration: "35 Earth days",
     credits: "$16M",
@@ -92,7 +92,7 @@ const moonMissions: Mission[] = [
   },
   {
     number: "05",
-    title: "Impact",
+    title: "Sudden Pressure",
     status: "locked",
     duration: "45 Earth days",
     credits: "$18M",
@@ -106,7 +106,7 @@ const moonMissions: Mission[] = [
   },
   {
     number: "06",
-    title: "Stormfall",
+    title: "Solar Veil",
     status: "locked",
     duration: "60 Earth days",
     credits: "$20M",
@@ -120,12 +120,12 @@ const moonMissions: Mission[] = [
   },
   {
     number: "07",
-    title: "The Inheritance",
+    title: "Hidden Yield",
     status: "locked",
     duration: "90 Earth days",
     credits: "$23M",
     xp: "2,000",
-    research: "+2",
+    research: "+3",
     difficulty: 4,
     objective: "Turn local material and limited reserves into a growing colony.",
     opportunity: "Local Resource Discovery",
@@ -134,7 +134,7 @@ const moonMissions: Mission[] = [
   },
   {
     number: "08",
-    title: "Cascade",
+    title: "Chain Reaction",
     status: "locked",
     duration: "120 Earth days",
     credits: "$27M",
@@ -151,7 +151,7 @@ const moonMissions: Mission[] = [
 const marsMissions: Mission[] = [
   {
     number: "01",
-    title: "Arrival",
+    title: "Red Horizon",
     status: "locked",
     duration: "30 Earth days",
     credits: "$20M",
@@ -165,7 +165,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "02",
-    title: "The Dust",
+    title: "Veilfall",
     status: "locked",
     duration: "45 Earth days",
     credits: "$22M",
@@ -179,7 +179,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "03",
-    title: "The Water Search",
+    title: "Deep Signal",
     status: "locked",
     duration: "60 Earth days",
     credits: "$25M",
@@ -193,7 +193,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "04",
-    title: "Martian Winter",
+    title: "Cold Front",
     status: "locked",
     duration: "90 Earth days",
     credits: "$28M",
@@ -207,7 +207,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "05",
-    title: "The Rover Network",
+    title: "Waypoint",
     status: "locked",
     duration: "120 Earth days",
     credits: "$31M",
@@ -221,7 +221,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "06",
-    title: "Dust Storm",
+    title: "Redout",
     status: "locked",
     duration: "150 Earth days",
     credits: "$34M",
@@ -235,7 +235,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "07",
-    title: "The Greenhouse",
+    title: "Green Thread",
     status: "locked",
     duration: "180 Earth days",
     credits: "$37M",
@@ -249,7 +249,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "08",
-    title: "Habitat Breach",
+    title: "Pressure Point",
     status: "locked",
     duration: "210 Earth days",
     credits: "$40M",
@@ -263,7 +263,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "09",
-    title: "ISRU",
+    title: "Native Forge",
     status: "locked",
     duration: "240 Earth days",
     credits: "$43M",
@@ -277,7 +277,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "10",
-    title: "The Supply Gap",
+    title: "Isolation",
     status: "locked",
     duration: "270 Earth days",
     credits: "$46M",
@@ -291,12 +291,12 @@ const marsMissions: Mission[] = [
   },
   {
     number: "11",
-    title: "The Great Dust Storm",
+    title: "Veil of Red",
     status: "locked",
     duration: "300 Earth days",
     credits: "$50M",
     xp: "3,500",
-    research: "+3",
+    research: "+4",
     difficulty: 7,
     objective: "Survive the major Mars cascade across all colony systems.",
     opportunity: "Cascade Prediction",
@@ -305,7 +305,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "12",
-    title: "The Expansion",
+    title: "Second Horizon",
     status: "locked",
     duration: "330 Earth days",
     credits: "$55M",
@@ -319,7 +319,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "13",
-    title: "The Independent Colony",
+    title: "No Lifeline",
     status: "locked",
     duration: "1 Earth year",
     credits: "$60M",
@@ -333,7 +333,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "14",
-    title: "Cascade",
+    title: "Chain Reaction",
     status: "locked",
     duration: "1 Earth year",
     credits: "$65M",
@@ -347,7 +347,7 @@ const marsMissions: Mission[] = [
   },
   {
     number: "15",
-    title: "Mars Rising",
+    title: "New Dawn",
     status: "locked",
     duration: "1 Martian year (~687 Earth days)",
     credits: "$75M",
