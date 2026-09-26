@@ -99,12 +99,10 @@ function isTierUnlocked(
 function deploymentCost(
   track: TechnologyTrack,
   tier: Tier,
-  unlockedTechnologies: string[],
+  _unlockedTechnologies: string[],
 ) {
-  if (tier !== "Foundation" && isTierUnlocked(track, tier, unlockedTechnologies)) {
-    return 0;
-  }
-
+  // Technology Lab ownership never removes the mission deployment cost.
+  // Credits are spent when this equipment is actually loaded onto a mission.
   return track.tiers[tier].cost;
 }
 
