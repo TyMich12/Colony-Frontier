@@ -435,6 +435,9 @@ export function CampaignMapRefresh() {
   }
 
   const activeStatus = getMissionStatus(activeMission.number);
+  const completedCount = missions.filter((mission) => completed.has(missionKey(mission.number))).length;
+  const progressPercent = Math.round((completedCount / missions.length) * 100);
+  const nextMissionNumber = missions.find((mission) => getMissionStatus(mission.number) === "current")?.number ?? missions[missions.length - 1].number;
 
   function selectMission(number: string) {
     const rewardMissionId = gameState.lastMissionReward?.missionId;
@@ -526,15 +529,15 @@ export function CampaignMapRefresh() {
                 Operation status
               </p>
               <p className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-[#dce9dc]">
-                Mission 01 / {meta.total} · starting route
+                Mission {activeMission.number} / {meta.total} · {activeMission.title}
               </p>
             </div>
             <div className="w-36">
               <div className="mb-2 flex justify-between text-[9px] uppercase tracking-[0.2em] text-[#799394]">
                 <span>{meta.label} progress</span>
-                <span className="text-[#efb658]">0%</span>
+                <span className="text-[#efb658]">{progressPercent}%</span>
               </div>
-              <ProgressBar value={0} />
+              <ProgressBar value={progressPercent} />
             </div>
           </div>
 
@@ -557,75 +560,87 @@ export function CampaignMapRefresh() {
               )}
             </div>
 
-            <div className="relative min-h-[420px]">
-              <svg
-                className="absolute inset-x-2 top-8 h-[220px] w-[calc(100%-16px)] overflow-visible"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 40"
-                aria-hidden="true"
-              >
-                <path
-                  d="M 2 28 C 8 8, 11 8, 18 15 S 26 33, 32 25 S 40 8, 46 12 S 55 31, 60 24 S 68 8, 72 13 S 80 31, 86 24 S 94 9, 99 10"
-                  fill="none"
-                  stroke="#31545a"
-                  strokeDasharray="1.4 1.4"
-                  strokeWidth="0.5"
-                />
-                <path
-                  d="M 2 28 C 8 8, 11 8, 18 15 S 26 33, 32 25"
-                  fill="none"
-                  stroke="#efb658"
-                  strokeWidth="0.8"
-                />
-              </svg>
-              {missions.map((mission) => {
-                const isSelected = mission.number === selected;
-                const count = missions.length;
-                const leftPct = 6 + ((Number(mission.number) - 1) / (count - 1)) * 88;
-                return (
-                  <button
-                    key={mission.number}
-                    type="button"
-                    onClick={() => selectMission(mission.number)}
-                    className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center transition hover:scale-105 focus:outline-none focus:ring-1 focus:ring-[#efb658] ${
-                      isSelected ? "scale-110" : ""
-                    }`}
-                    style={{
-                      left: `${leftPct}%`,
-                      top: Number(mission.number) % 2 ? "52%" : "30%",
-                    }}
-                    aria-label={`Select mission ${mission.number}, ${mission.title}`}
-                  >
-                    <span
-                      className={`grid h-11 w-11 place-items-center border ${
-                        isSelected
-                          ? "border-[#f5c56b] bg-[#efb658] text-[#17201b] shadow-[0_0_0_6px_rgba(239,182,88,0.12)]"
-                          : "border-[#324b50] bg-[#102128] text-[#5e7778]"
-                      }`}
+            <div className="overflow-x-auto pb-3">
+              <div className={campaign === "mars" ? "relative min-h-[420px] min-w-[1500px]" : "relative min-h-[420px] min-w-full"}>
+                <svg
+                  className="pointer-events-none absolute inset-x-0 top-8 h-[220px] w-full overflow-visible"
+                  preserveAspectRatio="none"
+                  viewBox="0 0 100 40"
+                  aria-hidden="true"
+                >
+                  <path
+                    d={missions.map((mission, index) => {
+                      const x = 2 + (index / Math.max(missions.length - 1, 1)) * 96;
+                      const y = Number(mission.number) % 2 ? 34 : 17;
+                      if (index === 0) return `M ${x} ${y}`;
+                      const previousX = 2 + ((index - 1) / Math.max(missions.length - 1, 1)) * 96;
+                      const previousY = Number(missions[index - 1].number) % 2 ? 34 : 17;
+                      const mid = (previousX + x) / 2;
+                      return ` C ${mid} ${previousY}, ${mid} ${y}, ${x} ${y}`;
+                    }).join("")}
+                    fill="none"
+                    stroke="#31545a"
+                    strokeDasharray="1.4 1.4"
+                    strokeWidth="0.55"
+                  />
+                  <path
+                    d={missions.slice(0, Math.max(completedCount + 1, 1)).map((mission, index, points) => {
+                      const x = 2 + (Number(mission.number) - 1) / Math.max(missions.length - 1, 1) * 96;
+                      const y = Number(mission.number) % 2 ? 34 : 17;
+                      if (index === 0) return `M ${x} ${y}`;
+                      const previous = points[index - 1];
+                      const previousX = 2 + (Number(previous.number) - 1) / Math.max(missions.length - 1, 1) * 96;
+                      const previousY = Number(previous.number) % 2 ? 34 : 17;
+                      const mid = (previousX + x) / 2;
+                      return ` C ${mid} ${previousY}, ${mid} ${y}, ${x} ${y}`;
+                    }).join("")}
+                    fill="none"
+                    stroke="#efb658"
+                    strokeWidth="1.1"
+                  />
+                </svg>
+                {missions.map((mission) => {
+                  const status = getMissionStatus(mission.number);
+                  const isSelected = mission.number === selected;
+                  const isNextUnlocked = mission.number === nextMissionNumber;
+                  const count = missions.length;
+                  const leftPct = 2 + ((Number(mission.number) - 1) / Math.max(count - 1, 1)) * 96;
+                  return (
+                    <button
+                      key={mission.number}
+                      type="button"
+                      onClick={() => selectMission(mission.number)}
+                      className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center transition hover:scale-105 focus:outline-none focus:ring-1 focus:ring-[#efb658] ${isSelected || isNextUnlocked ? "scale-110" : ""}`}
+                      style={{
+                        left: `${leftPct}%`,
+                        top: Number(mission.number) % 2 ? "52%" : "30%",
+                      }}
+                      aria-label={`Select mission ${mission.number}, ${mission.title}`}
                     >
-                      {getMissionStatus(mission.number) === "complete" ? (
-                        <Check className="h-4 w-4" />
-                      ) : getMissionStatus(mission.number) === "current" ? (
-                        <span className="text-xs font-bold">{mission.number}</span>
-                      ) : (
-                        <LockKeyhole className="h-4 w-4" />
-                      )}
-                    </span>
-                    <span
-                      className={`whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.13em] ${
-                        isSelected ? "text-[#f4c46d]" : "text-[#60787b]"
-                      }`}
-                    >
-                      {mission.title}
-                    </span>
-                    <span className="whitespace-nowrap text-[8px] uppercase tracking-[0.12em] text-[#657f80]">
-                      {getMissionStatus(mission.number) === "complete" ? "COMPLETE" : getMissionStatus(mission.number) === "current" ? "IN PROGRESS" : "LOCKED"}
-                    </span>
-                  </button>
-                );
-              })}
+                      <span
+                        className={`grid h-11 w-11 place-items-center border ${
+                          isSelected
+                            ? "border-[#f5c56b] bg-[#efb658] text-[#17201b] shadow-[0_0_0_6px_rgba(239,182,88,0.18)]"
+                            : isNextUnlocked
+                              ? "border-[#efb658] bg-[#172d2a] text-[#efb658] shadow-[0_0_12px_rgba(239,182,88,0.12)]"
+                              : "border-[#324b50] bg-[#102128] text-[#5e7778]"
+                        }`}
+                      >
+                        {status === "complete" ? <Check className="h-4 w-4" /> : status === "current" ? <span className="text-xs font-bold">{mission.number}</span> : <LockKeyhole className="h-4 w-4" />}
+                      </span>
+                      <span
+                        className={`whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.13em] ${isSelected || isNextUnlocked ? "text-[#f4c46d]" : "text-[#60787b]"}`}
+                      >
+                        {mission.title}
+                      </span>
+                      <span className="whitespace-nowrap text-[8px] uppercase tracking-[0.12em] text-[#657f80]">
+                        {status === "complete" ? "COMPLETE" : status === "current" ? (isNextUnlocked ? "NEXT UNLOCKED" : "AVAILABLE") : "LOCKED"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-
             <div className="flex items-center gap-5 border-t border-[#233d43] pt-4 text-[9px] uppercase tracking-[0.16em] text-[#719091]">
               <span className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-[#efb658]" /> Active
