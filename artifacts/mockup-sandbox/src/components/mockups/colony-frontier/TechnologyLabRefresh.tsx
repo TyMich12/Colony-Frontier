@@ -440,13 +440,13 @@ export function TechnologyLabRefresh() {
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
                 <span className="text-[#8e978a]">Experience earned</span>
                 <span className="font-mono text-[#f1d47c]">
-                  {currentXp.toLocaleString()} XP
+                  {gameState.xp.toLocaleString()} XP
                 </span>
               </div>
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
                 <span className="text-[#8e978a]">Research Tokens earned</span>
                 <span className="font-mono text-[#f1d47c]">
-                  {currentTokens}
+                  {gameState.researchTokens}
                 </span>
               </div>
             </div>
