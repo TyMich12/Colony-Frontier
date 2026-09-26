@@ -157,7 +157,7 @@ function CategoryHeader({
   const categoryColor = essentialBlocked
     ? "#ff4d4d"
     : categoryBlocked
-      ? "#d87979"
+      ? "#ff4d4d"
       : required
         ? "#72b9d4"
         : "#9fce82";
@@ -178,7 +178,7 @@ function CategoryHeader({
         essentialBlocked
           ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_22px_rgba(255,47,47,0.32)] hover:border-[#ff6666]"
           : categoryBlocked
-            ? "border-[#9a4b4b] bg-[#261719] hover:border-[#c96767]"
+            ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_18px_rgba(255,47,47,0.18)] hover:border-[#ff6666]"
             : required
             ? "border-[#3f83a8] bg-[#102936] hover:border-[#5ca8d1]"
             : open
@@ -609,7 +609,7 @@ export function MissionLoadout() {
         availableCredits,
         availableMass,
       );
-      return status === "locked" || status === "mass";
+      return status !== "available";
     });
   }
 
