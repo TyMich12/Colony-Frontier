@@ -300,7 +300,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 192, seedInput?: n
   ctx.putImageData(image, 0, 0);
 
   // Large, irregular dust islands.
-  const clumpCount = kind === "mars" ? 260 : 220;
+  const clumpCount = kind === "mars" ? 220 : 190;
   for (let i = 0; i < clumpCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
@@ -331,7 +331,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 192, seedInput?: n
   }
 
   // Wind-driven streaks with broken opacity.
-  const streakCount = kind === "mars" ? 180 : 160;
+  const streakCount = kind === "mars" ? 140 : 125;
   for (let i = 0; i < streakCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
@@ -364,7 +364,7 @@ export function makeDustTexture(kind: "moon" | "mars", size = 192, seedInput?: n
 
   // Thousands of distinct grains make the surface read as accumulated particles
   // rather than a material recolour.
-  const grainCount = kind === "mars" ? 3500 : 3000;
+  const grainCount = kind === "mars" ? 2500 : 2200;
   for (let i = 0; i < grainCount; i += 1) {
     const x = random() * size;
     const y = random() * size;
