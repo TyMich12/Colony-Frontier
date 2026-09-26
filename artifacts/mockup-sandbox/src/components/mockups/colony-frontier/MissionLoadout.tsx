@@ -778,7 +778,11 @@ export function MissionLoadout() {
       const rewardMessage =
         `MISSION COMPLETE — ${mission.title} · ${formatCredits(missionCredits)} Credits · +${missionXp.toLocaleString()} XP · +${missionResearch} Research Token${missionResearch === 1 ? "" : "s"}`;
       setCompletionNotice(rewardMessage);
-      setNotice(`${rewardMessage}. The next mission is now unlocked.`);
+      setNotice(`${rewardMessage}. Returning to the campaign map...`);
+
+      window.setTimeout(() => {
+        window.location.href = "/preview/CampaignMapRefresh";
+      }, 350);
     } else if (gameState.devMode && alreadyCompleted) {
       setNotice(
         `Mission ${mission.number} was already completed. No duplicate rewards issued.`,
