@@ -479,13 +479,31 @@ function createInitialSelection(
 
 export function MissionLoadout() {
   const gameState = loadGameState();
+  const params = new URLSearchParams(window.location.search);
+  const requestedCampaign = params.get("campaign") === "mars" ? "mars" : "moon";
   const moonCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("moon-")).length;
-  const currentMissionNumber = Math.min(8, moonCompletedCount + 1);
+  const marsCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("mars-")).length;
+  const moonComplete = moonCompletedCount >= moonMissions.length;
+  const campaign = requestedCampaign === "mars" && !moonComplete ? "moon" : requestedCampaign;
+  const campaignMissions = campaign === "moon" ? moonMissions : marsMissions;
+  const campaignCompletedCount = campaign === "moon" ? moonCompletedCount : marsCompletedCount;
+  const requestedMissionNumber = params.get("mission");
+  const fallbackMission = getNextMission(campaign, gameState);
+  const currentMission = campaignMissions.find((mission) => mission.number === requestedMissionNumber) ?? fallbackMission;
+  const currentMissionIndex = campaignMissions.findIndex((mission) => mission.number === currentMission.number);
+  const alreadyCompleted = gameState.completedMissions.includes(campaign + "-" + currentMission.number);
+  const previousMissionsComplete = campaignMissions.slice(0, currentMissionIndex).every((mission) =>
+    gameState.completedMissions.includes(campaign + "-" + mission.number),
+  );
+  const missionLocked =
+    (campaign === "mars" && !moonComplete) ||
+    (!alreadyCompleted && !previousMissionsComplete);
+  const missionCapacity = getMissionCapacity(campaign, campaignCompletedCount);
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const catalogScrollY = useRef(0);
 
   const [selected, setSelected] = useState<Record<string, Tier>>(() =>
-    createInitialSelection(gameState),
+    createInitialSelection(gameState, missionCapacity),
   );
 
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -525,7 +543,7 @@ export function MissionLoadout() {
     (track) =>
       requiredCategories.has(track.id) && selected[track.id] === undefined,
   );
-  const missionBlocked = blockedEssentialCategories.length > 0;
+  const missionBlocked = missionLocked || blockedEssentialCategories.length > 0;
 
   function selectTier(track: TechnologyTrack, tier: Tier) {
     const previousTier = selected[track.id];
@@ -703,9 +721,18 @@ export function MissionLoadout() {
   }
 
   function confirmMission() {
-    if (missionBlocked) {
+    if (missionLocked) {
       setNotice(
-        "MISSION BLOCKED — one or more essential systems cannot be afforded at any purchased technology tier. Downgrade another system or increase the Colony Treasury before launch.",
+        campaign === "mars" && !moonComplete
+          ? "MISSION LOCKED — complete the Moon campaign before deploying to Mars."
+          : "MISSION LOCKED — complete the previous mission before launching this one.",
+      );
+      return;
+    }
+
+    if (blockedEssentialCategories.length > 0) {
+      setNotice(
+        "MISSION BLOCKED — one or more essential systems cannot be afforded at any purchased technology tier. Downgrade another system or increase the Colony Treasury.",
       );
       return;
     }
@@ -715,12 +742,8 @@ export function MissionLoadout() {
       return;
     }
 
-    if (
-      [...requiredCategories].some(
-        (categoryId) => selected[categoryId] === undefined,
-      )
-    ) {
-      setNotice("All required Mission 01 systems must have a technology tier selected.");
+    if ([...requiredCategories].some((categoryId) => selected[categoryId] === undefined)) {
+      setNotice("All required systems for Mission " + currentMission.number + " must have a technology tier selected.");
       return;
     }
 
@@ -731,48 +754,29 @@ export function MissionLoadout() {
 
     if (spend > gameState.credits) {
       setNotice(
-        `Mission requires ${formatCredits(
-          spend,
-        )}, but the Colony Treasury contains only ${formatCredits(
-          gameState.credits,
-        )}.`,
+        "Mission requires " + formatCredits(spend) + ", but the Colony Treasury contains only " + formatCredits(gameState.credits) + ".",
       );
       return;
     }
 
-    const missionId = `moon-${String(currentMissionNumber).padStart(2, "0")}`;
-    const mission = moonMissions.find(
-      (entry) => entry.number === String(currentMissionNumber).padStart(2, "0"),
-    );
-
-    if (!mission) {
-      setNotice(`Mission ${String(currentMissionNumber).padStart(2, "0")} reward data is unavailable.`);
-      return;
-    }
-
-    const missionCredits = Number.parseFloat(
-      mission.credits.replace(/[$,M]/g, ""),
-    );
+    const missionId = campaign + "-" + currentMission.number;
+    const mission = currentMission;
+    const missionCredits = Number.parseFloat(mission.credits.replace(/[$,M]/g, ""));
     const missionXp = Number.parseInt(mission.xp.replace(/[,]/g, ""), 10);
-    const missionResearch = Number.parseInt(
-      mission.research.replace(/[^0-9-]/g, ""),
-      10,
-    );
-    const alreadyCompleted = gameState.completedMissions.includes(missionId);
-    const repeatRewardCredits = alreadyCompleted ? missionCredits * 0.2 : missionCredits;
-    const repeatRewardXp = alreadyCompleted ? missionXp * 0.2 : missionXp;
-    const rewardCredits = gameState.devMode ? repeatRewardCredits : 0;
-    const rewardXp = gameState.devMode ? repeatRewardXp : 0;
-    const rewardResearch = gameState.devMode && !alreadyCompleted ? missionResearch : 0;
+    const missionResearch = Number.parseInt(mission.research.replace(/[^0-9-]/g, ""), 10);
+    const replay = alreadyCompleted;
+    const rewardCredits = replay ? missionCredits * 0.2 : missionCredits;
+    const rewardXp = replay ? missionXp * 0.2 : missionXp;
+    const rewardResearch = replay ? 0 : missionResearch;
 
     const nextState = {
       ...gameState,
       credits: gameState.credits - spend + rewardCredits,
       xp: gameState.xp + rewardXp,
-      researchTokens:
-        gameState.researchTokens + rewardResearch,
-      ...(gameState.devMode && !alreadyCompleted
-        ? {
+      researchTokens: gameState.researchTokens + rewardResearch,
+      ...(replay
+        ? {}
+        : {
             lastMissionReward: {
               missionId,
               title: mission.title,
@@ -780,48 +784,24 @@ export function MissionLoadout() {
               xp: missionXp,
               researchTokens: missionResearch,
             },
-          }
-        : {}),
-      ...(gameState.devMode
-        ? {
-            completedMissions: Array.from(
-              new Set([
-                ...gameState.completedMissions,
-                missionId,
-              ]),
-            ),
-          }
-        : {}),
+          }),
+      completedMissions: Array.from(new Set([...gameState.completedMissions, missionId])),
     };
 
     saveGameState(nextState);
-
     setConfirmed(true);
 
-    if (gameState.devMode && !alreadyCompleted) {
-      const rewardMessage =
-        `MISSION COMPLETE — ${mission.title} · ${formatCredits(missionCredits)} Credits · +${missionXp.toLocaleString()} XP · +${missionResearch} Research Token${missionResearch === 1 ? "" : "s"}`;
-      setCompletionNotice(rewardMessage);
-      setNotice(`${rewardMessage}. Returning to the campaign map...`);
+    const rewardMessage = replay
+      ? "REPLAY REWARD — " + mission.title + " · +" + formatCredits(rewardCredits) + " Credits · +" + Math.round(rewardXp).toLocaleString() + " XP · +0 Research Tokens"
+      : "MISSION COMPLETE — " + mission.title + " · " + formatCredits(missionCredits) + " Credits · +" + missionXp.toLocaleString() + " XP · +" + missionResearch + " Research Token" + (missionResearch === 1 ? "" : "s");
 
-      window.setTimeout(() => {
-        window.location.href = "/preview/CampaignMapRefresh";
-      }, 350);
-    } else if (gameState.devMode && alreadyCompleted) {
-      const repeatCreditsDisplay = formatCredits(repeatRewardCredits);
-      const repeatXpDisplay = Math.round(repeatRewardXp).toLocaleString();
-      const repeatMessage =
-        `REPLAY REWARD — ${mission.title} · +${repeatCreditsDisplay} Credits · +${repeatXpDisplay} XP · +0 Research Tokens`;
-      setCompletionNotice(repeatMessage);
-      setNotice(repeatMessage);
-    }
-    } else {
-      setNotice(
-        `Mission ${mission.number} mission deployed. ${formatCredits(spend)} transferred from the Colony Treasury.`,
-      );
-    }
+    setCompletionNotice(rewardMessage);
+    setNotice(rewardMessage + ". Returning to the campaign map...");
+
+    window.setTimeout(() => {
+      window.location.href = "/preview/CampaignMapRefresh?campaign=" + campaign;
+    }, 350);
   }
-
   const visibleTracks = openCategory
     ? technologyTracks.filter((track) => track.id === openCategory)
     : technologyTracks;
