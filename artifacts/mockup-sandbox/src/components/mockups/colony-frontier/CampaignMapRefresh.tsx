@@ -667,15 +667,25 @@ export function CampaignMapRefresh() {
             <Trophy className="h-5 w-5 shrink-0 text-[#efb658]" />
             <div className="flex-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#efb658]">
-                {campaign === "moon" ? "Moon complete" : "Mars complete"}
+                {campaign === "moon"
+                  ? moonComplete
+                    ? "Moon complete"
+                    : "Moon campaign"
+                  : completedCount === missions.length
+                    ? "Mars complete"
+                    : "Mars campaign"}
               </p>
               <p className="mt-1 text-xs text-[#9a9f87]">
                 {campaign === "moon"
-                  ? "Complete all eight lunar missions to authorize Mars."
-                  : "Complete all fifteen Martian missions to achieve planetary independence."}
+                  ? moonComplete
+                    ? "All eight lunar missions are complete. Mars is authorized."
+                    : "Complete all eight lunar missions to authorize Mars."
+                  : completedCount === missions.length
+                    ? "All fifteen Martian missions are complete. Planetary independence achieved."
+                    : "Complete all fifteen Martian missions to achieve planetary independence."}
               </p>
             </div>
-            {campaign === "moon" && <LinkArrow />}
+            {campaign === "moon" && moonComplete && <LinkArrow />}
           </div>
         </section>
 
