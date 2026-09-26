@@ -145,10 +145,7 @@ function PanelSegment({
   // dustGenerationKey changes when the player clicks Clear Dust, forcing a
   // brand-new texture for every segment on every wing.
   const localDustMaterial = useMemo(() => {
-    const seed = Math.floor(Math.random() * 0x7fffffff);
-    const texture = makeDustTexture(terrain, 192, seed);
     const material = new THREE.MeshStandardMaterial({
-      map: texture,
       color: "#ffffff",
       roughness: 1,
       metalness: 0,
@@ -158,24 +155,48 @@ function PanelSegment({
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
-      bumpMap: texture,
       bumpScale: 0.12,
     });
 
-    material.userData.dustSeed = seed;
     material.userData.wingIndex = wingIndex;
     material.userData.segmentIndex = segmentIndex;
     material.userData.generationKey = dustGenerationKey;
+    // Start with no map and zero opacity so the clean array can render immediately.
+    material.opacity = 0;
     return material;
-  }, [terrain, wingIndex, segmentIndex, dustGenerationKey]);
+  }, [wingIndex, segmentIndex, dustGenerationKey]);
 
   useEffect(() => {
+    let cancelled = false;
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const panelOrder = wingIndex * NUM_SEG + segmentIndex;
+    // Spread texture work across multiple browser tasks instead of blocking first paint.
+    const delay = 80 + panelOrder * 28;
+
+    const id = window.setTimeout(() => {
+      if (cancelled) return;
+      const texture = makeDustTexture(terrain, 192, seed);
+      if (cancelled) {
+        texture.dispose();
+        return;
+      }
+      localDustMaterial.map?.dispose();
+      localDustMaterial.bumpMap?.dispose();
+      localDustMaterial.map = texture;
+      localDustMaterial.bumpMap = texture;
+      localDustMaterial.needsUpdate = true;
+    }, delay);
+
     return () => {
+      cancelled = true;
+      window.clearTimeout(id);
       const material = localDustMaterial as THREE.MeshStandardMaterial;
       material.map?.dispose();
+      material.map = null;
+      material.bumpMap = null;
       material.dispose();
     };
-  }, [localDustMaterial]);
+  }, [terrain, wingIndex, segmentIndex, dustGenerationKey, localDustMaterial]);
 
   useFrame(() => {
     // The texture can exist while clean, but contributes zero visual dust until
