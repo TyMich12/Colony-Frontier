@@ -794,7 +794,7 @@ export function CampaignMapRefresh() {
                   <div className="flex items-center gap-2 text-[#b7d5a0]">
                     <FlaskConical className="h-4 w-4" />
                     <p className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                      Optional Research Opportunity
+                      Research opportunity
                     </p>
                   </div>
                   <p className="mt-2 text-sm text-[#d9e5d3]">
@@ -809,7 +809,7 @@ export function CampaignMapRefresh() {
                   <ShieldCheck className="h-5 w-5 text-[#8fc8c4]" />
                   <div>
                     <p className="text-[9px] uppercase tracking-[0.18em] text-[#71898b]">
-                      Technology reward
+                      Technology focus
                     </p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#d5e4ce]">
                       {activeMission.technology}
