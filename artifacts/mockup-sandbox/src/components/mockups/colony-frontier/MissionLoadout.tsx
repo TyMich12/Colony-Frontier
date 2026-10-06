@@ -1151,20 +1151,7 @@ export function MissionLoadout() {
                         : "Deploy Mission"}
               </button>
 
-              {confirmed && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmed(false);
-                    setNotice(
-                      "Mission is locked after deployment. Mission execution is ready.",
-                    );
-                  }}
-                  className="flex w-full items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#8fa9a2] hover:text-[#e7f0df]"
-                >
-                  Continue to mission execution
-                </button>
-              )}
+
             </div>
           </div>
 
