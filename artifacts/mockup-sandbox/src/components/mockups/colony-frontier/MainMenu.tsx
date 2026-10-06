@@ -118,7 +118,7 @@ export function MainMenu() {
               href={moonComplete ? `${routes.moon}?campaign=mars` : routes.moon}
               className="group mt-9 inline-flex items-center gap-5 border border-[#efb658] bg-[#efb658] px-5 py-4 text-[11px] font-bold uppercase tracking-[0.23em] text-[#142127] transition hover:bg-[#f8cc79]"
             >
-              {moonComplete ? "Continue Mars campaign" : "Begin Moon campaign"}
+              {marsComplete ? "Review Mars campaign" : moonComplete ? "Continue Mars campaign" : "Begin Moon campaign"}
               <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </a>
 
