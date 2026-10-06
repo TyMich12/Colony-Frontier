@@ -53,7 +53,7 @@ export const technologyTracks: TechnologyTrack[] = [
     tiers: {
       Foundation: tier("Helios-1 Array", 850, 3, "Reliable normal-sun output", "Basic solar generation; reliable during normal sunlight."),
       Frontier: tier("Helios-X Array", 1250, 6.5, "Improved low-angle performance", "Higher output and improved low-angle sunlight performance."),
-      Apex: tier("Helios-X ArrayR", 1750, 12, "Automated tracking + dust tolerance", "Very high output with automated tracking and improved dust tolerance."),
+      Apex: tier("Helios-XR Array", 1750, 12, "Automated tracking + dust tolerance", "Very high output with automated tracking and improved dust tolerance."),
       Research: tier("Helios-Nova Array", 1600, 15, "Extreme output in difficult light", "Extreme generation with autonomous tracking and strong dust resistance.", 5)
     },
   },
