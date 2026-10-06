@@ -71,6 +71,13 @@ const starterCategories = new Set([
   "radiation",
 ]);
 
+const minimumDeploymentReserve = technologyTracks.length
+  ? Array.from(starterCategories).reduce((total, trackId) => {
+      const track = technologyTracks.find((entry) => entry.id === trackId);
+      return total + (track?.tiers.Foundation.cost ?? 0);
+    }, 0)
+  : 0;
+
 function getMissionCapacity(campaign: "moon" | "mars", completedCount: number) {
   if (campaign === "moon") {
     if (completedCount >= 6) return payloadProgression[2].capacity;
@@ -775,6 +782,16 @@ export function MissionLoadout() {
     const rewardCredits = replay ? missionCredits * 0.2 : missionCredits;
     const rewardXp = replay ? missionXp * 0.2 : missionXp;
     const rewardResearch = replay ? 0 : missionResearch;
+    const projectedCredits = gameState.credits - spend + rewardCredits;
+
+    if (replay && projectedCredits < minimumDeploymentReserve) {
+      setNotice(
+        "REPLAY BLOCKED — this loadout would leave the Colony Treasury below the mandatory Foundation reserve of " +
+          formatCredits(minimumDeploymentReserve) +
+          ". Reduce the loadout cost before replaying.",
+      );
+      return;
+    }
 
     deployingRef.current = true;
 
