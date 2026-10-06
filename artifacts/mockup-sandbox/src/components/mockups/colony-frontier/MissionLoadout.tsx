@@ -505,6 +505,7 @@ export function MissionLoadout() {
   const missionCapacity = getMissionCapacity(campaign, campaignCompletedCount);
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const catalogScrollY = useRef(0);
+  const deployingRef = useRef(false);
 
   const [selected, setSelected] = useState<Record<string, Tier>>(() =>
     createInitialSelection(gameState, missionCapacity),
@@ -725,6 +726,8 @@ export function MissionLoadout() {
   }
 
   function confirmMission() {
+    if (deployingRef.current) return;
+
     if (missionLocked) {
       setNotice(
         campaign === "mars" && !moonComplete
@@ -772,6 +775,8 @@ export function MissionLoadout() {
     const rewardCredits = replay ? missionCredits * 0.2 : missionCredits;
     const rewardXp = replay ? missionXp * 0.2 : missionXp;
     const rewardResearch = replay ? 0 : missionResearch;
+
+    deployingRef.current = true;
 
     const nextState = {
       ...gameState,
