@@ -483,6 +483,57 @@ function IsometricMap({
   );
 }
 
+function MissionTaskRibbon({
+  pending,
+  elapsed,
+  resolvedEvents,
+  surveyedNodes,
+  activeEvent,
+  roverTask,
+}: {
+  pending: PendingMission;
+  elapsed: number;
+  resolvedEvents: string[];
+  surveyedNodes: string[];
+  activeEvent: MissionEvent | null;
+  roverTask: string;
+}) {
+  const day = Math.min(14, Math.floor(elapsed / 30) + 1);
+  const eventGoal = EVENT_TIMES.length;
+  const surveyDone = surveyedNodes.length > 0;
+  const taskRows = [
+    { label: "SURVIVE", value: `DAY ${day.toString().padStart(2, "0")} / 14`, done: elapsed >= TOTAL_MISSION_SECONDS },
+    { label: "RESPOND TO EVENTS", value: `${resolvedEvents.length} / ${eventGoal}`, done: resolvedEvents.length >= eventGoal },
+    { label: "SURVEY A FIELD SITE", value: surveyDone ? "COMPLETE" : "1 REQUIRED", done: surveyDone },
+  ];
+  return (
+    <div className="pointer-events-none absolute left-3 top-3 z-30 w-[min(88vw,270px)]">
+      <div className="pointer-events-auto overflow-hidden rounded-xl border-2 border-[#d3a84a] bg-[#172026]/92 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+        <div className="flex items-center gap-2 border-b border-[#4d5050] bg-[#27363a] px-3 py-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#e2b84f] text-[9px] font-black text-[#20261e]">★</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[8px] font-black uppercase tracking-[0.18em] text-[#f4db87]">{pending.missionTitle}</p>
+            <p className="text-[7px] uppercase tracking-[0.15em] text-[#92a6a4]">Mission objectives</p>
+          </div>
+        </div>
+        <div className="space-y-1.5 p-2">
+          {taskRows.map((task) => (
+            <div key={task.label} className="flex items-center justify-between gap-3 rounded-lg bg-[#0d171c]/75 px-2.5 py-1.5">
+              <span className={`text-[7px] font-black uppercase tracking-[0.12em] ${task.done ? "text-[#7fe19f]" : "text-[#d8e0da]"}`}>
+                {task.done ? "✓ " : "○ "}{task.label}
+              </span>
+              <span className={`shrink-0 text-[7px] font-mono font-bold ${task.done ? "text-[#7fe19f]" : "text-[#f2c960]"}`}>{task.value}</span>
+            </div>
+          ))}
+          <div className="px-1 pt-0.5 text-[7px] uppercase tracking-[0.1em] text-[#728886]">
+            {activeEvent ? `Target: ${activeEvent.trackId.toUpperCase()}` : roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MetricBar({
   icon,
   label,
@@ -1272,6 +1323,15 @@ export function MissionSimulation() {
             setSelectedResourceId(node.id);
             setSelectedBuildingId(null);
           }}
+          roverTask={roverTask}
+        />
+
+        <MissionTaskRibbon
+          pending={pending}
+          elapsed={elapsed}
+          resolvedEvents={resolvedEventIds}
+          surveyedNodes={surveyedNodes}
+          activeEvent={activeEvent}
           roverTask={roverTask}
         />
 
