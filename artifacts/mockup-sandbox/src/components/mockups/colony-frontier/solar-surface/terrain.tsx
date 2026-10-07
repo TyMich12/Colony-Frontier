@@ -4,8 +4,8 @@ import { fbm, mulberry32 } from "./noise";
 import { makeTerrainTexture } from "./textures";
 import type { TerrainKind } from "./state";
 
-const SIZE = 90;
-const SEGMENTS = 180;
+const SIZE = 220;
+const SEGMENTS = 220;
 
 function heightAt(x: number, z: number): number {
   const d = Math.sqrt(x * x + z * z);
@@ -35,7 +35,7 @@ export function Terrain({ kind }: { kind: TerrainKind }) {
 
   const texture = useMemo(() => {
     const t = makeTerrainTexture(kind);
-    t.repeat.set(4, 4);
+    t.repeat.set(9, 9);
     return t;
   }, [kind]);
 
