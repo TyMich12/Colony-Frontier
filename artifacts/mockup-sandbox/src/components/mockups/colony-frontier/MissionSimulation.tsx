@@ -460,6 +460,7 @@ function IsometricMap({
   selectedResourceId: string | null;
   surveyedNodes: string[];
   onSelectResource: (node: ResourceNode) => void;
+  roverTask: string;
 }) {
   return (
     <Colony3DMap
@@ -476,7 +477,7 @@ function IsometricMap({
       resourceNodes={RESOURCE_NODES[environmentLabel === "MARS" ? "MARS" : "MOON"]}
       onSelect={onSelect}
       onSelectResource={onSelectResource}
-      roverTask="STANDBY"
+      roverTask={roverTask}
     />
   );
 }
@@ -1317,6 +1318,7 @@ export function MissionSimulation() {
               selectedResourceId={selectedResourceId}
               surveyedNodes={surveyedNodes}
               onSelectResource={(node) => setSelectedResourceId(node.id)}
+              roverTask={roverTask}
             />
           </div>
         </div>
