@@ -19,6 +19,7 @@ type Props = {
   selected: Record<string, Tier>;
   buildings: Record<string, BuildingRuntime>;
   selectedBuildingId: string | null;
+  elapsed: number;
   environmentLabel: "MOON" | "MARS";
   environmentTitle: string;
   activeEventTrackId: string | null;
@@ -441,66 +442,84 @@ function ColonyBuilding({
   );
 }
 
-function ColonyAmbientLife() {
-  const droneRefs = useRef<THREE.Mesh[]>([]);
-  const energyRefs = useRef<THREE.Mesh[]>([]);
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    droneRefs.current.forEach((mesh, index) => {
-      if (!mesh) return;
-      const phase = t * (0.35 + index * 0.04) + index * 1.7;
-      mesh.position.x = Math.sin(phase) * (5.5 + index * 0.8);
-      mesh.position.z = Math.cos(phase * 0.82) * (4.8 + index * 0.55) + 2;
-      mesh.position.y = terrainHeight(mesh.position.x, mesh.position.z) + 2.6 + Math.sin(phase * 2) * 0.35;
-    });
-    energyRefs.current.forEach((mesh, index) => {
-      if (!mesh) return;
-      const phase = (t * 0.18 + index * 0.24) % 1;
-      const x = THREE.MathUtils.lerp(-5.5, 3.5, phase);
-      const z = THREE.MathUtils.lerp(-3, 1.2, phase);
-      mesh.position.set(x, terrainHeight(x, z) + 0.34, z);
-      mesh.scale.setScalar(0.65 + Math.sin(t * 5 + index) * 0.16);
-    });
-  });
+function ResourceMarker({ node, surveyed, selected, onClick }: {
+  node: MissionResourceNode;
+  surveyed: boolean;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const [x, z] = nodeWorldPosition(node);
+  const y = terrainHeight(x, z);
+  const color = node.kind === "ICE"
+    ? "#58e3ff"
+    : node.kind === "MINERAL"
+      ? "#ffd257"
+      : node.kind === "SCIENCE"
+        ? "#cc8cff"
+        : "#b39c7f";
 
   return (
-    <group>
-      {[0, 1, 2, 3].map((index) => (
-        <mesh key={index} ref={(node) => { if (node) droneRefs.current[index] = node; }}>
-          <sphereGeometry args={[0.1 + (index % 2) * 0.035, 10, 8]} />
-          <meshStandardMaterial color={index % 2 ? "#ff66db" : "#57efff"} emissive={index % 2 ? "#ff22c9" : "#0ce7ff"} emissiveIntensity={2} />
-        </mesh>
-      ))}
-      {[0, 1, 2].map((index) => (
-        <mesh key={"energy-" + index} ref={(node) => { if (node) energyRefs.current[index] = node; }}>
-          <sphereGeometry args={[0.12, 10, 8]} />
-          <meshStandardMaterial color="#faff8a" emissive="#fff05e" emissiveIntensity={2} />
-        </mesh>
-      ))}
+    <group position={[x, y + 0.36, z]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
+      <mesh>
+        <octahedronGeometry args={[0.42, 0]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.48} roughness={0.34} metalness={0.14} />
+      </mesh>
+      <mesh position={[0, -0.28, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.54, selected ? 0.8 : 0.66, 24]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <Text position={[0, 0.72, 0]} rotation={[-0.66, 0, 0]} fontSize={0.22} color="#fff3c5" outlineWidth={0.025} outlineColor="#3b2c20" anchorX="center">
+        {surveyed ? "SURVEYED" : node.label}
+      </Text>
     </group>
   );
 }
 
 function MissionScene(props: Props) {
   const mars = props.environmentLabel === "MARS";
+
   return (
-    <Canvas shadows dpr={[1, 1.25]} camera={{ position: [23, 20, 25], fov: 40, near: 0.1, far: 220 }} gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}>
-      <color attach="background" args={[mars ? "#3a1714" : "#08051a"]} />
-      <fog attach="fog" args={[mars ? "#4d2d25" : "#13171f", 52, 112]} />
-      <ambientLight intensity={0.48} color={mars ? "#ffd0b8" : "#bcd5ff"} />
-      <hemisphereLight args={[mars ? "#ffe0cf" : "#eef4ff", mars ? "#3d201b" : "#1f1738", 0.86]} />
-      <directionalLight position={[17, 28, 13]} intensity={2.3} color="#fff5df" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={100} shadow-camera-left={-40} shadow-camera-right={40} shadow-camera-top={40} shadow-camera-bottom={-40} />
+    <Canvas
+      shadows
+      dpr={[1, 1.25]}
+      camera={{ position: [23, 20, 25], fov: 42, near: 0.1, far: 220 }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
+    >
+      <color attach="background" args={[mars ? "#7a3f31" : "#5e5b60"]} />
+      <fog attach="fog" args={[mars ? "#925b49" : "#6b6870", 55, 112]} />
+      <ambientLight intensity={0.78} color={mars ? "#ffe0d0" : "#e4ebf7"} />
+      <hemisphereLight args={[mars ? "#ffe8db" : "#f2f6ff", mars ? "#43241f" : "#34313b", 0.92]} />
+      <directionalLight
+        position={[17, 28, 13]}
+        intensity={2.25}
+        color="#fff1d9"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-near={1}
+        shadow-camera-far={100}
+        shadow-camera-left={-40}
+        shadow-camera-right={40}
+        shadow-camera-top={40}
+        shadow-camera-bottom={-40}
+      />
+
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
-      {props.buildings.solar?.dust && props.buildings.solar.dust > 18 ? <DustParticles kind={mars ? "mars" : "moon"} dust={props.buildings.solar.dust} /> : null}
       <FoundationPad />
       <ConnectionPaths />
+
       {props.resourceNodes.map((node) => (
-        <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} elapsed={props.elapsed} onClick={() => props.onSelectResource(node)} />
+        <ResourceMarker
+          key={node.id}
+          node={node}
+          surveyed={props.surveyedNodes.includes(node.id)}
+          selected={props.selectedResourceId === node.id}
+          onClick={() => props.onSelectResource(node)}
+        />
       ))}
-      {props.tracks.filter((track) => track.id !== "rover").map((track) => (
-        <StandardBuilding
+
+      {props.tracks.map((track) => (
+        <ColonyBuilding
           key={track.id}
           track={track}
           tier={props.selected[track.id]}
@@ -508,30 +527,30 @@ function MissionScene(props: Props) {
           selected={props.selectedBuildingId === track.id}
           alerted={props.activeEventTrackId === track.id}
           position={POSITIONS[track.id] ?? [0, 0]}
+          roverTask={props.roverTask}
           onClick={() => props.onSelect(track.id)}
         />
       ))}
-      {props.selected.rover && (
-        <Rover
-          selected={props.selectedBuildingId === "rover"}
-          alerted={props.activeEventTrackId === "rover"}
-          task={props.roverTask}
-          position={POSITIONS.rover}
-          resourceNodes={props.resourceNodes}
-          onClick={() => props.onSelect("rover")}
-        />
-      )}
-      <Text position={[0, 5.1, -1.5]} rotation={[-0.66, 0, 0]} fontSize={0.46} color="#fff0c2" outlineWidth={0.045} outlineColor="#191816" anchorX="center">
+
+      <Text
+        position={[0, 5.0, -1.5]}
+        rotation={[-0.66, 0, 0]}
+        fontSize={0.5}
+        color="#fff0ad"
+        outlineWidth={0.055}
+        outlineColor="#231e1c"
+        anchorX="center"
+      >
         {props.environmentLabel + " OUTPOST"}
       </Text>
+
       <OrbitControls
         enableRotate={false}
         enablePan={false}
         enableZoom
-        enableDamping
-        dampingFactor={0.08}
         minDistance={14}
         maxDistance={38}
+        zoomSpeed={0.9}
         target={[0, 0, 2]}
       />
     </Canvas>
