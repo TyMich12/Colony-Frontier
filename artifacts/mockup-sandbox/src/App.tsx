@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { Component, useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
 
@@ -17,6 +17,56 @@ function _resolveComponent(
     (mod[name] as ComponentType) ||
     fns[fns.length - 1]
   );
+}
+
+class PreviewErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }): void {
+    console.error("Preview component crashed:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      const error = this.state.error;
+      return (
+        <div style={{ minHeight: "100vh", padding: "2rem", background: "#071017", color: "#eaf1e8", fontFamily: "system-ui, sans-serif" }}>
+          <div style={{ maxWidth: 900, margin: "0 auto", border: "1px solid #70483e", background: "#1a1113", padding: "1.5rem" }}>
+            <div style={{ color: "#ff8170", fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase" }}>
+              Preview crashed while rendering
+            </div>
+            <h1 style={{ marginTop: 10, fontSize: 22 }}>Mission Simulation Error</h1>
+            <pre style={{ marginTop: 16, whiteSpace: "pre-wrap", color: "#ffc5ba", fontSize: 13, lineHeight: 1.6 }}>
+              {error.message}
+            </pre>
+            {error.stack && (
+              <details style={{ marginTop: 16 }}>
+                <summary style={{ cursor: "pointer", color: "#efb658", fontSize: 12 }}>Show stack trace</summary>
+                <pre style={{ marginTop: 12, whiteSpace: "pre-wrap", color: "#9eb0aa", fontSize: 11, lineHeight: 1.5 }}>
+                  {error.stack}
+                </pre>
+              </details>
+            )}
+            <a
+              href="/preview/CampaignMapRefresh"
+              style={{ display: "inline-flex", marginTop: 20, background: "#efb658", color: "#17201b", padding: "10px 14px", fontSize: 11, fontWeight: 800, textDecoration: "none", textTransform: "uppercase", letterSpacing: "0.12em" }}
+            >
+              Return to campaign
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function PreviewRenderer({
@@ -82,9 +132,19 @@ function PreviewRenderer({
     );
   }
 
-  if (!Component) return null;
+  if (!Component) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#040a0e", color: "#9eb0aa", fontFamily: "system-ui, sans-serif" }}>
+        Loading preview…
+      </div>
+    );
+  }
 
-  return <Component />;
+  return (
+    <PreviewErrorBoundary>
+      <Component />
+    </PreviewErrorBoundary>
+  );
 }
 
 function getBasePath(): string {
