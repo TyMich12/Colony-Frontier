@@ -1257,7 +1257,10 @@ export function MissionSimulation() {
           tracks={selectedTracks}
           selected={pending.selected}
           buildings={buildings}
-          onSelect={setSelectedBuildingId}
+          onSelect={(trackId) => {
+            setSelectedResourceId(null);
+            setSelectedBuildingId(trackId);
+          }}
           selectedBuildingId={selectedBuildingId}
           elapsed={elapsed}
           environmentLabel={environmentLabel}
@@ -1295,8 +1298,8 @@ export function MissionSimulation() {
         )}
 
         {activeEvent && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-40 flex justify-center px-3">
-            <div className="pointer-events-auto w-[min(94vw,620px)] overflow-hidden rounded-2xl border-2 border-[#ff5367] bg-[#120f16]/95 shadow-[0_14px_40px_rgba(0,0,0,0.5)]">
+          <div className="pointer-events-none absolute right-3 top-3 z-40 flex justify-end px-0">
+            <div className="pointer-events-auto w-[min(92vw,400px)] overflow-hidden rounded-2xl border-2 border-[#ff5367] bg-[#120f16]/95 shadow-[0_14px_40px_rgba(0,0,0,0.5)]">
               <div className="flex items-center justify-between gap-3 bg-[#2a1620] px-3 py-2">
                 <div className="min-w-0">
                   <p className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-[#ff7180]">⚠ {activeEvent.title}</p>
@@ -1309,8 +1312,9 @@ export function MissionSimulation() {
                   <button
                     key={choice.id}
                     type="button"
+                    disabled={selectedBuildingId !== activeTargetTrackId}
                     onClick={() => handleEventChoice(choice.id)}
-                    className="min-w-0 rounded-xl border border-[#60404c] bg-[#241922] px-2.5 py-2 text-left hover:border-[#f6cd63] hover:bg-[#31202c]"
+                    className="min-w-0 rounded-xl border border-[#60404c] bg-[#241922] px-2.5 py-2 text-left hover:border-[#f6cd63] hover:bg-[#31202c] disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#ff5367]/20 text-[8px] font-black text-[#ffd96d]">{index + 1}</span>
