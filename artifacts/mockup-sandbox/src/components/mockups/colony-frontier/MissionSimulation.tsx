@@ -91,6 +91,15 @@ type EventChoice = {
   detail: string;
 };
 
+type ResourceNode = {
+  id: string;
+  label: string;
+  kind: "ICE" | "MINERAL" | "SCIENCE" | "REGOLITH";
+  x: number;
+  y: number;
+  description: string;
+};
+
 const EVENT_DEFS: MissionEvent[] = [
   { id: "solar-dust", trackId: "solar", title: "Solar output falling", subtitle: "Surface dust is reducing array performance.", summary: "A new dust layer is building across the deployed solar array. Power generation is falling faster than baseline demand." },
   { id: "battery-thermal", trackId: "battery", title: "Battery thermal spike", subtitle: "One storage module is operating above its ideal temperature.", summary: "Battery efficiency is dropping. The colony can rebalance its loads, isolate the affected storage path, or continue at the cost of stored energy." },
@@ -318,6 +327,7 @@ function BuildingShape({
   tier,
   runtime,
   selected,
+  alerted,
   x,
   y,
   onClick,
@@ -326,6 +336,7 @@ function BuildingShape({
   tier: Tier;
   runtime: BuildingRuntime;
   selected: boolean;
+  alerted: boolean;
   x: number;
   y: number;
   onClick: () => void;
@@ -341,7 +352,13 @@ function BuildingShape({
 
   return (
     <g transform={`translate(${x} ${y})`} onClick={onClick} style={{ cursor: "pointer" }}>
-      <polygon points={`-${size},0 0,${size * 0.55} ${size},0 0,-${size * 0.55}`} fill="#0b171d" stroke={selected ? "#f5c86c" : "#35565b"} strokeWidth={selected ? 3 : 1.4} />
+      {alerted && (
+        <>
+          <ellipse cx="0" cy="4" rx={size * 1.15} ry={size * 0.68} fill="none" stroke="#ff8a65" strokeWidth="3" opacity="0.9" className="animate-ping" />
+          <ellipse cx="0" cy="4" rx={size * 0.98} ry={size * 0.56} fill="#ff8a65" opacity="0.08" />
+        </>
+      )}
+      <polygon points={`-${size},0 0,${size * 0.55} ${size},0 0,-${size * 0.55}`} fill="#0b171d" stroke={alerted ? "#ff8a65" : selected ? "#f5c86c" : "#55746d"} strokeWidth={alerted || selected ? 3 : 1.4} />
       <polygon points={`-${size},0 0,${size * 0.55} 0,${size * 0.55 + height} -${size},${height}`} fill={sideFill} />
       <polygon points={`0,${size * 0.55} ${size},0 ${size},${height} 0,${size * 0.55 + height}`} fill="#10242c" />
 
@@ -401,6 +418,21 @@ function BuildingShape({
   );
 }
 
+const RESOURCE_NODES: Record<"MOON" | "MARS", ResourceNode[]> = {
+  MOON: [
+    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: 165, y: 190, description: "A cold-trap site with a strong water-ice signature." },
+    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 820, y: 285, description: "A bright mineral ridge worth a future extraction run." },
+    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 730, y: 145, description: "Fresh crater ejecta may contain useful scientific data." },
+    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: 225, y: 420, description: "A broad regolith field suitable for rover mapping." },
+  ],
+  MARS: [
+    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: 175, y: 205, description: "Orbital data suggests shallow buried water ice." },
+    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 825, y: 275, description: "A high-value iron-rich ridge sits beyond the outpost." },
+    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 725, y: 145, description: "An exposed basalt layer is ideal for geological sampling." },
+    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: 225, y: 425, description: "A wide dust plain offers an easy autonomous mapping route." },
+  ],
+};
+
 function IsometricMap({
   tracks,
   selected,
@@ -410,6 +442,10 @@ function IsometricMap({
   elapsed,
   environmentLabel,
   environmentTitle,
+  activeEventTrackId,
+  selectedResourceId,
+  surveyedNodes,
+  onSelectResource,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
@@ -419,6 +455,10 @@ function IsometricMap({
   elapsed: number;
   environmentLabel: string;
   environmentTitle: string;
+  activeEventTrackId: string | null;
+  selectedResourceId: string | null;
+  surveyedNodes: string[];
+  onSelectResource: (node: ResourceNode) => void;
 }) {
   const layout: Record<string, [number, number]> = {
     solar: [285, 135], comms: [575, 135], habitat: [430, 265], battery: [630, 285],
@@ -426,64 +466,127 @@ function IsometricMap({
     rover: [420, 465], thermal: [250, 455], grid: [635, 480], science: [805, 405],
     extraction: [520, 505], isru: [820, 505], agriculture: [335, 515], maintenance: [610, 180],
   };
+  const nodes = RESOURCE_NODES[environmentLabel === "MARS" ? "MARS" : "MOON"];
+  const mars = environmentLabel === "MARS";
+  const terrainBase = mars ? "#76513f" : "#77745a";
+  const terrainMid = mars ? "#ad7456" : "#9d9a73";
+  const terrainLight = mars ? "#cf9771" : "#c0ba8d";
+  const terrainDark = mars ? "#4f3830" : "#505545";
 
   return (
-    <svg viewBox="0 0 1000 600" className="h-full w-full select-none" role="img" aria-label="Isometric colony map">
+    <svg viewBox="0 0 1000 600" className="h-full w-full select-none" role="img" aria-label="Colorful isometric colony map">
       <defs>
         <linearGradient id="terrainGradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#263b38" />
-          <stop offset="100%" stopColor="#122329" />
+          <stop offset="0%" stopColor={terrainLight} />
+          <stop offset="48%" stopColor={terrainMid} />
+          <stop offset="100%" stopColor={terrainBase} />
         </linearGradient>
-        <radialGradient id="habGlow">
-          <stop offset="0%" stopColor="#b5d19f" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#b5d19f" stopOpacity="0" />
+        <radialGradient id="colonyGlow">
+          <stop offset="0%" stopColor={mars ? "#c5efc5" : "#ebe3a9"} stopOpacity="0.6" />
+          <stop offset="100%" stopColor={mars ? "#c5efc5" : "#ebe3a9"} stopOpacity="0" />
         </radialGradient>
+        <linearGradient id="pathGradient" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={mars ? "#e0b07f" : "#e1dbb2"} />
+          <stop offset="100%" stopColor={mars ? "#ae704f" : "#8a8667"} />
+        </linearGradient>
+        <filter id="softShadow">
+          <feGaussianBlur stdDeviation="5" />
+        </filter>
       </defs>
-      <rect width="1000" height="600" fill="#070d12" />
-      <polygon points="500,30 965,285 500,575 35,285" fill="url(#terrainGradient)" stroke="#385b5b" strokeWidth="3" />
-      {Array.from({ length: 10 }).map((_, index) => (
-        <path key={index} d={`M ${105 + index * 42} 285 L 500 ${70 + index * 45} L ${895 - index * 42} 285`} fill="none" stroke="#477069" strokeOpacity="0.11" />
+
+      <rect width="1000" height="600" fill={mars ? "#392724" : "#34372e"} />
+      <polygon points="500,26 968,284 500,582 32,284" fill="url(#terrainGradient)" stroke={mars ? "#e2aa7d" : "#d8d09b"} strokeWidth="4" />
+
+      <g opacity="0.22">
+        {Array.from({ length: 38 }).map((_, index) => {
+          const cx = 65 + ((index * 149) % 870);
+          const cy = 70 + ((index * 71) % 430);
+          const rx = 7 + (index % 6) * 3;
+          const ry = 3 + (index % 4) * 2;
+          return <ellipse key={index} cx={cx} cy={cy} rx={rx} ry={ry} fill={index % 2 === 0 ? terrainLight : terrainDark} transform={`rotate(${(index % 5) * 12 - 24} ${cx} ${cy})`} />;
+        })}
+      </g>
+
+      <g opacity="0.55">
+        <ellipse cx="145" cy="170" rx="68" ry="36" fill={terrainDark} opacity="0.5" />
+        <ellipse cx="145" cy="170" rx="43" ry="23" fill={terrainBase} opacity="0.6" />
+        <ellipse cx="845" cy="185" rx="76" ry="40" fill={terrainDark} opacity="0.42" />
+        <ellipse cx="845" cy="185" rx="49" ry="25" fill={terrainBase} opacity="0.58" />
+        <ellipse cx="185" cy="445" rx="62" ry="33" fill={terrainDark} opacity="0.36" />
+        <ellipse cx="790" cy="445" rx="61" ry="32" fill={terrainDark} opacity="0.32" />
+      </g>
+
+      <path d="M 410 292 C 360 250 315 205 275 150" fill="none" stroke={pathGradient} strokeWidth="20" strokeLinecap="round" opacity="0.72" />
+      <path d="M 460 320 C 545 316 630 304 713 275" fill="none" stroke={pathGradient} strokeWidth="19" strokeLinecap="round" opacity="0.7" />
+      <path d="M 450 335 C 446 389 438 426 420 460" fill="none" stroke={pathGradient} strokeWidth="18" strokeLinecap="round" opacity="0.67" />
+      <path d="M 405 325 C 350 350 304 377 260 415" fill="none" stroke={pathGradient} strokeWidth="16" strokeLinecap="round" opacity="0.58" />
+
+      <circle cx="500" cy="300" r="190" fill="url(#colonyGlow)" />
+      <circle cx="500" cy="300" r="120" fill="none" stroke={mars ? "#b2e5af" : "#e5dea9"} strokeWidth="4" strokeDasharray="5 12" opacity="0.45" />
+      <circle cx="500" cy="300" r="78" fill="none" stroke={mars ? "#8bc79e" : "#d7cf91"} strokeWidth="2" opacity="0.45" />
+
+      <g>
+        {nodes.map((node) => {
+          const surveyed = surveyedNodes.includes(node.id);
+          const selectedNode = selectedResourceId === node.id;
+          const nodeFill = node.kind === "ICE" ? "#6ed5f2" : node.kind === "MINERAL" ? "#f0c76e" : node.kind === "SCIENCE" ? "#bd98e8" : "#a79578";
+          const symbol = node.kind === "ICE" ? "◆" : node.kind === "MINERAL" ? "◇" : node.kind === "SCIENCE" ? "✦" : "●";
+          return (
+            <g key={node.id} onClick={() => onSelectResource(node)} style={{ cursor: "pointer" }}>
+              <circle cx={node.x} cy={node.y} r={selectedNode ? 30 : 23} fill={nodeFill} opacity="0.14" className="animate-pulse" />
+              <circle cx={node.x} cy={node.y} r={selectedNode ? 14 : 11} fill={nodeFill} stroke={selectedNode ? "#fff6c6" : "#f4e9c6"} strokeWidth={selectedNode ? 3 : 1.5} />
+              <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#26332e" fontSize="11" fontWeight="900">{symbol}</text>
+              <text x={node.x} y={node.y + 29} textAnchor="middle" fill="#fff8d8" fontSize="9" fontWeight="900" letterSpacing="1">{surveyed ? "SURVEYED" : node.label}</text>
+            </g>
+          );
+        })}
+      </g>
+
+      {Array.from({ length: 15 }).map((_, index) => (
+        <path key={index} d={`M ${130 + index * 49} 286 L 500 ${64 + index * 34} L ${870 - index * 49} 286`} fill="none" stroke={mars ? "#f0b488" : "#ece3b3"} strokeWidth="1" strokeOpacity="0.16" />
       ))}
-      {Array.from({ length: 9 }).map((_, index) => (
-        <path key={index} d={`M ${165 + index * 42} 250 L 500 ${495 - index * 35} L ${835 - index * 42} 250`} fill="none" stroke="#477069" strokeOpacity="0.08" />
-      ))}
-      <circle cx="500" cy="300" r="180" fill="url(#habGlow)" />
+
       {tracks.map((track) => {
         const [x, y] = layout[track.id] ?? [500, 300];
         const runtime = buildings[track.id] ?? { condition: 100, dust: 0, status: "ONLINE" };
         const roverOffset = track.id === "rover" ? Math.sin(elapsed / 12) * 70 : 0;
+        const roverY = track.id === "rover" ? y - Math.cos(elapsed / 18) * 22 : y;
         return (
-          <BuildingShape
-            key={track.id}
-            track={track}
-            tier={selected[track.id]}
-            runtime={runtime}
-            selected={selectedBuildingId === track.id}
-            x={x + roverOffset}
-            y={track.id === "rover" ? y - Math.cos(elapsed / 18) * 22 : y}
-            onClick={() => onSelect(track.id)}
-          />
+          <g key={track.id}>
+            <ellipse cx={x + roverOffset} cy={roverY + 8} rx="54" ry="25" fill="#111b17" opacity="0.33" filter="url(#softShadow)" />
+            <BuildingShape
+              track={track}
+              tier={selected[track.id]}
+              runtime={runtime}
+              selected={selectedBuildingId === track.id}
+              alerted={activeEventTrackId === track.id}
+              x={x + roverOffset}
+              y={roverY}
+              onClick={() => onSelect(track.id)}
+            />
+          </g>
         );
       })}
-      <g opacity="0.8">
-        <circle cx="200" cy="160" r="3" fill="#e8dfb3" className="animate-pulse" />
-        <circle cx="845" cy="185" r="2" fill="#e8dfb3" className="animate-pulse" />
-        <circle cx="185" cy="430" r="2" fill="#9fb8ad" className="animate-pulse" />
+
+      <g opacity="0.9">
+        <circle cx="205" cy="150" r="4" fill="#fbe8a2" className="animate-pulse" />
+        <circle cx="850" cy="355" r="3" fill="#c7f0c0" className="animate-pulse" />
+        <circle cx="180" cy="380" r="3" fill="#efc0a0" className="animate-pulse" />
+        <circle cx="790" cy="470" r="4" fill="#f5d488" className="animate-pulse" />
       </g>
-      {buildings.solar?.dust > 20 && (
-        <g opacity={Math.min(0.35, buildings.solar.dust / 250)}>
-          {Array.from({ length: 35 }).map((_, index) => (
-            <circle key={index} cx={120 + ((index * 83) % 760)} cy={150 + ((index * 47) % 300)} r={1 + (index % 3) * 0.8} fill="#c6b99f" className="animate-pulse" />
-          ))}
-        </g>
-      )}
-      <text x="500" y="100" textAnchor="middle" fill="#9ab0ab" fontSize="11" letterSpacing="3" opacity="0.7">
-        {environmentLabel} OUTPOST · {environmentTitle}
-      </text>
+
+      {Array.from({ length: 20 }).map((_, index) => {
+        const x = 78 + ((index * 73) % 830);
+        const y = 100 + ((index * 59) % 360);
+        const drift = ((elapsed * 0.8) + index * 11) % 80;
+        return <circle key={index} cx={x + drift} cy={y} r={index % 3 === 0 ? 2.6 : 1.5} fill={mars ? "#e1a97e" : "#ddd1a2"} opacity={buildings.solar?.dust && buildings.solar.dust > 18 ? 0.34 : 0.1} />;
+      })}
+
+      <rect x="367" y="50" width="266" height="36" rx="18" fill="#1a2a24" opacity="0.82" />
+      <text x="500" y="73" textAnchor="middle" fill="#fff4c8" fontSize="11" fontWeight="900" letterSpacing="2.1">{environmentLabel} OUTPOST · {environmentTitle}</text>
     </svg>
   );
 }
-
 function MetricBar({
   icon,
   label,
@@ -596,6 +699,50 @@ function BuildingInspector({
   );
 }
 
+function ResourceInspector({
+  node, surveyed, hasRover, hasExtraction, onAction, onClose,
+}: {
+  node: ResourceNode;
+  surveyed: boolean;
+  hasRover: boolean;
+  hasExtraction: boolean;
+  onAction: (action: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute bottom-24 right-5 z-30 w-[min(92vw,360px)] border border-[#6b805c] bg-[#14231c]/96 shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop-blur-md">
+      <div className="border-b border-[#4e6758] bg-[#20372b] p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.23em] text-[#f0c96d]">Terrain discovery</p>
+            <h2 className="mt-1 text-sm font-semibold uppercase tracking-[0.1em] text-[#f3f0df]">{node.label}</h2>
+            <p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-[#8eaa97]">{node.kind} · {surveyed ? "SITE SURVEYED" : "UNSURVEYED"}</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-[#76908b] hover:text-[#f0c673]" aria-label="Close terrain panel">×</button>
+        </div>
+      </div>
+      <div className="p-4">
+        <p className="text-xs leading-5 text-[#d0dbd2]">{node.description}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => onAction("survey")} className="border border-[#557060] bg-[#19352a] px-3 py-3 text-left hover:border-[#efb658]">
+            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#e8eedf]">{surveyed ? "Resurvey" : "Survey"}</span>
+            <span className="mt-1 block text-[8px] leading-4 text-[#86a293]">{hasRover ? "Send the rover to map the site." : "Use local sensors to scan the site."}</span>
+          </button>
+          <button type="button" onClick={() => onAction("sample")} disabled={!surveyed} className="border border-[#557060] bg-[#19352a] px-3 py-3 text-left hover:border-[#efb658] disabled:cursor-not-allowed disabled:opacity-35">
+            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#e8eedf]">Sample</span>
+            <span className="mt-1 block text-[8px] leading-4 text-[#86a293]">Collect a field result after surveying the site.</span>
+          </button>
+        </div>
+        {hasExtraction && surveyed && (
+          <button type="button" onClick={() => onAction("extract")} className="mt-2 w-full border border-[#7c6842] bg-[#32291c] px-3 py-3 text-left hover:border-[#efb658]">
+            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#f2e1be]">Test extraction point</span>
+            <span className="mt-1 block text-[8px] leading-4 text-[#aa9978]">Spend power to recover a small resource yield.</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 function getAiAnalysis(metrics: MissionMetrics, score: number): string {
   if (metrics.battery < 45) return "Your largest weakness was battery management during low-solar periods. Stored energy was used more aggressively than necessary.";
   if (metrics.water < 55) return "Your largest weakness was water recovery. The colony remained stable, but the recycling loop lost reserve that could have been protected earlier.";
@@ -618,6 +765,10 @@ export function MissionSimulation() {
   const [aiMessage, setAiMessage] = useState(runtime?.aiMessage ?? "Mission AI online. I am monitoring power, life support, habitat condition, and system behaviour.");
   const [roverTask, setRoverTask] = useState(runtime?.roverTask ?? "STANDBY");
   const [score, setScore] = useState(runtime?.score ?? 72);
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  const [surveyedNodes, setSurveyedNodes] = useState<string[]>([]);
+  const [resourceYield, setResourceYield] = useState(0);
+  const [manualActions, setManualActions] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [results, setResults] = useState(false);
@@ -630,6 +781,10 @@ export function MissionSimulation() {
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
   const selectedTier = selectedTrack && pending ? pending.selected[selectedTrack.id] : undefined;
   const activeEvent = activeEventId ? EVENT_DEFS.find((event) => event.id === activeEventId) ?? null : null;
+  const activeTargetTrackId = activeEvent?.trackId === "power" ? "battery" : activeEvent?.trackId ?? null;
+  const selectedResource = selectedResourceId
+    ? RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === selectedResourceId)
+    : undefined;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
 
@@ -1020,8 +1175,52 @@ export function MissionSimulation() {
     setActiveEventId(null);
   };
 
+  const handleResourceAction = (nodeId: string, action: string) => {
+    const nodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
+    const node = nodes.find((item) => item.id === nodeId);
+    if (!node) return;
+
+    if (action === "survey") {
+      setSurveyedNodes((current) => current.includes(nodeId) ? current : [...current, nodeId]);
+      setManualActions((value) => value + 1);
+      setScore((value) => clamp(value + (pending?.selected.rover ? 4 : 2)));
+      setRoverTask(pending?.selected.rover ? "SURVEYING " + node.label : "REMOTE TERRAIN SCAN");
+      setAiMessage(pending?.selected.rover ? "Rover dispatched to " + node.label + ". Terrain geometry and resource signatures are being mapped." : "Local sensors scanned " + node.label + ". A rover would provide higher-resolution terrain data.");
+      return;
+    }
+    if (action === "sample" && surveyedNodes.includes(nodeId)) {
+      setResourceYield((value) => value + 1);
+      setManualActions((value) => value + 1);
+      setScore((value) => clamp(value + 5));
+      setAiMessage("Sample secured from " + node.label + ". The mission now has a physical field result.");
+      return;
+    }
+    if (action === "extract" && surveyedNodes.includes(nodeId)) {
+      setResourceYield((value) => value + 5);
+      setManualActions((value) => value + 1);
+      setMetrics((current) => ({ ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 2) }));
+      setScore((value) => clamp(value + 7));
+      setAiMessage("Extraction test complete at " + node.label + ". Resource yield increased, but the operation consumed real colony power.");
+    }
+  };
+  const runQuickCommand = (command: "survey" | "service" | "clean") => {
+    if (command === "survey") {
+      const nodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
+      const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
+      if (nextNode) handleResourceAction(nextNode.id, "survey");
+      return;
+    }
+    if (command === "clean" && pending?.selected.solar) {
+      handleBuildingAction("solar", "clean");
+      return;
+    }
+    if (command === "service" && pending?.selected.maintenance) {
+      handleBuildingAction("maintenance", "service");
+    }
+  };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId]) return;
+    setManualActions((value) => value + 1);
 
     if (action === "clean" && trackId === "solar") {
       setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) - (pending.selected.rover ? 24 : 16)) } }));
@@ -1220,6 +1419,10 @@ export function MissionSimulation() {
               elapsed={elapsed}
               environmentLabel={environmentLabel}
               environmentTitle={environmentTitle}
+              activeEventTrackId={activeTargetTrackId}
+              selectedResourceId={selectedResourceId}
+              surveyedNodes={surveyedNodes}
+              onSelectResource={(node) => setSelectedResourceId(node.id)}
             />
           </div>
         </div>
@@ -1253,6 +1456,33 @@ export function MissionSimulation() {
           </div>
         </div>
 
+        <div className="absolute left-1/2 top-8 z-20 w-[min(92vw,520px)] -translate-x-1/2 border border-[#56695a] bg-[#14211d]/92 p-3 shadow-[0_15px_45px_rgba(0,0,0,0.28)] backdrop-blur-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#efc76b]">Field operations</p>
+              <p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-[#8ba095]">You control the colony between alerts.</p>
+            </div>
+            <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.13em] text-[#93a99b]">
+              <span>Sites {surveyedNodes.length}/4</span>
+              <span>Yield {resourceYield}</span>
+              <span>Actions {manualActions}</span>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <button type="button" onClick={() => runQuickCommand("survey")} className="border border-[#536c5f] bg-[#1a332a] px-3 py-2 text-left hover:border-[#efb658]">
+              <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-[#e6eddc]">Survey site</span>
+              <span className="mt-1 block text-[8px] text-[#7f988d]">Explore the surrounding terrain.</span>
+            </button>
+            <button type="button" onClick={() => runQuickCommand("service")} disabled={!pending?.selected.maintenance} className="border border-[#536c5f] bg-[#1a332a] px-3 py-2 text-left hover:border-[#efb658] disabled:opacity-35">
+              <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-[#e6eddc]">Service weak link</span>
+              <span className="mt-1 block text-[8px] text-[#7f988d]">{pending?.selected.maintenance ? "Use maintenance to recover condition." : "Requires Maintenance."}</span>
+            </button>
+            <button type="button" onClick={() => runQuickCommand("clean")} disabled={!pending?.selected.solar} className="border border-[#536c5f] bg-[#1a332a] px-3 py-2 text-left hover:border-[#efb658] disabled:opacity-35">
+              <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-[#e6eddc]">Clean array</span>
+              <span className="mt-1 block text-[8px] text-[#7f988d]">Recover some solar output manually.</span>
+            </button>
+          </div>
+        </div>
         <div className="absolute bottom-8 left-8 z-20 w-[min(90vw,420px)] border border-[#455a58] bg-[#08141a]/94 p-4 backdrop-blur-md">
           <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#efb658]" /><div><p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#efb658]">Mission AI</p><p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-[#6e8986]">Live operational analysis</p></div></div><button type="button" onClick={askMissionAi} className="border border-[#526b63] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.14em] text-[#b9cbbf] hover:border-[#efb658]">Diagnose</button></div>
           <p className="mt-3 text-xs leading-5 text-[#c8d5cf]">{aiMessage}</p>
@@ -1264,6 +1494,16 @@ export function MissionSimulation() {
           <p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-[#5e7776]">{environmentTitle}</p>
         </div>
 
+        {selectedResource && (
+          <ResourceInspector
+            node={selectedResource}
+            surveyed={surveyedNodes.includes(selectedResource.id)}
+            hasRover={pending.selected.rover !== undefined}
+            hasExtraction={pending.selected.extraction !== undefined || pending.selected.isru !== undefined}
+            onAction={(action) => handleResourceAction(selectedResource.id, action)}
+            onClose={() => setSelectedResourceId(null)}
+          />
+        )}
         {selectedTrack && selectedTier && (
           <BuildingInspector
             track={selectedTrack}
@@ -1279,6 +1519,7 @@ export function MissionSimulation() {
           <div className="absolute inset-x-5 bottom-5 z-50 mx-auto w-[min(94vw,760px)] border-2 border-[#d77a5a] bg-[#171315]/96 shadow-[0_0_45px_rgba(215,122,90,0.22)] backdrop-blur-md">
             <div className="border-b border-[#6d4138] bg-[#2a1a19] px-5 py-4">
               <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.24em] text-[#d77a5a]"><CircleDot className="h-3.5 w-3.5 animate-pulse" /> System alert · {activeEvent.trackId.toUpperCase()}</p>
+              <p className="mt-1 text-[8px] font-black uppercase tracking-[0.16em] text-[#f3c66e]">{selectedBuildingId === activeTargetTrackId ? "TARGET SYSTEM SELECTED · RESPONSE UNLOCKED" : "SELECT THE HIGHLIGHTED SYSTEM ON THE MAP TO UNLOCK RESPONSE"}</p>
               <h2 className="mt-1 text-xl font-semibold uppercase tracking-[0.1em] text-[#fff0e7]">{activeEvent.title}</h2>
               <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#bc9182]">{activeEvent.subtitle}</p>
             </div>
@@ -1286,7 +1527,7 @@ export function MissionSimulation() {
               <p className="text-sm leading-6 text-[#d6d3cb]">{activeEvent.summary}</p>
               <div className="mt-4 grid gap-2 md:grid-cols-3">
                 {getEventChoices(activeEvent, pending.selected).map((choice) => (
-                  <button key={choice.id} type="button" onClick={() => handleEventChoice(choice.id)} className="border border-[#644a43] bg-[#241c1d] px-4 py-3 text-left transition hover:border-[#efb658] hover:bg-[#2d2421]">
+                  <button key={choice.id} type="button" disabled={selectedBuildingId !== activeTargetTrackId} onClick={() => handleEventChoice(choice.id)} className="border border-[#644a43] bg-[#241c1d] px-4 py-3 text-left transition hover:border-[#efb658] hover:bg-[#2d2421]">
                     <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#f0ddcb]">{choice.label}</span>
                     <span className="mt-2 block text-[8px] leading-4 text-[#ad9c96]">{choice.detail}</span>
                   </button>
