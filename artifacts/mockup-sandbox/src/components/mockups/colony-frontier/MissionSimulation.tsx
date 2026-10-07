@@ -1433,7 +1433,7 @@ export function MissionSimulation() {
             <div className="pointer-events-auto w-[min(94vw,720px)] overflow-hidden rounded-2xl border-2 border-[#ff5f6d]/80 bg-[#160f19]/92 shadow-[0_0_35px_rgba(255,95,109,0.2)] backdrop-blur-lg">
               <div className="flex items-center justify-between gap-3 border-b border-[#6f3848] bg-gradient-to-r from-[#281727] to-[#24101b] px-4 py-2.5">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#ff6b75]"><CircleDot className="h-3.5 w-3.5 animate-pulse" /> Incoming event · {activeEvent.trackId.toUpperCase()}</p>
+                  <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#ff6b75]"><CircleDot className="h-3.5 w-3.5 " /> Incoming event · {activeEvent.trackId.toUpperCase()}</p>
                   <p className="mt-0.5 truncate text-[8px] uppercase tracking-[0.13em] text-[#f1c45d]">Target on map is flashing · choose a response</p>
                 </div>
                 <span className="shrink-0 rounded-full border border-[#ff7b68]/50 bg-[#ff5f6d]/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#ffad8e]">LIVE</span>
@@ -1447,7 +1447,7 @@ export function MissionSimulation() {
                 </div>
                 <div className="mt-2.5 grid grid-cols-3 gap-2">
                   {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
-                    <button key={choice.id} type="button" onClick={() => handleEventChoice(choice.id)} className="group min-w-0 rounded-xl border border-[#5d4350] bg-[#271b2a] px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:border-[#ffd65b] hover:bg-[#35213a] hover:shadow-[0_8px_20px_rgba(255,214,91,0.12)]">
+                    <button key={choice.id} type="button" onClick={() => handleEventChoice(choice.id)} className="group min-w-0 rounded-xl border border-[#5d4350] bg-[#271b2a] px-3 py-2.5 text-left  hover:-translate-y-0.5 hover:border-[#ffd65b] hover:bg-[#35213a] hover:shadow-[0_8px_20px_rgba(255,214,91,0.12)]">
                       <span className="flex items-center gap-2">
                         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#ff5f6d]/20 text-[8px] font-black text-[#ffd77b]">{index + 1}</span>
                         <span className="truncate text-[8px] font-black uppercase tracking-[0.11em] text-[#fff0dc]">{choice.label}</span>
