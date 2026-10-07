@@ -559,34 +559,48 @@ function BuildingInspector({
   };
 
   const actions = actionMap[track.id] ?? [{ id: "inspect", label: "Inspect", detail: "Run a detailed system inspection." }];
+  const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
 
   return (
-    <div className="absolute bottom-24 left-5 z-30 w-[min(92vw,370px)] border border-[#536d61] bg-[#0a171c]/95 shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop-blur-md">
-      <div className="flex items-start justify-between border-b border-[#304c4d] bg-[#11242a] p-4">
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.24em]" style={{ color: tierMeta[tier].color }}>{tier} technology</p>
-          <h2 className="mt-1 text-sm font-semibold uppercase tracking-[0.1em] text-[#eef3e7]">{track.tiers[tier].name}</h2>
-          <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#708b89]">{track.category} · {runtime.status}</p>
+    <div className="absolute bottom-6 left-1/2 z-30 w-[min(94vw,470px)] -translate-x-1/2 overflow-hidden rounded-2xl border-2 border-[#f1c95b] bg-[#17222a]/97 shadow-[0_22px_70px_rgba(0,0,0,0.6)]">
+      <div className="flex items-center gap-3 border-b border-[#55646a] bg-gradient-to-r from-[#263944] to-[#18262f] px-4 py-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-[#f1c95b] bg-[#0d171d] shadow-[0_0_18px_rgba(241,201,91,0.16)]">
+          <Icon className="h-5 w-5" style={{ color: tierMeta[tier].color }} />
         </div>
-        <button type="button" onClick={onClose} className="text-[#6f8987] hover:text-[#f0c673]" aria-label="Close inspector">×</button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[8px] font-black uppercase tracking-[0.22em]" style={{ color: tierMeta[tier].color }}>{tier} technology</p>
+          <h2 className="truncate text-base font-black uppercase tracking-[0.08em] text-white">{track.tiers[tier].name}</h2>
+          <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#91a3a8]">{track.category} · {runtime.status}</p>
+        </div>
+        <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#53656b] bg-[#101a20] text-lg font-bold text-[#a5b4b7] hover:border-[#f1c95b] hover:text-white" aria-label="Close inspector">×</button>
       </div>
-      <div className="grid grid-cols-2 gap-3 p-4">
-        <div className="border border-[#29434a] bg-[#0d2027] p-3">
-          <p className="text-[8px] uppercase tracking-[0.18em] text-[#708887]">Condition</p>
-          <p className="mt-1 font-mono text-lg" style={{ color: resourceColor(runtime.condition) }}>{Math.round(runtime.condition)}%</p>
+
+      <div className="grid grid-cols-2 gap-2 border-b border-[#344950] bg-[#111c22] p-3">
+        <div className="rounded-xl border border-[#344d54] bg-[#1a2a31] px-3 py-2">
+          <p className="text-[7px] font-black uppercase tracking-[0.18em] text-[#7f959a]">Condition</p>
+          <p className="mt-1 text-xl font-black" style={{ color: resourceColor(runtime.condition) }}>{Math.round(runtime.condition)}%</p>
         </div>
-        <div className="border border-[#29434a] bg-[#0d2027] p-3">
-          <p className="text-[8px] uppercase tracking-[0.18em] text-[#708887]">Dust</p>
-          <p className="mt-1 font-mono text-lg text-[#d5c69e]">{Math.round(runtime.dust)}%</p>
+        <div className="rounded-xl border border-[#344d54] bg-[#1a2a31] px-3 py-2">
+          <p className="text-[7px] font-black uppercase tracking-[0.18em] text-[#7f959a]">Dust</p>
+          <p className="mt-1 text-xl font-black text-[#e4ca82]">{Math.round(runtime.dust)}%</p>
         </div>
       </div>
-      <div className="border-t border-[#29434a] p-4">
-        <p className="text-[9px] uppercase tracking-[0.18em] text-[#718f89]">{track.tiers[tier]?.description ?? track.tiers.Foundation.description}</p>
+
+      <div className="bg-[#0f1a20] p-3">
+        <p className="text-[9px] leading-4 text-[#c6d1d2]">{track.tiers[tier]?.description ?? track.tiers.Foundation.description}</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          {actions.map((action) => (
-            <button key={action.id} type="button" onClick={() => onAction(action.id)} className="border border-[#3d5955] bg-[#11272c] px-3 py-2 text-left transition hover:border-[#efb658] hover:bg-[#173238]">
-              <span className="block text-[9px] font-bold uppercase tracking-[0.14em] text-[#dce7d9]">{action.label}</span>
-              <span className="mt-1 block text-[8px] leading-4 text-[#76908d]">{action.detail}</span>
+          {actions.map((action, index) => (
+            <button
+              key={action.id}
+              type="button"
+              onClick={() => onAction(action.id)}
+              className="rounded-xl border border-[#3e5a61] bg-[#1c3037] px-3 py-2.5 text-left hover:border-[#f1c95b] hover:bg-[#294149]"
+            >
+              <span className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0f1c22] text-[8px] font-black text-[#f3cf67]">{index + 1}</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white">{action.label}</span>
+              </span>
+              <span className="mt-1.5 block text-[7px] leading-3.5 text-[#84999d]">{action.detail}</span>
             </button>
           ))}
         </div>
