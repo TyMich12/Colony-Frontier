@@ -1413,22 +1413,33 @@ export function MissionSimulation() {
         )}
 
         {activeEvent && (
-          <div className="absolute inset-x-5 bottom-5 z-50 mx-auto w-[min(94vw,760px)] border-2 border-[#d77a5a] bg-[#171315]/96 shadow-[0_0_45px_rgba(215,122,90,0.22)] backdrop-blur-md">
-            <div className="border-b border-[#6d4138] bg-[#2a1a19] px-5 py-4">
-              <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.24em] text-[#d77a5a]"><CircleDot className="h-3.5 w-3.5 animate-pulse" /> System alert · {activeEvent.trackId.toUpperCase()}</p>
-              <p className="mt-1 text-[8px] font-black uppercase tracking-[0.16em] text-[#f3c66e]">{selectedBuildingId === activeTargetTrackId ? "TARGET SYSTEM SELECTED · RESPONSE UNLOCKED" : "SELECT THE HIGHLIGHTED SYSTEM ON THE MAP TO UNLOCK RESPONSE"}</p>
-              <h2 className="mt-1 text-xl font-semibold uppercase tracking-[0.1em] text-[#fff0e7]">{activeEvent.title}</h2>
-              <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#bc9182]">{activeEvent.subtitle}</p>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm leading-6 text-[#d6d3cb]">{activeEvent.summary}</p>
-              <div className="mt-4 grid gap-2 md:grid-cols-3">
-                {getEventChoices(activeEvent, pending.selected).map((choice) => (
-                  <button key={choice.id} type="button" disabled={selectedBuildingId !== activeTargetTrackId} onClick={() => handleEventChoice(choice.id)} className="border border-[#644a43] bg-[#241c1d] px-4 py-3 text-left transition hover:border-[#efb658] hover:bg-[#2d2421]">
-                    <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#f0ddcb]">{choice.label}</span>
-                    <span className="mt-2 block text-[8px] leading-4 text-[#ad9c96]">{choice.detail}</span>
-                  </button>
-                ))}
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-40 flex justify-center px-4">
+            <div className="pointer-events-auto w-[min(94vw,720px)] overflow-hidden rounded-2xl border-2 border-[#ff5f6d]/80 bg-[#160f19]/92 shadow-[0_0_35px_rgba(255,95,109,0.2)] backdrop-blur-lg">
+              <div className="flex items-center justify-between gap-3 border-b border-[#6f3848] bg-gradient-to-r from-[#281727] to-[#24101b] px-4 py-2.5">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#ff6b75]"><CircleDot className="h-3.5 w-3.5 animate-pulse" /> Incoming event · {activeEvent.trackId.toUpperCase()}</p>
+                  <p className="mt-0.5 truncate text-[8px] uppercase tracking-[0.13em] text-[#f1c45d]">Target on map is flashing · choose a response</p>
+                </div>
+                <span className="shrink-0 rounded-full border border-[#ff7b68]/50 bg-[#ff5f6d]/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#ffad8e]">LIVE</span>
+              </div>
+              <div className="px-4 py-2.5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-black uppercase tracking-[0.08em] text-[#fff4ee]">{activeEvent.title}</h2>
+                    <p className="mt-0.5 line-clamp-1 text-[8px] uppercase tracking-[0.11em] text-[#c59690]">{activeEvent.subtitle}</p>
+                  </div>
+                </div>
+                <div className="mt-2.5 grid grid-cols-3 gap-2">
+                  {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
+                    <button key={choice.id} type="button" onClick={() => handleEventChoice(choice.id)} className="group min-w-0 rounded-xl border border-[#5d4350] bg-[#271b2a] px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:border-[#ffd65b] hover:bg-[#35213a] hover:shadow-[0_8px_20px_rgba(255,214,91,0.12)]">
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#ff5f6d]/20 text-[8px] font-black text-[#ffd77b]">{index + 1}</span>
+                        <span className="truncate text-[8px] font-black uppercase tracking-[0.11em] text-[#fff0dc]">{choice.label}</span>
+                      </span>
+                      <span className="mt-1.5 block line-clamp-2 text-[7px] leading-3 text-[#bda9b4]">{choice.detail}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
