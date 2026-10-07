@@ -130,7 +130,7 @@ function formatMissionTime(seconds: number): string {
   const dayProgress = Math.floor(seconds % 30);
   const hour = Math.floor((dayProgress / 30) * 24);
   const minute = Math.floor((((dayProgress / 30) * 24) % 1) * 60);
-  return \`DAY \${day.toString().padStart(2, "0")} · \${hour.toString().padStart(2, "0")}:\${minute.toString().padStart(2, "0")}\`;
+  return `DAY ${day.toString().padStart(2, "0")} · ${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
 function initialMetrics(selected: Record<string, Tier>): MissionMetrics {
@@ -329,63 +329,63 @@ function BuildingShape({
   const sideFill = tier === "Research" ? "#203c3b" : tier === "Apex" ? "#1d3440" : "#172a32";
 
   return (
-    <g transform={\`translate(\${x} \${y})\`} onClick={onClick} style={{ cursor: "pointer" }}>
-      <polygon points={\`-\${size},0 0,\${size * 0.55} \${size},0 0,-\${size * 0.55}\`} fill="#0b171d" stroke={selected ? "#f5c86c" : "#35565b"} strokeWidth={selected ? 3 : 1.4} />
-      <polygon points={\`-\${size},0 0,\${size * 0.55} 0,\${size * 0.55 + height} -\${size},\${height}\`} fill={sideFill} />
-      <polygon points={\`0,\${size * 0.55} \${size},0 \${size},\${height} 0,\${size * 0.55 + height}\`} fill="#10242c" />
+    <g transform={`translate(${x} ${y})`} onClick={onClick} style={{ cursor: "pointer" }}>
+      <polygon points={`-${size},0 0,${size * 0.55} ${size},0 0,-${size * 0.55}`} fill="#0b171d" stroke={selected ? "#f5c86c" : "#35565b"} strokeWidth={selected ? 3 : 1.4} />
+      <polygon points={`-${size},0 0,${size * 0.55} 0,${size * 0.55 + height} -${size},${height}`} fill={sideFill} />
+      <polygon points={`0,${size * 0.55} ${size},0 ${size},${height} 0,${size * 0.55 + height}`} fill="#10242c" />
 
       {track.id === "solar" ? (
         <g>
           {Array.from({ length: 2 + level }).map((_, index) => (
-            <polygon key={index} points={\`-\${size * 0.7 + index * 5},-\${size * 0.22} -\${size * 0.05 + index * 5},-\${size * 0.48} \${size * 0.5 + index * 5},-\${size * 0.15} 0,\${size * 0.1}\`} fill="#244852" stroke={dusted ? "#8f7960" : "#6fb2c6"} opacity={dusted ? 0.7 : 0.95} />
+            <polygon key={index} points={`-${size * 0.7 + index * 5},-${size * 0.22} -${size * 0.05 + index * 5},-${size * 0.48} ${size * 0.5 + index * 5},-${size * 0.15} 0,${size * 0.1}`} fill="#244852" stroke={dusted ? "#8f7960" : "#6fb2c6"} opacity={dusted ? 0.7 : 0.95} />
           ))}
-          <line x1="0" y1={-\${size * 0.05}} x2="0" y2={-\${size * 0.75}} stroke="#76939a" strokeWidth="2" />
+          <line x1="0" y1={-${size * 0.05}} x2="0" y2={-${size * 0.75}} stroke="#76939a" strokeWidth="2" />
         </g>
       ) : track.id === "habitat" ? (
         <g>
-          <ellipse cx="0" cy={-\${height * 0.72}} rx={\${size * 0.66}} ry={\${size * 0.38}} fill="#294f57" opacity="0.96" />
-          <ellipse cx="0" cy={-\${height * 0.82}} rx={\${size * 0.38}} ry={\${size * 0.2}} fill="#6b7f73" opacity="0.45" />
+          <ellipse cx="0" cy={-${height * 0.72}} rx={${size * 0.66}} ry={${size * 0.38}} fill="#294f57" opacity="0.96" />
+          <ellipse cx="0" cy={-${height * 0.82}} rx={${size * 0.38}} ry={${size * 0.2}} fill="#6b7f73" opacity="0.45" />
         </g>
       ) : track.id === "battery" ? (
         <g>
           {Array.from({ length: 2 + level }).map((_, index) => (
-            <rect key={index} x={-\${size * 0.55} + index * \${size * 0.34}} y={-\${height * 0.95}} width={\${size * 0.25}} height={\${height * 1.55}} rx="4" fill="#1d3c45" stroke="#688684" strokeWidth="1.2" />
+            <rect key={index} x={-${size * 0.55} + index * ${size * 0.34}} y={-${height * 0.95}} width={${size * 0.25}} height={${height * 1.55}} rx="4" fill="#1d3c45" stroke="#688684" strokeWidth="1.2" />
           ))}
         </g>
       ) : track.id === "rover" ? (
         <g>
-          <rect x={-\${size * 0.62}} y={-\${height * 0.85}} width={\${size * 1.24}} height={\${height * 0.72}} rx="5" fill="#6a6e69" stroke="#c4b88e" strokeWidth="1.5" />
-          <circle cx={-\${size * 0.45}} cy="-1" r="6" fill="#1b2528" stroke="#9ca39b" />
-          <circle cx={\${size * 0.45}} cy="-1" r="6" fill="#1b2528" stroke="#9ca39b" />
+          <rect x={-${size * 0.62}} y={-${height * 0.85}} width={${size * 1.24}} height={${height * 0.72}} rx="5" fill="#6a6e69" stroke="#c4b88e" strokeWidth="1.5" />
+          <circle cx={-${size * 0.45}} cy="-1" r="6" fill="#1b2528" stroke="#9ca39b" />
+          <circle cx={${size * 0.45}} cy="-1" r="6" fill="#1b2528" stroke="#9ca39b" />
         </g>
       ) : track.id === "agriculture" ? (
         <g>
-          <polygon points={\`-\${size * 0.65},0 0,-\${size * 0.42} \${size * 0.65},0 0,\${size * 0.42}\`} fill="#37584f" stroke="#7cae8c" strokeWidth="1.2" />
-          <line x1={-\${size * 0.3}} y1="0" x2={\${size * 0.3}} y2="0" stroke="#91c29d" strokeWidth="2" opacity="0.7" />
+          <polygon points={`-${size * 0.65},0 0,-${size * 0.42} ${size * 0.65},0 0,${size * 0.42}`} fill="#37584f" stroke="#7cae8c" strokeWidth="1.2" />
+          <line x1={-${size * 0.3}} y1="0" x2={${size * 0.3}} y2="0" stroke="#91c29d" strokeWidth="2" opacity="0.7" />
         </g>
       ) : track.id === "comms" ? (
         <g>
-          <ellipse cx="0" cy={-\${height * 1.2}} rx={\${size * 0.48}} ry={\${size * 0.25}} fill="#34555d" stroke="#a2bac0" strokeWidth="1.1" />
-          <line x1="0" y1={-\${height * 1.05}} x2="0" y2={-\${height * 2}} stroke="#829a9f" strokeWidth="2" />
+          <ellipse cx="0" cy={-${height * 1.2}} rx={${size * 0.48}} ry={${size * 0.25}} fill="#34555d" stroke="#a2bac0" strokeWidth="1.1" />
+          <line x1="0" y1={-${height * 1.05}} x2="0" y2={-${height * 2}} stroke="#829a9f" strokeWidth="2" />
         </g>
       ) : track.id === "extraction" || track.id === "isru" ? (
         <g>
-          <rect x={-\${size * 0.25}} y={-\${height * 1.55}} width={\${size * 0.5}} height={\${height * 1.2}} fill="#475c58" stroke="#a4ae91" strokeWidth="1.2" />
-          <line x1="0" y1={-\${height * 1.55}} x2={\${size * 0.68}} y2={-\${height * 2.1}} stroke="#b0a27c" strokeWidth="4" />
+          <rect x={-${size * 0.25}} y={-${height * 1.55}} width={${size * 0.5}} height={${height * 1.2}} fill="#475c58" stroke="#a4ae91" strokeWidth="1.2" />
+          <line x1="0" y1={-${height * 1.55}} x2={${size * 0.68}} y2={-${height * 2.1}} stroke="#b0a27c" strokeWidth="4" />
         </g>
       ) : (
         <g>
-          <rect x={-\${size * 0.55}} y={-\${height * 1.15}} width={\${size * 1.1}} height={\${height * 1.15}} rx="5" fill={topFill} opacity="0.75" stroke="#b7c8b7" strokeWidth="1" />
+          <rect x={-${size * 0.55}} y={-${height * 1.15}} width={${size * 1.1}} height={${height * 1.15}} rx="5" fill={topFill} opacity="0.75" stroke="#b7c8b7" strokeWidth="1" />
           {Array.from({ length: 1 + level }).map((_, index) => (
-            <rect key={index} x={-\${size * 0.36} + index * \${size * 0.24}} y={-\${height * 1}} width={\${size * 0.14}} height={\${height * 0.35}} rx="1" fill="#e0d9b2" opacity="0.55" />
+            <rect key={index} x={-${size * 0.36} + index * ${size * 0.24}} y={-${height * 1}} width={${size * 0.14}} height={${height * 0.35}} rx="1" fill="#e0d9b2" opacity="0.55" />
           ))}
         </g>
       )}
 
-      <Icon x={-10} y={-\${height * 2.25}} width={20} height={20} color={selected ? "#f6c96f" : "#b9d4ca"} />
-      <text x="0" y={\${size * 0.92}} textAnchor="middle" fill={selected ? "#f7cf79" : "#b0c4bf"} fontSize="11" fontWeight="700" letterSpacing="1.3">{track.category.toUpperCase()}</text>
-      <text x="0" y={\${size * 0.92 + 14}} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{tier.toUpperCase()}</text>
-      {damaged && <circle cx={\${size * 0.76}} cy={-\${size * 0.1}} r="5" fill="#d77a5a" className="animate-pulse" />}
+      <Icon x={-10} y={-${height * 2.25}} width={20} height={20} color={selected ? "#f6c96f" : "#b9d4ca"} />
+      <text x="0" y={${size * 0.92}} textAnchor="middle" fill={selected ? "#f7cf79" : "#b0c4bf"} fontSize="11" fontWeight="700" letterSpacing="1.3">{track.category.toUpperCase()}</text>
+      <text x="0" y={${size * 0.92 + 14}} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{tier.toUpperCase()}</text>
+      {damaged && <circle cx={${size * 0.76}} cy={-${size * 0.1}} r="5" fill="#d77a5a" className="animate-pulse" />}
     </g>
   );
 }
@@ -425,10 +425,10 @@ function IsometricMap({
       <rect width="1000" height="600" fill="#070d12" />
       <polygon points="500,30 965,285 500,575 35,285" fill="url(#terrainGradient)" stroke="#385b5b" strokeWidth="3" />
       {Array.from({ length: 10 }).map((_, index) => (
-        <path key={index} d={\`M \${105 + index * 42} 285 L 500 \${70 + index * 45} L \${895 - index * 42} 285\`} fill="none" stroke="#477069" strokeOpacity="0.11" />
+        <path key={index} d={`M ${105 + index * 42} 285 L 500 ${70 + index * 45} L ${895 - index * 42} 285`} fill="none" stroke="#477069" strokeOpacity="0.11" />
       ))}
       {Array.from({ length: 9 }).map((_, index) => (
-        <path key={index} d={\`M \${165 + index * 42} 250 L 500 \${495 - index * 35} L \${835 - index * 42} 250\`} fill="none" stroke="#477069" strokeOpacity="0.08" />
+        <path key={index} d={`M ${165 + index * 42} 250 L 500 ${495 - index * 35} L ${835 - index * 42} 250`} fill="none" stroke="#477069" strokeOpacity="0.08" />
       ))}
       <circle cx="500" cy="300" r="180" fill="url(#habGlow)" />
       {tracks.map((track) => {
@@ -461,7 +461,7 @@ function IsometricMap({
         </g>
       )}
       <text x="500" y="100" textAnchor="middle" fill="#9ab0ab" fontSize="11" letterSpacing="3" opacity="0.7">
-        \${environmentLabel} + " OUTPOST · " + environmentTitle
+        ${environmentLabel} + " OUTPOST · " + environmentTitle
       </text>
     </svg>
   );
@@ -489,7 +489,7 @@ function MetricBar({
         <span style={{ color: resourceColor(safe, invert) }} className="font-mono font-bold">{displayValue}{suffix}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full border border-[#29434a] bg-[#0a171c]">
-        <div className="h-full transition-all duration-300" style={{ width: \`\${clamp(value)}%\`, background: resourceColor(safe, invert), boxShadow: \`0 0 10px \${resourceColor(safe, invert)}55\` }} />
+        <div className="h-full transition-all duration-300" style={{ width: `${clamp(value)}%`, background: resourceColor(safe, invert), boxShadow: `0 0 10px ${resourceColor(safe, invert)}55` }} />
       </div>
     </div>
   );
@@ -626,7 +626,7 @@ export function MissionSimulation() {
           eventPointerRef.current += 1;
           setTimeout(() => {
             setActiveEventId(event.id);
-            setAiMessage(\`EVENT DETECTED: \${event.title}. Review the situation and choose a response.\`);
+            setAiMessage(`EVENT DETECTED: ${event.title}. Review the situation and choose a response.`);
           }, 0);
           break;
         }
@@ -1055,13 +1055,13 @@ export function MissionSimulation() {
       const target = candidates[0]?.[0];
       if (target) {
         setBuildings((current) => ({ ...current, [target]: { ...current[target], condition: clamp(current[target].condition + 10), status: buildingStatus(clamp(current[target].condition + 10)) } }));
-        setAiMessage(\`Maintenance scan complete. \${target.toUpperCase()} received preventative service.\`);
+        setAiMessage(`Maintenance scan complete. ${target.toUpperCase()} received preventative service.`);
       }
       return;
     }
 
     const track = technologyTracks.find((item) => item.id === trackId);
-    setAiMessage(\`INSPECTION COMPLETE — \${track?.category ?? trackId} is operating at \${Math.round(buildings[trackId]?.condition ?? 100)}% condition.\`);
+    setAiMessage(`INSPECTION COMPLETE — ${track?.category ?? trackId} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
   };
 
   const askMissionAi = () => {
@@ -1074,13 +1074,13 @@ export function MissionSimulation() {
     ].sort((a, b) => a.value - b.value)[0];
 
     if (weakest.value < 45) {
-      setAiMessage(\`Mission AI diagnosis: your current weakest area is \${weakest.label} at \${Math.round(weakest.value)}%. Prioritise that system before taking another optional risk.\`);
+      setAiMessage(`Mission AI diagnosis: your current weakest area is ${weakest.label} at ${Math.round(weakest.value)}%. Prioritise that system before taking another optional risk.`);
     } else if (metrics.power < 55) {
       setAiMessage("Mission AI diagnosis: power generation is your current limiting factor. Reduce non-critical loads and protect battery reserve.");
     } else if (Math.abs(metrics.temperature - 21) > 2.5) {
       setAiMessage("Mission AI diagnosis: thermal conditions are drifting. Restoring the preferred temperature band will reduce long-term system stress.");
     } else {
-      setAiMessage(\`Mission AI diagnosis: colony state is stable. Your current score is \${Math.round(score)}/100. Keep monitoring the next event rather than overreacting to small fluctuations.\`);
+      setAiMessage(`Mission AI diagnosis: colony state is stable. Your current score is ${Math.round(score)}/100. Keep monitoring the next event rather than overreacting to small fluctuations.`);
     }
   };
 
@@ -1152,12 +1152,12 @@ export function MissionSimulation() {
               <div className="border border-[#6b5734] bg-[#1b1d18] p-5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#efb658]">Rewards</p>
                 <div className="mt-4 space-y-3">
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Credits</span><span className="font-mono text-[#efb658]">+\${pending.rewardCredits.toFixed(pending.rewardCredits % 1 === 0 ? 0 : 1)}M</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+\${pending.rewardXp.toLocaleString()}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Research Tokens</span><span className="font-mono text-[#d4dfb7]">+\${pending.rewardResearchTokens}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Credits</span><span className="font-mono text-[#efb658]">+{pending.rewardCredits.toFixed(pending.rewardCredits % 1 === 0 ? 0 : 1)}M</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{pending.rewardXp.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Research Tokens</span><span className="font-mono text-[#d4dfb7]">+{pending.rewardResearchTokens}</span></div>
                 </div>
               </div>
-              <a href={\`/preview/CampaignMapRefresh?campaign=\${pending.campaign}\`} className="flex w-full items-center justify-center gap-2 bg-[#efb658] px-5 py-4 text-[10px] font-bold uppercase tracking-[0.22em] text-[#17201b]">
+              <a href={`/preview/CampaignMapRefresh?campaign=${pending.campaign}`} className="flex w-full items-center justify-center gap-2 bg-[#efb658] px-5 py-4 text-[10px] font-bold uppercase tracking-[0.22em] text-[#17201b]">
                 <Check className="h-4 w-4" /> Continue
               </a>
             </aside>
@@ -1182,7 +1182,7 @@ export function MissionSimulation() {
             </button>
             <div className="flex overflow-hidden border border-[#47605f]">
               {[1, 2, 4].map((value) => (
-                <button key={value} type="button" onClick={() => setSpeed(value)} disabled={Boolean(activeEvent)} className={\`px-2.5 py-2 text-[9px] font-bold uppercase tracking-[0.1em] \${speed === value ? "bg-[#efb658] text-[#17201b]" : "bg-[#0d2027] text-[#77918f]"} disabled:opacity-40\`}>{value}×</button>
+                <button key={value} type="button" onClick={() => setSpeed(value)} disabled={Boolean(activeEvent)} className={`px-2.5 py-2 text-[9px] font-bold uppercase tracking-[0.1em] ${speed === value ? "bg-[#efb658] text-[#17201b]" : "bg-[#0d2027] text-[#77918f]"} disabled:opacity-40`}>{value}×</button>
               ))}
             </div>
           </div>
