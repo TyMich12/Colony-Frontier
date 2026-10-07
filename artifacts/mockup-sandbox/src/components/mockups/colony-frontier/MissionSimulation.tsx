@@ -1140,9 +1140,11 @@ export function MissionSimulation() {
     }
 
     if (trackId === "rover" && action === "survey") {
-      setRoverTask("SURVEYING");
+      const nodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
+      const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
+      setRoverTask(nextNode ? "SURVEYING " + nextNode.label : "SURVEYING");
       setScore((value) => clamp(value + 2));
-      setAiMessage("Rover mission started. The rover is now surveying nearby terrain.");
+      setAiMessage(nextNode ? "Rover dispatched to " + nextNode.label + ". It will travel there, scan the site, and return." : "Rover mission started. The rover is surveying nearby terrain.");
       return;
     }
 
