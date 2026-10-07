@@ -371,26 +371,26 @@ function BuildingShape({
         </g>
       ) : track.id === "comms" ? (
         <g>
-          <ellipse cx="0" cy={-height * 1.2} rx={${size * 0.48}} ry={size * 0.25} fill="#34555d" stroke="#a2bac0" strokeWidth="1.1" />
+          <ellipse cx="0" cy={-height * 1.2} rx={size * 0.48} ry={size * 0.25} fill="#34555d" stroke="#a2bac0" strokeWidth="1.1" />
           <line x1="0" y1={-height * 1.05} x2="0" y2={-height * 2} stroke="#829a9f" strokeWidth="2" />
         </g>
       ) : track.id === "extraction" || track.id === "isru" ? (
         <g>
-          <rect x={-${size * 0.25}} y={-height * 1.55} width={size * 0.5} height={${height * 1.2}} fill="#475c58" stroke="#a4ae91" strokeWidth="1.2" />
-          <line x1="0" y1={-height * 1.55} x2={${size * 0.68}} y2={-${height * 2.1}} stroke="#b0a27c" strokeWidth="4" />
+          <rect x={-size * 0.25} y={-height * 1.55} width={size * 0.5} height={height * 1.2} fill="#475c58" stroke="#a4ae91" strokeWidth="1.2" />
+          <line x1="0" y1={-height * 1.55} x2={size * 0.68} y2={-height * 2.1} stroke="#b0a27c" strokeWidth="4" />
         </g>
       ) : (
         <g>
           <rect x={-size * 0.55} y={-height * 1.15} width={size * 1.1} height={height * 1.15} rx="5" fill={topFill} opacity="0.75" stroke="#b7c8b7" strokeWidth="1" />
           {Array.from({ length: 1 + level }).map((_, index) => (
-            <rect key={index} x={-${size * 0.36} + index * ${size * 0.24}} y={-${height * 1}} width={size * 0.14} height={height * 0.35} rx="1" fill="#e0d9b2" opacity="0.55" />
+            <rect key={index} x={-size * 0.36 + index * size * 0.24} y={-height} width={size * 0.14} height={height * 0.35} rx="1" fill="#e0d9b2" opacity="0.55" />
           ))}
         </g>
       )}
 
       <Icon x={-10} y={-height * 2.25} width={20} height={20} color={selected ? "#f6c96f" : "#b9d4ca"} />
-      <text x="0" y={${size * 0.92}} textAnchor="middle" fill={selected ? "#f7cf79" : "#b0c4bf"} fontSize="11" fontWeight="700" letterSpacing="1.3">{track.category.toUpperCase()}</text>
-      <text x="0" y={${size * 0.92 + 14}} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{tier.toUpperCase()}</text>
+      <text x="0" y={size * 0.92} textAnchor="middle" fill={selected ? "#f7cf79" : "#b0c4bf"} fontSize="11" fontWeight="700" letterSpacing="1.3">{track.category.toUpperCase()}</text>
+      <text x="0" y={size * 0.92 + 14} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{tier.toUpperCase()}</text>
       {damaged && <circle cx={size * 0.76} cy={-size * 0.1} r="5" fill="#d77a5a" className="animate-pulse" />}
     </g>
   );
