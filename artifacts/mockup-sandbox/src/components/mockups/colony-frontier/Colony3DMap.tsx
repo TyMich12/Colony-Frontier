@@ -1,4 +1,5 @@
-import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
@@ -391,16 +392,87 @@ function UniqueBuilding({ id, color, task }: { id: string; color: string; task: 
   return <BoxBuilding color={color} />;
 }
 
-function ColonyBuilding({
-  track,
-  tier,
-  runtime,
-  selected,
-  alerted,
-  position,
-  roverTask,
-  onClick,
-}: {
+function BuildingIdleMotion({ color, level, active }: { color: string; level: number; active: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const orbRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (groupRef.current) {
+      groupRef.current.position.y = Math.sin(t * 1.35 + level * 0.7) * 0.045;
+      groupRef.current.rotation.z = Math.sin(t * 0.8 + level) * 0.012;
+    }
+    if (orbRef.current) {
+      orbRef.current.rotation.y = t * (0.8 + level * 0.2);
+      const pulse = active ? 1.12 : 0.9 + (Math.sin(t * 2.8 + level) + 1) * 0.035;
+      orbRef.current.scale.setScalar(pulse);
+    }
+  });
+  return (
+    <group ref={groupRef} position={[0, 0.05, 0]}>
+      <mesh ref={orbRef} position={[0, 2.0 + level * 0.08, 0]}>
+        <octahedronGeometry args={[0.11 + level * 0.025, 0]} />
+        <meshStandardMaterial color={active ? "#fff066" : color} emissive={active ? "#ffba35" : color} emissiveIntensity={active ? 1.6 : 0.75} />
+      </mesh>
+    </group>
+  );
+}
+
+function RoverWorld({ task, position, resourceNodes, selected, alerted, onClick }: {
+  task: string;
+  position: [number, number];
+  resourceNodes: MissionResourceNode[];
+  selected: boolean;
+  alerted: boolean;
+  onClick: () => void;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  const scannerRef = useRef<THREE.Mesh>(null);
+  const home = position;
+  const targetName = task.startsWith("SURVEYING ") ? task.slice("SURVEYING ".length) : "";
+  const resource = resourceNodes.find((node) => node.label === targetName);
+  const destination = resource ? nodeWorldPosition(resource) : home;
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    const active = task !== "STANDBY" && task !== "RETURNING";
+    const duration = active ? 0.18 : 0;
+    const p = active ? (Math.sin(t * duration) + 1) / 2 : 0;
+    const from = task === "RETURNING" ? destination : home;
+    const to = task === "RETURNING" ? home : destination;
+    const x = THREE.MathUtils.lerp(from[0], to[0], p);
+    const z = THREE.MathUtils.lerp(from[1], to[1], p);
+    const nx = THREE.MathUtils.lerp(from[0], to[0], Math.min(1, p + 0.02));
+    const nz = THREE.MathUtils.lerp(from[1], to[1], Math.min(1, p + 0.02));
+    ref.current.position.set(x, terrainHeight(x, z) + 0.62, z);
+    if (Math.abs(nx - x) + Math.abs(nz - z) > 0.02) {
+      ref.current.rotation.y = Math.atan2(nx - x, nz - z);
+    }
+    if (scannerRef.current) {
+      const atSite = !!resource && Math.hypot(x - destination[0], z - destination[1]) < 1.1;
+      scannerRef.current.scale.setScalar(atSite ? 0.85 + (Math.sin(t * 5) + 1) * 0.25 : 0.25);
+      (scannerRef.current.material as THREE.MeshBasicMaterial).opacity = atSite ? 0.55 : 0.12;
+    }
+  });
+  return (
+    <group ref={ref} position={[position[0], terrainHeight(position[0], position[1]) + 0.62, position[1]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
+      <SelectionRing selected={selected} alerted={alerted} radius={1.08} />
+      <mesh castShadow><boxGeometry args={[1.45, 0.34, 0.95]} /><meshStandardMaterial color="#e7c66b" roughness={0.66} metalness={0.28} /></mesh>
+      <mesh castShadow position={[0, 0.38, 0]}><boxGeometry args={[0.43, 0.48, 0.43]} /><meshStandardMaterial color="#22d9e3" emissive="#0fc6d0" emissiveIntensity={0.7} /></mesh>
+      {[[-0.5, -0.36], [-0.5, 0.36], [0.5, -0.36], [0.5, 0.36]].map(([x, z]) => (
+        <mesh key={String(x)+String(z)} position={[x, -0.18, z]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.2, 0.2, 0.18, 12]} /><meshStandardMaterial color="#25292d" roughness={0.9} />
+        </mesh>
+      ))}
+      <mesh position={[0.44, 0.54, 0]}><boxGeometry args={[0.08, 0.08, 0.72]} /><meshStandardMaterial color="#ffda52" emissive="#ffbd18" emissiveIntensity={0.65} /></mesh>
+      <mesh ref={scannerRef} position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.58, 0.86, 28]} /><meshBasicMaterial color="#54eaff" transparent opacity={0.12} />
+      </mesh>
+      <Text position={[0, 1.12, 0]} rotation={[-0.66, 0, 0]} fontSize={0.22} color="#fff0a7" outlineWidth={0.03} outlineColor="#171a20" anchorX="center">{task}</Text>
+    </group>
+  );
+}
+
+function ColonyBuilding({ track, tier, runtime, selected, alerted, position, roverTask, resourceNodes, onClick }: {
   track: TechnologyTrack;
   tier: Tier;
   runtime: BuildingRuntime;
@@ -408,34 +480,33 @@ function ColonyBuilding({
   alerted: boolean;
   position: [number, number];
   roverTask: string;
+  resourceNodes: MissionResourceNode[];
   onClick: () => void;
 }) {
   const y = terrainHeight(position[0], position[1]);
   const color = tierColor(tier);
-  const radius = track.id === "habitat" ? 1.72 : track.id === "rover" ? 1.05 : 1.28;
+  const level = tier === "Foundation" ? 0 : tier === "Frontier" ? 1 : tier === "Apex" ? 2 : 3;
+
+  if (track.id === "rover") {
+    return <RoverWorld task={roverTask} position={position} resourceNodes={resourceNodes} selected={selected} alerted={alerted} onClick={onClick} />;
+  }
 
   return (
     <group
       position={[position[0], y, position[1]]}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
+      onClick={(event) => { event.stopPropagation(); onClick(); }}
     >
-      <mesh position={[0, 0.1, 0]}>
-        <cylinderGeometry args={[track.id === "habitat" ? 1.55 : 1.25, track.id === "habitat" ? 1.55 : 1.25, 0.15, 18]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
-      <SelectionRing selected={selected} alerted={alerted} radius={radius} />
-      <UniqueBuilding id={track.id} color={color} task={roverTask} />
+      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 1.82 : 1.3} />
+      <BuildingIdleMotion color={color} level={level} active={alerted} />
+      <StaticBuildingArt id={track.id} color={color} task={roverTask} />
       <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.16, 0.27, 18]} />
+        <ringGeometry args={[0.15, 0.26, 18]} />
         <meshBasicMaterial color={statusColor(runtime.condition)} />
       </mesh>
-      <Text position={[0, track.id === "habitat" ? 2.72 : 2.32, 0]} rotation={[-0.66, 0, 0]} fontSize={0.29} color={selected ? "#fff2a3" : "#ffffff"} outlineWidth={0.045} outlineColor="#171d24" anchorX="center">
+      <Text position={[0, track.id === "habitat" ? 2.7 : 2.3, 0]} rotation={[-0.66, 0, 0]} fontSize={0.29} color={selected ? "#fff2a3" : "#ffffff"} outlineWidth={0.045} outlineColor="#171d24" anchorX="center">
         {track.category}
       </Text>
-      <Text position={[0, track.id === "habitat" ? 2.4 : 2.02, 0]} rotation={[-0.66, 0, 0]} fontSize={0.17} color={color} outlineWidth={0.025} outlineColor="#171d24" anchorX="center">
+      <Text position={[0, track.id === "habitat" ? 2.38 : 2.0, 0]} rotation={[-0.66, 0, 0]} fontSize={0.17} color={color} outlineWidth={0.025} outlineColor="#171d24" anchorX="center">
         {tier}
       </Text>
     </group>
@@ -528,6 +599,7 @@ function MissionScene(props: Props) {
           alerted={props.activeEventTrackId === track.id}
           position={POSITIONS[track.id] ?? [0, 0]}
           roverTask={props.roverTask}
+          resourceNodes={props.resourceNodes}
           onClick={() => props.onSelect(track.id)}
         />
       ))}
