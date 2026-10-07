@@ -395,12 +395,14 @@ function IsometricMap({
   selected,
   buildings,
   onSelect,
+  selectedBuildingId,
   elapsed,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
   buildings: Record<string, BuildingRuntime>;
   onSelect: (trackId: string) => void;
+  selectedBuildingId: string | null;
   elapsed: number;
 }) {
   const layout: Record<string, [number, number]> = {
@@ -1197,6 +1199,7 @@ export function MissionSimulation() {
               selected={pending.selected}
               buildings={buildings}
               onSelect={setSelectedBuildingId}
+              selectedBuildingId={selectedBuildingId}
               elapsed={elapsed}
             />
           </div>
