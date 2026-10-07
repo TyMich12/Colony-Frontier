@@ -558,6 +558,172 @@ function PlazaTower({ position, color }: { position: [number, number]; color: st
   );
 }
 
+
+function SmallColonyBuilding({
+  position,
+  index,
+  mars,
+}: {
+  position: [number, number];
+  index: number;
+  mars: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.04;
+  const shell = mars ? ["#714539", "#7b503e", "#674037"][index % 3] : ["#5d696d", "#687477", "#536166"][index % 3];
+  const roof = mars ? ["#c78361", "#df9c71", "#ae6b52"][index % 3] : ["#65b7c1", "#7b8dd0", "#72c39d"][index % 3];
+  return (
+    <group position={[x, y, z]} rotation={[0, (index % 4) * 0.12 - 0.18, 0]}>
+      <mesh castShadow receiveShadow position={[0, 0.43, 0]}>
+        <boxGeometry args={[1.25 + (index % 2) * 0.2, 0.78, 0.98]} />
+        <meshStandardMaterial color={shell} roughness={0.82} metalness={0.12} />
+      </mesh>
+      <mesh castShadow position={[0, 0.9, 0]}>
+        <boxGeometry args={[1.05 + (index % 2) * 0.2, 0.16, 0.82]} />
+        <meshStandardMaterial color={roof} roughness={0.52} metalness={0.18} />
+      </mesh>
+      <mesh position={[0, 0.42, 0.51]}>
+        <boxGeometry args={[0.31, 0.42, 0.035]} />
+        <meshStandardMaterial color="#263237" roughness={0.65} metalness={0.2} />
+      </mesh>
+      {[-0.35, 0.35].map((wx) => (
+        <mesh key={wx} position={[wx, 0.56, 0.515]}>
+          <boxGeometry args={[0.24, 0.17, 0.028]} />
+          <meshStandardMaterial color="#88dfe7" emissive="#2a8590" emissiveIntensity={0.32} roughness={0.28} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.18, 0]}>
+        <cylinderGeometry args={[0.055, 0.08, 0.48, 8]} />
+        <meshStandardMaterial color="#d3dad6" metalness={0.52} roughness={0.28} />
+      </mesh>
+      <mesh position={[0, 1.43, 0]}>
+        <sphereGeometry args={[0.045, 8, 6]} />
+        <meshStandardMaterial color="#ffdd74" emissive="#ffbd24" emissiveIntensity={0.75} />
+      </mesh>
+    </group>
+  );
+}
+
+function StorageYard({
+  position,
+  mars,
+}: {
+  position: [number, number];
+  mars: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.05;
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[3.2, 2.1]} />
+        <meshStandardMaterial color={mars ? "#7b5143" : "#515b5e"} roughness={0.95} />
+      </mesh>
+      {[[-0.9, -0.45], [0, -0.45], [0.9, -0.45], [-0.45, 0.42], [0.45, 0.42]].map(([cx, cz], index) => (
+        <mesh key={index} castShadow position={[cx, 0.26 + (index % 2) * 0.38, cz]} rotation={[0, index * 0.17, 0]}>
+          <boxGeometry args={[0.66, 0.46, 0.66]} />
+          <meshStandardMaterial color={index % 2 ? "#839391" : "#bc8b50"} roughness={0.86} metalness={0.14} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.1, 0.92]}>
+        <boxGeometry args={[2.42, 0.08, 0.08]} />
+        <meshStandardMaterial color="#707a79" metalness={0.42} roughness={0.44} />
+      </mesh>
+    </group>
+  );
+}
+
+function CanopyMarket({
+  position,
+  mars,
+}: {
+  position: [number, number];
+  mars: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.04;
+  return (
+    <group position={[x, y, z]}>
+      {[[-0.65, -0.52], [0.65, -0.52], [-0.65, 0.52], [0.65, 0.52]].map(([cx, cz], index) => (
+        <mesh key={index} castShadow position={[cx, 0.55, cz]}>
+          <cylinderGeometry args={[0.045, 0.06, 1.05, 8]} />
+          <meshStandardMaterial color="#747f7f" metalness={0.42} roughness={0.46} />
+        </mesh>
+      ))}
+      <mesh castShadow position={[0, 1.12, 0]}>
+        <boxGeometry args={[1.65, 0.12, 1.45]} />
+        <meshStandardMaterial color={mars ? "#d38d65" : "#73c7ce"} emissive={mars ? "#6e3524" : "#267e87"} emissiveIntensity={0.2} roughness={0.58} />
+      </mesh>
+      {[[-0.48, 0, -0.28], [0, 0, 0], [0.48, 0, 0.28]].map(([cx, cy, cz], index) => (
+        <mesh key={index} castShadow position={[cx, 0.34, cz]}>
+          <boxGeometry args={[0.42, 0.34, 0.48]} />
+          <meshStandardMaterial color={index % 2 ? "#c89a56" : "#6e9b96"} roughness={0.82} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function HydroponicPlanter({
+  position,
+  mars,
+}: {
+  position: [number, number];
+  mars: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.04;
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow>
+        <boxGeometry args={[1.55, 0.2, 0.74]} />
+        <meshStandardMaterial color="#3f5048" roughness={0.92} />
+      </mesh>
+      {[-0.52, -0.17, 0.17, 0.52].map((cx, index) => (
+        <mesh key={index} position={[cx, 0.28, 0]} castShadow>
+          <sphereGeometry args={[0.12, 10, 8]} />
+          <meshStandardMaterial color={mars ? "#78aa69" : "#6fd17b"} emissive={mars ? "#315f2c" : "#2f9b44"} emissiveIntensity={0.4} roughness={0.9} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.17, -0.39]}>
+        <boxGeometry args={[1.7, 0.04, 0.05]} />
+        <meshStandardMaterial color="#6fdbdf" emissive="#25a6ae" emissiveIntensity={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+function FenceRow({
+  from,
+  to,
+}: {
+  from: [number, number];
+  to: [number, number];
+}) {
+  const dx = to[0] - from[0];
+  const dz = to[1] - from[1];
+  const length = Math.hypot(dx, dz);
+  const angle = Math.atan2(dx, dz);
+  const mx = (from[0] + to[0]) / 2;
+  const mz = (from[1] + to[1]) / 2;
+  return (
+    <group position={[mx, terrainHeight(mx, mz) + 0.05, mz]} rotation={[0, angle, 0]}>
+      {Array.from({ length: Math.max(2, Math.floor(length / 0.9)) }, (_, index) => (
+        <group key={index} position={[0, 0, -length / 2 + 0.45 + index * 0.9]}>
+          <mesh>
+            <cylinderGeometry args={[0.025, 0.035, 0.42, 6]} />
+            <meshStandardMaterial color="#6f7a78" metalness={0.42} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.18, 0]}>
+            <boxGeometry args={[0.18, 0.035, 0.05]} />
+            <meshStandardMaterial color="#83918e" metalness={0.36} roughness={0.54} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function StaticBuildingArt({
   id,
   color,
@@ -1468,6 +1634,26 @@ function MissionScene(props: Props) {
         <StreetLamp key={index} position={[x, z]} mars={mars} />
       ))}
 
+      <SmallColonyBuilding position={[-13.1, -9.0]} index={0} mars={mars} />
+      <SmallColonyBuilding position={[-10.9, -7.6]} index={1} mars={mars} />
+      <SmallColonyBuilding position={[10.8, -9.0]} index={2} mars={mars} />
+      <SmallColonyBuilding position={[12.9, -6.8]} index={3} mars={mars} />
+      <SmallColonyBuilding position={[-12.3, 0.5]} index={4} mars={mars} />
+      <SmallColonyBuilding position={[12.6, 2.0]} index={5} mars={mars} />
+      <SmallColonyBuilding position={[-11.8, 8.1]} index={0} mars={mars} />
+      <SmallColonyBuilding position={[12.2, 9.6]} index={1} mars={mars} />
+      <StorageYard position={[-13.1, -4.0]} mars={mars} />
+      <StorageYard position={[12.6, -3.8]} mars={mars} />
+      <CanopyMarket position={[3.1, -9.0]} mars={mars} />
+      <CanopyMarket position={[-3.3, 8.1]} mars={mars} />
+      <HydroponicPlanter position={[-7.9, -8.4]} mars={mars} />
+      <HydroponicPlanter position={[7.8, -9.1]} mars={mars} />
+      <HydroponicPlanter position={[-8.5, 8.2]} mars={mars} />
+      <HydroponicPlanter position={[8.6, 8.8]} mars={mars} />
+      <FenceRow from={[-14.8, 1.8]} to={[-12.0, 1.8]} />
+      <FenceRow from={[11.5, 5.2]} to={[14.8, 5.2]} />
+      <FenceRow from={[-5.2, 12.2]} to={[-1.0, 12.2]} />
+      <FenceRow from={[1.8, 12.8]} to={[5.7, 12.8]} />
       <CrateCluster position={[-13.7, -6.7]} large />
       <CrateCluster position={[13.5, -6.8]} />
       <CrateCluster position={[13.6, 8.6]} />
