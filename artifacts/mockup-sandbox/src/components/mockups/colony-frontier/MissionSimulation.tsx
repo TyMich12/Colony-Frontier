@@ -516,10 +516,10 @@ function IsometricMap({
         <ellipse cx="790" cy="445" rx="61" ry="32" fill={terrainDark} opacity="0.32" />
       </g>
 
-      <path d="M 410 292 C 360 250 315 205 275 150" fill="none" stroke={pathGradient} strokeWidth="20" strokeLinecap="round" opacity="0.72" />
-      <path d="M 460 320 C 545 316 630 304 713 275" fill="none" stroke={pathGradient} strokeWidth="19" strokeLinecap="round" opacity="0.7" />
-      <path d="M 450 335 C 446 389 438 426 420 460" fill="none" stroke={pathGradient} strokeWidth="18" strokeLinecap="round" opacity="0.67" />
-      <path d="M 405 325 C 350 350 304 377 260 415" fill="none" stroke={pathGradient} strokeWidth="16" strokeLinecap="round" opacity="0.58" />
+      <path d="M 410 292 C 360 250 315 205 275 150" fill="none" stroke="url(#pathGradient)" strokeWidth="20" strokeLinecap="round" opacity="0.72" />
+      <path d="M 460 320 C 545 316 630 304 713 275" fill="none" stroke="url(#pathGradient)" strokeWidth="19" strokeLinecap="round" opacity="0.7" />
+      <path d="M 450 335 C 446 389 438 426 420 460" fill="none" stroke="url(#pathGradient)" strokeWidth="18" strokeLinecap="round" opacity="0.67" />
+      <path d="M 405 325 C 350 350 304 377 260 415" fill="none" stroke="url(#pathGradient)" strokeWidth="16" strokeLinecap="round" opacity="0.58" />
 
       <circle cx="500" cy="300" r="190" fill="url(#colonyGlow)" />
       <circle cx="500" cy="300" r="120" fill="none" stroke={mars ? "#b2e5af" : "#e5dea9"} strokeWidth="4" strokeDasharray="5 12" opacity="0.45" />
