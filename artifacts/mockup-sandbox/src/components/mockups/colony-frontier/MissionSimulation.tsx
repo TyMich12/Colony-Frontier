@@ -447,6 +447,7 @@ function IsometricMap({
   selectedResourceId,
   surveyedNodes,
   onSelectResource,
+  roverTask,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
