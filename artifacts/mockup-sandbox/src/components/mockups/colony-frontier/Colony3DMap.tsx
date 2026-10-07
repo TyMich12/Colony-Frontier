@@ -34,24 +34,23 @@ type Props = {
 
 const POSITIONS: Record<string, [number, number]> = {
   habitat: [0, 0],
-  grid: [0, -4.8],
-  solar: [-5.4, -6.5],
-  battery: [6.2, -2.1],
-  oxygen: [-6.2, 2.0],
-  co2: [-3.1, 4.9],
-  water: [6.4, 4.0],
-  comms: [5.9, -7.0],
-  navigation: [-6.2, 7.9],
-  radiation: [7.5, 8.0],
-  rover: [0, 9.1],
-  agriculture: [-9.9, 5.2],
-  thermal: [-9.0, -1.4],
-  science: [9.2, -6.8],
-  extraction: [-8.8, 9.8],
-  isru: [8.7, 11.0],
-  maintenance: [10.3, 2.7],
-};
-
+  grid: [0, -6.6],
+  solar: [-8.7, -8.1],
+  battery: [8.4, -3.3],
+  oxygen: [-8.2, 3.0],
+  co2: [-4.0, 7.3],
+  water: [8.4, 4.8],
+  comms: [7.5, -8.5],
+  navigation: [-8.6, 8.9],
+  radiation: [8.7, 9.0],
+  rover: [0, 11.7],
+  agriculture: [-11.4, 6.0],
+  thermal: [-11.0, -1.3],
+  science: [10.9, -7.8],
+  extraction: [-10.8, 10.9],
+  isru: [10.9, 11.8],
+  maintenance: [11.2, 1.9],
+}
 const BUILDING_ROTATIONS: Record<string, number> = {
   habitat: 0,
   grid: 0,
@@ -147,14 +146,13 @@ function PathStrip({
 
 function CityRoadNetwork({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number, number]>> = [
-    [[-15.8, -15.6], [-8.2, -11.8], [0, -7.7], [0, -4.8], [0, 0]],
-    [[0, 0], [0, 4.0], [0, 9.1], [4.4, 11.0], [8.7, 11.0]],
-    [[0, 0], [-3.1, 4.9], [-6.2, 7.9], [-8.8, 9.8]],
-    [[0, 0], [-6.2, 2.0], [-9.9, 5.2], [-6.2, 7.9]],
-    [[0, 0], [6.4, 4.0], [7.5, 8.0], [8.7, 11.0]],
-    [[0, 0], [6.2, -2.1], [5.9, -7.0], [9.2, -6.8]],
-    [[-6.2, 2.0], [-3.1, 4.9], [6.4, 4.0], [10.3, 2.7]],
-    [[-6.2, 2.0], [-9.0, -1.4], [-5.4, -6.5], [0, -4.8]],
+    [[0, -15.5], [0, -11.0], [0, -6.6], [0, 0]],
+    [[0, 0], [-4.0, 7.3], [-8.2, 3.0], [-11.0, -1.3]],
+    [[0, 0], [8.4, 4.8], [8.7, 9.0], [10.9, 11.8]],
+    [[0, 0], [8.4, -3.3], [7.5, -8.5], [10.9, -7.8]],
+    [[0, 0], [-8.7, -8.1], [-11.4, 6.0], [-10.8, 10.9]],
+    [[-8.2, 3.0], [-4.0, 7.3], [-8.6, 8.9]],
+    [[8.4, 4.8], [11.2, 1.9], [10.9, -7.8]],
   ];
 
   return (
@@ -163,7 +161,7 @@ function CityRoadNetwork({ mars }: { mars: boolean }) {
         <PathStrip
           key={index}
           points={route}
-          width={index === 0 ? 1.2 : index < 4 ? 0.98 : 0.86}
+          width={index === 0 ? 1.28 : index < 4 ? 0.96 : 0.82}
           mars={mars}
         />
       ))}
@@ -2202,7 +2200,6 @@ function ColonyBuilding({
       }}
     >
       <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.6 : 1.38} />
-      {track.id !== "habitat" && <BuildingDetailTrim id={track.id} color={color} mars={false} />}
       <mesh
         position={[0, 1.05, 0]}
         onClick={(event) => {
@@ -2215,7 +2212,6 @@ function ColonyBuilding({
       </mesh>
       <group scale={track.id === "habitat" ? 2.1 : 1}>
         <StaticBuildingArt id={track.id} color={color} />
-        <GoldArchitecturalTrim id={track.id} color={color} />
         <FunctionalBuildingMotion id={track.id} color={color} />
         <BuildingIdleMotion color={color} level={level} active={alerted} id={track.id} />
       </group>
@@ -2288,26 +2284,10 @@ function MissionScene(props: Props) {
               <CityRoadNetwork mars={mars} />
               <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
               <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
-              <Plaza position={[0, 0]} radius={4.15} mars={mars} accent="#43dbe6" />
-              <Plaza position={[0, 9.2]} radius={2.6} mars={mars} accent="#f1c95e" />
-              <Plaza position={[-8.9, 9.9]} radius={2.1} mars={mars} accent="#69e3f0" />
-
               <PipeRuns />
               <ColonyLighting mars={mars} />
-              <Archway position={[0, -5.7]} color="#56dfe8" />
-              <Archway position={[0, 5.7]} color="#f0c75d" />
-              <GoldenCivicArch position={[0, -9.3]} color="#62e7ec" />
-              <GoldenCivicArch position={[0, 9.0]} color="#f1cb61" />
-              <GildedRoadMarker position={[-7.6, -7.4]} color="#59dfe8" />
-              <GildedRoadMarker position={[-3.8, -7.4]} color="#f1ca5f" />
-              <GildedRoadMarker position={[3.8, -7.4]} color="#f1ca5f" />
-              <GildedRoadMarker position={[7.6, -7.4]} color="#59dfe8" />
-              <GildedRoadMarker position={[-7.6, 7.0]} color="#b97bf0" />
-              <GildedRoadMarker position={[7.6, 7.0]} color="#62e6eb" />
-              <Archway position={[-6.5, 0]} color="#6fdddf" />
-              <Archway position={[6.5, 0]} color="#b579ef" />
+              <GoldenCivicArch position={[0, -10.2]} color="#62e7ec" />
               <StatueRow z={-2.9} color="#56dce6" />
-              <StatueRow z={2.9} color="#f0c760" />
               <CargoCart position={[-10.9, -4.9]} mars={mars} />
               <CargoCart position={[10.9, 6.6]} mars={mars} />
 
