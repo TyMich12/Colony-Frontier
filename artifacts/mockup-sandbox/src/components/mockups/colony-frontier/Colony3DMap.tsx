@@ -90,11 +90,11 @@ function tierColor(tier: Tier) {
 }
 
 function surfaceRoadColor(mars: boolean) {
-  return mars ? "#b98569" : "#a99f8e";
+  return mars ? "#c28a69" : "#cbbf9f";
 }
 
 function roadEdgeColor(mars: boolean) {
-  return mars ? "#e0b18f" : "#d8cdb7";
+  return mars ? "#e7bd9b" : "#eadfc3";
 }
 
 function PathStrip({
@@ -705,6 +705,28 @@ function BuildingPlot({ position, size = 3.4, mars }: { position: [number, numbe
   );
 }
 
+function buildingPalette(id: string) {
+  const palette: Record<string, { body: string; roof: string; accent: string; glow: string }> = {
+    habitat: { body: "#d9e1d8", roof: "#2f9eb2", accent: "#f0c85e", glow: "#43d7e8" },
+    solar: { body: "#4a6f82", roof: "#2879b8", accent: "#67d9ee", glow: "#43dff1" },
+    battery: { body: "#4b587c", roof: "#7564b5", accent: "#55d9ef", glow: "#55e7f3" },
+    oxygen: { body: "#4b817d", roof: "#3bb8ba", accent: "#f1cf62", glow: "#68eff0" },
+    water: { body: "#477a9e", roof: "#2caed3", accent: "#f4cd62", glow: "#53dfff" },
+    co2: { body: "#8a604c", roof: "#d58b58", accent: "#ffd064", glow: "#ffb34d" },
+    comms: { body: "#66548b", roof: "#4c86c5", accent: "#f0c75b", glow: "#66ddff" },
+    navigation: { body: "#5f5689", roof: "#8b63c4", accent: "#ffd160", glow: "#ff74df" },
+    radiation: { body: "#554f78", roof: "#8b65b7", accent: "#efca63", glow: "#d48cff" },
+    science: { body: "#634f84", roof: "#a05ac1", accent: "#f1c761", glow: "#e082ff" },
+    agriculture: { body: "#3f765c", roof: "#54b86d", accent: "#f5d060", glow: "#6cff8c" },
+    extraction: { body: "#765942", roof: "#c58d49", accent: "#f2d065", glow: "#ffc04d" },
+    isru: { body: "#497969", roof: "#54b59b", accent: "#f0cf5c", glow: "#69f0bd" },
+    thermal: { body: "#80574e", roof: "#d27657", accent: "#f6d166", glow: "#ff8f63" },
+    grid: { body: "#4c6874", roof: "#4db3c8", accent: "#f0cc5a", glow: "#5fe9f3" },
+    maintenance: { body: "#596b74", roof: "#4e9cb5", accent: "#f2c65d", glow: "#6fdff1" },
+  };
+  return palette[id] ?? { body: "#607277", roof: "#4e9cae", accent: "#f0c85e", glow: "#63e4ee" };
+}
+
 function BuildingBase({
   color,
   width = 2.2,
@@ -718,7 +740,7 @@ function BuildingBase({
 }) {
   return (
     <RoundedBox args={[width, height, depth]} radius={0.18} smoothness={4} castShadow receiveShadow>
-      <meshStandardMaterial color={color} roughness={0.72} metalness={0.18} />
+      <meshStandardMaterial color={color} roughness={0.64} metalness={0.16} />
     </RoundedBox>
   );
 }
@@ -886,6 +908,8 @@ function StaticBuildingArt({
   id: string;
   color: string;
 }) {
+  const palette = buildingPalette(id);
+
   switch (id) {
     case "habitat":
       return <CommandHabitat color={color} />;
@@ -893,7 +917,7 @@ function StaticBuildingArt({
     case "solar":
       return (
         <group>
-          <BuildingBase color="#4d595d" width={2.4} depth={1.9} height={0.34} />
+          <BuildingBase color={palette.body} width={2.4} depth={1.9} height={0.34} />
           <mesh position={[0, 0.42, 0]} castShadow>
             <RoundedBox args={[0.22, 0.62, 1.42]} radius={0.08} smoothness={3}>
               <meshStandardMaterial color="#7b8582" metalness={0.42} roughness={0.35} />
@@ -915,7 +939,7 @@ function StaticBuildingArt({
     case "comms":
       return (
         <group>
-          <BuildingBase color="#4d5a5e" width={1.9} depth={1.7} height={0.38} />
+          <BuildingBase color={palette.body} width={1.9} depth={1.7} height={0.38} />
           <mesh position={[0, 0.98, 0]}>
             <cylinderGeometry args={[0.09, 0.14, 1.55, 10]} />
             <meshStandardMaterial color="#d9e0dc" metalness={0.7} roughness={0.2} />
@@ -926,7 +950,7 @@ function StaticBuildingArt({
           </mesh>
           <mesh position={[0, 1.6, 0.52]} rotation={[0.15, 0, 0]}>
             <RoundedBox args={[0.72, 0.08, 0.08]} radius={0.025} smoothness={2}>
-              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.55} />
+              <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.55} />
             </RoundedBox>
           </mesh>
         </group>
@@ -935,7 +959,7 @@ function StaticBuildingArt({
     case "oxygen":
       return (
         <group>
-          <BuildingBase color="#4f5b5e" width={2.15} depth={1.8} height={0.36} />
+          <BuildingBase color={palette.body} width={2.15} depth={1.8} height={0.36} />
           <IndustrialTanks color={color} water={false} />
           <mesh position={[0, 1.14, -0.62]}>
             <RoundedBox args={[1.38, 0.14, 0.22]} radius={0.05} smoothness={2}>
@@ -948,7 +972,7 @@ function StaticBuildingArt({
     case "water":
       return (
         <group>
-          <BuildingBase color="#4d5b5f" width={2.15} depth={1.8} height={0.36} />
+          <BuildingBase color={palette.body} width={2.15} depth={1.8} height={0.36} />
           <IndustrialTanks color={color} water />
           <mesh position={[0, 1.14, -0.62]}>
             <RoundedBox args={[1.38, 0.14, 0.22]} radius={0.05} smoothness={2}>
@@ -961,7 +985,7 @@ function StaticBuildingArt({
     case "battery":
       return (
         <group>
-          <BuildingBase color="#454f53" width={2.32} depth={1.84} height={0.42} />
+          <BuildingBase color={palette.body} width={2.32} depth={1.84} height={0.42} />
           {[-0.78, 0, 0.78].map((x, index) => (
             <group key={x} position={[x, 0.72, 0]}>
               <RoundedBox args={[0.5, 1.02, 0.94]} radius={0.15} smoothness={4} castShadow>
@@ -969,7 +993,7 @@ function StaticBuildingArt({
               </RoundedBox>
               <mesh position={[0, 0.58, 0.48]}>
                 <RoundedBox args={[0.27, 0.1, 0.05]} radius={0.035} smoothness={2}>
-                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} />
+                  <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.8} />
                 </RoundedBox>
               </mesh>
             </group>
@@ -984,7 +1008,7 @@ function StaticBuildingArt({
     case "co2":
       return (
         <group>
-          <BuildingBase color="#4c585d" width={1.95} depth={1.7} height={0.38} />
+          <BuildingBase color={palette.body} width={1.95} depth={1.7} height={0.38} />
           <mesh position={[0, 1.0, 0]}>
             <cylinderGeometry args={[0.48, 0.58, 1.12, 14]} />
             <meshStandardMaterial color="#717d7e" roughness={0.46} metalness={0.3} />
@@ -1002,7 +1026,7 @@ function StaticBuildingArt({
           ))}
           <mesh position={[0, 1.02, 0.5]}>
             <torusGeometry args={[0.34, 0.045, 7, 24]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} />
+            <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.6} />
           </mesh>
         </group>
       );
@@ -1010,7 +1034,7 @@ function StaticBuildingArt({
     case "radiation":
       return (
         <group>
-          <BuildingBase color="#465156" width={2.2} depth={1.8} height={0.4} />
+          <BuildingBase color={palette.body} width={2.2} depth={1.8} height={0.4} />
           <DomeStructure color={color} glass="#7868a7" />
           {[-0.9, 0.9].map((x) => (
             <mesh key={x} position={[x, 0.66, 0.72]} rotation={[0, 0, x > 0 ? -0.28 : 0.28]}>
@@ -1025,7 +1049,7 @@ function StaticBuildingArt({
     case "science":
       return (
         <group>
-          <BuildingBase color="#4e5960" width={2.28} depth={2.05} height={0.38} />
+          <BuildingBase color={palette.body} width={2.28} depth={2.05} height={0.38} />
           <DomeStructure color={color} glass="#6a5e95" />
           <mesh position={[0, 1.34, 0.22]} rotation={[0.24, 0, 0]}>
             <cylinderGeometry args={[0.11, 0.13, 1.05, 10]} />
@@ -1042,14 +1066,14 @@ function StaticBuildingArt({
     case "extraction":
       return (
         <group>
-          <BuildingBase color="#485356" width={2.35} depth={1.9} height={0.42} />
+          <BuildingBase color={palette.body} width={2.35} depth={1.9} height={0.42} />
           <mesh position={[0, 1.0, 0]}>
             <cylinderGeometry args={[0.33, 0.45, 1.08, 12]} />
             <meshStandardMaterial color="#626f70" metalness={0.38} roughness={0.42} />
           </mesh>
           <mesh position={[0, 1.62, 0]}>
             <coneGeometry args={[0.42, 0.48, 8]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.38} metalness={0.3} roughness={0.28} />
+            <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.38} metalness={0.3} roughness={0.28} />
           </mesh>
           <mesh position={[0, 1.08, 0]} rotation={[0, 0, Math.PI / 2.8]}>
             <cylinderGeometry args={[0.11, 0.14, 1.55, 8]} />
@@ -1068,7 +1092,7 @@ function StaticBuildingArt({
     case "isru":
       return (
         <group>
-          <BuildingBase color="#465154" width={2.45} depth={2.02} height={0.44} />
+          <BuildingBase color={palette.body} width={2.45} depth={2.02} height={0.44} />
           {[-0.72, 0.72].map((x, index) => (
             <group key={x} position={[x, 0.98, 0]}>
               <mesh>
@@ -1087,7 +1111,7 @@ function StaticBuildingArt({
           </mesh>
           <mesh position={[0, 2.18, 0]}>
             <torusGeometry args={[0.28, 0.05, 7, 22]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.65} />
+            <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.65} />
           </mesh>
         </group>
       );
@@ -1095,15 +1119,15 @@ function StaticBuildingArt({
     case "agriculture":
       return (
         <group>
-          <BuildingBase color="#3f574f" width={2.5} depth={1.92} height={0.36} />
+          <BuildingBase color={palette.body} width={2.5} depth={1.92} height={0.36} />
           <mesh position={[0, 0.95, 0]}>
             <RoundedBox args={[2.28, 1.06, 1.5]} radius={0.34} smoothness={5} castShadow>
-              <meshStandardMaterial color="#74bcc0" transparent opacity={0.48} roughness={0.2} metalness={0.1} />
+              <meshStandardMaterial color={palette.roof} transparent opacity={0.48} roughness={0.2} metalness={0.1} />
             </RoundedBox>
           </mesh>
           <mesh position={[0, 1.48, 0]}>
             <boxGeometry args={[2.36, 0.08, 1.58]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.2} metalness={0.36} roughness={0.3} />
+            <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.2} metalness={0.36} roughness={0.3} />
           </mesh>
           {[-0.72, -0.24, 0.24, 0.72].map((x) => (
             <group key={x} position={[x, 0.82, 0]}>
@@ -1123,14 +1147,14 @@ function StaticBuildingArt({
     case "navigation":
       return (
         <group>
-          <BuildingBase color="#4d585d" width={1.8} depth={1.7} height={0.34} />
+          <BuildingBase color={palette.body} width={1.8} depth={1.7} height={0.34} />
           <mesh position={[0, 1.02, 0]}>
             <cylinderGeometry args={[0.13, 0.2, 1.85, 10]} />
             <meshStandardMaterial color="#dbe2dd" metalness={0.68} roughness={0.21} />
           </mesh>
           <mesh position={[0, 1.66, 0]} rotation={[Math.PI / 2, 0, 0]}>
             <torusGeometry args={[0.64, 0.065, 8, 28]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} metalness={0.36} roughness={0.22} />
+            <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.5} metalness={0.36} roughness={0.22} />
           </mesh>
           <mesh position={[0, 2.14, 0]}>
             <octahedronGeometry args={[0.23, 1]} />
@@ -1149,7 +1173,7 @@ function StaticBuildingArt({
     case "thermal":
       return (
         <group>
-          <BuildingBase color="#4c5659" width={2.3} depth={1.9} height={0.36} />
+          <BuildingBase color={palette.body} width={2.3} depth={1.9} height={0.36} />
           {[-0.64, 0, 0.64].map((x) => (
             <group key={x} position={[x, 0.92, 0]}>
               <mesh castShadow rotation={[0.18, 0, -0.28]}>
@@ -1160,7 +1184,7 @@ function StaticBuildingArt({
               {[-0.42, -0.14, 0.14, 0.42].map((z) => (
                 <mesh key={z} position={[0, 0.06, z]} rotation={[0.18, 0, -0.28]}>
                   <boxGeometry args={[0.46, 0.024, 0.035]} />
-                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.38} />
+                  <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.38} />
                 </mesh>
               ))}
             </group>
@@ -1175,7 +1199,7 @@ function StaticBuildingArt({
     case "grid":
       return (
         <group>
-          <BuildingBase color="#444f53" width={2.35} depth={1.92} height={0.4} />
+          <BuildingBase color={palette.body} width={2.35} depth={1.92} height={0.4} />
           {[[-0.7, 0.52], [0.7, 0.52]].map(([x, z], index) => (
             <group key={index} position={[x, 0, z]}>
               <RoundedBox args={[0.6, 0.84, 0.6]} radius={0.12} smoothness={4} castShadow>
@@ -1183,7 +1207,7 @@ function StaticBuildingArt({
               </RoundedBox>
               <mesh position={[0, 0.5, 0]}>
                 <sphereGeometry args={[0.1, 10, 8]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.72} />
+                <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.72} />
               </mesh>
             </group>
           ))}
@@ -1201,7 +1225,7 @@ function StaticBuildingArt({
     case "maintenance":
       return (
         <group>
-          <BuildingBase color="#4b5558" width={2.38} depth={2.0} height={0.4} />
+          <BuildingBase color={palette.body} width={2.38} depth={2.0} height={0.4} />
           <RoundedBox args={[1.72, 1.18, 1.42]} radius={0.28} smoothness={5} position={[0, 0.95, 0]} castShadow>
             <meshStandardMaterial color="#596568" roughness={0.64} metalness={0.22} />
           </RoundedBox>
@@ -1217,7 +1241,7 @@ function StaticBuildingArt({
           {[-0.62, 0.62].map((x) => (
             <mesh key={x} position={[x, 0.83, 0.8]}>
               <cylinderGeometry args={[0.075, 0.09, 0.52, 8]} />
-              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} metalness={0.25} roughness={0.24} />
+              <meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={0.4} metalness={0.25} roughness={0.24} />
             </mesh>
           ))}
         </group>
@@ -1226,7 +1250,7 @@ function StaticBuildingArt({
     default:
       return (
         <group>
-          <BuildingBase color="#4e595d" width={1.95} depth={1.7} height={0.38} />
+          <BuildingBase color={palette.body} width={1.95} depth={1.7} height={0.38} />
           <DomeStructure color={color} glass="#6f9da2" />
         </group>
       );
@@ -1806,8 +1830,8 @@ function BuildingDetailTrim({
 
 
 function CityFloor({ mars }: { mars: boolean }) {
-  const ground = mars ? "#a8644d" : "#a9a39a";
-  const inset = mars ? "#b97559" : "#b8b1a4";
+  const ground = mars ? "#ae664f" : "#879d78";
+  const inset = mars ? "#c47a5b" : "#a9ba92";
   return (
     <group>
       <mesh receiveShadow position={[0, terrainHeight(0, 0) + 0.055, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -2267,11 +2291,11 @@ function MissionScene(props: Props) {
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
       <fog attach="fog" args={[mars ? "#a3604d" : "#737177", 58, 115]} />
 
-      <ambientLight intensity={0.84} color={mars ? "#ffe4d9" : "#eef4ff"} />
+      <ambientLight intensity={1.04} color={mars ? "#ffe4d9" : "#eef4ff"} />
       <hemisphereLight args={[mars ? "#ffeadd" : "#f7f8ff", mars ? "#43271f" : "#34323b", 1.02]} />
       <directionalLight
         position={[17, 33, 20]}
-        intensity={2.6}
+        intensity={3.05}
         color="#fff3dc"
         castShadow
         shadow-mapSize={[2048, 2048]}
