@@ -1228,41 +1228,57 @@ function HumanSettler({
 
   return (
     <group ref={groupRef}>
-      <mesh castShadow position={[0, 0.52, 0]}>
-        <boxGeometry args={[0.32, 0.56, 0.21]} />
+      <mesh castShadow position={[0, 0.42, 0]}>
+        <capsuleGeometry args={[0.12, 0.24, 4, 8]} />
         <meshStandardMaterial color={bodyColor} roughness={0.82} />
       </mesh>
-      <mesh castShadow position={[0, 0.91, 0]}>
-        <sphereGeometry args={[0.145, 12, 8]} />
+      <mesh castShadow position={[0, 0.73, 0]}>
+        <sphereGeometry args={[0.105, 12, 8]} />
         <meshStandardMaterial color={skin} roughness={0.86} />
       </mesh>
-      <mesh castShadow position={[0, 1.03, 0]}>
-        <sphereGeometry args={[0.17, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+      <mesh castShadow position={[0, 0.82, 0]}>
+        <sphereGeometry args={[0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
         <meshStandardMaterial color={helmetColor} roughness={0.7} metalness={0.15} />
       </mesh>
+      <mesh position={[0, 0.73, 0.10]}>
+        <sphereGeometry args={[0.035, 8, 6]} />
+        <meshStandardMaterial color="#67e7ef" emissive="#29bcc6" emissiveIntensity={0.75} />
+      </mesh>
+      <mesh castShadow position={[0, 0.34, -0.10]}>
+        <boxGeometry args={[0.22, 0.24, 0.12]} />
+        <meshStandardMaterial color="#445256" roughness={0.82} metalness={0.2} />
+      </mesh>
 
-      <group ref={leftArmRef} position={[-0.2, 0.63, 0]}>
-        <mesh castShadow position={[0, -0.19, 0]}>
-          <boxGeometry args={[0.085, 0.38, 0.085]} />
+      <group ref={leftArmRef} position={[-0.16, 0.48, 0]}>
+        <mesh castShadow position={[0, -0.13, 0]}>
+          <capsuleGeometry args={[0.035, 0.2, 3, 6]} />
           <meshStandardMaterial color={skin} roughness={0.88} />
         </mesh>
+        <mesh castShadow position={[0, -0.25, 0]}>
+          <sphereGeometry args={[0.045, 8, 6]} />
+          <meshStandardMaterial color={skin} roughness={0.9} />
+        </mesh>
       </group>
-      <group ref={rightArmRef} position={[0.2, 0.63, 0]}>
-        <mesh castShadow position={[0, -0.19, 0]}>
-          <boxGeometry args={[0.085, 0.38, 0.085]} />
+      <group ref={rightArmRef} position={[0.16, 0.48, 0]}>
+        <mesh castShadow position={[0, -0.13, 0]}>
+          <capsuleGeometry args={[0.035, 0.2, 3, 6]} />
           <meshStandardMaterial color={skin} roughness={0.88} />
+        </mesh>
+        <mesh castShadow position={[0, -0.25, 0]}>
+          <sphereGeometry args={[0.045, 8, 6]} />
+          <meshStandardMaterial color={skin} roughness={0.9} />
         </mesh>
       </group>
 
-      <group ref={leftLegRef} position={[-0.09, 0.27, 0]}>
-        <mesh castShadow position={[0, -0.17, 0]}>
-          <boxGeometry args={[0.11, 0.34, 0.12]} />
+      <group ref={leftLegRef} position={[-0.07, 0.19, 0]}>
+        <mesh castShadow position={[0, -0.1, 0]}>
+          <capsuleGeometry args={[0.042, 0.17, 3, 6]} />
           <meshStandardMaterial color={bootColor} roughness={0.92} />
         </mesh>
       </group>
-      <group ref={rightLegRef} position={[0.09, 0.27, 0]}>
-        <mesh castShadow position={[0, -0.17, 0]}>
-          <boxGeometry args={[0.11, 0.34, 0.12]} />
+      <group ref={rightLegRef} position={[0.07, 0.19, 0]}>
+        <mesh castShadow position={[0, -0.1, 0]}>
+          <capsuleGeometry args={[0.042, 0.17, 3, 6]} />
           <meshStandardMaterial color={bootColor} roughness={0.92} />
         </mesh>
       </group>
@@ -1289,7 +1305,7 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
 
   return (
     <group>
-      {Array.from({ length: 24 }, (_, index) => (
+      {Array.from({ length: 32 }, (_, index) => (
         <HumanSettler
           key={index}
           route={routes[index % routes.length]}
@@ -1298,6 +1314,89 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
           mars={mars}
         />
       ))}
+    </group>
+  );
+}
+
+
+function CivicPlazaStatue({ position, mars }: { position: [number, number]; mars: boolean }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.06;
+  const glowRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (glowRef.current) {
+      const t = clock.getElapsedTime();
+      glowRef.current.scale.setScalar(0.94 + (Math.sin(t * 2.2) + 1) * 0.035);
+    }
+  });
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.15, 32]} />
+        <meshStandardMaterial color={mars ? "#75483a" : "#5b686b"} roughness={0.92} />
+      </mesh>
+      <mesh castShadow position={[0, 0.45, 0]}>
+        <cylinderGeometry args={[0.3, 0.42, 0.72, 10]} />
+        <meshStandardMaterial color="#657174" roughness={0.58} metalness={0.28} />
+      </mesh>
+      <mesh castShadow position={[0, 1.05, 0]}>
+        <coneGeometry args={[0.25, 0.55, 8]} />
+        <meshStandardMaterial color={mars ? "#d89067" : "#6dd3d9"} emissive={mars ? "#713825" : "#248993"} emissiveIntensity={0.32} />
+      </mesh>
+      <mesh ref={glowRef} position={[0, 1.48, 0]}>
+        <octahedronGeometry args={[0.2, 0]} />
+        <meshStandardMaterial color="#fff0a2" emissive="#ffc62f" emissiveIntensity={1.2} />
+      </mesh>
+    </group>
+  );
+}
+
+function ColonyBanner({ position, accent, mars }: { position: [number, number]; accent: string; mars: boolean }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.02;
+  return (
+    <group position={[x, y, z]}>
+      <mesh castShadow position={[0, 0.62, 0]}>
+        <cylinderGeometry args={[0.035, 0.05, 1.25, 8]} />
+        <meshStandardMaterial color={mars ? "#725046" : "#626e70"} metalness={0.5} roughness={0.46} />
+      </mesh>
+      <mesh position={[0.22, 0.85, 0]}>
+        <boxGeometry args={[0.42, 0.28, 0.035]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.25} roughness={0.5} />
+      </mesh>
+      <mesh position={[0.22, 0.85, 0.022]}>
+        <boxGeometry args={[0.16, 0.13, 0.01]} />
+        <meshStandardMaterial color={mars ? "#ffd18c" : "#173039"} emissive={mars ? "#7e5128" : "#0d5661"} emissiveIntensity={0.18} />
+      </mesh>
+    </group>
+  );
+}
+
+function WorkshopYard({ position, index }: { position: [number, number]; index: number }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.04;
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[2.25, 1.65]} />
+        <meshStandardMaterial color={index % 2 ? "#565f60" : "#5e6667"} roughness={0.97} />
+      </mesh>
+      <mesh castShadow position={[-0.58, 0.32, -0.18]}>
+        <boxGeometry args={[0.62, 0.52, 0.5]} />
+        <meshStandardMaterial color={index % 2 ? "#6f8f8b" : "#bc8f50"} roughness={0.86} />
+      </mesh>
+      <mesh castShadow position={[0.36, 0.25, 0.34]}>
+        <boxGeometry args={[0.42, 0.38, 0.42]} />
+        <meshStandardMaterial color={index % 2 ? "#c69450" : "#738b88"} roughness={0.86} />
+      </mesh>
+      <mesh position={[0.56, 0.52, -0.36]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.13, 0.13, 0.16, 10]} />
+        <meshStandardMaterial color="#2d383b" roughness={0.88} />
+      </mesh>
+      <mesh position={[-0.06, 0.25, 0.2]}>
+        <boxGeometry args={[0.7, 0.08, 0.08]} />
+        <meshStandardMaterial color="#a3afac" metalness={0.5} roughness={0.42} />
+      </mesh>
     </group>
   );
 }
@@ -1587,7 +1686,7 @@ function MissionScene(props: Props) {
     <Canvas
       shadows
       dpr={[1, 1.3]}
-      camera={{ position: [31, 29, 33], fov: 39, near: 0.1, far: 240 }}
+      camera={{ position: [38, 43, 31], fov: 45, near: 0.1, far: 260 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
@@ -1621,6 +1720,16 @@ function MissionScene(props: Props) {
 
       <PipeRuns />
       <ColonyLighting mars={mars} />
+      <CivicPlazaStatue position={[0, -3.25]} mars={mars} />
+      <CivicPlazaStatue position={[0, 7.55]} mars={mars} />
+      <ColonyBanner position={[-4.0, -2.9]} accent="#54dfe9" mars={mars} />
+      <ColonyBanner position={[4.0, -2.9]} accent="#f2c65e" mars={mars} />
+      <ColonyBanner position={[-4.0, 7.0]} accent="#b878ef" mars={mars} />
+      <ColonyBanner position={[4.0, 7.0]} accent="#5ed9e5" mars={mars} />
+      <WorkshopYard position={[-13.0, -2.0]} index={0} />
+      <WorkshopYard position={[12.8, 4.8]} index={1} />
+      <WorkshopYard position={[-12.4, 7.1]} index={2} />
+      <WorkshopYard position={[12.1, -1.0]} index={3} />
 
       {decorativeTrees.map(([x, z, scale, flower], index) => (
         <DecorativeTree key={index} position={[x, z]} scale={scale} flower={flower} mars={mars} />
@@ -1699,10 +1808,10 @@ function MissionScene(props: Props) {
         enableRotate={false}
         enablePan={false}
         enableZoom
-        minDistance={18}
-        maxDistance={44}
-        zoomSpeed={0.74}
-        target={[0, 0, 1.7]}
+        minDistance={24}
+        maxDistance={58}
+        zoomSpeed={0.66}
+        target={[0, 0, 1.25]}
       />
     </Canvas>
   );
