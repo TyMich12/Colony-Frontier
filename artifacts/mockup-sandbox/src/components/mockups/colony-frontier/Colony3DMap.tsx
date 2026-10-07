@@ -454,7 +454,7 @@ function RoverWorld({ task, position, resourceNodes, selected, alerted, onClick 
     }
   });
   return (
-    <group ref={ref} position={[position[0], terrainHeight(position[0], position[1]) + 0.62, position[1]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
+    <group ref={ref} position={[position[0], terrainHeight(position[0], position[1]) + 0.62, position[1]]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
       <SelectionRing selected={selected} alerted={alerted} radius={1.08} />
       <mesh castShadow><boxGeometry args={[1.45, 0.34, 0.95]} /><meshStandardMaterial color="#e7c66b" roughness={0.66} metalness={0.28} /></mesh>
       <mesh castShadow position={[0, 0.38, 0]}><boxGeometry args={[0.43, 0.48, 0.43]} /><meshStandardMaterial color="#22d9e3" emissive="#0fc6d0" emissiveIntensity={0.7} /></mesh>
