@@ -1385,7 +1385,7 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
 
   return (
     <group>
-      {Array.from({ length: 48 }, (_, index) => (
+      {Array.from({ length: 14 }, (_, index) => (
         <HumanSettler
           key={index}
           route={routes[index % routes.length]}
@@ -2085,7 +2085,7 @@ function ColonyBuilding({
         onClick();
       }}
     >
-      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 2.45 : 1.38} />
+      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.1 : 1.38} />
       {track.id !== "habitat" && <BuildingDetailTrim id={track.id} color={color} mars={false} />}
       <mesh
         position={[0, 1.05, 0]}
@@ -2094,13 +2094,15 @@ function ColonyBuilding({
           onClick();
         }}
       >
-        <boxGeometry args={[2.65, 2.5, 2.65]} />
+        <boxGeometry args={track.id === "habitat" ? [5.8, 4.6, 5.8] : [2.65, 2.5, 2.65]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      <StaticBuildingArt id={track.id} color={color} />
-      <GoldArchitecturalTrim id={track.id} color={color} />
-      <FunctionalBuildingMotion id={track.id} color={color} />
-      <BuildingIdleMotion color={color} level={level} active={alerted} id={track.id} />
+      <group scale={track.id === "habitat" ? 1.82 : 1}>
+        <StaticBuildingArt id={track.id} color={color} />
+        <GoldArchitecturalTrim id={track.id} color={color} />
+        <FunctionalBuildingMotion id={track.id} color={color} />
+        <BuildingIdleMotion color={color} level={level} active={alerted} id={track.id} />
+      </group>
       <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.16, 0.25, 18]} />
         <meshBasicMaterial color={statusColor(runtime.condition)} />
@@ -2125,16 +2127,12 @@ function MissionScene(props: Props) {
 
   const gardens = [
     [-11.8, -5.1, 0.72],
-    [11.7, -4.2, 0.72],
-    [-11.6, 7.6, 0.7],
-    [11.9, 9.3, 0.68],
-    [-4.7, 10.8, 0.62],
-    [4.4, 8.4, 0.62],
+    [11.7, 8.9, 0.68],
   ] as Array<[number, number, number]>;
 
   const lamps = [
-    [-9.1, -9.6], [-3.9, -5.7], [3.9, -5.7], [9.1, -9.7],
-    [-8.2, 1.0], [8.2, 1.2], [-3.0, 6.9], [3.1, 6.7],
+    [-9.1, -9.6], [9.1, -9.7],
+    [-8.2, 1.0], [8.2, 1.2],
     [-5.7, 10.7], [6.0, 10.9],
   ] as Array<[number, number]>;
 
@@ -2174,7 +2172,7 @@ function MissionScene(props: Props) {
               <CityRoadNetwork mars={mars} />
               <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
               <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
-              <Plaza position={[0, 0]} radius={5.0} mars={mars} accent="#43dbe6" />
+              <Plaza position={[0, 0]} radius={4.35} mars={mars} accent="#43dbe6" />
               <Plaza position={[0, 9.2]} radius={2.6} mars={mars} accent="#f1c95e" />
               <Plaza position={[-8.9, 9.9]} radius={2.1} mars={mars} accent="#69e3f0" />
 
@@ -2195,32 +2193,19 @@ function MissionScene(props: Props) {
               <StatueRow z={-2.9} color="#56dce6" />
               <StatueRow z={2.9} color="#f0c760" />
               <CargoCart position={[-10.9, -4.9]} mars={mars} />
-              <CargoCart position={[10.9, -5.0]} mars={mars} />
-              <CargoCart position={[-10.4, 6.3]} mars={mars} />
-              <CargoCart position={[10.5, 6.6]} mars={mars} />
+              <CargoCart position={[10.9, 6.6]} mars={mars} />
 
               <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
               <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
-              <UrbanBlock position={[-8.5, 6.1]} width={3.4} depth={2.45} mars={mars} accent="#73d7e0" />
-              <UrbanBlock position={[8.8, 6.2]} width={3.4} depth={2.45} mars={mars} accent="#c17bf0" />
-              <UrbanBlock position={[-3.7, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#5edfe8" />
-              <UrbanBlock position={[4.0, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#f3cf67" />
 
-              <ColonyMonument position={[-3.0, 3.0]} color="#61dfe8" />
-              <ColonyMonument position={[3.1, 3.0]} color="#f0c75d" />
               <ColonyMonument position={[0, 6.6]} color="#b97bf0" />
 
               
               <CivicPlazaStatue position={[0, -3.25]} mars={mars} />
-              <CivicPlazaStatue position={[0, 7.55]} mars={mars} />
               <ColonyBanner position={[-4.0, -2.9]} accent="#54dfe9" mars={mars} />
-              <ColonyBanner position={[4.0, -2.9]} accent="#f2c65e" mars={mars} />
-              <ColonyBanner position={[-4.0, 7.0]} accent="#b878ef" mars={mars} />
               <ColonyBanner position={[4.0, 7.0]} accent="#5ed9e5" mars={mars} />
               <WorkshopYard position={[-13.0, -2.0]} index={0} />
               <WorkshopYard position={[12.8, 4.8]} index={1} />
-              <WorkshopYard position={[-12.4, 7.1]} index={2} />
-              <WorkshopYard position={[12.1, -1.0]} index={3} />
 
               {gardens.map(([x, z, scale], index) => (
                 <GardenPatch key={index} position={[x, z]} scale={scale} flower={!mars || index % 2 === 0} />
@@ -2231,41 +2216,19 @@ function MissionScene(props: Props) {
               ))}
 
               <SmallColonyBuilding position={[-14.1, -8.9]} index={2} mars={mars} />
-              <SmallColonyBuilding position={[-11.9, -8.3]} index={4} mars={mars} />
               <SmallColonyBuilding position={[10.9, -9.0]} index={3} mars={mars} />
-              <SmallColonyBuilding position={[13.3, -8.1]} index={5} mars={mars} />
               <SmallColonyBuilding position={[-13.4, 4.2]} index={1} mars={mars} />
               <SmallColonyBuilding position={[13.6, 4.2]} index={0} mars={mars} />
               <SmallColonyBuilding position={[-13.2, 8.8]} index={3} mars={mars} />
               <SmallColonyBuilding position={[13.0, 9.2]} index={4} mars={mars} />
-                    <SmallColonyBuilding position={[-13.1, -9.0]} index={0} mars={mars} />
-              <SmallColonyBuilding position={[-10.9, -7.6]} index={1} mars={mars} />
-              <SmallColonyBuilding position={[10.8, -9.0]} index={2} mars={mars} />
-              <SmallColonyBuilding position={[12.9, -6.8]} index={3} mars={mars} />
-              <SmallColonyBuilding position={[-12.3, 0.5]} index={4} mars={mars} />
-              <SmallColonyBuilding position={[12.6, 2.0]} index={5} mars={mars} />
-              <SmallColonyBuilding position={[-11.8, 8.1]} index={0} mars={mars} />
-              <SmallColonyBuilding position={[12.2, 9.6]} index={1} mars={mars} />
               <StorageYard position={[-13.1, -4.0]} mars={mars} />
-              <StorageYard position={[12.6, -3.8]} mars={mars} />
               <CanopyMarket position={[3.1, -9.0]} mars={mars} />
-              <CanopyMarket position={[-3.3, 8.1]} mars={mars} />
               <HydroponicPlanter position={[-7.9, -8.4]} mars={mars} />
-              <HydroponicPlanter position={[7.8, -9.1]} mars={mars} />
-              <HydroponicPlanter position={[-8.5, 8.2]} mars={mars} />
-              <HydroponicPlanter position={[8.6, 8.8]} mars={mars} />
+              <HydroponicPlanter position={[7.8, 8.8]} mars={mars} />
               <FenceRow from={[-14.8, 1.8]} to={[-12.0, 1.8]} />
               <FenceRow from={[11.5, 5.2]} to={[14.8, 5.2]} />
-              <FenceRow from={[-5.2, 12.2]} to={[-1.0, 12.2]} />
-              <FenceRow from={[1.8, 12.8]} to={[5.7, 12.8]} />
               <CrateCluster position={[-13.7, -6.7]} large />
-              <CrateCluster position={[13.5, -6.8]} />
-              <CrateCluster position={[13.6, 8.6]} />
-              <CrateCluster position={[-12.8, 9.0]} />
-
               <PlazaTower position={[-2.65, -2.65]} color="#57dce7" />
-              <PlazaTower position={[2.65, -2.65]} color="#57dce7" />
-              <PlazaTower position={[-2.65, 2.65]} color="#57dce7" />
               <PlazaTower position={[2.65, 2.65]} color="#57dce7" />
 
               <SettlerCrowd mars={mars} />
