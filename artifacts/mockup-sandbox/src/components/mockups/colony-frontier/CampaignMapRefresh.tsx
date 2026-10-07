@@ -62,7 +62,7 @@ export const moonMissions: Mission[] = [
     objective: "Survive a prolonged period of extremely limited sunlight.",
     opportunity: "Thermal Environment Survey",
     technology: "Thermal Storage Technology",
-    prerequisite: "Complete Survival",
+    prerequisite: "Complete First Light",
   },
   {
     number: "03",
@@ -76,7 +76,7 @@ export const moonMissions: Mission[] = [
     objective: "Explore a permanently shadowed region and retrieve a useful resource.",
     opportunity: "Subsurface Ice Characterisation",
     technology: "Water / Ice Extraction",
-    prerequisite: "Complete The Long Night",
+    prerequisite: "Complete Blackout",
   },
   {
     number: "04",
@@ -90,7 +90,7 @@ export const moonMissions: Mission[] = [
     objective: "Maintain a stable settlement while an unseen systems fault develops.",
     opportunity: "Dust Behaviour Study",
     technology: "Autonomous Maintenance Rover",
-    prerequisite: "Complete The Shadow",
+    prerequisite: "Complete Echoes Below",
   },
   {
     number: "05",
@@ -104,7 +104,7 @@ export const moonMissions: Mission[] = [
     objective: "Detect, isolate, and repair an unexpected structural anomaly.",
     opportunity: "Structural Impact Analysis",
     technology: "Improved Habitat Structure",
-    prerequisite: "Complete Contamination",
+    prerequisite: "Complete Signal Drift",
   },
   {
     number: "06",
@@ -118,7 +118,7 @@ export const moonMissions: Mission[] = [
     objective: "Keep crew and critical systems within safe operating limits.",
     opportunity: "Radiation Mapping",
     technology: "Regolith Shielding",
-    prerequisite: "Complete Impact",
+    prerequisite: "Complete Sudden Pressure",
   },
   {
     number: "07",
@@ -132,7 +132,7 @@ export const moonMissions: Mission[] = [
     objective: "Turn local material and limited reserves into a growing colony.",
     opportunity: "Local Resource Discovery",
     technology: "Local Resource Processing",
-    prerequisite: "Complete Stormfall",
+    prerequisite: "Complete Solar Veil",
   },
   {
     number: "08",
@@ -146,7 +146,7 @@ export const moonMissions: Mission[] = [
     objective: "Prevent a chain reaction from reaching any critical colony system.",
     opportunity: "Cascade Prevention Study",
     technology: "Advanced Colony Management",
-    prerequisite: "Complete The Inheritance",
+    prerequisite: "Complete Hidden Yield",
   },
 ];
 
@@ -177,7 +177,7 @@ export const marsMissions: Mission[] = [
     objective: "Manage falling solar output caused by atmospheric dust.",
     opportunity: "Dust Composition Analysis",
     technology: "Dust-Resistant Solar",
-    prerequisite: "Complete Arrival",
+    prerequisite: "Complete Red Horizon",
   },
   {
     number: "03",
@@ -191,7 +191,7 @@ export const marsMissions: Mission[] = [
     objective: "Find accessible subsurface ice and return a verified sample.",
     opportunity: "Ice Deposit Characterisation",
     technology: "Ice Extraction",
-    prerequisite: "Complete The Dust",
+    prerequisite: "Complete Veilfall",
   },
   {
     number: "04",
@@ -205,7 +205,7 @@ export const marsMissions: Mission[] = [
     objective: "Survive extreme cold threatening habitat, batteries, and machinery.",
     opportunity: "Subsurface Thermal Study",
     technology: "Advanced Thermal Regulation",
-    prerequisite: "Complete The Water Search",
+    prerequisite: "Complete Deep Signal",
   },
   {
     number: "05",
@@ -219,7 +219,7 @@ export const marsMissions: Mission[] = [
     objective: "Operate multiple rovers with charging, routing, and recovery.",
     opportunity: "Autonomous Navigation Trial",
     technology: "Autonomous Rover Technology",
-    prerequisite: "Complete Martian Winter",
+    prerequisite: "Complete Cold Front",
   },
   {
     number: "06",
@@ -233,7 +233,7 @@ export const marsMissions: Mission[] = [
     objective: "Prepare the colony for a major approaching storm.",
     opportunity: "Storm Prediction Model",
     technology: "Storm Prediction System",
-    prerequisite: "Complete The Rover Network",
+    prerequisite: "Complete Waypoint",
   },
   {
     number: "07",
@@ -247,7 +247,7 @@ export const marsMissions: Mission[] = [
     objective: "Make agriculture a major part of the colony.",
     opportunity: "Closed-Loop Agriculture Experiment",
     technology: "Closed-Loop Agriculture",
-    prerequisite: "Complete Dust Storm",
+    prerequisite: "Complete Redout",
   },
   {
     number: "08",
@@ -261,7 +261,7 @@ export const marsMissions: Mission[] = [
     objective: "Detect, isolate, and repair a structural failure.",
     opportunity: "Habitat Failure Analysis",
     technology: "Modular Habitat System",
-    prerequisite: "Complete The Greenhouse",
+    prerequisite: "Complete Green Thread",
   },
   {
     number: "09",
@@ -275,7 +275,7 @@ export const marsMissions: Mission[] = [
     objective: "Turn Mars itself into your supply chain.",
     opportunity: "New Resource Discovery",
     technology: "Advanced ISRU",
-    prerequisite: "Complete Habitat Breach",
+    prerequisite: "Complete Pressure Point",
   },
   {
     number: "10",
@@ -289,7 +289,7 @@ export const marsMissions: Mission[] = [
     objective: "Manage the colony without normal resupply from Earth.",
     opportunity: "Advanced Waste Recovery",
     technology: "Advanced Recycling",
-    prerequisite: "Complete ISRU",
+    prerequisite: "Complete Native Forge",
   },
   {
     number: "11",
@@ -303,7 +303,7 @@ export const marsMissions: Mission[] = [
     objective: "Survive the major Mars cascade across all colony systems.",
     opportunity: "Cascade Prediction",
     technology: "Planetary Resilience",
-    prerequisite: "Complete The Supply Gap",
+    prerequisite: "Complete Isolation",
   },
   {
     number: "12",
@@ -317,7 +317,7 @@ export const marsMissions: Mission[] = [
     objective: "Build a second settlement and share resources between them.",
     opportunity: "Inter-Settlement Optimisation",
     technology: "Colony Grid Architecture",
-    prerequisite: "Complete The Great Dust Storm",
+    prerequisite: "Complete Veil of Red",
   },
   {
     number: "13",
@@ -331,7 +331,7 @@ export const marsMissions: Mission[] = [
     objective: "Achieve autonomy with no meaningful emergency support from Earth.",
     opportunity: "Local Manufacturing Breakthrough",
     technology: "Self-Sufficient Colony Technology",
-    prerequisite: "Complete The Expansion",
+    prerequisite: "Complete Second Horizon",
   },
   {
     number: "14",
@@ -345,7 +345,7 @@ export const marsMissions: Mission[] = [
     objective: "Triage multiple simultaneous system failures. Not everything can be saved.",
     opportunity: "Autonomous Colony Management",
     technology: "Advanced Colony Management",
-    prerequisite: "Complete The Independent Colony",
+    prerequisite: "Complete No Lifeline",
   },
   {
     number: "15",
@@ -359,7 +359,7 @@ export const marsMissions: Mission[] = [
     objective: "Survive one complete Martian year with zero external resupply.",
     opportunity: "Mars Biosphere — Final Research Opportunity",
     technology: "Closed-Loop Colony Core",
-    prerequisite: "Complete Cascade",
+    prerequisite: "Complete Critical Mass",
   },
 ];
 
