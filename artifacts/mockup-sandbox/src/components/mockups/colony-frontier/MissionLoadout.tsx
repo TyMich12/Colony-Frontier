@@ -183,7 +183,7 @@ function CategoryHeader({
   const categoryColor = essentialBlocked
     ? "#ff4d4d"
     : categoryBlocked
-      ? "#ff4d4d"
+      ? "#c46c6c"
       : required
         ? "#72b9d4"
         : "#9fce82";
@@ -204,7 +204,7 @@ function CategoryHeader({
         essentialBlocked
           ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_22px_rgba(255,47,47,0.32)] hover:border-[#ff6666]"
           : categoryBlocked
-            ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_18px_rgba(255,47,47,0.18)] hover:border-[#ff6666]"
+            ? "border-[#8b4545] bg-[#241719] shadow-[0_0_18px_rgba(196,108,108,0.12)] hover:border-[#c46c6c]"
             : required
             ? "border-[#3f83a8] bg-[#102936] hover:border-[#5ca8d1]"
             : open
