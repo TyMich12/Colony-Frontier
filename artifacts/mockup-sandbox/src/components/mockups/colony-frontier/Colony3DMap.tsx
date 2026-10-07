@@ -90,11 +90,11 @@ function tierColor(tier: Tier) {
 }
 
 function surfaceRoadColor(mars: boolean) {
-  return mars ? "#a96f50" : "#787f80";
+  return mars ? "#b98569" : "#a99f8e";
 }
 
 function roadEdgeColor(mars: boolean) {
-  return mars ? "#d69a72" : "#bfc6c3";
+  return mars ? "#e0b18f" : "#d8cdb7";
 }
 
 function PathStrip({
@@ -116,7 +116,7 @@ function PathStrip({
         const angle = Math.atan2(dx, dz);
         const mx = (x1 + x2) / 2;
         const mz = (z1 + z2) / 2;
-        const y = terrainHeight(mx, mz) + 0.13;
+        const y = terrainHeight(mx, mz) + 0.16;
         return (
           <group
             key={index}
@@ -124,17 +124,20 @@ function PathStrip({
             rotation={[-Math.PI / 2, 0, angle]}
           >
             <mesh receiveShadow>
-              <planeGeometry args={[width + 0.22, length + 0.1]} />
-              <meshStandardMaterial color={roadEdgeColor(mars)} roughness={0.98} />
+              <planeGeometry args={[width + 0.28, length + 0.08]} />
+              <meshStandardMaterial color={roadEdgeColor(mars)} roughness={0.94} />
             </mesh>
-            <mesh position={[0, 0.016, 0]} receiveShadow>
+            <mesh position={[0, 0.018, 0]} receiveShadow>
               <planeGeometry args={[width, length]} />
-              <meshStandardMaterial color={surfaceRoadColor(mars)} roughness={1} />
+              <meshStandardMaterial color={surfaceRoadColor(mars)} roughness={0.98} />
             </mesh>
-            {Array.from({ length: Math.max(2, Math.floor(length / 2.1)) }, (_, tileIndex) => (
-              <mesh key={tileIndex} position={[0, 0.025, -length / 2 + 0.85 + tileIndex * 2.05]}>
-                <planeGeometry args={[width * 0.82, 0.045]} />
-                <meshBasicMaterial color={roadEdgeColor(mars)} transparent opacity={0.45} />
+            {Array.from({ length: Math.max(2, Math.floor(length / 1.15)) }, (_, tileIndex) => (
+              <mesh
+                key={tileIndex}
+                position={[0, 0.03, -length / 2 + 0.58 + tileIndex * 1.15]}
+              >
+                <planeGeometry args={[width * 0.84, 0.035]} />
+                <meshStandardMaterial color={roadEdgeColor(mars)} roughness={0.96} />
               </mesh>
             ))}
           </group>
@@ -681,6 +684,23 @@ function FenceRow({
           </mesh>
         </group>
       ))}
+    </group>
+  );
+}
+
+function BuildingPlot({ position, size = 3.4, mars }: { position: [number, number]; size?: number; mars: boolean }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.095;
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[size, size]} />
+        <meshStandardMaterial color={mars ? "#9b604b" : "#9a948a"} roughness={1} />
+      </mesh>
+      <mesh position={[0, 0.014, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[size * 0.43, size * 0.46, 4, 1, Math.PI / 4, Math.PI * 2]} />
+        <meshBasicMaterial color={mars ? "#d7a381" : "#d3c7b3"} transparent opacity={0.72} />
+      </mesh>
     </group>
   );
 }
@@ -1786,34 +1806,22 @@ function BuildingDetailTrim({
 
 
 function CityFloor({ mars }: { mars: boolean }) {
-  const tiles = [
-    { x: 0, z: -7.4, w: 18, d: 2.2 },
-    { x: 0, z: 0, w: 2.3, d: 22 },
-    { x: 0, z: 7.1, w: 18, d: 1.9 },
-    { x: -8.5, z: 0.8, w: 2.0, d: 17 },
-    { x: 8.6, z: 0.8, w: 2.0, d: 17 },
-  ];
+  const ground = mars ? "#a8644d" : "#a9a39a";
+  const inset = mars ? "#b97559" : "#b8b1a4";
   return (
     <group>
-      {tiles.map((tile, index) => {
-        const y = terrainHeight(tile.x, tile.z) + 0.08;
-        return (
-          <mesh key={index} receiveShadow position={[tile.x, y, tile.z]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[tile.w, tile.d]} />
-            <meshStandardMaterial color={mars ? "#875743" : "#687477"} roughness={0.97} />
-          </mesh>
-        );
-      })}
-      {Array.from({ length: 9 }, (_, index) => {
-        const x = -8 + index * 2;
-        const y = terrainHeight(x, -7.4) + 0.12;
-        return (
-          <mesh key={index} position={[x, y, -7.4]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[0.72, 1.54]} />
-            <meshStandardMaterial color={mars ? "#b6795e" : "#9aa3a0"} roughness={0.94} />
-          </mesh>
-        );
-      })}
+      <mesh receiveShadow position={[0, terrainHeight(0, 0) + 0.055, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[36.6, 33.0]} />
+        <meshStandardMaterial color={ground} roughness={1} />
+      </mesh>
+      <mesh receiveShadow position={[0, terrainHeight(0, 0) + 0.072, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[31.8, 28.2]} />
+        <meshStandardMaterial color={inset} roughness={0.99} />
+      </mesh>
+      <mesh position={[0, terrainHeight(0, 0) + 0.085, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[14.0, 14.25, 4, 1, Math.PI / 4, Math.PI * 2]} />
+        <meshBasicMaterial color={mars ? "#d89d79" : "#d0c7b7"} transparent opacity={0.38} />
+      </mesh>
     </group>
   );
 }
@@ -2250,9 +2258,10 @@ function MissionScene(props: Props) {
 
   return (
     <Canvas
+      orthographic
       shadows
       dpr={[1, 1.3]}
-      camera={{ position: [57, 70, 54], fov: 49, near: 0.1, far: 360 }}
+      camera={{ position: [47, 56, 47], zoom: 25, near: 0.1, far: 360 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
@@ -2327,6 +2336,17 @@ function MissionScene(props: Props) {
               <PlazaTower position={[-2.65, -2.65]} color="#57dce7" />
               <PlazaTower position={[2.65, 2.65]} color="#57dce7" />
 
+              {props.tracks.map((track) => (
+                track.id !== "rover" ? (
+                  <BuildingPlot
+                    key={`plot-${track.id}`}
+                    position={POSITIONS[track.id] ?? [0, 0]}
+                    size={track.id === "habitat" ? 6.6 : track.id === "extraction" || track.id === "isru" ? 4.0 : 3.5}
+                    mars={mars}
+                  />
+                ) : null
+              ))}
+
               <SettlerCrowd mars={mars} />
 
       {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
@@ -2372,10 +2392,10 @@ function MissionScene(props: Props) {
         enableRotate={false}
         enablePan={false}
         enableZoom
-        minDistance={40}
-        maxDistance={96}
-        zoomSpeed={0.58}
-        target={[0, 1.2, 1.6]}
+        minZoom={18}
+        maxZoom={38}
+        zoomSpeed={0.78}
+        target={[0, 0.9, 1.4]}
       />
     </Canvas>
   );
