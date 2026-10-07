@@ -527,80 +527,37 @@ function BuildingInspector({
   hasMaintenance: boolean;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
-    solar: [
-      { id: "clean", label: "Clean", detail: "Reduce accumulated surface dust." },
-      { id: "inspect", label: "Inspect", detail: "Run a detailed condition scan." },
-    ],
-    habitat: [
-      { id: "repair", label: "Repair", detail: hasMaintenance ? "Use maintenance capability for a stronger repair." : "Perform a basic habitat seal repair." },
-      { id: "inspect", label: "Inspect", detail: "Scan pressure and structural sensors." },
-    ],
-    battery: [
-      { id: "balance", label: "Balance", detail: "Rebalance storage output against colony demand." },
-      { id: "inspect", label: "Inspect", detail: "Check storage condition." },
-    ],
-    rover: [
-      { id: "survey", label: "Survey", detail: "Send the rover onto a local survey route." },
-      { id: "return", label: "Return", detail: "Bring the rover back toward the habitat." },
-      { id: "inspect", label: "Inspect", detail: "Check wheels, power and payload." },
-    ],
-    water: [
-      { id: "flush", label: "Flush", detail: "Restore filtration performance." },
-      { id: "inspect", label: "Inspect", detail: "Check the recovery loop." },
-    ],
-    oxygen: [
-      { id: "reset", label: "Reset", detail: "Reset the atmospheric processing loop." },
-      { id: "inspect", label: "Inspect", detail: "Check flow and condition." },
-    ],
-    maintenance: [
-      { id: "service", label: "Service colony", detail: "Improve condition on the most damaged selected system." },
-      { id: "inspect", label: "Inspect", detail: "Run a colony maintenance scan." },
-    ],
+    solar: [{ id: "clean", label: "Clean", detail: "Reduce solar dust." }, { id: "inspect", label: "Inspect", detail: "Check condition." }],
+    habitat: [{ id: "repair", label: "Repair", detail: hasMaintenance ? "Use maintenance for a stronger repair." : "Repair the habitat seal." }, { id: "inspect", label: "Inspect", detail: "Check structure." }],
+    battery: [{ id: "balance", label: "Balance", detail: "Rebalance storage." }, { id: "inspect", label: "Inspect", detail: "Check storage." }],
+    rover: [{ id: "survey", label: "Survey", detail: "Send the rover to a site." }, { id: "return", label: "Return", detail: "Call it back to base." }, { id: "inspect", label: "Inspect", detail: "Check wheels and payload." }],
+    water: [{ id: "flush", label: "Flush", detail: "Restore filtration." }, { id: "inspect", label: "Inspect", detail: "Check recovery." }],
+    oxygen: [{ id: "reset", label: "Reset", detail: "Reset processing." }, { id: "inspect", label: "Inspect", detail: "Check flow." }],
+    maintenance: [{ id: "service", label: "Service", detail: "Service the weakest system." }, { id: "inspect", label: "Inspect", detail: "Scan the colony." }],
   };
-
-  const actions = actionMap[track.id] ?? [{ id: "inspect", label: "Inspect", detail: "Run a detailed system inspection." }];
+  const actions = actionMap[track.id] ?? [{ id: "inspect", label: "Inspect", detail: "Check this system." }];
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
 
   return (
-    <div className="absolute bottom-6 left-1/2 z-30 w-[min(94vw,470px)] -translate-x-1/2 overflow-hidden rounded-2xl border-2 border-[#f1c95b] bg-[#17222a]/97 shadow-[0_22px_70px_rgba(0,0,0,0.6)]">
-      <div className="flex items-center gap-3 border-b border-[#55646a] bg-gradient-to-r from-[#263944] to-[#18262f] px-4 py-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-[#f1c95b] bg-[#0d171d] shadow-[0_0_18px_rgba(241,201,91,0.16)]">
-          <Icon className="h-5 w-5" style={{ color: tierMeta[tier].color }} />
+    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[min(92vw,360px)]">
+      <div className="pointer-events-auto overflow-hidden rounded-2xl border-2 border-[#eecb61] bg-[#141c22]/96 shadow-[0_12px_35px_rgba(0,0,0,0.52)]">
+        <div className="flex items-center gap-2 border-b border-[#405158] bg-[#23333b] px-3 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#10181d]"><Icon className="h-4 w-4" style={{ color: tierMeta[tier].color }} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-white">{track.tiers[tier].name}</p>
+            <p className="truncate text-[7px] uppercase tracking-[0.1em]" style={{ color: tierMeta[tier].color }}>{track.category} · {tier}</p>
+          </div>
+          <span className="font-mono text-xs font-black" style={{ color: resourceColor(runtime.condition) }}>{Math.round(runtime.condition)}%</span>
+          <button type="button" onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-md text-sm text-[#9fb0b5] hover:bg-[#344a52] hover:text-white" aria-label="Close inspector">×</button>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[8px] font-black uppercase tracking-[0.22em]" style={{ color: tierMeta[tier].color }}>{tier} technology</p>
-          <h2 className="truncate text-base font-black uppercase tracking-[0.08em] text-white">{track.tiers[tier].name}</h2>
-          <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#91a3a8]">{track.category} · {runtime.status}</p>
-        </div>
-        <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#53656b] bg-[#101a20] text-lg font-bold text-[#a5b4b7] hover:border-[#f1c95b] hover:text-white" aria-label="Close inspector">×</button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 border-b border-[#344950] bg-[#111c22] p-3">
-        <div className="rounded-xl border border-[#344d54] bg-[#1a2a31] px-3 py-2">
-          <p className="text-[7px] font-black uppercase tracking-[0.18em] text-[#7f959a]">Condition</p>
-          <p className="mt-1 text-xl font-black" style={{ color: resourceColor(runtime.condition) }}>{Math.round(runtime.condition)}%</p>
-        </div>
-        <div className="rounded-xl border border-[#344d54] bg-[#1a2a31] px-3 py-2">
-          <p className="text-[7px] font-black uppercase tracking-[0.18em] text-[#7f959a]">Dust</p>
-          <p className="mt-1 text-xl font-black text-[#e4ca82]">{Math.round(runtime.dust)}%</p>
-        </div>
-      </div>
-
-      <div className="bg-[#0f1a20] p-3">
-        <p className="text-[9px] leading-4 text-[#c6d1d2]">{track.tiers[tier]?.description ?? track.tiers.Foundation.description}</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1.5 p-2">
           {actions.map((action, index) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => onAction(action.id)}
-              className="rounded-xl border border-[#3e5a61] bg-[#1c3037] px-3 py-2.5 text-left hover:border-[#f1c95b] hover:bg-[#294149]"
-            >
-              <span className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0f1c22] text-[8px] font-black text-[#f3cf67]">{index + 1}</span>
-                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white">{action.label}</span>
+            <button key={action.id} type="button" onClick={() => onAction(action.id)} className="rounded-xl border border-[#3f5860] bg-[#1c3038] px-2.5 py-2 text-left hover:border-[#f3cf63] hover:bg-[#29434c]">
+              <span className="flex items-center gap-1.5">
+                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0c171d] text-[7px] font-black text-[#f4d16a]">{index + 1}</span>
+                <span className="truncate text-[8px] font-black uppercase tracking-[0.08em] text-white">{action.label}</span>
               </span>
-              <span className="mt-1.5 block text-[7px] leading-3.5 text-[#84999d]">{action.detail}</span>
+              <span className="mt-1 block truncate text-[7px] text-[#8da1a6]">{action.detail}</span>
             </button>
           ))}
         </div>
@@ -620,35 +577,31 @@ function ResourceInspector({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute bottom-24 right-5 z-30 w-[min(92vw,360px)] border border-[#6b805c] bg-[#14231c]/96 shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop-blur-md">
-      <div className="border-b border-[#4e6758] bg-[#20372b] p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.23em] text-[#f0c96d]">Terrain discovery</p>
-            <h2 className="mt-1 text-sm font-semibold uppercase tracking-[0.1em] text-[#f3f0df]">{node.label}</h2>
-            <p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-[#8eaa97]">{node.kind} · {surveyed ? "SITE SURVEYED" : "UNSURVEYED"}</p>
+    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[min(92vw,330px)]">
+      <div className="pointer-events-auto overflow-hidden rounded-2xl border-2 border-[#d8ad5c] bg-[#17231d]/96 shadow-[0_12px_35px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center gap-2 bg-[#28402e] px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[8px] font-black uppercase tracking-[0.15em] text-[#f2d27a]">{node.label}</p>
+            <p className="mt-0.5 text-[7px] uppercase tracking-[0.1em] text-[#9fb8a6]">{node.kind} · {surveyed ? "SURVEYED" : "UNSURVEYED"}</p>
           </div>
-          <button type="button" onClick={onClose} className="text-[#76908b] hover:text-[#f0c673]" aria-label="Close terrain panel">×</button>
+          <button type="button" onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-md text-sm text-[#9bb0a1] hover:bg-[#3c5842] hover:text-white" aria-label="Close resource inspector">×</button>
         </div>
-      </div>
-      <div className="p-4">
-        <p className="text-xs leading-5 text-[#d0dbd2]">{node.description}</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => onAction("survey")} className="border border-[#557060] bg-[#19352a] px-3 py-3 text-left hover:border-[#efb658]">
-            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#e8eedf]">{surveyed ? "Resurvey" : "Survey"}</span>
-            <span className="mt-1 block text-[8px] leading-4 text-[#86a293]">{hasRover ? "Send the rover to map the site." : "Use local sensors to scan the site."}</span>
+        <div className="grid grid-cols-2 gap-1.5 p-2">
+          <button type="button" onClick={() => onAction("survey")} className="rounded-xl border border-[#4e6d57] bg-[#1b3625] px-2.5 py-2 text-left hover:border-[#f0cf68]">
+            <span className="block text-[8px] font-black uppercase tracking-[0.08em] text-white">{surveyed ? "Resurvey" : "Survey"}</span>
+            <span className="mt-1 block truncate text-[7px] text-[#91ab98]">{hasRover ? "Send rover." : "Use sensors."}</span>
           </button>
-          <button type="button" onClick={() => onAction("sample")} disabled={!surveyed} className="border border-[#557060] bg-[#19352a] px-3 py-3 text-left hover:border-[#efb658] disabled:cursor-not-allowed disabled:opacity-35">
-            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#e8eedf]">Sample</span>
-            <span className="mt-1 block text-[8px] leading-4 text-[#86a293]">Collect a field result after surveying the site.</span>
+          <button type="button" disabled={!surveyed} onClick={() => onAction("sample")} className="rounded-xl border border-[#4e6d57] bg-[#1b3625] px-2.5 py-2 text-left disabled:opacity-40 hover:border-[#f0cf68]">
+            <span className="block text-[8px] font-black uppercase tracking-[0.08em] text-white">Sample</span>
+            <span className="mt-1 block truncate text-[7px] text-[#91ab98]">Collect a result.</span>
           </button>
+          {hasExtraction && surveyed && (
+            <button type="button" onClick={() => onAction("extract")} className="col-span-2 rounded-xl border border-[#806640] bg-[#332a1c] px-2.5 py-2 text-left hover:border-[#f0cf68]">
+              <span className="block text-[8px] font-black uppercase tracking-[0.08em] text-[#ffe7b0]">Test extraction point</span>
+              <span className="mt-1 block truncate text-[7px] text-[#b69f79]">Spend power for a small resource yield.</span>
+            </button>
+          )}
         </div>
-        {hasExtraction && surveyed && (
-          <button type="button" onClick={() => onAction("extract")} className="mt-2 w-full border border-[#7c6842] bg-[#32291c] px-3 py-3 text-left hover:border-[#efb658]">
-            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#f2e1be]">Test extraction point</span>
-            <span className="mt-1 block text-[8px] leading-4 text-[#aa9978]">Spend power to recover a small resource yield.</span>
-          </button>
-        )}
       </div>
     </div>
   );
