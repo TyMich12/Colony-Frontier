@@ -42,6 +42,7 @@ import {
   type MissionMetrics,
   type PendingMission,
 } from "./missionRuntime";
+import { Colony3DMap } from "./Colony3DMap";
 
 const TOTAL_MISSION_SECONDS = 14 * 30;
 const EVENT_TIMES = [60, 120, 195, 255, 315, 375];
@@ -460,133 +461,26 @@ function IsometricMap({
   surveyedNodes: string[];
   onSelectResource: (node: ResourceNode) => void;
 }) {
-  const layout: Record<string, [number, number]> = {
-    solar: [285, 135], comms: [575, 135], habitat: [430, 265], battery: [630, 285],
-    oxygen: [300, 345], water: [555, 355], radiation: [770, 245], navigation: [720, 390],
-    rover: [420, 465], thermal: [250, 455], grid: [635, 480], science: [805, 405],
-    extraction: [520, 505], isru: [820, 505], agriculture: [335, 515], maintenance: [610, 180],
-  };
-  const nodes = RESOURCE_NODES[environmentLabel === "MARS" ? "MARS" : "MOON"];
-  const mars = environmentLabel === "MARS";
-  const terrainBase = mars ? "#76513f" : "#77745a";
-  const terrainMid = mars ? "#ad7456" : "#9d9a73";
-  const terrainLight = mars ? "#cf9771" : "#c0ba8d";
-  const terrainDark = mars ? "#4f3830" : "#505545";
-
   return (
-    <svg viewBox="0 0 1000 600" className="h-full w-full select-none" role="img" aria-label="Colorful isometric colony map">
-      <defs>
-        <linearGradient id="terrainGradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={terrainLight} />
-          <stop offset="48%" stopColor={terrainMid} />
-          <stop offset="100%" stopColor={terrainBase} />
-        </linearGradient>
-        <radialGradient id="colonyGlow">
-          <stop offset="0%" stopColor={mars ? "#c5efc5" : "#ebe3a9"} stopOpacity="0.6" />
-          <stop offset="100%" stopColor={mars ? "#c5efc5" : "#ebe3a9"} stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="pathGradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={mars ? "#e0b07f" : "#e1dbb2"} />
-          <stop offset="100%" stopColor={mars ? "#ae704f" : "#8a8667"} />
-        </linearGradient>
-        <filter id="softShadow">
-          <feGaussianBlur stdDeviation="5" />
-        </filter>
-      </defs>
-
-      <rect width="1000" height="600" fill={mars ? "#392724" : "#34372e"} />
-      <polygon points="500,26 968,284 500,582 32,284" fill="url(#terrainGradient)" stroke={mars ? "#e2aa7d" : "#d8d09b"} strokeWidth="4" />
-
-      <g opacity="0.22">
-        {Array.from({ length: 38 }).map((_, index) => {
-          const cx = 65 + ((index * 149) % 870);
-          const cy = 70 + ((index * 71) % 430);
-          const rx = 7 + (index % 6) * 3;
-          const ry = 3 + (index % 4) * 2;
-          return <ellipse key={index} cx={cx} cy={cy} rx={rx} ry={ry} fill={index % 2 === 0 ? terrainLight : terrainDark} transform={`rotate(${(index % 5) * 12 - 24} ${cx} ${cy})`} />;
-        })}
-      </g>
-
-      <g opacity="0.55">
-        <ellipse cx="145" cy="170" rx="68" ry="36" fill={terrainDark} opacity="0.5" />
-        <ellipse cx="145" cy="170" rx="43" ry="23" fill={terrainBase} opacity="0.6" />
-        <ellipse cx="845" cy="185" rx="76" ry="40" fill={terrainDark} opacity="0.42" />
-        <ellipse cx="845" cy="185" rx="49" ry="25" fill={terrainBase} opacity="0.58" />
-        <ellipse cx="185" cy="445" rx="62" ry="33" fill={terrainDark} opacity="0.36" />
-        <ellipse cx="790" cy="445" rx="61" ry="32" fill={terrainDark} opacity="0.32" />
-      </g>
-
-      <path d="M 410 292 C 360 250 315 205 275 150" fill="none" stroke="url(#pathGradient)" strokeWidth="20" strokeLinecap="round" opacity="0.72" />
-      <path d="M 460 320 C 545 316 630 304 713 275" fill="none" stroke="url(#pathGradient)" strokeWidth="19" strokeLinecap="round" opacity="0.7" />
-      <path d="M 450 335 C 446 389 438 426 420 460" fill="none" stroke="url(#pathGradient)" strokeWidth="18" strokeLinecap="round" opacity="0.67" />
-      <path d="M 405 325 C 350 350 304 377 260 415" fill="none" stroke="url(#pathGradient)" strokeWidth="16" strokeLinecap="round" opacity="0.58" />
-
-      <circle cx="500" cy="300" r="190" fill="url(#colonyGlow)" />
-      <circle cx="500" cy="300" r="120" fill="none" stroke={mars ? "#b2e5af" : "#e5dea9"} strokeWidth="4" strokeDasharray="5 12" opacity="0.45" />
-      <circle cx="500" cy="300" r="78" fill="none" stroke={mars ? "#8bc79e" : "#d7cf91"} strokeWidth="2" opacity="0.45" />
-
-      <g>
-        {nodes.map((node) => {
-          const surveyed = surveyedNodes.includes(node.id);
-          const selectedNode = selectedResourceId === node.id;
-          const nodeFill = node.kind === "ICE" ? "#6ed5f2" : node.kind === "MINERAL" ? "#f0c76e" : node.kind === "SCIENCE" ? "#bd98e8" : "#a79578";
-          const symbol = node.kind === "ICE" ? "◆" : node.kind === "MINERAL" ? "◇" : node.kind === "SCIENCE" ? "✦" : "●";
-          return (
-            <g key={node.id} onClick={() => onSelectResource(node)} style={{ cursor: "pointer" }}>
-              <circle cx={node.x} cy={node.y} r={selectedNode ? 30 : 23} fill={nodeFill} opacity="0.14" className="animate-pulse" />
-              <circle cx={node.x} cy={node.y} r={selectedNode ? 14 : 11} fill={nodeFill} stroke={selectedNode ? "#fff6c6" : "#f4e9c6"} strokeWidth={selectedNode ? 3 : 1.5} />
-              <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#26332e" fontSize="11" fontWeight="900">{symbol}</text>
-              <text x={node.x} y={node.y + 29} textAnchor="middle" fill="#fff8d8" fontSize="9" fontWeight="900" letterSpacing="1">{surveyed ? "SURVEYED" : node.label}</text>
-            </g>
-          );
-        })}
-      </g>
-
-      {Array.from({ length: 15 }).map((_, index) => (
-        <path key={index} d={`M ${130 + index * 49} 286 L 500 ${64 + index * 34} L ${870 - index * 49} 286`} fill="none" stroke={mars ? "#f0b488" : "#ece3b3"} strokeWidth="1" strokeOpacity="0.16" />
-      ))}
-
-      {tracks.map((track) => {
-        const [x, y] = layout[track.id] ?? [500, 300];
-        const runtime = buildings[track.id] ?? { condition: 100, dust: 0, status: "ONLINE" };
-        const roverOffset = track.id === "rover" ? Math.sin(elapsed / 12) * 70 : 0;
-        const roverY = track.id === "rover" ? y - Math.cos(elapsed / 18) * 22 : y;
-        return (
-          <g key={track.id}>
-            <ellipse cx={x + roverOffset} cy={roverY + 8} rx="54" ry="25" fill="#111b17" opacity="0.33" filter="url(#softShadow)" />
-            <BuildingShape
-              track={track}
-              tier={selected[track.id]}
-              runtime={runtime}
-              selected={selectedBuildingId === track.id}
-              alerted={activeEventTrackId === track.id}
-              x={x + roverOffset}
-              y={roverY}
-              onClick={() => onSelect(track.id)}
-            />
-          </g>
-        );
-      })}
-
-      <g opacity="0.9">
-        <circle cx="205" cy="150" r="4" fill="#fbe8a2" className="animate-pulse" />
-        <circle cx="850" cy="355" r="3" fill="#c7f0c0" className="animate-pulse" />
-        <circle cx="180" cy="380" r="3" fill="#efc0a0" className="animate-pulse" />
-        <circle cx="790" cy="470" r="4" fill="#f5d488" className="animate-pulse" />
-      </g>
-
-      {Array.from({ length: 20 }).map((_, index) => {
-        const x = 78 + ((index * 73) % 830);
-        const y = 100 + ((index * 59) % 360);
-        const drift = ((elapsed * 0.8) + index * 11) % 80;
-        return <circle key={index} cx={x + drift} cy={y} r={index % 3 === 0 ? 2.6 : 1.5} fill={mars ? "#e1a97e" : "#ddd1a2"} opacity={buildings.solar?.dust && buildings.solar.dust > 18 ? 0.34 : 0.1} />;
-      })}
-
-      <rect x="367" y="50" width="266" height="36" rx="18" fill="#1a2a24" opacity="0.82" />
-      <text x="500" y="73" textAnchor="middle" fill="#fff4c8" fontSize="11" fontWeight="900" letterSpacing="2.1">{environmentLabel} OUTPOST · {environmentTitle}</text>
-    </svg>
+    <Colony3DMap
+      tracks={tracks}
+      selected={selected}
+      buildings={buildings}
+      selectedBuildingId={selectedBuildingId}
+      elapsed={elapsed}
+      environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
+      environmentTitle={environmentTitle}
+      activeEventTrackId={activeEventTrackId}
+      selectedResourceId={selectedResourceId}
+      surveyedNodes={surveyedNodes}
+      resourceNodes={RESOURCE_NODES[environmentLabel === "MARS" ? "MARS" : "MOON"]}
+      onSelect={onSelect}
+      onSelectResource={onSelectResource}
+      roverTask="STANDBY"
+    />
   );
 }
+
 function MetricBar({
   icon,
   label,
