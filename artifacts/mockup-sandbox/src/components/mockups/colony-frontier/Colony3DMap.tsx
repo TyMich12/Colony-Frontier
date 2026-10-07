@@ -2222,9 +2222,6 @@ function MissionScene(props: Props) {
               <WorkshopYard position={[-12.4, 7.1]} index={2} />
               <WorkshopYard position={[12.1, -1.0]} index={3} />
 
-              {decorativeTrees.map(([x, z, scale, flower], index) => (
-              ))}
-
               {gardens.map(([x, z, scale], index) => (
                 <GardenPatch key={index} position={[x, z]} scale={scale} flower={!mars || index % 2 === 0} />
               ))}
