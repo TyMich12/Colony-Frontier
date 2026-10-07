@@ -513,12 +513,59 @@ function ColonyBuilding({ track, tier, runtime, selected, alerted, position, rov
   );
 }
 
+function WorkerBots() {
+  const refs = useRef<THREE.Group[]>([]);
+  const routes: Array<[[number, number], [number, number]]> = [
+    [[-9, -4], [0, 0]],
+    [[2, 1], [6, 8]],
+    [[-2, 11], [11, 6]],
+  ];
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    refs.current.forEach((group, index) => {
+      if (!group) return;
+      const [a, b] = routes[index];
+      const p = (Math.sin(t * (0.35 + index * 0.06) + index) + 1) / 2;
+      const x = THREE.MathUtils.lerp(a[0], b[0], p);
+      const z = THREE.MathUtils.lerp(a[1], b[1], p);
+      const nx = THREE.MathUtils.lerp(a[0], b[0], Math.min(1, p + 0.03));
+      const nz = THREE.MathUtils.lerp(a[1], b[1], Math.min(1, p + 0.03));
+      group.position.set(x, terrainHeight(x, z) + 0.35, z);
+      group.rotation.y = Math.atan2(nx - x, nz - z);
+      group.position.y += Math.abs(Math.sin(t * 7 + index)) * 0.045;
+    });
+  });
+
+  return (
+    <group>
+      {routes.map((_, index) => (
+        <group key={index} ref={(node) => { if (node) refs.current[index] = node; }}>
+          <mesh castShadow position={[0, 0.22, 0]} scale={[0.72, 1, 0.72]}>
+            <sphereGeometry args={[0.22, 12, 8]} />
+            <meshStandardMaterial color={index === 1 ? "#ff8b4d" : index === 2 ? "#8f7cff" : "#f5d35c"} roughness={0.72} />
+          </mesh>
+          <mesh position={[0, 0.5, 0]}>
+            <sphereGeometry args={[0.12, 12, 8]} />
+            <meshStandardMaterial color="#f3eee1" roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.54, 0.1]}>
+            <sphereGeometry args={[0.045, 8, 6]} />
+            <meshStandardMaterial color="#3de4ff" emissive="#3de4ff" emissiveIntensity={0.8} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function ResourceMarker({ node, surveyed, selected, onClick }: {
   node: MissionResourceNode;
   surveyed: boolean;
   selected: boolean;
   onClick: () => void;
 }) {
+  const ref = useRef<THREE.Group>(null);
   const [x, z] = nodeWorldPosition(node);
   const y = terrainHeight(x, z);
   const color = node.kind === "ICE"
@@ -529,11 +576,18 @@ function ResourceMarker({ node, surveyed, selected, onClick }: {
         ? "#cc8cff"
         : "#b39c7f";
 
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    const pulse = selected ? 1.08 + (Math.sin(t * 4) + 1) * 0.045 : 0.96 + (Math.sin(t * 2.2 + x) + 1) * 0.02;
+    ref.current.scale.setScalar(pulse);
+  });
+
   return (
-    <group position={[x, y + 0.36, z]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
+    <group ref={ref} position={[x, y + 0.36, z]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
       <mesh>
         <octahedronGeometry args={[0.42, 0]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.48} roughness={0.34} metalness={0.14} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected ? 0.85 : 0.48} roughness={0.34} metalness={0.14} />
       </mesh>
       <mesh position={[0, -0.28, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.54, selected ? 0.8 : 0.66, 24]} />
@@ -578,6 +632,7 @@ function MissionScene(props: Props) {
       <Rocks kind={mars ? "mars" : "moon"} />
       <FoundationPad />
       <ConnectionPaths />
+      <WorkerBots />
 
       {props.resourceNodes.map((node) => (
         <ResourceMarker
