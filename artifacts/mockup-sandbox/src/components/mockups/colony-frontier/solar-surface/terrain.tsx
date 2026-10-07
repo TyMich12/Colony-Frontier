@@ -53,9 +53,9 @@ export function Rocks({ kind }: { kind: TerrainKind }) {
     const rnd = mulberry32(kind === "moon" ? 7 : 99);
     const arr: { p: THREE.Vector3; s: number; r: number }[] = [];
 
-    for (let i = 0; i < 72; i += 1) {
+    for (let i = 0; i < 48; i += 1) {
       const angle = rnd() * Math.PI * 2;
-      const radius = 21 + rnd() * 24;
+      const radius = 26 + rnd() * 22;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const s = 0.15 + rnd() * (rnd() > 0.9 ? 2.2 : 0.7);
