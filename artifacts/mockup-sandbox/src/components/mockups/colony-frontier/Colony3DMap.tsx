@@ -559,6 +559,567 @@ function PlazaTower({ position, color }: { position: [number, number]; color: st
 }
 
 
+port { useMemo, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, Text } from "@react-three/drei";
+import * as THREE from "three";
+import type { TechnologyTrack, Tier } from "./_shared/gameData";
+import type { BuildingRuntime } from "./missionRuntime";
+import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+
+export type MissionResourceNode = {
+  id: string;
+  label: string;
+  kind: "ICE" | "MINERAL" | "SCIENCE" | "REGOLITH";
+  x: number;
+  y: number;
+  description: string;
+};
+
+type Props = {
+  tracks: TechnologyTrack[];
+  selected: Record<string, Tier>;
+  buildings: Record<string, BuildingRuntime>;
+  selectedBuildingId: string | null;
+  elapsed: number;
+  environmentLabel: "MOON" | "MARS";
+  environmentTitle: string;
+  activeEventTrackId: string | null;
+  selectedResourceId: string | null;
+  surveyedNodes: string[];
+  resourceNodes: MissionResourceNode[];
+  onSelect: (trackId: string) => void;
+  onSelectResource: (node: MissionResourceNode) => void;
+  roverTask: string;
+};
+
+const POSITIONS: Record<string, [number, number]> = {
+  habitat: [0, 0],
+  grid: [0, -4.8],
+  solar: [-5.4, -6.5],
+  battery: [6.2, -2.1],
+  oxygen: [-6.2, 2.0],
+  co2: [-3.1, 4.9],
+  water: [6.4, 4.0],
+  comms: [5.9, -7.0],
+  navigation: [-6.2, 7.9],
+  radiation: [7.5, 8.0],
+  rover: [0, 9.1],
+  agriculture: [-9.9, 5.2],
+  thermal: [-9.0, -1.4],
+  science: [9.2, -6.8],
+  extraction: [-8.8, 9.8],
+  isru: [8.7, 11.0],
+  maintenance: [10.3, 2.7],
+};
+
+const BUILDING_ROTATIONS: Record<string, number> = {
+  habitat: 0,
+  grid: 0,
+  solar: 0.25,
+  battery: -0.2,
+  oxygen: 0.16,
+  co2: 0.1,
+  water: -0.08,
+  comms: 0.45,
+  navigation: -0.12,
+  radiation: 0.22,
+  rover: 0,
+  agriculture: -0.15,
+  thermal: 0.05,
+  science: -0.42,
+  extraction: 0.08,
+  isru: -0.12,
+  maintenance: 0.3,
+};
+
+function nodeWorldPosition(node: MissionResourceNode): [number, number] {
+  return [(node.x - 500) / 22, (node.y - 300) / 10];
+}
+
+function statusColor(condition: number) {
+  return condition < 55 ? "#ff705d" : condition < 82 ? "#f5c85d" : "#7be0a0";
+}
+
+function tierColor(tier: Tier) {
+  return tier === "Foundation"
+    ? "#62df8b"
+    : tier === "Frontier"
+      ? "#2dcaf1"
+      : tier === "Apex"
+        ? "#bb6cff"
+        : "#ffae3f";
+}
+
+function surfaceRoadColor(mars: boolean) {
+  return mars ? "#a96f50" : "#787f80";
+}
+
+function roadEdgeColor(mars: boolean) {
+  return mars ? "#d69a72" : "#bfc6c3";
+}
+
+function PathStrip({
+  points,
+  width = 0.86,
+  mars,
+}: {
+  points: Array<[number, number]>;
+  width?: number;
+  mars: boolean;
+}) {
+  return (
+    <group>
+      {points.slice(0, -1).map(([x1, z1], index) => {
+        const [x2, z2] = points[index + 1];
+        const dx = x2 - x1;
+        const dz = z2 - z1;
+        const length = Math.hypot(dx, dz);
+        const angle = Math.atan2(dx, dz);
+        const mx = (x1 + x2) / 2;
+        const mz = (z1 + z2) / 2;
+        const y = terrainHeight(mx, mz) + 0.13;
+        return (
+          <group
+            key={index}
+            position={[mx, y, mz]}
+            rotation={[-Math.PI / 2, 0, angle]}
+          >
+            <mesh receiveShadow>
+              <planeGeometry args={[width + 0.22, length + 0.1]} />
+              <meshStandardMaterial color={roadEdgeColor(mars)} roughness={0.98} />
+            </mesh>
+            <mesh position={[0, 0.016, 0]} receiveShadow>
+              <planeGeometry args={[width, length]} />
+              <meshStandardMaterial color={surfaceRoadColor(mars)} roughness={1} />
+            </mesh>
+            {Array.from({ length: Math.max(2, Math.floor(length / 2.1)) }, (_, tileIndex) => (
+              <mesh key={tileIndex} position={[0, 0.025, -length / 2 + 0.85 + tileIndex * 2.05]}>
+                <planeGeometry args={[width * 0.82, 0.045]} />
+                <meshBasicMaterial color={roadEdgeColor(mars)} transparent opacity={0.45} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function CityRoadNetwork({ mars }: { mars: boolean }) {
+  const routes: Array<Array<[number, number]>> = [
+    [[-15.8, -15.6], [-8.2, -11.8], [0, -7.7], [0, -4.8], [0, 0]],
+    [[0, 0], [0, 4.0], [0, 9.1], [4.4, 11.0], [8.7, 11.0]],
+    [[0, 0], [-3.1, 4.9], [-6.2, 7.9], [-8.8, 9.8]],
+    [[0, 0], [-6.2, 2.0], [-9.9, 5.2], [-6.2, 7.9]],
+    [[0, 0], [6.4, 4.0], [7.5, 8.0], [8.7, 11.0]],
+    [[0, 0], [6.2, -2.1], [5.9, -7.0], [9.2, -6.8]],
+    [[-6.2, 2.0], [-3.1, 4.9], [6.4, 4.0], [10.3, 2.7]],
+    [[-6.2, 2.0], [-9.0, -1.4], [-5.4, -6.5], [0, -4.8]],
+  ];
+
+  return (
+    <group>
+      {routes.map((route, index) => (
+        <PathStrip
+          key={index}
+          points={route}
+          width={index === 0 ? 1.2 : index < 4 ? 0.98 : 0.86}
+          mars={mars}
+        />
+      ))}
+    </group>
+  );
+}
+
+function Plaza({
+  position,
+  radius,
+  mars,
+  accent,
+}: {
+  position: [number, number];
+  radius: number;
+  mars: boolean;
+  accent: string;
+}) {
+  const ringRef = useRef<THREE.Mesh>(null);
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.17;
+
+  useFrame(({ clock }) => {
+    if (ringRef.current) ringRef.current.rotation.z = clock.getElapsedTime() * 0.08;
+  });
+
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[radius, 48]} />
+        <meshStandardMaterial color={mars ? "#704638" : "#59666a"} roughness={0.9} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.022, 0]}>
+        <ringGeometry args={[radius * 0.77, radius * 0.81, 48]} />
+        <meshBasicMaterial color={accent} transparent opacity={0.65} />
+      </mesh>
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.027, 0]}>
+        <ringGeometry args={[radius * 0.4, radius * 0.44, 32]} />
+        <meshBasicMaterial color={mars ? "#e8b66d" : "#f1cf61"} transparent opacity={0.72} />
+      </mesh>
+    </group>
+  );
+}
+
+function CentralCommandCenter({ color }: { color: string }) {
+  const beaconRef = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (beaconRef.current) {
+      beaconRef.current.rotation.y = t * 0.5;
+      const mat = beaconRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 0.9 + (Math.sin(t * 2.5) + 1) * 0.22;
+    }
+    if (ringRef.current) ringRef.current.rotation.z = -t * 0.18;
+  });
+
+  return (
+    <group>
+      <mesh castShadow receiveShadow position={[0, 0.42, 0]}>
+        <cylinderGeometry args={[1.62, 1.78, 0.84, 14]} />
+        <meshStandardMaterial color="#4f5b60" roughness={0.72} metalness={0.22} />
+      </mesh>
+      <mesh castShadow position={[0, 0.94, 0]}>
+        <cylinderGeometry args={[1.42, 1.52, 0.24, 14]} />
+        <meshStandardMaterial color="#899291" roughness={0.52} metalness={0.34} />
+      </mesh>
+      <mesh castShadow position={[0, 1.45, 0]}>
+        <sphereGeometry args={[1.32, 28, 18]} />
+        <meshStandardMaterial color="#79cbd0" emissive="#245d68" emissiveIntensity={0.25} roughness={0.28} />
+      </mesh>
+      <mesh position={[0, 1.47, 0]}>
+        <torusGeometry args={[0.92, 0.075, 8, 30]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <mesh ref={ringRef} position={[0, 1.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.18, 0.035, 6, 28]} />
+        <meshBasicMaterial color="#54eaff" transparent opacity={0.68} />
+      </mesh>
+      <mesh position={[0, 2.35, 0]}>
+        <cylinderGeometry args={[0.13, 0.18, 1.4, 10]} />
+        <meshStandardMaterial color="#dce3de" metalness={0.7} roughness={0.2} />
+      </mesh>
+      <mesh ref={beaconRef} position={[0, 3.06, 0]}>
+        <octahedronGeometry args={[0.3, 0]} />
+        <meshStandardMaterial color="#60eaff" emissive="#1fcfda" emissiveIntensity={1} metalness={0.12} roughness={0.18} />
+      </mesh>
+      <mesh position={[0, 2.55, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.52, 0.048, 8, 24]} />
+        <meshBasicMaterial color="#ffcf5c" />
+      </mesh>
+      {[-0.9, 0.9].map((x) => (
+        <group key={x} position={[x, 0.68, 0]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.24, 0.28, 0.75, 10]} />
+            <meshStandardMaterial color="#6f7b7c" roughness={0.6} metalness={0.2} />
+          </mesh>
+          <mesh position={[0, 0.42, 0]}>
+            <sphereGeometry args={[0.16, 10, 8]} />
+            <meshStandardMaterial color="#58dce6" emissive="#21c5d2" emissiveIntensity={0.6} />
+          </mesh>
+        </group>
+      ))}
+      <Text position={[0, 3.52, 0]} rotation={[-0.66, 0, 0]} fontSize={0.24} color="#fff1b4" outlineWidth={0.035} outlineColor="#28221f" anchorX="center">
+        COMMAND HABITAT
+      </Text>
+    </group>
+  );
+}
+
+function DecorativeTree({
+  position,
+  scale = 1,
+  flower = false,
+  mars = false,
+}: {
+  position: [number, number];
+  scale?: number;
+  flower?: boolean;
+  mars?: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.02;
+  const foliage = mars ? (flower ? "#d98d72" : "#6e8f5d") : flower ? "#e39abb" : "#5f9f67";
+
+  return (
+    <group position={[x, y, z]} scale={scale}>
+      <mesh castShadow position={[0, 0.48, 0]}>
+        <cylinderGeometry args={[0.095, 0.14, 0.96, 8]} />
+        <meshStandardMaterial color="#5f5046" roughness={0.94} />
+      </mesh>
+      {[
+        [-0.21, 0.66, 0],
+        [0.18, 0.74, 0.06],
+        [0, 1.04, -0.03],
+        [0.22, 0.98, 0.11],
+        [-0.16, 0.96, 0.07],
+      ].map(([bx, by, bz], index) => (
+        <mesh key={index} castShadow position={[bx, by, bz]}>
+          <sphereGeometry args={[0.28 + (index % 2) * 0.06, 10, 8]} />
+          <meshStandardMaterial color={foliage} roughness={0.96} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function GardenPatch({
+  position,
+  scale = 1,
+  flower = false,
+}: {
+  position: [number, number];
+  scale?: number;
+  flower?: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.03;
+  return (
+    <group position={[x, y, z]} scale={scale}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[2.3, 1.35]} />
+        <meshStandardMaterial color="#4c604d" roughness={1} />
+      </mesh>
+      {Array.from({ length: 12 }, (_, index) => {
+        const gx = ((index % 4) - 1.5) * 0.46;
+        const gz = (Math.floor(index / 4) - 1) * 0.38;
+        return (
+          <group key={index} position={[gx, 0.11 + (index % 2) * 0.03, gz]}>
+            <mesh>
+              <cylinderGeometry args={[0.035, 0.05, 0.22, 6]} />
+              <meshStandardMaterial color="#6d4d36" roughness={0.95} />
+            </mesh>
+            <mesh position={[0, 0.14, 0]}>
+              <sphereGeometry args={[0.095, 8, 6]} />
+              <meshStandardMaterial color={flower ? "#d888ae" : "#75b56b"} roughness={0.92} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function CrateCluster({ position, large = false }: { position: [number, number]; large?: boolean }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.17;
+  const s = large ? 1.12 : 1;
+  return (
+    <group position={[x, y, z]} scale={s}>
+      {[
+        [0, 0.22, 0],
+        [0.36, 0.18, 0.15],
+        [-0.26, 0.16, -0.33],
+        [0.18, 0.57, -0.08],
+      ].map(([cx, cy, cz], index) => (
+        <mesh key={index} castShadow position={[cx, cy, cz]} rotation={[0, (index % 2) * 0.12, 0]}>
+          <boxGeometry args={[0.5, 0.4, 0.5]} />
+          <meshStandardMaterial color={index % 2 ? "#839694" : "#bf8e4f"} roughness={0.86} metalness={0.12} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PipeRuns() {
+  const pipes: Array<[number, number, number, number]> = [
+    [-6.2, 2.0, -3.1, 4.9],
+    [6.4, 4.0, 10.3, 2.7],
+    [-9.0, -1.4, -5.4, -6.5],
+    [-3.1, 4.9, 0, 0],
+    [6.2, -2.1, 0, -4.8],
+  ];
+  return (
+    <group>
+      {pipes.map(([x1, z1, x2, z2], index) => {
+        const dx = x2 - x1;
+        const dz = z2 - z1;
+        const length = Math.hypot(dx, dz);
+        const angle = Math.atan2(dx, dz);
+        const mx = (x1 + x2) / 2;
+        const mz = (z1 + z2) / 2;
+        return (
+          <group key={index} position={[mx, terrainHeight(mx, mz) + 0.24, mz]} rotation={[0, angle, 0]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.08, 0.08, length, 8]} />
+              <meshStandardMaterial color="#7f8a88" metalness={0.55} roughness={0.32} />
+            </mesh>
+            <mesh position={[0, 0.08, 0]}>
+              <cylinderGeometry args={[0.035, 0.035, length, 6]} />
+              <meshStandardMaterial color="#39dce9" emissive="#1da8b4" emissiveIntensity={0.34} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function StreetLamp({ position, mars = false }: { position: [number, number]; mars?: boolean }) {
+  const bulbRef = useRef<THREE.Mesh>(null);
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.02;
+  useFrame(({ clock }) => {
+    if (!bulbRef.current) return;
+    (bulbRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity =
+      0.72 + (Math.sin(clock.getElapsedTime() * 2.1 + x) + 1) * 0.1;
+  });
+  return (
+    <group position={[x, y, z]}>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.045, 0.07, 0.72, 8]} />
+        <meshStandardMaterial color={mars ? "#5b514f" : "#5d6869"} metalness={0.45} roughness={0.45} />
+      </mesh>
+      <mesh position={[0.16, 0.31, 0]}>
+        <boxGeometry args={[0.33, 0.045, 0.045]} />
+        <meshStandardMaterial color="#65706f" metalness={0.45} roughness={0.4} />
+      </mesh>
+      <mesh ref={bulbRef} position={[0.31, 0.25, 0]}>
+        <sphereGeometry args={[0.085, 10, 8]} />
+        <meshStandardMaterial color="#ffdf78" emissive="#ffbf2a" emissiveIntensity={1} />
+      </mesh>
+    </group>
+  );
+}
+
+function SettlementGate({
+  mars,
+}: {
+  mars: boolean;
+}) {
+  const wall = mars ? "#6e4136" : "#56636a";
+  const cap = mars ? "#d89b6d" : "#c2cbca";
+  return (
+    <group position={[0, terrainHeight(0, -15.5) + 0.06, -15.5]}>
+      <mesh castShadow>
+        <boxGeometry args={[5.2, 1.35, 0.62]} />
+        <meshStandardMaterial color={wall} roughness={0.78} metalness={0.18} />
+      </mesh>
+      {[[-2.05, 0], [2.05, 0]].map(([x], index) => (
+        <group key={index} position={[x, 1.0, 0]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.72, 0.84, 2.45, 12]} />
+            <meshStandardMaterial color={wall} roughness={0.72} metalness={0.2} />
+          </mesh>
+          <mesh position={[0, 1.33, 0]}>
+            <cylinderGeometry args={[0.58, 0.67, 0.22, 12]} />
+            <meshStandardMaterial color={cap} roughness={0.38} metalness={0.32} />
+          </mesh>
+          <mesh position={[0, 1.7, 0]}>
+            <coneGeometry args={[0.35, 0.55, 8]} />
+            <meshStandardMaterial color={index ? "#4cdbec" : "#f2c95f"} emissive={index ? "#1b9aa8" : "#b97a17"} emissiveIntensity={0.42} />
+          </mesh>
+        </group>
+      ))}
+      <mesh castShadow position={[0, 1.28, -0.08]}>
+        <boxGeometry args={[2.15, 2.05, 0.55]} />
+        <meshStandardMaterial color="#394349" roughness={0.73} metalness={0.18} />
+      </mesh>
+      <mesh position={[0, 1.3, -0.4]}>
+        <boxGeometry args={[1.55, 1.72, 0.06]} />
+        <meshStandardMaterial color="#1e282c" roughness={0.45} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, 2.48, 0]}>
+        <cylinderGeometry args={[0.06, 0.08, 1.08, 8]} />
+        <meshStandardMaterial color="#d8dfdb" metalness={0.6} roughness={0.24} />
+      </mesh>
+      <mesh position={[0.46, 2.42, 0]}>
+        <boxGeometry args={[0.62, 0.34, 0.05]} />
+        <meshStandardMaterial color="#48d9e8" emissive="#1fabb7" emissiveIntensity={0.45} />
+      </mesh>
+    </group>
+  );
+}
+
+function SettlementWall({ mars }: { mars: boolean }) {
+  const wall = mars ? "#6a3f34" : "#515e64";
+  const cap = mars ? "#d08f66" : "#bfc8c6";
+  const merlon = mars ? "#7c4b3d" : "#626e74";
+  const segments = [
+    { x: 0, z: -15.5, w: 34, d: 0.56 },
+    { x: 0, z: 15.5, w: 34, d: 0.56 },
+    { x: -17, z: 0, w: 0.56, d: 31 },
+    { x: 17, z: 0, w: 0.56, d: 31 },
+  ];
+
+  return (
+    <group>
+      {segments.map((segment, index) => {
+        const isFront = index === 0;
+        const y = terrainHeight(segment.x, segment.z) + 0.65;
+        return (
+          <group key={index} position={[segment.x, y, segment.z]}>
+            {isFront ? (
+              <>
+                <mesh castShadow receiveShadow position={[-6.2, 0, 0]}>
+                  <boxGeometry args={[21.6, 1.15, segment.d]} />
+                  <meshStandardMaterial color={wall} roughness={0.76} metalness={0.16} />
+                </mesh>
+                <mesh castShadow receiveShadow position={[6.2, 0, 0]}>
+                  <boxGeometry args={[21.6, 1.15, segment.d]} />
+                  <meshStandardMaterial color={wall} roughness={0.76} metalness={0.16} />
+                </mesh>
+              </>
+            ) : (
+              <mesh castShadow receiveShadow>
+                <boxGeometry args={[segment.w, 1.15, segment.d]} />
+                <meshStandardMaterial color={wall} roughness={0.76} metalness={0.16} />
+              </mesh>
+            )}
+            <mesh position={[0, 0.64, 0]}>
+              <boxGeometry args={[segment.w, 0.11, segment.d * 1.1]} />
+              <meshStandardMaterial color={cap} roughness={0.42} metalness={0.28} />
+            </mesh>
+            {Array.from({ length: index < 2 ? 18 : 16 }, (_, merlonIndex) => {
+              const span = index < 2 ? 34 : 31;
+              const along = -span / 2 + 1.0 + merlonIndex * 2.0;
+              const pos = index < 2 ? [along, 0.84, 0] : [0, 0.84, along];
+              return (
+                <mesh key={merlonIndex} castShadow position={pos as [number, number, number]}>
+                  <boxGeometry args={index < 2 ? [0.62, 0.34, 0.72] : [0.72, 0.34, 0.62]} />
+                  <meshStandardMaterial color={merlon} roughness={0.74} metalness={0.15} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function PlazaTower({ position, color }: { position: [number, number]; color: string }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.14;
+  return (
+    <group position={[x, y, z]}>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.3, 0.42, 1.28, 10]} />
+        <meshStandardMaterial color="#626c6f" roughness={0.65} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, 0.82, 0]}>
+        <sphereGeometry args={[0.12, 10, 8]} />
+        <meshStandardMaterial color="#ffd565" emissive="#ffb91d" emissiveIntensity={0.9} />
+      </mesh>
+      <mesh position={[0, 0.98, 0]}>
+        <boxGeometry args={[0.48, 0.06, 0.05]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.42} />
+      </mesh>
+    </group>
+  );
+}
+
+
 function SmallColonyBuilding({
   position,
   index,
@@ -1537,6 +2098,113 @@ function BuildingDetailTrim({
   );
 }
 
+
+function CityFloor({ mars }: { mars: boolean }) {
+  const tiles = [
+    { x: 0, z: -7.4, w: 18, d: 2.2 },
+    { x: 0, z: 0, w: 2.3, d: 22 },
+    { x: 0, z: 7.1, w: 18, d: 1.9 },
+    { x: -8.5, z: 0.8, w: 2.0, d: 17 },
+    { x: 8.6, z: 0.8, w: 2.0, d: 17 },
+  ];
+  return (
+    <group>
+      {tiles.map((tile, index) => {
+        const y = terrainHeight(tile.x, tile.z) + 0.08;
+        return (
+          <mesh key={index} receiveShadow position={[tile.x, y, tile.z]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[tile.w, tile.d]} />
+            <meshStandardMaterial color={mars ? "#875743" : "#687477"} roughness={0.97} />
+          </mesh>
+        );
+      })}
+      {Array.from({ length: 9 }, (_, index) => {
+        const x = -8 + index * 2;
+        const y = terrainHeight(x, -7.4) + 0.12;
+        return (
+          <mesh key={index} position={[x, y, -7.4]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.72, 1.54]} />
+            <meshStandardMaterial color={mars ? "#b6795e" : "#9aa3a0"} roughness={0.94} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function Archway({ position, color }: { position: [number, number]; color: string }) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.04;
+  return (
+    <group position={[x, y, z]}>
+      <mesh castShadow position={[-0.55, 0.7, 0]}>
+        <cylinderGeometry args={[0.1, 0.14, 1.38, 10]} />
+        <meshStandardMaterial color="#778281" metalness={0.32} roughness={0.5} />
+      </mesh>
+      <mesh castShadow position={[0.55, 0.7, 0]}>
+        <cylinderGeometry args={[0.1, 0.14, 1.38, 10]} />
+        <meshStandardMaterial color="#778281" metalness={0.32} roughness={0.5} />
+      </mesh>
+      <mesh castShadow position={[0, 1.33, 0]}>
+        <boxGeometry args={[1.24, 0.18, 0.18]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} metalness={0.22} roughness={0.42} />
+      </mesh>
+      <mesh position={[0, 1.55, 0]}>
+        <octahedronGeometry args={[0.12, 0]} />
+        <meshStandardMaterial color="#ffe18a" emissive="#ffbf28" emissiveIntensity={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+function StatueRow({ z, color }: { z: number; color: string }) {
+  const points = [-6.8, -4.6, 4.6, 6.8];
+  return (
+    <group>
+      {points.map((x, index) => (
+        <group key={index} position={[x, terrainHeight(x, z) + 0.04, z]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.14, 0.2, 0.38, 10]} />
+            <meshStandardMaterial color="#697474" metalness={0.22} roughness={0.62} />
+          </mesh>
+          <mesh position={[0, 0.3, 0]}>
+            <coneGeometry args={[0.17, 0.36, 6]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.18} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function CargoCart({ position, mars }: { position: [number, number]; mars: boolean }) {
+  const ref = useRef<THREE.Group>(null);
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.1;
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.position.y = y + Math.sin(clock.getElapsedTime() * 2.2 + x) * 0.018;
+  });
+  return (
+    <group ref={ref} position={[x, y, z]}>
+      <mesh castShadow>
+        <boxGeometry args={[0.8, 0.3, 0.55]} />
+        <meshStandardMaterial color={mars ? "#c77f55" : "#c8a05d"} roughness={0.86} />
+      </mesh>
+      <mesh position={[0.08, 0.28, 0]}>
+        <boxGeometry args={[0.56, 0.28, 0.42]} />
+        <meshStandardMaterial color="#788b88" roughness={0.84} metalness={0.12} />
+      </mesh>
+      {[-0.3, 0.3].map((wheel) => (
+        <mesh key={wheel} castShadow position={[wheel, -0.14, 0.28]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.12, 0.12, 0.11, 10]} />
+          <meshStandardMaterial color="#2d3538" roughness={0.94} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function RoverWorld({
   task,
   position,
@@ -1823,7 +2491,7 @@ function MissionScene(props: Props) {
     <Canvas
       shadows
       dpr={[1, 1.3]}
-      camera={{ position: [46, 56, 42], fov: 48, near: 0.1, far: 300 }}
+      camera={{ position: [48, 58, 46], fov: 50, near: 0.1, far: 320 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
@@ -1848,6 +2516,7 @@ function MissionScene(props: Props) {
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
 
+      <CityFloor mars={mars} />
       <SettlementWall mars={mars} />
       <SettlementGate mars={mars} />
       <CityRoadNetwork mars={mars} />
@@ -1859,6 +2528,16 @@ function MissionScene(props: Props) {
 
       <PipeRuns />
       <ColonyLighting mars={mars} />
+      <Archway position={[0, -5.7]} color="#56dfe8" />
+      <Archway position={[0, 5.7]} color="#f0c75d" />
+      <Archway position={[-6.5, 0]} color="#6fdddf" />
+      <Archway position={[6.5, 0]} color="#b579ef" />
+      <StatueRow z={-2.9} color="#56dce6" />
+      <StatueRow z={2.9} color="#f0c760" />
+      <CargoCart position={[-10.9, -4.9]} mars={mars} />
+      <CargoCart position={[10.9, -5.0]} mars={mars} />
+      <CargoCart position={[-10.4, 6.3]} mars={mars} />
+      <CargoCart position={[10.5, 6.6]} mars={mars} />
 
       <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
       <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
@@ -1904,7 +2583,15 @@ function MissionScene(props: Props) {
         <StreetLamp key={index} position={[x, z]} mars={mars} />
       ))}
 
-      <SmallColonyBuilding position={[-13.1, -9.0]} index={0} mars={mars} />
+      <SmallColonyBuilding position={[-14.1, -8.9]} index={2} mars={mars} />
+      <SmallColonyBuilding position={[-11.9, -8.3]} index={4} mars={mars} />
+      <SmallColonyBuilding position={[10.9, -9.0]} index={3} mars={mars} />
+      <SmallColonyBuilding position={[13.3, -8.1]} index={5} mars={mars} />
+      <SmallColonyBuilding position={[-13.4, 4.2]} index={1} mars={mars} />
+      <SmallColonyBuilding position={[13.6, 4.2]} index={0} mars={mars} />
+      <SmallColonyBuilding position={[-13.2, 8.8]} index={3} mars={mars} />
+      <SmallColonyBuilding position={[13.0, 9.2]} index={4} mars={mars} />
+            <SmallColonyBuilding position={[-13.1, -9.0]} index={0} mars={mars} />
       <SmallColonyBuilding position={[-10.9, -7.6]} index={1} mars={mars} />
       <SmallColonyBuilding position={[10.8, -9.0]} index={2} mars={mars} />
       <SmallColonyBuilding position={[12.9, -6.8]} index={3} mars={mars} />
@@ -1969,10 +2656,10 @@ function MissionScene(props: Props) {
         enableRotate={false}
         enablePan={false}
         enableZoom
-        minDistance={30}
-        maxDistance={74}
-        zoomSpeed={0.62}
-        target={[0, 0.5, 1.8]}
+        minDistance={34}
+        maxDistance={82}
+        zoomSpeed={0.6}
+        target={[0, 0.9, 1.1]}
       />
     </Canvas>
   );
