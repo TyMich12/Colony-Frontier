@@ -355,7 +355,7 @@ function BuildingShape({
       ) : track.id === "battery" ? (
         <g>
           {Array.from({ length: 2 + level }).map((_, index) => (
-            <rect key={index} x={-${size * 0.55} + index * ${size * 0.34}} y={-${height * 0.95}} width={size * 0.25} height={height * 1.55} rx="4" fill="#1d3c45" stroke="#688684" strokeWidth="1.2" />
+            <rect key={index} x={-size * 0.55 + index * size * 0.34} y={-height * 0.95} width={size * 0.25} height={height * 1.55} rx="4" fill="#1d3c45" stroke="#688684" strokeWidth="1.2" />
           ))}
         </g>
       ) : track.id === "rover" ? (
