@@ -167,7 +167,7 @@ function Tank({ color, x, z }: { color: string; x: number; z: number }) {
   );
 }
 
-function UniqueBuilding({ id, color, task }: { id: string; color: string; task: string }) {
+function StaticBuildingArt({ id, color, task }: { id: string; color: string; task: string }) {
   if (id === "solar") return (
     <group>
       <BoxBuilding color={color} height={1.1} width={1.55} depth={1.35} />
@@ -390,6 +390,189 @@ function UniqueBuilding({ id, color, task }: { id: string; color: string; task: 
   );
 
   return <BoxBuilding color={color} />;
+}
+
+
+function ColonyDecor({ mars }: { mars: boolean }) {
+  const beaconRef = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (beaconRef.current) {
+      beaconRef.current.scale.setScalar(0.92 + (Math.sin(t * 2.4) + 1) * 0.05);
+      (beaconRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.55 + (Math.sin(t * 2.4) + 1) * 0.18;
+    }
+    if (ringRef.current) {
+      ringRef.current.rotation.z = t * 0.18;
+    }
+  });
+
+  const padX = -15;
+  const padZ = -7.5;
+  const padY = terrainHeight(padX, padZ) + 0.09;
+  const beaconX = -3.1;
+  const beaconZ = -0.8;
+  const beaconY = terrainHeight(beaconX, beaconZ) + 2.25;
+
+  return (
+    <group>
+      <group position={[padX, padY, padZ]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh receiveShadow>
+          <circleGeometry args={[2.25, 48]} />
+          <meshStandardMaterial color={mars ? "#6c3b2c" : "#3b4348"} roughness={0.92} metalness={0.12} />
+        </mesh>
+        <mesh position={[0, 0.012, 0]}>
+          <ringGeometry args={[1.78, 1.94, 48]} />
+          <meshBasicMaterial color="#53d7eb" transparent opacity={0.68} />
+        </mesh>
+        <mesh position={[0, 0.018, 0]}>
+          <ringGeometry args={[0.92, 0.98, 32]} />
+          <meshBasicMaterial color="#f5d45b" transparent opacity={0.75} />
+        </mesh>
+      </group>
+
+      {[[-1.55, -1.2], [1.25, -0.95], [-1.1, 1.05], [1.35, 0.95]].map(([x, z], index) => (
+        <group key={index} position={[padX + x, terrainHeight(padX + x, padZ + z) + 0.22, padZ + z]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.58, 0.42, 0.62]} />
+            <meshStandardMaterial color={index % 2 === 0 ? "#c7a25a" : "#8faaa9"} roughness={0.7} metalness={0.2} />
+          </mesh>
+          <mesh position={[0, 0.25, 0]}>
+            <boxGeometry args={[0.42, 0.08, 0.46]} />
+            <meshStandardMaterial color={index % 2 === 0 ? "#f2c95d" : "#56d7e3"} emissive={index % 2 === 0 ? "#be8d27" : "#1aa4b1"} emissiveIntensity={0.3} />
+          </mesh>
+        </group>
+      ))}
+
+      <group position={[beaconX, terrainHeight(beaconX, beaconZ) + 0.1, beaconZ]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <circleGeometry args={[2.2, 48]} />
+          <meshStandardMaterial color="#26343c" roughness={0.86} metalness={0.18} />
+        </mesh>
+        <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+          <torusGeometry args={[1.78, 0.055, 8, 36]} />
+          <meshBasicMaterial color="#20d9ea" transparent opacity={0.62} />
+        </mesh>
+        <mesh position={[0, 0.34, 0]} castShadow>
+          <cylinderGeometry args={[0.34, 0.44, 0.62, 10]} />
+          <meshStandardMaterial color="#44545a" roughness={0.66} metalness={0.26} />
+        </mesh>
+        <mesh ref={beaconRef} position={[0, 0.98, 0]}>
+          <octahedronGeometry args={[0.25, 0]} />
+          <meshStandardMaterial color="#54edff" emissive="#1bcbd9" emissiveIntensity={0.8} metalness={0.15} roughness={0.2} />
+        </mesh>
+        {[0, 1, 2].map((index) => (
+          <mesh key={index} position={[Math.cos(index * Math.PI * 2 / 3) * 0.72, 0.34, Math.sin(index * Math.PI * 2 / 3) * 0.72]}>
+            <cylinderGeometry args={[0.055, 0.075, 0.38, 8]} />
+            <meshStandardMaterial color="#7ee9f0" emissive="#1ed8df" emissiveIntensity={0.4} />
+          </mesh>
+        ))}
+      </group>
+
+      {[
+        [-12.5, -2.4],
+        [10.4, -4.4],
+        [-11.6, 11.4],
+        [9.7, 12.2],
+      ].map(([x, z], index) => {
+        const y = terrainHeight(x, z);
+        return (
+          <group key={index} position={[x, y + 0.45, z]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.15, 0.2, 0.9, 8]} />
+              <meshStandardMaterial color="#6e7978" roughness={0.74} metalness={0.36} />
+            </mesh>
+            <mesh position={[0, 0.55, 0]}>
+              <sphereGeometry args={[0.09, 10, 8]} />
+              <meshStandardMaterial color={index % 2 === 0 ? "#55eaff" : "#ffd54d"} emissive={index % 2 === 0 ? "#1acddd" : "#ffc107"} emissiveIntensity={1.1} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function EnergyConduits() {
+  const refs = useRef<THREE.Mesh[]>([]);
+  const lines: Array<[number, number, number, number]> = [
+    [0, 0, 6.5, 2],
+    [0, 0, -8, 6.5],
+    [0, 0, 7, -8],
+    [0, 0, 5.5, 13],
+    [0, 0, 14, 9],
+    [0, 0, -11, -6],
+  ];
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    refs.current.forEach((mesh, index) => {
+      if (!mesh) return;
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = 0.18 + (Math.sin(t * 2.6 + index * 0.9) + 1) * 0.04;
+    });
+  });
+
+  return (
+    <group>
+      {lines.map(([x1, z1, x2, z2], index) => {
+        const dx = x2 - x1;
+        const dz = z2 - z1;
+        const length = Math.hypot(dx, dz);
+        const angle = Math.atan2(dx, dz);
+        const mx = (x1 + x2) / 2;
+        const mz = (z1 + z2) / 2;
+        return (
+          <mesh
+            key={index}
+            ref={(node) => { if (node) refs.current[index] = node; }}
+            position={[mx, terrainHeight(mx, mz) + 0.16, mz]}
+            rotation={[-Math.PI / 2, 0, angle]}
+          >
+            <planeGeometry args={[0.1, length]} />
+            <meshBasicMaterial color="#49deeb" transparent opacity={0.2} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function SettlementAtmosphere({ mars }: { mars: boolean }) {
+  const ref = useRef<THREE.Points>(null);
+
+  const positions = useMemo(() => {
+    const data = new Float32Array(84 * 3);
+    for (let i = 0; i < 84; i += 1) {
+      const angle = (i / 84) * Math.PI * 2;
+      const radius = 8 + (i % 7) * 1.5;
+      data[i * 3] = Math.cos(angle) * radius;
+      data[i * 3 + 1] = 2.5 + (i % 6) * 0.5;
+      data[i * 3 + 2] = Math.sin(angle) * radius;
+    }
+    return data;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = clock.getElapsedTime() * 0.01;
+  });
+
+  return (
+    <points ref={ref} position={[0, 0, 0]}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={positions.length / 3} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={mars ? 0.045 : 0.035}
+        color={mars ? "#ffd5c0" : "#c8efff"}
+        transparent
+        opacity={0.32}
+        sizeAttenuation
+      />
+    </points>
+  );
 }
 
 function BuildingIdleMotion({ color, level, active }: { color: string; level: number; active: boolean }) {
@@ -632,6 +815,9 @@ function MissionScene(props: Props) {
       <Rocks kind={mars ? "mars" : "moon"} />
       <FoundationPad />
       <ConnectionPaths />
+      <EnergyConduits />
+      <ColonyDecor mars={mars} />
+      <SettlementAtmosphere mars={mars} />
       <WorkerBots />
 
       {props.resourceNodes.map((node) => (
