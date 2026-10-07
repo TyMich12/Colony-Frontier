@@ -415,6 +415,8 @@ function IsometricMap({
   onSelect: (trackId: string) => void;
   selectedBuildingId: string | null;
   elapsed: number;
+  environmentLabel: string;
+  environmentTitle: string;
 }) {
   const layout: Record<string, [number, number]> = {
     solar: [285, 135], comms: [575, 135], habitat: [430, 265], battery: [630, 285],
@@ -1214,6 +1216,8 @@ export function MissionSimulation() {
               onSelect={setSelectedBuildingId}
               selectedBuildingId={selectedBuildingId}
               elapsed={elapsed}
+              environmentLabel={environmentLabel}
+              environmentTitle={environmentTitle}
             />
           </div>
         </div>
