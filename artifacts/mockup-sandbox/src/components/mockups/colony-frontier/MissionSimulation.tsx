@@ -195,8 +195,14 @@ function pickNextEvent(
     { value: metrics.oxygen, event: "oxygen-filter" },
     { value: metrics.water, event: "water-filter" },
     { value: metrics.habitat, event: "habitat-pressure" },
-    { value: metrics.power, event: "grid-overload" },
-    { value: Math.max(0, 100 - Math.abs(metrics.temperature - 21) * 8), event: "thermal-drift" },
+    {
+      value: metrics.power,
+      event: selected.grid ? "grid-overload" : "core-power",
+    },
+    {
+      value: Math.max(0, 100 - Math.abs(metrics.temperature - 21) * 8),
+      event: selected.thermal ? "thermal-drift" : "habitat-pressure",
+    },
   ].sort((a, b) => a.value - b.value)[0];
 
   return (
@@ -606,7 +612,9 @@ export function MissionSimulation() {
   const [manualPaused, setManualPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [results, setResults] = useState(false);
-  const eventPointerRef = useRef(runtime?.resolvedEventIds.length ?? 0);
+  const eventPointerRef = useRef(
+    (runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0),
+  );
   const completionSavedRef = useRef(false);
 
   const selectedTracks = pending ? selectedTrackData(pending.selected) : [];
