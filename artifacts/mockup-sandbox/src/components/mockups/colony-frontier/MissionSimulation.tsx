@@ -110,7 +110,12 @@ const EVENT_DEFS: MissionEvent[] = [
   { id: "core-power", trackId: "power", title: "Reduced power margin", subtitle: "Colony demand is temporarily exceeding comfortable generation.", summary: "The settlement is still stable, but the power margin is shrinking. The player can preserve reserves or accept a deeper battery draw." },
 ];
 
+function isTier(value: unknown): value is Tier {
+  return value === "Foundation" || value === "Frontier" || value === "Apex" || value === "Research";
+}
+
 function tierLevel(tier: Tier): number {
+  if (!isTier(tier)) return 0;
   return tier === "Foundation" ? 0 : tier === "Frontier" ? 1 : tier === "Apex" ? 2 : 3;
 }
 
@@ -165,7 +170,7 @@ function initialBuildings(selected: Record<string, Tier>): Record<string, Buildi
 }
 
 function selectedTrackData(selected: Record<string, Tier>): TechnologyTrack[] {
-  return technologyTracks.filter((track) => selected[track.id] !== undefined);
+  return technologyTracks.filter((track) => isTier(selected[track.id]));
 }
 
 function pickNextEvent(
@@ -331,7 +336,7 @@ function BuildingShape({
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Zap;
   const damaged = runtime.condition < 82;
   const dusted = track.id === "solar" && runtime.dust > 2;
-  const topFill = tierMeta[tier].color;
+  const topFill = tierMeta[tier]?.color ?? tierMeta.Foundation.color;
   const sideFill = tier === "Research" ? "#203c3b" : tier === "Apex" ? "#1d3440" : "#172a32";
 
   return (
@@ -390,7 +395,7 @@ function BuildingShape({
 
       <Icon x={-10} y={-height * 2.25} width={20} height={20} color={selected ? "#f6c96f" : "#b9d4ca"} />
       <text x="0" y={size * 0.92} textAnchor="middle" fill={selected ? "#f7cf79" : "#b0c4bf"} fontSize="11" fontWeight="700" letterSpacing="1.3">{track.category.toUpperCase()}</text>
-      <text x="0" y={size * 0.92 + 14} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{tier.toUpperCase()}</text>
+      <text x="0" y={size * 0.92 + 14} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{isTier(tier) ? tier.toUpperCase() : "FOUNDATION"}</text>
       {damaged && <circle cx={size * 0.76} cy={-size * 0.1} r="5" fill="#d77a5a" className="animate-pulse" />}
     </g>
   );
@@ -469,7 +474,7 @@ function IsometricMap({
         </g>
       )}
       <text x="500" y="100" textAnchor="middle" fill="#9ab0ab" fontSize="11" letterSpacing="3" opacity="0.7">
-        ${environmentLabel} + " OUTPOST · " + environmentTitle
+        {environmentLabel} OUTPOST · {environmentTitle}
       </text>
     </svg>
   );
@@ -573,7 +578,7 @@ function BuildingInspector({
         </div>
       </div>
       <div className="border-t border-[#29434a] p-4">
-        <p className="text-[9px] uppercase tracking-[0.18em] text-[#718f89]">{track.tiers[tier].description}</p>
+        <p className="text-[9px] uppercase tracking-[0.18em] text-[#718f89]">{track.tiers[tier]?.description ?? track.tiers.Foundation.description}</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {actions.map((action) => (
             <button key={action.id} type="button" onClick={() => onAction(action.id)} className="border border-[#3d5955] bg-[#11272c] px-3 py-2 text-left transition hover:border-[#efb658] hover:bg-[#173238]">
