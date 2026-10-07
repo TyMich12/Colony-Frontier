@@ -1754,18 +1754,62 @@ function RoverWorld({
   const targetName = task.startsWith("SURVEYING ") ? task.slice("SURVEYING ".length) : "";
   const resource = resourceNodes.find((node) => node.label === targetName);
   const destination = resource ? nodeWorldPosition(resource) : home;
+  const roverWaypoints = useMemo<[number, number][]>(() => {
+    if (!resource) return [home];
+    const [dx, dz] = destination;
+    const outerZ = dz >= 0 ? 15.2 : -15.2;
+    const sideX = dx < 0 ? -15.0 : 15.0;
+    return [
+      home,
+      [home[0], outerZ],
+      [sideX, outerZ],
+      [sideX, dz],
+      destination,
+    ];
+  }, [destination, home, resource]);
+
+  const roverPathLengths = useMemo(() => {
+    const lengths = [];
+    let total = 0;
+    for (let index = 0; index < roverWaypoints.length - 1; index += 1) {
+      const [ax, az] = roverWaypoints[index];
+      const [bx, bz] = roverWaypoints[index + 1];
+      const length = Math.hypot(bx - ax, bz - az);
+      lengths.push(length);
+      total += length;
+    }
+    return { lengths, total };
+  }, [roverWaypoints]);
 
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
     const active = task !== "STANDBY" && task !== "RETURNING";
     const p = active ? (Math.sin(t * 0.28) + 1) / 2 : 0;
-    const from = task === "RETURNING" ? destination : home;
-    const to = task === "RETURNING" ? home : destination;
-    const x = THREE.MathUtils.lerp(from[0], to[0], p);
-    const z = THREE.MathUtils.lerp(from[1], to[1], p);
-    const nx = THREE.MathUtils.lerp(from[0], to[0], Math.min(1, p + 0.02));
-    const nz = THREE.MathUtils.lerp(from[1], to[1], Math.min(1, p + 0.02));
+    const forwardPath = roverWaypoints;
+    const reversePath = [...roverWaypoints].reverse();
+    const path = task === "RETURNING" ? reversePath : forwardPath;
+    const total = roverPathLengths.total;
+    const targetDistance = p * total;
+    let travelled = 0;
+    let segment = 0;
+    while (segment < path.length - 2) {
+      const [ax, az] = path[segment];
+      const [bx, bz] = path[segment + 1];
+      const segmentLength = Math.hypot(bx - ax, bz - az);
+      if (travelled + segmentLength >= targetDistance) break;
+      travelled += segmentLength;
+      segment += 1;
+    }
+    const [ax, az] = path[segment];
+    const [bx, bz] = path[segment + 1] ?? path[segment];
+    const segmentLength = Math.max(0.001, Math.hypot(bx - ax, bz - az));
+    const segmentPhase = THREE.MathUtils.clamp((targetDistance - travelled) / segmentLength, 0, 1);
+    const x = THREE.MathUtils.lerp(ax, bx, segmentPhase);
+    const z = THREE.MathUtils.lerp(az, bz, segmentPhase);
+    const nextSegment = path[segment + 1] ?? [x, z];
+    const nx = THREE.MathUtils.lerp(x, nextSegment[0], 0.12);
+    const nz = THREE.MathUtils.lerp(z, nextSegment[1], 0.12);
     ref.current.position.set(x, terrainHeight(x, z) + 0.47, z);
     if (Math.abs(nx - x) + Math.abs(nz - z) > 0.02) ref.current.rotation.y = Math.atan2(nx - x, nz - z);
     if (scannerRef.current) {
@@ -1819,6 +1863,42 @@ function SelectionRing({
       <ringGeometry args={[radius, radius + 0.15, 36]} />
       <meshBasicMaterial color={alerted ? "#ff4b55" : "#ffe36d"} />
     </mesh>
+  );
+}
+
+function TaskMarker({
+  position,
+  label,
+  color,
+}: {
+  position: [number, number];
+  label: string;
+  color: string;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.16;
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    ref.current.position.y = y + Math.sin(t * 2.8) * 0.05;
+    const scale = 0.9 + (Math.sin(t * 3.4) + 1) * 0.04;
+    ref.current.scale.setScalar(scale);
+  });
+  return (
+    <group ref={ref} position={[x, y, z]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.5, 0.62, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.72} />
+      </mesh>
+      <mesh position={[0, 0.25, 0]}>
+        <octahedronGeometry args={[0.12, 0]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} />
+      </mesh>
+      <Text position={[0, 0.64, 0]} rotation={[-0.66, 0, 0]} fontSize={0.16} color="#ffeaa0" outlineWidth={0.025} outlineColor="#1d1915" anchorX="center">
+        {label}
+      </Text>
+    </group>
   );
 }
 
@@ -1963,6 +2043,16 @@ function ColonyBuilding({
     >
       <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 2.45 : 1.38} />
       {track.id !== "habitat" && <BuildingDetailTrim id={track.id} color={color} mars={false} />}
+      <mesh
+        position={[0, 1.05, 0]}
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+      >
+        <boxGeometry args={[2.65, 2.5, 2.65]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
       <StaticBuildingArt id={track.id} color={color} />
       <GoldArchitecturalTrim id={track.id} color={color} />
       <BuildingIdleMotion color={color} level={level} active={alerted} id={track.id} />
@@ -2020,7 +2110,7 @@ function MissionScene(props: Props) {
     <Canvas
       shadows
       dpr={[1, 1.3]}
-      camera={{ position: [48, 58, 46], fov: 50, near: 0.1, far: 320 }}
+      camera={{ position: [57, 70, 54], fov: 49, near: 0.1, far: 360 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
@@ -2045,121 +2135,123 @@ function MissionScene(props: Props) {
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
 
-      <CityFloor mars={mars} />
-      <SettlementWall mars={mars} />
-      <SettlementGate mars={mars} />
-      <CityRoadNetwork mars={mars} />
-      <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
-      <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
-      <Plaza position={[0, 0]} radius={5.0} mars={mars} accent="#43dbe6" />
-      <Plaza position={[0, 9.2]} radius={2.6} mars={mars} accent="#f1c95e" />
-      <Plaza position={[-8.9, 9.9]} radius={2.1} mars={mars} accent="#69e3f0" />
+      <group scale={[1.22, 1.22, 1.22]}>\n              <CityFloor mars={mars} />
+              <SettlementWall mars={mars} />
+              <SettlementGate mars={mars} />
+              <CityRoadNetwork mars={mars} />
+              <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
+              <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
+              <Plaza position={[0, 0]} radius={5.0} mars={mars} accent="#43dbe6" />
+              <Plaza position={[0, 9.2]} radius={2.6} mars={mars} accent="#f1c95e" />
+              <Plaza position={[-8.9, 9.9]} radius={2.1} mars={mars} accent="#69e3f0" />
 
-      <PipeRuns />
-      <ColonyLighting mars={mars} />
-      <Archway position={[0, -5.7]} color="#56dfe8" />
-      <Archway position={[0, 5.7]} color="#f0c75d" />
-      <GoldenCivicArch position={[0, -9.3]} color="#62e7ec" />
-      <GoldenCivicArch position={[0, 9.0]} color="#f1cb61" />
-      <GildedRoadMarker position={[-7.6, -7.4]} color="#59dfe8" />
-      <GildedRoadMarker position={[-3.8, -7.4]} color="#f1ca5f" />
-      <GildedRoadMarker position={[3.8, -7.4]} color="#f1ca5f" />
-      <GildedRoadMarker position={[7.6, -7.4]} color="#59dfe8" />
-      <GildedRoadMarker position={[-7.6, 7.0]} color="#b97bf0" />
-      <GildedRoadMarker position={[7.6, 7.0]} color="#62e6eb" />
-      <Archway position={[-6.5, 0]} color="#6fdddf" />
-      <Archway position={[6.5, 0]} color="#b579ef" />
-      <StatueRow z={-2.9} color="#56dce6" />
-      <StatueRow z={2.9} color="#f0c760" />
-      <CargoCart position={[-10.9, -4.9]} mars={mars} />
-      <CargoCart position={[10.9, -5.0]} mars={mars} />
-      <CargoCart position={[-10.4, 6.3]} mars={mars} />
-      <CargoCart position={[10.5, 6.6]} mars={mars} />
+              <PipeRuns />
+              <ColonyLighting mars={mars} />
+              <Archway position={[0, -5.7]} color="#56dfe8" />
+              <Archway position={[0, 5.7]} color="#f0c75d" />
+              <GoldenCivicArch position={[0, -9.3]} color="#62e7ec" />
+              <GoldenCivicArch position={[0, 9.0]} color="#f1cb61" />
+              <GildedRoadMarker position={[-7.6, -7.4]} color="#59dfe8" />
+              <GildedRoadMarker position={[-3.8, -7.4]} color="#f1ca5f" />
+              <GildedRoadMarker position={[3.8, -7.4]} color="#f1ca5f" />
+              <GildedRoadMarker position={[7.6, -7.4]} color="#59dfe8" />
+              <GildedRoadMarker position={[-7.6, 7.0]} color="#b97bf0" />
+              <GildedRoadMarker position={[7.6, 7.0]} color="#62e6eb" />
+              <Archway position={[-6.5, 0]} color="#6fdddf" />
+              <Archway position={[6.5, 0]} color="#b579ef" />
+              <StatueRow z={-2.9} color="#56dce6" />
+              <StatueRow z={2.9} color="#f0c760" />
+              <CargoCart position={[-10.9, -4.9]} mars={mars} />
+              <CargoCart position={[10.9, -5.0]} mars={mars} />
+              <CargoCart position={[-10.4, 6.3]} mars={mars} />
+              <CargoCart position={[10.5, 6.6]} mars={mars} />
 
-      <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
-      <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
-      <UrbanBlock position={[-8.5, 6.1]} width={3.4} depth={2.45} mars={mars} accent="#73d7e0" />
-      <UrbanBlock position={[8.8, 6.2]} width={3.4} depth={2.45} mars={mars} accent="#c17bf0" />
-      <UrbanBlock position={[-3.7, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#5edfe8" />
-      <UrbanBlock position={[4.0, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#f3cf67" />
+              <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
+              <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
+              <UrbanBlock position={[-8.5, 6.1]} width={3.4} depth={2.45} mars={mars} accent="#73d7e0" />
+              <UrbanBlock position={[8.8, 6.2]} width={3.4} depth={2.45} mars={mars} accent="#c17bf0" />
+              <UrbanBlock position={[-3.7, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#5edfe8" />
+              <UrbanBlock position={[4.0, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#f3cf67" />
 
-      <ColonyMonument position={[-3.0, 3.0]} color="#61dfe8" />
-      <ColonyMonument position={[3.1, 3.0]} color="#f0c75d" />
-      <ColonyMonument position={[0, 6.6]} color="#b97bf0" />
+              <ColonyMonument position={[-3.0, 3.0]} color="#61dfe8" />
+              <ColonyMonument position={[3.1, 3.0]} color="#f0c75d" />
+              <ColonyMonument position={[0, 6.6]} color="#b97bf0" />
 
-      <ShrubCluster position={[-12.2, -10.4]} scale={1.1} />
-      <ShrubCluster position={[-10.7, -9.2]} flower scale={0.8} />
-      <ShrubCluster position={[11.4, -10.6]} flower scale={1.0} />
-      <ShrubCluster position={[13.0, -8.9]} scale={0.78} />
-      <ShrubCluster position={[-12.4, 4.4]} flower scale={0.85} />
-      <ShrubCluster position={[12.6, 4.8]} scale={0.82} />
-      <ShrubCluster position={[-10.9, 11.2]} scale={0.8} />
-      <ShrubCluster position={[11.2, 11.5]} flower scale={0.86} />
+              
+              <CivicPlazaStatue position={[0, -3.25]} mars={mars} />
+              <CivicPlazaStatue position={[0, 7.55]} mars={mars} />
+              <ColonyBanner position={[-4.0, -2.9]} accent="#54dfe9" mars={mars} />
+              <ColonyBanner position={[4.0, -2.9]} accent="#f2c65e" mars={mars} />
+              <ColonyBanner position={[-4.0, 7.0]} accent="#b878ef" mars={mars} />
+              <ColonyBanner position={[4.0, 7.0]} accent="#5ed9e5" mars={mars} />
+              <WorkshopYard position={[-13.0, -2.0]} index={0} />
+              <WorkshopYard position={[12.8, 4.8]} index={1} />
+              <WorkshopYard position={[-12.4, 7.1]} index={2} />
+              <WorkshopYard position={[12.1, -1.0]} index={3} />
 
-      
-      <CivicPlazaStatue position={[0, -3.25]} mars={mars} />
-      <CivicPlazaStatue position={[0, 7.55]} mars={mars} />
-      <ColonyBanner position={[-4.0, -2.9]} accent="#54dfe9" mars={mars} />
-      <ColonyBanner position={[4.0, -2.9]} accent="#f2c65e" mars={mars} />
-      <ColonyBanner position={[-4.0, 7.0]} accent="#b878ef" mars={mars} />
-      <ColonyBanner position={[4.0, 7.0]} accent="#5ed9e5" mars={mars} />
-      <WorkshopYard position={[-13.0, -2.0]} index={0} />
-      <WorkshopYard position={[12.8, 4.8]} index={1} />
-      <WorkshopYard position={[-12.4, 7.1]} index={2} />
-      <WorkshopYard position={[12.1, -1.0]} index={3} />
+              {decorativeTrees.map(([x, z, scale, flower], index) => (
+              ))}
 
-      {decorativeTrees.map(([x, z, scale, flower], index) => (
-        <DecorativeTree key={index} position={[x, z]} scale={scale} flower={flower} mars={mars} />
-      ))}
+              {gardens.map(([x, z, scale], index) => (
+                <GardenPatch key={index} position={[x, z]} scale={scale} flower={!mars || index % 2 === 0} />
+              ))}
 
-      {gardens.map(([x, z, scale], index) => (
-        <GardenPatch key={index} position={[x, z]} scale={scale} flower={!mars || index % 2 === 0} />
-      ))}
+              {lamps.map(([x, z], index) => (
+                <StreetLamp key={index} position={[x, z]} mars={mars} />
+              ))}
 
-      {lamps.map(([x, z], index) => (
-        <StreetLamp key={index} position={[x, z]} mars={mars} />
-      ))}
+              <SmallColonyBuilding position={[-14.1, -8.9]} index={2} mars={mars} />
+              <SmallColonyBuilding position={[-11.9, -8.3]} index={4} mars={mars} />
+              <SmallColonyBuilding position={[10.9, -9.0]} index={3} mars={mars} />
+              <SmallColonyBuilding position={[13.3, -8.1]} index={5} mars={mars} />
+              <SmallColonyBuilding position={[-13.4, 4.2]} index={1} mars={mars} />
+              <SmallColonyBuilding position={[13.6, 4.2]} index={0} mars={mars} />
+              <SmallColonyBuilding position={[-13.2, 8.8]} index={3} mars={mars} />
+              <SmallColonyBuilding position={[13.0, 9.2]} index={4} mars={mars} />
+                    <SmallColonyBuilding position={[-13.1, -9.0]} index={0} mars={mars} />
+              <SmallColonyBuilding position={[-10.9, -7.6]} index={1} mars={mars} />
+              <SmallColonyBuilding position={[10.8, -9.0]} index={2} mars={mars} />
+              <SmallColonyBuilding position={[12.9, -6.8]} index={3} mars={mars} />
+              <SmallColonyBuilding position={[-12.3, 0.5]} index={4} mars={mars} />
+              <SmallColonyBuilding position={[12.6, 2.0]} index={5} mars={mars} />
+              <SmallColonyBuilding position={[-11.8, 8.1]} index={0} mars={mars} />
+              <SmallColonyBuilding position={[12.2, 9.6]} index={1} mars={mars} />
+              <StorageYard position={[-13.1, -4.0]} mars={mars} />
+              <StorageYard position={[12.6, -3.8]} mars={mars} />
+              <CanopyMarket position={[3.1, -9.0]} mars={mars} />
+              <CanopyMarket position={[-3.3, 8.1]} mars={mars} />
+              <HydroponicPlanter position={[-7.9, -8.4]} mars={mars} />
+              <HydroponicPlanter position={[7.8, -9.1]} mars={mars} />
+              <HydroponicPlanter position={[-8.5, 8.2]} mars={mars} />
+              <HydroponicPlanter position={[8.6, 8.8]} mars={mars} />
+              <FenceRow from={[-14.8, 1.8]} to={[-12.0, 1.8]} />
+              <FenceRow from={[11.5, 5.2]} to={[14.8, 5.2]} />
+              <FenceRow from={[-5.2, 12.2]} to={[-1.0, 12.2]} />
+              <FenceRow from={[1.8, 12.8]} to={[5.7, 12.8]} />
+              <CrateCluster position={[-13.7, -6.7]} large />
+              <CrateCluster position={[13.5, -6.8]} />
+              <CrateCluster position={[13.6, 8.6]} />
+              <CrateCluster position={[-12.8, 9.0]} />
 
-      <SmallColonyBuilding position={[-14.1, -8.9]} index={2} mars={mars} />
-      <SmallColonyBuilding position={[-11.9, -8.3]} index={4} mars={mars} />
-      <SmallColonyBuilding position={[10.9, -9.0]} index={3} mars={mars} />
-      <SmallColonyBuilding position={[13.3, -8.1]} index={5} mars={mars} />
-      <SmallColonyBuilding position={[-13.4, 4.2]} index={1} mars={mars} />
-      <SmallColonyBuilding position={[13.6, 4.2]} index={0} mars={mars} />
-      <SmallColonyBuilding position={[-13.2, 8.8]} index={3} mars={mars} />
-      <SmallColonyBuilding position={[13.0, 9.2]} index={4} mars={mars} />
-            <SmallColonyBuilding position={[-13.1, -9.0]} index={0} mars={mars} />
-      <SmallColonyBuilding position={[-10.9, -7.6]} index={1} mars={mars} />
-      <SmallColonyBuilding position={[10.8, -9.0]} index={2} mars={mars} />
-      <SmallColonyBuilding position={[12.9, -6.8]} index={3} mars={mars} />
-      <SmallColonyBuilding position={[-12.3, 0.5]} index={4} mars={mars} />
-      <SmallColonyBuilding position={[12.6, 2.0]} index={5} mars={mars} />
-      <SmallColonyBuilding position={[-11.8, 8.1]} index={0} mars={mars} />
-      <SmallColonyBuilding position={[12.2, 9.6]} index={1} mars={mars} />
-      <StorageYard position={[-13.1, -4.0]} mars={mars} />
-      <StorageYard position={[12.6, -3.8]} mars={mars} />
-      <CanopyMarket position={[3.1, -9.0]} mars={mars} />
-      <CanopyMarket position={[-3.3, 8.1]} mars={mars} />
-      <HydroponicPlanter position={[-7.9, -8.4]} mars={mars} />
-      <HydroponicPlanter position={[7.8, -9.1]} mars={mars} />
-      <HydroponicPlanter position={[-8.5, 8.2]} mars={mars} />
-      <HydroponicPlanter position={[8.6, 8.8]} mars={mars} />
-      <FenceRow from={[-14.8, 1.8]} to={[-12.0, 1.8]} />
-      <FenceRow from={[11.5, 5.2]} to={[14.8, 5.2]} />
-      <FenceRow from={[-5.2, 12.2]} to={[-1.0, 12.2]} />
-      <FenceRow from={[1.8, 12.8]} to={[5.7, 12.8]} />
-      <CrateCluster position={[-13.7, -6.7]} large />
-      <CrateCluster position={[13.5, -6.8]} />
-      <CrateCluster position={[13.6, 8.6]} />
-      <CrateCluster position={[-12.8, 9.0]} />
+              <PlazaTower position={[-2.65, -2.65]} color="#57dce7" />
+              <PlazaTower position={[2.65, -2.65]} color="#57dce7" />
+              <PlazaTower position={[-2.65, 2.65]} color="#57dce7" />
+              <PlazaTower position={[2.65, 2.65]} color="#57dce7" />
 
-      <PlazaTower position={[-2.65, -2.65]} color="#57dce7" />
-      <PlazaTower position={[2.65, -2.65]} color="#57dce7" />
-      <PlazaTower position={[-2.65, 2.65]} color="#57dce7" />
-      <PlazaTower position={[2.65, 2.65]} color="#57dce7" />
+              <SettlerCrowd mars={mars} />
 
-      <SettlerCrowd mars={mars} />
-
+      </group>\n\n      {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
+        <TaskMarker
+          position={POSITIONS[props.activeEventTrackId]}
+          label="EVENT"
+          color="#ff5965"
+        />
+      )}
+      {props.roverTask !== "STANDBY" && props.roverTask !== "RETURNING" && props.roverTask.startsWith("SURVEYING ") && (() => {
+        const targetLabel = props.roverTask.slice("SURVEYING ".length);
+        const node = props.resourceNodes.find((item) => item.label === targetLabel);
+        return node ? <TaskMarker position={nodeWorldPosition(node)} label="ROVER TASK" color="#55e6f3" /> : null;
+      })()}
       {props.resourceNodes.map((node) => (
         <ResourceMarker
           key={node.id}
@@ -2189,10 +2281,10 @@ function MissionScene(props: Props) {
         enableRotate={false}
         enablePan={false}
         enableZoom
-        minDistance={34}
-        maxDistance={82}
-        zoomSpeed={0.6}
-        target={[0, 0.9, 1.1]}
+        minDistance={40}
+        maxDistance={96}
+        zoomSpeed={0.58}
+        target={[0, 1.2, 1.6]}
       />
     </Canvas>
   );
