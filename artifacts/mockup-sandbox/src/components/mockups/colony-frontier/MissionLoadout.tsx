@@ -38,6 +38,7 @@ import {
   type Tier,
 } from "./_shared/gameData";
 import { loadGameState, saveGameState } from "./gameState";
+import { loadPendingMission, savePendingMission } from "./missionRuntime";
 import { marsMissions, moonMissions } from "./CampaignMapRefresh";
 
 const categoryIcons = {
@@ -735,6 +736,15 @@ export function MissionLoadout() {
   function confirmMission() {
     if (deployingRef.current) return;
 
+    const existingPendingMission = loadPendingMission();
+    if (existingPendingMission) {
+      setNotice(
+        "MISSION ALREADY DEPLOYED — resume the active mission simulation before starting another deployment.",
+      );
+      window.location.href = "/preview/MissionSimulation";
+      return;
+    }
+
     if (missionLocked) {
       setNotice(
         campaign === "mars" && !moonComplete
@@ -768,7 +778,11 @@ export function MissionLoadout() {
 
     if (spend > gameState.credits) {
       setNotice(
-        "Mission requires " + formatCredits(spend) + ", but the Colony Treasury contains only " + formatCredits(gameState.credits) + ".",
+        "Mission requires " +
+          formatCredits(spend) +
+          ", but the Colony Treasury contains only " +
+          formatCredits(gameState.credits) +
+          ".",
       );
       return;
     }
@@ -795,37 +809,40 @@ export function MissionLoadout() {
 
     deployingRef.current = true;
 
+    const pendingMission = {
+      missionId,
+      campaign,
+      missionNumber: currentMission.number,
+      missionTitle: mission.title,
+      selected: { ...selected },
+      spend,
+      rewardCredits,
+      rewardXp,
+      rewardResearchTokens: rewardResearch,
+      replay,
+      startedAt: Date.now(),
+    };
+
+    savePendingMission(pendingMission);
+
     const nextState = {
       ...gameState,
-      credits: gameState.credits - spend + rewardCredits,
-      xp: gameState.xp + rewardXp,
-      researchTokens: gameState.researchTokens + rewardResearch,
-      lastMissionReward: replay
-        ? undefined
-        : {
-            missionId,
-            title: mission.title,
-            credits: missionCredits,
-            xp: missionXp,
-            researchTokens: missionResearch,
-          },
-      completedMissions: Array.from(new Set([...gameState.completedMissions, missionId])),
+      credits: gameState.credits - spend,
+      lastMissionReward: undefined,
     };
 
     saveGameState(nextState);
     setConfirmed(true);
-
-    const rewardMessage = replay
-      ? "REPLAY REWARD — " + mission.title + " · +" + formatCredits(rewardCredits) + " Credits · +" + Math.round(rewardXp).toLocaleString() + " XP · +0 Research Tokens"
-      : "MISSION COMPLETE — " + mission.title + " · " + formatCredits(missionCredits) + " Credits · +" + missionXp.toLocaleString() + " XP · +" + missionResearch + " Research Token" + (missionResearch === 1 ? "" : "s");
-
-    setCompletionNotice(rewardMessage);
-    setNotice(rewardMessage + ". Returning to the campaign map...");
+    setNotice(
+      (replay ? "REPLAY DEPLOYED" : "MISSION DEPLOYED") +
+        " — launch systems online. Entering mission simulation...",
+    );
 
     window.setTimeout(() => {
-      window.location.href = "/preview/CampaignMapRefresh?campaign=" + campaign;
+      window.location.href = "/preview/MissionSimulation";
     }, 350);
   }
+
   const visibleTracks = openCategory
     ? technologyTracks.filter((track) => track.id === openCategory)
     : technologyTracks;
