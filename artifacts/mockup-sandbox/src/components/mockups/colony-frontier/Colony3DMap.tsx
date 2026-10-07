@@ -275,43 +275,6 @@ function CentralCommandCenter({ color }: { color: string }) {
   );
 }
 
-function DecorativeTree({
-  position,
-  scale = 1,
-  flower = false,
-  mars = false,
-}: {
-  position: [number, number];
-  scale?: number;
-  flower?: boolean;
-  mars?: boolean;
-}) {
-  const [x, z] = position;
-  const y = terrainHeight(x, z) + 0.02;
-  const foliage = mars ? (flower ? "#d98d72" : "#6e8f5d") : flower ? "#e39abb" : "#5f9f67";
-
-  return (
-    <group position={[x, y, z]} scale={scale}>
-      <mesh castShadow position={[0, 0.48, 0]}>
-        <cylinderGeometry args={[0.095, 0.14, 0.96, 8]} />
-        <meshStandardMaterial color="#5f5046" roughness={0.94} />
-      </mesh>
-      {[
-        [-0.21, 0.66, 0],
-        [0.18, 0.74, 0.06],
-        [0, 1.04, -0.03],
-        [0.22, 0.98, 0.11],
-        [-0.16, 0.96, 0.07],
-      ].map(([bx, by, bz], index) => (
-        <mesh key={index} castShadow position={[bx, by, bz]}>
-          <sphereGeometry args={[0.28 + (index % 2) * 0.06, 10, 8]} />
-          <meshStandardMaterial color={foliage} roughness={0.96} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
 function GardenPatch({
   position,
   scale = 1,
@@ -1443,30 +1406,6 @@ function UrbanBlock({
   );
 }
 
-function ShrubCluster({ position, flower = false, scale = 1 }: {
-  position: [number, number];
-  flower?: boolean;
-  scale?: number;
-}) {
-  const [x, z] = position;
-  const y = terrainHeight(x, z) + 0.03;
-  const leaves = flower ? "#d989b3" : "#57975e";
-  return (
-    <group position={[x, y, z]} scale={scale}>
-      {[-0.18, 0.0, 0.18].map((dx, index) => (
-        <mesh key={index} castShadow position={[dx, 0.17 + (index % 2) * 0.05, index % 2 ? 0.06 : -0.03]}>
-          <sphereGeometry args={[0.16 + (index % 2) * 0.035, 10, 8]} />
-          <meshStandardMaterial color={leaves} roughness={0.96} />
-        </mesh>
-      ))}
-      <mesh position={[0, 0.08, 0]}>
-        <cylinderGeometry args={[0.12, 0.16, 0.12, 8]} />
-        <meshStandardMaterial color="#625244" roughness={0.98} />
-      </mesh>
-    </group>
-  );
-}
-
 function ColonyMonument({ position, color }: {
   position: [number, number];
   color: string;
@@ -2078,19 +2017,6 @@ function ColonyBuilding({
 function MissionScene(props: Props) {
   const mars = props.environmentLabel === "MARS";
 
-  const decorativeTrees = [
-    [-14.2, -11.7, 1.0, true],
-    [-11.3, -9.6, 0.8, false],
-    [12.8, -11.8, 1.1, true],
-    [14.5, -1.1, 0.8, false],
-    [-13.1, 2.7, 0.9, true],
-    [12.9, 6.0, 0.92, true],
-    [-13.1, 10.9, 0.82, false],
-    [12.0, 12.1, 0.9, true],
-    [-4.7, -11.0, 0.72, false],
-    [4.5, -11.6, 0.74, true],
-  ] as Array<[number, number, number, boolean]>;
-
   const gardens = [
     [-11.8, -5.1, 0.72],
     [11.7, -4.2, 0.72],
@@ -2135,7 +2061,8 @@ function MissionScene(props: Props) {
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
 
-      <group scale={[1.22, 1.22, 1.22]}>\n              <CityFloor mars={mars} />
+      <group scale={[1.28, 1.28, 1.28]}>
+              <CityFloor mars={mars} />
               <SettlementWall mars={mars} />
               <SettlementGate mars={mars} />
               <CityRoadNetwork mars={mars} />
@@ -2240,7 +2167,7 @@ function MissionScene(props: Props) {
 
               <SettlerCrowd mars={mars} />
 
-      </group>\n\n      {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
+      {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
         <TaskMarker
           position={POSITIONS[props.activeEventTrackId]}
           label="EVENT"
@@ -2276,6 +2203,8 @@ function MissionScene(props: Props) {
           onClick={() => props.onSelect(track.id)}
         />
       ))}
+
+      </group>
 
       <OrbitControls
         enableRotate={false}
