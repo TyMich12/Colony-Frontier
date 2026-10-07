@@ -1385,7 +1385,7 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
 
   return (
     <group>
-      {Array.from({ length: 14 }, (_, index) => (
+      {Array.from({ length: 10 }, (_, index) => (
         <HumanSettler
           key={index}
           route={routes[index % routes.length]}
@@ -2085,7 +2085,7 @@ function ColonyBuilding({
         onClick();
       }}
     >
-      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.1 : 1.38} />
+      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.6 : 1.38} />
       {track.id !== "habitat" && <BuildingDetailTrim id={track.id} color={color} mars={false} />}
       <mesh
         position={[0, 1.05, 0]}
@@ -2094,10 +2094,10 @@ function ColonyBuilding({
           onClick();
         }}
       >
-        <boxGeometry args={track.id === "habitat" ? [5.8, 4.6, 5.8] : [2.65, 2.5, 2.65]} />
+        <boxGeometry args={track.id === "habitat" ? [6.6, 5.4, 6.6] : [2.65, 2.5, 2.65]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      <group scale={track.id === "habitat" ? 1.82 : 1}>
+      <group scale={track.id === "habitat" ? 2.1 : 1}>
         <StaticBuildingArt id={track.id} color={color} />
         <GoldArchitecturalTrim id={track.id} color={color} />
         <FunctionalBuildingMotion id={track.id} color={color} />
@@ -2172,7 +2172,7 @@ function MissionScene(props: Props) {
               <CityRoadNetwork mars={mars} />
               <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
               <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
-              <Plaza position={[0, 0]} radius={4.35} mars={mars} accent="#43dbe6" />
+              <Plaza position={[0, 0]} radius={4.15} mars={mars} accent="#43dbe6" />
               <Plaza position={[0, 9.2]} radius={2.6} mars={mars} accent="#f1c95e" />
               <Plaza position={[-8.9, 9.9]} radius={2.1} mars={mars} accent="#69e3f0" />
 
