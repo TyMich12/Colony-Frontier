@@ -408,6 +408,8 @@ function IsometricMap({
   onSelect,
   selectedBuildingId,
   elapsed,
+  environmentLabel,
+  environmentTitle,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
