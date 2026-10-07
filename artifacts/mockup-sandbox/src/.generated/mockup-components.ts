@@ -5,6 +5,7 @@ export const modules: ModuleMap = {
   "./components/mockups/colony-frontier/CampaignMapRefresh.tsx": () => import("../components/mockups/colony-frontier/CampaignMapRefresh.tsx"),
   "./components/mockups/colony-frontier/MainMenu.tsx": () => import("../components/mockups/colony-frontier/MainMenu.tsx"),
   "./components/mockups/colony-frontier/MissionLoadout.tsx": () => import("../components/mockups/colony-frontier/MissionLoadout.tsx"),
+  "./components/mockups/colony-frontier/MissionSimulation.tsx": () => import("../components/mockups/colony-frontier/MissionSimulation.tsx"),
   "./components/mockups/colony-frontier/Solar3DViewer.tsx": () => import("../components/mockups/colony-frontier/Solar3DViewer.tsx"),
   "./components/mockups/colony-frontier/SolarSurfaceSimulation.tsx": () => import("../components/mockups/colony-frontier/SolarSurfaceSimulation.tsx"),
   "./components/mockups/colony-frontier/TechnicalViewer.tsx": () => import("../components/mockups/colony-frontier/TechnicalViewer.tsx"),
