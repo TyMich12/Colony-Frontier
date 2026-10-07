@@ -1298,116 +1298,28 @@ export function MissionSimulation() {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#040a0e] text-[#e7eee5]">
-      <header className="relative z-40 border-b border-[#29454a] bg-[#07131a]/95 px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-md sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#d77a5a]"><span className="h-2 w-2 rounded-full bg-[#d77a5a] shadow-[0_0_10px_#d77a5a]" />{environmentLabel} · Mission {pending.missionNumber}</p>
-            <h1 className="mt-1 text-lg font-semibold uppercase tracking-[0.12em] text-[#edf1e7]">{pending.missionTitle}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="border border-[#324d50] bg-[#102127] px-3 py-2 text-right"><p className="text-[8px] uppercase tracking-[0.16em] text-[#728b89]">Mission clock</p><p className="font-mono text-sm text-[#efb658]">{formatMissionTime(elapsed)}</p></div>
-            <button type="button" onClick={() => setManualPaused((value) => !value)} disabled={Boolean(activeEvent)} className="inline-flex items-center gap-2 border border-[#47605f] bg-[#11262b] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#cbd8d0] hover:border-[#efb658] disabled:opacity-40">
-              {manualPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />} {manualPaused ? "Resume" : "Pause"}
-            </button>
-            <div className="flex overflow-hidden border border-[#47605f]">
-              {[1, 2, 4].map((value) => (
-                <button key={value} type="button" onClick={() => setSpeed(value)} disabled={Boolean(activeEvent)} className={`px-2.5 py-2 text-[9px] font-bold uppercase tracking-[0.1em] ${speed === value ? "bg-[#efb658] text-[#17201b]" : "bg-[#0d2027] text-[#77918f]"} disabled:opacity-40`}>{value}×</button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="fixed inset-0 h-[100dvh] w-full overflow-hidden bg-[#05040a] text-white">
+      <main className="relative h-full w-full overflow-hidden">
+        <IsometricMap
+          tracks={selectedTracks}
+          selected={pending.selected}
+          buildings={buildings}
+          onSelect={setSelectedBuildingId}
+          selectedBuildingId={selectedBuildingId}
+          elapsed={elapsed}
+          environmentLabel={environmentLabel}
+          environmentTitle={environmentTitle}
+          activeEventTrackId={activeTargetTrackId}
+          selectedResourceId={selectedResourceId}
+          surveyedNodes={surveyedNodes}
+          onSelectResource={(node) => {
+            setSelectedResourceId(node.id);
+            setSelectedBuildingId(null);
+          }}
+          roverTask={roverTask}
+        />
 
-      <main className="relative h-[calc(100vh-75px)] min-h-[760px]">
-        <div className="absolute inset-0">
-          <div className="absolute inset-5 overflow-hidden border border-[#29464b] bg-[#071117] shadow-[inset_0_0_100px_rgba(0,0,0,0.45)]">
-            <IsometricMap
-              tracks={selectedTracks}
-              selected={pending.selected}
-              buildings={buildings}
-              onSelect={setSelectedBuildingId}
-              selectedBuildingId={selectedBuildingId}
-              elapsed={elapsed}
-              environmentLabel={environmentLabel}
-              environmentTitle={environmentTitle}
-              activeEventTrackId={activeTargetTrackId}
-              selectedResourceId={selectedResourceId}
-              surveyedNodes={surveyedNodes}
-              onSelectResource={(node) => setSelectedResourceId(node.id)}
-              roverTask={roverTask}
-            />
-          </div>
-        </div>
-
-        <div className="pointer-events-none absolute left-8 top-8 z-20 w-[min(90vw,330px)] border border-[#3c5652] bg-[#08141a]/88 p-4 backdrop-blur-md">
-          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#efb658]">Colony status</p>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            <MetricBar icon={<Gauge className="h-3 w-3" />} label="Power" value={metrics.power} />
-            <MetricBar icon={<BatteryCharging className="h-3 w-3" />} label="Battery" value={metrics.battery} />
-            <MetricBar icon={<Wind className="h-3 w-3" />} label="O₂" value={metrics.oxygen} />
-            <MetricBar icon={<Droplets className="h-3 w-3" />} label="Water" value={metrics.water} />
-            <MetricBar icon={<Sprout className="h-3 w-3" />} label="Food" value={metrics.food} />
-            <MetricBar icon={<Home className="h-3 w-3" />} label="Habitat" value={metrics.habitat} />
-            <MetricBar icon={<Thermometer className="h-3 w-3" />} label="Temp" value={metrics.temperature} suffix="°" />
-            <MetricBar icon={<Shield className="h-3 w-3" />} label="Radiation" value={metrics.radiation} invert />
-          </div>
-        </div>
-
-        <div className="absolute right-8 top-8 z-20 w-[min(88vw,305px)] border border-[#3c5652] bg-[#08141a]/92 p-4 backdrop-blur-md">
-          <div className="flex items-center justify-between gap-2">
-            <div><p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#8fc9a0]">Mission systems</p><p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-[#718b88]">{selectedTracks.length} deployed systems</p></div>
-            <span className="font-mono text-sm text-[#efb658]">{Math.round(score)}/100</span>
-          </div>
-          <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
-            {selectedTracks.map((track) => (
-              <button key={track.id} type="button" onClick={() => setSelectedBuildingId(track.id)} className="flex w-full items-center justify-between gap-3 border border-[#243f43] bg-[#0b1b21] px-3 py-2 text-left hover:border-[#56776f]">
-                <span className="min-w-0"><span className="block truncate text-[9px] font-bold uppercase tracking-[0.14em] text-[#cbd8ce]">{track.category}</span><span className="mt-0.5 block truncate text-[8px] uppercase tracking-[0.1em] text-[#718a88]">{pending.selected[track.id]} · {track.tiers[pending.selected[track.id]].name}</span></span>
-                <span className="shrink-0 text-[8px] uppercase tracking-[0.12em]" style={{ color: resourceColor(buildings[track.id]?.condition ?? 100) }}>{buildings[track.id]?.status ?? "ONLINE"}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="absolute left-1/2 top-8 z-20 w-[min(92vw,520px)] -translate-x-1/2 border border-[#56695a] bg-[#14211d]/92 p-3 shadow-[0_15px_45px_rgba(0,0,0,0.28)] backdrop-blur-md">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#efc76b]">Field operations</p>
-              <p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-[#8ba095]">You control the colony between alerts.</p>
-            </div>
-            <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.13em] text-[#93a99b]">
-              <span>Sites {surveyedNodes.length}/4</span>
-              <span>Yield {resourceYield}</span>
-              <span>Actions {manualActions}</span>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <button type="button" onClick={() => runQuickCommand("survey")} className="border border-[#536c5f] bg-[#1a332a] px-3 py-2 text-left hover:border-[#efb658]">
-              <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-[#e6eddc]">Survey site</span>
-              <span className="mt-1 block text-[8px] text-[#7f988d]">Explore the surrounding terrain.</span>
-            </button>
-            <button type="button" onClick={() => runQuickCommand("service")} disabled={!pending?.selected.maintenance} className="border border-[#536c5f] bg-[#1a332a] px-3 py-2 text-left hover:border-[#efb658] disabled:opacity-35">
-              <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-[#e6eddc]">Service weak link</span>
-              <span className="mt-1 block text-[8px] text-[#7f988d]">{pending?.selected.maintenance ? "Use maintenance to recover condition." : "Requires Maintenance."}</span>
-            </button>
-            <button type="button" onClick={() => runQuickCommand("clean")} disabled={!pending?.selected.solar} className="border border-[#536c5f] bg-[#1a332a] px-3 py-2 text-left hover:border-[#efb658] disabled:opacity-35">
-              <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-[#e6eddc]">Clean array</span>
-              <span className="mt-1 block text-[8px] text-[#7f988d]">Recover some solar output manually.</span>
-            </button>
-          </div>
-        </div>
-        <div className="absolute bottom-8 left-8 z-20 w-[min(90vw,420px)] border border-[#455a58] bg-[#08141a]/94 p-4 backdrop-blur-md">
-          <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#efb658]" /><div><p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#efb658]">Mission AI</p><p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-[#6e8986]">Live operational analysis</p></div></div><button type="button" onClick={askMissionAi} className="border border-[#526b63] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.14em] text-[#b9cbbf] hover:border-[#efb658]">Diagnose</button></div>
-          <p className="mt-3 text-xs leading-5 text-[#c8d5cf]">{aiMessage}</p>
-        </div>
-
-        <div className="absolute bottom-8 right-8 z-20 border border-[#455a58] bg-[#08141a]/94 px-4 py-3 backdrop-blur-md">
-          <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-[#718b88]">Controls</p>
-          <p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-[#98aaa5]">Click buildings · inspect systems · manage problems · watch the colony evolve</p>
-          <p className="mt-1 text-[8px] uppercase tracking-[0.12em] text-[#5e7776]">{environmentTitle}</p>
-        </div>
-
-        {selectedResource && (
+        {selectedResource && !activeEvent && (
           <ResourceInspector
             node={selectedResource}
             surveyed={surveyedNodes.includes(selectedResource.id)}
@@ -1417,7 +1329,8 @@ export function MissionSimulation() {
             onClose={() => setSelectedResourceId(null)}
           />
         )}
-        {selectedTrack && selectedTier && (
+
+        {selectedTrack && selectedTier && !activeEvent && !selectedResource && (
           <BuildingInspector
             track={selectedTrack}
             tier={selectedTier}
@@ -1429,33 +1342,30 @@ export function MissionSimulation() {
         )}
 
         {activeEvent && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-40 flex justify-center px-4">
-            <div className="pointer-events-auto w-[min(94vw,720px)] overflow-hidden rounded-2xl border-2 border-[#ff5f6d]/80 bg-[#160f19]/92 shadow-[0_0_35px_rgba(255,95,109,0.2)] backdrop-blur-lg">
-              <div className="flex items-center justify-between gap-3 border-b border-[#6f3848] bg-gradient-to-r from-[#281727] to-[#24101b] px-4 py-2.5">
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-40 flex justify-center px-3">
+            <div className="pointer-events-auto w-[min(94vw,620px)] overflow-hidden rounded-2xl border-2 border-[#ff5367] bg-[#120f16]/95 shadow-[0_14px_40px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center justify-between gap-3 bg-[#2a1620] px-3 py-2">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#ff6b75]"><CircleDot className="h-3.5 w-3.5 " /> Incoming event · {activeEvent.trackId.toUpperCase()}</p>
-                  <p className="mt-0.5 truncate text-[8px] uppercase tracking-[0.13em] text-[#f1c45d]">Target on map is flashing · choose a response</p>
+                  <p className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-[#ff7180]">⚠ {activeEvent.title}</p>
+                  <p className="truncate text-[7px] uppercase tracking-[0.1em] text-[#e5bd64]">Tap the flashing building, then choose your response</p>
                 </div>
-                <span className="shrink-0 rounded-full border border-[#ff7b68]/50 bg-[#ff5f6d]/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#ffad8e]">LIVE</span>
+                <span className="shrink-0 text-[7px] font-black uppercase tracking-[0.14em] text-[#ffb39d]">{activeEvent.trackId}</span>
               </div>
-              <div className="px-4 py-2.5">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-base font-black uppercase tracking-[0.08em] text-[#fff4ee]">{activeEvent.title}</h2>
-                    <p className="mt-0.5 line-clamp-1 text-[8px] uppercase tracking-[0.11em] text-[#c59690]">{activeEvent.subtitle}</p>
-                  </div>
-                </div>
-                <div className="mt-2.5 grid grid-cols-3 gap-2">
-                  {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
-                    <button key={choice.id} type="button" onClick={() => handleEventChoice(choice.id)} className="group min-w-0 rounded-xl border border-[#5d4350] bg-[#271b2a] px-3 py-2.5 text-left  hover:-translate-y-0.5 hover:border-[#ffd65b] hover:bg-[#35213a] hover:shadow-[0_8px_20px_rgba(255,214,91,0.12)]">
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#ff5f6d]/20 text-[8px] font-black text-[#ffd77b]">{index + 1}</span>
-                        <span className="truncate text-[8px] font-black uppercase tracking-[0.11em] text-[#fff0dc]">{choice.label}</span>
-                      </span>
-                      <span className="mt-1.5 block line-clamp-2 text-[7px] leading-3 text-[#bda9b4]">{choice.detail}</span>
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-3 gap-1.5 p-2">
+                {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    onClick={() => handleEventChoice(choice.id)}
+                    className="min-w-0 rounded-xl border border-[#60404c] bg-[#241922] px-2.5 py-2 text-left hover:border-[#f6cd63] hover:bg-[#31202c]"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#ff5367]/20 text-[8px] font-black text-[#ffd96d]">{index + 1}</span>
+                      <span className="truncate text-[8px] font-black uppercase tracking-[0.08em] text-white">{choice.label}</span>
+                    </span>
+                    <span className="mt-1 block line-clamp-2 text-[7px] leading-3 text-[#bca9b3]">{choice.detail}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
