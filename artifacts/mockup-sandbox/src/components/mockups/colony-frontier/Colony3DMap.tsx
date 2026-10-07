@@ -1165,7 +1165,7 @@ function BuildingIdleMotion({
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} scale={0.52}>
       <mesh ref={beaconRef} position={[0, id === "habitat" ? 3.85 : 2.3, 0]}>
         <octahedronGeometry args={[0.075 + level * 0.018, 0]} />
         <meshStandardMaterial color={active ? "#fff16c" : color} emissive={active ? "#ffb735" : color} emissiveIntensity={0.7} />
@@ -1229,12 +1229,20 @@ function HumanSettler({
   return (
     <group ref={groupRef}>
       <mesh castShadow position={[0, 0.42, 0]}>
-        <capsuleGeometry args={[0.12, 0.24, 4, 8]} />
+        <capsuleGeometry args={[0.125, 0.25, 4, 8]} />
         <meshStandardMaterial color={bodyColor} roughness={0.82} />
+      </mesh>
+      <mesh castShadow position={[0, 0.48, -0.13]}>
+        <boxGeometry args={[0.2, 0.25, 0.08]} />
+        <meshStandardMaterial color={helmetColor} roughness={0.74} metalness={0.22} />
       </mesh>
       <mesh castShadow position={[0, 0.73, 0]}>
         <sphereGeometry args={[0.105, 12, 8]} />
         <meshStandardMaterial color={skin} roughness={0.86} />
+      </mesh>
+      <mesh position={[0, 0.74, 0.085]}>
+        <boxGeometry args={[0.12, 0.055, 0.018]} />
+        <meshStandardMaterial color={index % 2 ? "#7ddfe7" : "#f4d267"} emissive={index % 2 ? "#238c95" : "#8e6513"} emissiveIntensity={0.4} metalness={0.24} roughness={0.28} />
       </mesh>
       <mesh castShadow position={[0, 0.82, 0]}>
         <sphereGeometry args={[0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
@@ -1295,17 +1303,21 @@ function HumanSettler({
 
 function SettlerCrowd({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number, number]>> = [
-    [[-14.8, -14.4], [-8.2, -11.8], [0, -7.7], [0, -4.8], [0, 0]],
-    [[0, 0], [-3.1, 4.9], [-6.2, 7.9], [-8.8, 9.8], [0, 9.1]],
-    [[0, 0], [6.4, 4.0], [7.5, 8.0], [8.7, 11.0], [0, 9.1]],
-    [[0, 0], [6.2, -2.1], [5.9, -7.0], [9.2, -6.8], [0, -4.8]],
-    [[-6.2, 2.0], [-9.9, 5.2], [-9.0, -1.4], [-5.4, -6.5], [0, 0]],
-    [[-6.2, 2.0], [-3.1, 4.9], [6.4, 4.0], [10.3, 2.7], [7.5, 8.0]],
+    [[-15.0, -14.2], [-10.3, -12.1], [-6.0, -8.8], [0, -4.8], [0, 0]],
+    [[0, 0], [-3.1, 4.9], [-6.2, 7.9], [-8.8, 9.8], [-4.0, 11.2], [0, 9.1]],
+    [[0, 0], [6.4, 4.0], [7.5, 8.0], [8.7, 11.0], [4.6, 12.0], [0, 9.1]],
+    [[0, 0], [6.2, -2.1], [5.9, -7.0], [9.2, -6.8], [12.8, -9.2], [0, -4.8]],
+    [[-6.2, 2.0], [-9.9, 5.2], [-9.0, -1.4], [-5.4, -6.5], [-12.8, -6.3], [0, 0]],
+    [[-6.2, 2.0], [-3.1, 4.9], [6.4, 4.0], [10.3, 2.7], [12.4, 5.9], [7.5, 8.0]],
+    [[-13.0, 1.0], [-10.5, 5.5], [-6.2, 7.9], [-1.0, 10.4], [0.1, 9.1]],
+    [[12.7, -0.8], [10.1, 2.7], [8.0, 6.8], [7.5, 8.0], [12.0, 10.5]],
+    [[-11.7, -9.5], [-7.0, -6.0], [-3.3, -2.2], [0, 0], [4.0, -2.7]],
+    [[10.8, -9.7], [6.0, -7.0], [3.3, -3.0], [0, 0], [-4.0, -2.7]],
   ];
 
   return (
     <group>
-      {Array.from({ length: 32 }, (_, index) => (
+      {Array.from({ length: 48 }, (_, index) => (
         <HumanSettler
           key={index}
           route={routes[index % routes.length]}
@@ -1396,6 +1408,130 @@ function WorkshopYard({ position, index }: { position: [number, number]; index: 
       <mesh position={[-0.06, 0.25, 0.2]}>
         <boxGeometry args={[0.7, 0.08, 0.08]} />
         <meshStandardMaterial color="#a3afac" metalness={0.5} roughness={0.42} />
+      </mesh>
+    </group>
+  );
+}
+
+
+function UrbanBlock({
+  position,
+  width = 2.5,
+  depth = 2.0,
+  accent = "#67c4ca",
+  mars = false,
+}: {
+  position: [number, number];
+  width?: number;
+  depth?: number;
+  accent?: string;
+  mars?: boolean;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.035;
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, depth]} />
+        <meshStandardMaterial color={mars ? "#754b3e" : "#566366"} roughness={0.98} />
+      </mesh>
+      <mesh position={[0, 0.035, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[Math.min(width, depth) * 0.38, Math.min(width, depth) * 0.41, 4]} />
+        <meshBasicMaterial color={accent} transparent opacity={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+function ShrubCluster({ position, flower = false, scale = 1 }: {
+  position: [number, number];
+  flower?: boolean;
+  scale?: number;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.03;
+  const leaves = flower ? "#d989b3" : "#57975e";
+  return (
+    <group position={[x, y, z]} scale={scale}>
+      {[-0.18, 0.0, 0.18].map((dx, index) => (
+        <mesh key={index} castShadow position={[dx, 0.17 + (index % 2) * 0.05, index % 2 ? 0.06 : -0.03]}>
+          <sphereGeometry args={[0.16 + (index % 2) * 0.035, 10, 8]} />
+          <meshStandardMaterial color={leaves} roughness={0.96} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.08, 0]}>
+        <cylinderGeometry args={[0.12, 0.16, 0.12, 8]} />
+        <meshStandardMaterial color="#625244" roughness={0.98} />
+      </mesh>
+    </group>
+  );
+}
+
+function ColonyMonument({ position, color }: {
+  position: [number, number];
+  color: string;
+}) {
+  const [x, z] = position;
+  const y = terrainHeight(x, z) + 0.05;
+  const coreRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!coreRef.current) return;
+    coreRef.current.rotation.y = clock.getElapsedTime() * 0.32;
+  });
+  return (
+    <group position={[x, y, z]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.9, 32]} />
+        <meshStandardMaterial color="#586568" roughness={0.93} />
+      </mesh>
+      <mesh castShadow position={[0, 0.36, 0]}>
+        <cylinderGeometry args={[0.28, 0.38, 0.56, 10]} />
+        <meshStandardMaterial color="#737f80" metalness={0.3} roughness={0.55} />
+      </mesh>
+      <mesh castShadow position={[0, 0.84, 0]}>
+        <coneGeometry args={[0.28, 0.62, 6]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.32} metalness={0.2} roughness={0.4} />
+      </mesh>
+      <mesh ref={coreRef} position={[0, 1.32, 0]}>
+        <octahedronGeometry args={[0.14, 0]} />
+        <meshStandardMaterial color="#fff0a2" emissive="#ffc21f" emissiveIntensity={1.1} />
+      </mesh>
+    </group>
+  );
+}
+
+function BuildingDetailTrim({
+  id,
+  color,
+  mars,
+}: {
+  id: string;
+  color: string;
+  mars: boolean;
+}) {
+  const size = id === "habitat" ? 3.0 : id === "extraction" || id === "isru" ? 2.65 : 2.2;
+  const materialColor = mars ? "#77645c" : "#707b7d";
+  return (
+    <group>
+      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[size, size * 0.82]} />
+        <meshStandardMaterial color={materialColor} roughness={0.96} transparent opacity={0.78} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * (size * 0.4), 0.27, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.09, 0.5, size * 0.48]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} metalness={0.28} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.28, 0]}>
+            <sphereGeometry args={[0.065, 8, 6]} />
+            <meshStandardMaterial color="#ffe18a" emissive="#ffb91d" emissiveIntensity={0.85} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, 0.23, size * 0.38]}>
+        <boxGeometry args={[0.58, 0.38, 0.05]} />
+        <meshStandardMaterial color="#202a2e" roughness={0.55} metalness={0.35} />
       </mesh>
     </group>
   );
@@ -1630,6 +1766,7 @@ function ColonyBuilding({
       }}
     >
       <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 2.45 : 1.38} />
+      {track.id !== "habitat" && <BuildingDetailTrim id={track.id} color={color} mars={false} />}
       <StaticBuildingArt id={track.id} color={color} />
       <BuildingIdleMotion color={color} level={level} active={alerted} id={track.id} />
       <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -1686,7 +1823,7 @@ function MissionScene(props: Props) {
     <Canvas
       shadows
       dpr={[1, 1.3]}
-      camera={{ position: [38, 43, 31], fov: 45, near: 0.1, far: 260 }}
+      camera={{ position: [46, 56, 42], fov: 48, near: 0.1, far: 300 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
@@ -1714,12 +1851,36 @@ function MissionScene(props: Props) {
       <SettlementWall mars={mars} />
       <SettlementGate mars={mars} />
       <CityRoadNetwork mars={mars} />
+      <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
+      <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
       <Plaza position={[0, 0]} radius={5.0} mars={mars} accent="#43dbe6" />
       <Plaza position={[0, 9.2]} radius={2.6} mars={mars} accent="#f1c95e" />
       <Plaza position={[-8.9, 9.9]} radius={2.1} mars={mars} accent="#69e3f0" />
 
       <PipeRuns />
       <ColonyLighting mars={mars} />
+
+      <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
+      <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
+      <UrbanBlock position={[-8.5, 6.1]} width={3.4} depth={2.45} mars={mars} accent="#73d7e0" />
+      <UrbanBlock position={[8.8, 6.2]} width={3.4} depth={2.45} mars={mars} accent="#c17bf0" />
+      <UrbanBlock position={[-3.7, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#5edfe8" />
+      <UrbanBlock position={[4.0, 10.9]} width={3.0} depth={2.25} mars={mars} accent="#f3cf67" />
+
+      <ColonyMonument position={[-3.0, 3.0]} color="#61dfe8" />
+      <ColonyMonument position={[3.1, 3.0]} color="#f0c75d" />
+      <ColonyMonument position={[0, 6.6]} color="#b97bf0" />
+
+      <ShrubCluster position={[-12.2, -10.4]} scale={1.1} />
+      <ShrubCluster position={[-10.7, -9.2]} flower scale={0.8} />
+      <ShrubCluster position={[11.4, -10.6]} flower scale={1.0} />
+      <ShrubCluster position={[13.0, -8.9]} scale={0.78} />
+      <ShrubCluster position={[-12.4, 4.4]} flower scale={0.85} />
+      <ShrubCluster position={[12.6, 4.8]} scale={0.82} />
+      <ShrubCluster position={[-10.9, 11.2]} scale={0.8} />
+      <ShrubCluster position={[11.2, 11.5]} flower scale={0.86} />
+
+      
       <CivicPlazaStatue position={[0, -3.25]} mars={mars} />
       <CivicPlazaStatue position={[0, 7.55]} mars={mars} />
       <ColonyBanner position={[-4.0, -2.9]} accent="#54dfe9" mars={mars} />
@@ -1808,10 +1969,10 @@ function MissionScene(props: Props) {
         enableRotate={false}
         enablePan={false}
         enableZoom
-        minDistance={24}
-        maxDistance={58}
-        zoomSpeed={0.66}
-        target={[0, 0, 1.25]}
+        minDistance={30}
+        maxDistance={74}
+        zoomSpeed={0.62}
+        target={[0, 0.5, 1.8]}
       />
     </Canvas>
   );
