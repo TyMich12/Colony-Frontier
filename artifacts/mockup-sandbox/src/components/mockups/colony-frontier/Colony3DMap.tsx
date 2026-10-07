@@ -62,12 +62,12 @@ function statusColor(condition: number) {
 
 function tierColor(tier: Tier) {
   return tier === "Foundation"
-    ? "#8fd18f"
+    ? "#56e57a"
     : tier === "Frontier"
-      ? "#54c7ee"
+      ? "#16c8ff"
       : tier === "Apex"
-        ? "#ae86ee"
-        : "#ffb65f";
+        ? "#b65cff"
+        : "#ff9d32";
 }
 
 function FoundationPad() {
@@ -84,10 +84,16 @@ function FoundationPad() {
       {pads.map(([x, z, w, d], index) => {
         const y = terrainHeight(x, z) + 0.08;
         return (
-          <mesh key={index} position={[x, y, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-            <planeGeometry args={[w, d]} />
-            <meshStandardMaterial color={index === 1 ? "#48504e" : "#5d625c"} roughness={1} metalness={0.02} />
-          </mesh>
+          <group key={index}>
+            <mesh position={[x, y, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[w, d]} />
+              <meshStandardMaterial color={index === 1 ? "#344b58" : "#42515a"} roughness={0.82} metalness={0.16} />
+            </mesh>
+            <mesh position={[x, y + 0.035, z]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[Math.min(w, d) * 0.34, Math.min(w, d) * 0.39, 32]} />
+              <meshBasicMaterial color={index === 1 ? "#22d3ee" : "#4ade80"} transparent opacity={0.22} />
+            </mesh>
+          </group>
         );
       })}
     </group>
@@ -162,40 +168,67 @@ function StandardBuilding({ track, tier, runtime, selected, alerted, position, o
   position: [number, number];
   onClick: () => void;
 }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const beaconRef = useRef<THREE.Mesh>(null);
+  const orbRef = useRef<THREE.Mesh>(null);
   const y = terrainHeight(position[0], position[1]);
   const level = tier === "Foundation" ? 0 : tier === "Frontier" ? 1 : tier === "Apex" ? 2 : 3;
   const h = 1.15 + level * 0.32;
   const c = tierColor(tier);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (groupRef.current) {
+      groupRef.current.position.y = y + Math.sin(t * 1.8 + position[0] * 0.4) * 0.055;
+    }
+    if (beaconRef.current) {
+      beaconRef.current.rotation.y = t * (1.7 + level * 0.25);
+      beaconRef.current.scale.setScalar(0.92 + (Math.sin(t * 4 + position[1]) + 1) * 0.055);
+    }
+    if (orbRef.current) {
+      orbRef.current.position.y = h + 0.64 + Math.sin(t * 3.2 + position[0]) * 0.09;
+    }
+  });
+
   return (
-    <group position={[position[0], y, position[1]]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
-      {selected && <PulseRing color="#ffe18a" y={0.08} radius={1.15 + level * 0.12} />}
-      {alerted && <PulseRing color="#ff6e52" y={0.11} radius={1.42 + level * 0.12} />}
+    <group ref={groupRef} position={[position[0], y, position[1]]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
+      {selected && <PulseRing color="#ffe66b" y={0.08} radius={1.18 + level * 0.14} />}
+      {alerted && <PulseRing color="#ff3f68" y={0.12} radius={1.46 + level * 0.14} />}
       <mesh castShadow receiveShadow position={[0, h / 2, 0]}>
         <boxGeometry args={[1.7 + level * 0.32, h, 1.45 + level * 0.25]} />
-        <meshStandardMaterial color="#36454a" roughness={0.86} metalness={0.18} />
+        <meshStandardMaterial color="#27343d" roughness={0.7} metalness={0.28} />
+      </mesh>
+      <mesh castShadow position={[0, h * 0.62, 0.73]}>
+        <boxGeometry args={[1.32 + level * 0.18, 0.36, 0.08]} />
+        <meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.32} roughness={0.35} metalness={0.18} />
       </mesh>
       <mesh castShadow position={[0, h + 0.22, 0]}>
         <cylinderGeometry args={[0.75 + level * 0.08, 0.9 + level * 0.08, 0.4, 6]} />
-        <meshStandardMaterial color={c} roughness={0.5} metalness={0.25} emissive={c} emissiveIntensity={0.18} />
+        <meshStandardMaterial color={c} roughness={0.4} metalness={0.3} emissive={c} emissiveIntensity={0.3} />
+      </mesh>
+      <mesh ref={beaconRef} position={[0, h + 0.62, 0]}>
+        <octahedronGeometry args={[0.18 + level * 0.035, 0]} />
+        <meshStandardMaterial color={c} emissive={c} emissiveIntensity={1.5} roughness={0.18} metalness={0.15} />
       </mesh>
       <mesh position={[0.72, h + 0.45, 0.32]}>
         <sphereGeometry args={[0.11, 12, 8]} />
-        <meshStandardMaterial color={statusColor(runtime.condition)} emissive={statusColor(runtime.condition)} emissiveIntensity={0.7} />
+        <meshStandardMaterial color={statusColor(runtime.condition)} emissive={statusColor(runtime.condition)} emissiveIntensity={1.05} />
       </mesh>
+      <pointLight color={c} intensity={selected || alerted ? 1.6 : 0.6} distance={3.8} />
       {track.id === "solar" && <SolarEquipment level={level} dust={runtime.dust} />}
       {track.id === "habitat" && (
         <mesh castShadow position={[0, h + 0.85, 0]}>
           <sphereGeometry args={[0.96 + level * 0.12, 24, 16]} />
-          <meshStandardMaterial color="#668d8c" roughness={0.5} metalness={0.12} />
+          <meshStandardMaterial color="#56b7b2" roughness={0.38} metalness={0.14} emissive="#164c50" emissiveIntensity={0.22} />
         </mesh>
       )}
       {track.id !== "solar" && track.id !== "habitat" && (
-        <mesh position={[0, h + 0.7, 0]}>
+        <mesh ref={orbRef} position={[0, h + 0.64, 0]}>
           <sphereGeometry args={[0.24 + level * 0.045, 16, 12]} />
-          <meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.75} roughness={0.25} metalness={0.25} />
+          <meshStandardMaterial color={c} emissive={c} emissiveIntensity={1.15} roughness={0.2} metalness={0.2} />
         </mesh>
       )}
-      <Text position={[0, h + (track.id === "solar" ? 1.8 : 1.25), 0]} rotation={[-0.66, 0, 0]} fontSize={0.34} color={selected ? "#ffe08a" : "#edf2df"} outlineWidth={0.035} outlineColor="#182022" anchorX="center">
+      <Text position={[0, h + (track.id === "solar" ? 2.0 : 1.48), 0]} rotation={[-0.66, 0, 0]} fontSize={0.34} color={selected ? "#fff2a7" : "#ffffff"} outlineWidth={0.045} outlineColor="#111820" anchorX="center">
         {track.category}
       </Text>
     </group>
@@ -275,10 +308,10 @@ function MissionScene(props: Props) {
   const mars = props.environmentLabel === "MARS";
   return (
     <Canvas shadows dpr={[1, 1.25]} camera={{ position: [23, 20, 25], fov: 40, near: 0.1, far: 220 }} gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}>
-      <color attach="background" args={[mars ? "#241412" : "#05070c"]} />
+      <color attach="background" args={[mars ? "#3a1714" : "#08051a"]} />
       <fog attach="fog" args={[mars ? "#4d2d25" : "#13171f", 52, 112]} />
-      <ambientLight intensity={0.3} color={mars ? "#f0b59c" : "#b7c9df"} />
-      <hemisphereLight args={[mars ? "#ffd5c0" : "#e7f0ff", mars ? "#3d201b" : "#242524", 0.62]} />
+      <ambientLight intensity={0.48} color={mars ? "#ffd0b8" : "#bcd5ff"} />
+      <hemisphereLight args={[mars ? "#ffe0cf" : "#eef4ff", mars ? "#3d201b" : "#1f1738", 0.86]} />
       <directionalLight position={[17, 28, 13]} intensity={2.3} color="#fff5df" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={100} shadow-camera-left={-40} shadow-camera-right={40} shadow-camera-top={40} shadow-camera-bottom={-40} />
       <Stars radius={95} depth={60} count={1700} factor={2.8} saturation={0} fade speed={0.45} />
       <Terrain kind={mars ? "mars" : "moon"} />
