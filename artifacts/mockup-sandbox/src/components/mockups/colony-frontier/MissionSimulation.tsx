@@ -355,7 +355,7 @@ function BuildingShape({
     <g transform={`translate(${x} ${y})`} onClick={onClick} style={{ cursor: "pointer" }}>
       {alerted && (
         <>
-          <ellipse cx="0" cy="4" rx={size * 1.15} ry={size * 0.68} fill="none" stroke="#ff8a65" strokeWidth="3" opacity="0.9" className="animate-ping" />
+          <ellipse cx="0" cy="4" rx={size * 1.15} ry={size * 0.68} fill="none" stroke="#ff8a65" strokeWidth="3" opacity="0.9" />
           <ellipse cx="0" cy="4" rx={size * 0.98} ry={size * 0.56} fill="#ff8a65" opacity="0.08" />
         </>
       )}
@@ -414,7 +414,7 @@ function BuildingShape({
       <Icon x={-10} y={-height * 2.25} width={20} height={20} color={selected ? "#f6c96f" : "#b9d4ca"} />
       <text x="0" y={size * 0.92} textAnchor="middle" fill={selected ? "#f7cf79" : "#b0c4bf"} fontSize="11" fontWeight="700" letterSpacing="1.3">{track.category.toUpperCase()}</text>
       <text x="0" y={size * 0.92 + 14} textAnchor="middle" fill="#6e8d8b" fontSize="8" letterSpacing="0.7">{isTier(tier) ? tier.toUpperCase() : "FOUNDATION"}</text>
-      {damaged && <circle cx={size * 0.76} cy={-size * 0.1} r="5" fill="#d77a5a" className="animate-pulse" />}
+      {damaged && <circle cx={size * 0.76} cy={-size * 0.1} r="5" fill="#d77a5a" />}
     </g>
   );
 }
@@ -505,7 +505,7 @@ function MetricBar({
         <span style={{ color: resourceColor(safe, invert) }} className="font-mono font-bold">{displayValue}{suffix}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full border border-[#29434a] bg-[#0a171c]">
-        <div className="h-full transition-all duration-300" style={{ width: `${clamp(value)}%`, background: resourceColor(safe, invert), boxShadow: `0 0 10px ${resourceColor(safe, invert)}55` }} />
+        <div className="h-full" style={{ width: `${clamp(value)}%`, background: resourceColor(safe, invert), boxShadow: `0 0 10px ${resourceColor(safe, invert)}55` }} />
       </div>
     </div>
   );
