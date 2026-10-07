@@ -1788,7 +1788,7 @@ function HumanSettler({
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} scale={0.43}>
       <mesh castShadow position={[0, 0.42, 0]}>
         <capsuleGeometry args={[0.125, 0.25, 4, 8]} />
         <meshStandardMaterial color={bodyColor} roughness={0.82} />
@@ -2647,10 +2647,6 @@ function MissionScene(props: Props) {
           onClick={() => props.onSelect(track.id)}
         />
       ))}
-
-      <Text position={[0, 5.1, 0]} rotation={[-0.66, 0, 0]} fontSize={0.38} color="#fff0ae" outlineWidth={0.05} outlineColor="#29231f" anchorX="center">
-        {props.environmentLabel + " COLONY"}
-      </Text>
 
       <OrbitControls
         enableRotate={false}
