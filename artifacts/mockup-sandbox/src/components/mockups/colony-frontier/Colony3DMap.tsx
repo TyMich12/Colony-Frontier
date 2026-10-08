@@ -33,24 +33,24 @@ type Props = {
 };
 
 const POSITIONS: Record<string, [number, number]> = {
-  habitat: [0, 0],
-  grid: [0, -6.6],
-  solar: [-8.7, -8.1],
-  battery: [8.4, -3.3],
-  oxygen: [-8.2, 3.0],
-  co2: [-4.0, 7.3],
-  water: [8.4, 4.8],
-  comms: [7.5, -8.5],
-  navigation: [-8.6, 8.9],
-  radiation: [8.7, 9.0],
-  rover: [0, 11.7],
-  agriculture: [-11.4, 6.0],
-  thermal: [-11.0, -1.3],
-  science: [10.9, -7.8],
-  extraction: [-10.8, 10.9],
-  isru: [10.9, 11.8],
-  maintenance: [11.2, 1.9],
-}
+  habitat: [-12.5, 10.5],
+  extraction: [-3.8, 10.5],
+  isru: [5.0, 10.5],
+  radiation: [13.0, 10.5],
+  oxygen: [-12.5, 3.0],
+  comms: [-4.5, 3.0],
+  maintenance: [4.5, 3.0],
+  water: [12.5, 3.0],
+  co2: [-12.5, -4.5],
+  grid: [-4.0, -4.5],
+  science: [4.5, -4.5],
+  battery: [12.5, -4.5],
+  thermal: [-12.5, -12.0],
+  solar: [-4.0, -12.0],
+  agriculture: [4.5, -12.0],
+  navigation: [12.5, -12.0],
+  rover: [0, -17.0],
+};
 const BUILDING_ROTATIONS: Record<string, number> = {
   habitat: 0,
   grid: 0,
@@ -149,22 +149,22 @@ function PathStrip({
 
 function CityRoadNetwork({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number, number]>> = [
-    [[0, -15.5], [0, -11.0], [0, -6.6], [0, 0]],
-    [[0, 0], [-4.0, 7.3], [-8.2, 3.0], [-11.0, -1.3]],
-    [[0, 0], [8.4, 4.8], [8.7, 9.0], [10.9, 11.8]],
-    [[0, 0], [8.4, -3.3], [7.5, -8.5], [10.9, -7.8]],
-    [[0, 0], [-8.7, -8.1], [-11.4, 6.0], [-10.8, 10.9]],
-    [[-8.2, 3.0], [-4.0, 7.3], [-8.6, 8.9]],
-    [[8.4, 4.8], [11.2, 1.9], [10.9, -7.8]],
+    [[-15.5, -12], [0, -12], [14.5, -12]],
+    [[-15.5, -4.5], [0, -4.5], [14.5, -4.5]],
+    [[-15.5, 3], [0, 3], [14.5, 3]],
+    [[-15.5, 10.5], [0, 10.5], [14.5, 10.5]],
+    [[-12.5, -13], [-12.5, -4.5], [-12.5, 3], [-12.5, 10.5]],
+    [[-4, -13], [-4, -4.5], [-4.5, 3], [-3.8, 10.5]],
+    [[4.5, -13], [4.5, -4.5], [4.5, 3], [5, 10.5]],
+    [[12.5, -13], [12.5, -4.5], [12.5, 3], [13, 10.5]],
   ];
-
   return (
     <group>
       {routes.map((route, index) => (
         <PathStrip
           key={index}
           points={route}
-          width={index === 0 ? 1.28 : index < 4 ? 0.96 : 0.82}
+          width={index < 4 ? 1.05 : 0.92}
           mars={mars}
         />
       ))}
@@ -688,18 +688,28 @@ function FenceRow({
   );
 }
 
-function BuildingPlot({ position, size = 3.4, mars }: { position: [number, number]; size?: number; mars: boolean }) {
+function BuildingPlot({
+  position,
+  size = 3.8,
+  mars,
+  accent = "#b7ab95",
+}: {
+  position: [number, number];
+  size?: number;
+  mars: boolean;
+  accent?: string;
+}) {
   const [x, z] = position;
-  const y = terrainHeight(x, z) + 0.095;
+  const y = terrainHeight(x, z) + 0.07;
   return (
     <group position={[x, y, z]}>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[size, size]} />
-        <meshStandardMaterial color={mars ? "#9b604b" : "#9a948a"} roughness={1} />
+      <mesh receiveShadow castShadow>
+        <boxGeometry args={[size, 0.14, size]} />
+        <meshStandardMaterial color={mars ? "#875748" : "#696861"} roughness={0.98} />
       </mesh>
-      <mesh position={[0, 0.014, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[size * 0.43, size * 0.46, 4, 1, Math.PI / 4, Math.PI * 2]} />
-        <meshBasicMaterial color={mars ? "#d7a381" : "#d3c7b3"} transparent opacity={0.72} />
+      <mesh position={[0, 0.075, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[size * 0.43, size * 0.47, 4, 1, Math.PI / 4, Math.PI * 2]} />
+        <meshStandardMaterial color={accent} roughness={0.96} transparent opacity={0.48} />
       </mesh>
     </group>
   );
@@ -1529,21 +1539,18 @@ function HumanSettler({
 
 function SettlerCrowd({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number, number]>> = [
-    [[-15.0, -14.2], [-10.3, -12.1], [-6.0, -8.8], [0, -4.8], [0, 0]],
-    [[0, 0], [-3.1, 4.9], [-6.2, 7.9], [-8.8, 9.8], [-4.0, 11.2], [0, 9.1]],
-    [[0, 0], [6.4, 4.0], [7.5, 8.0], [8.7, 11.0], [4.6, 12.0], [0, 9.1]],
-    [[0, 0], [6.2, -2.1], [5.9, -7.0], [9.2, -6.8], [12.8, -9.2], [0, -4.8]],
-    [[-6.2, 2.0], [-9.9, 5.2], [-9.0, -1.4], [-5.4, -6.5], [-12.8, -6.3], [0, 0]],
-    [[-6.2, 2.0], [-3.1, 4.9], [6.4, 4.0], [10.3, 2.7], [12.4, 5.9], [7.5, 8.0]],
-    [[-13.0, 1.0], [-10.5, 5.5], [-6.2, 7.9], [-1.0, 10.4], [0.1, 9.1]],
-    [[12.7, -0.8], [10.1, 2.7], [8.0, 6.8], [7.5, 8.0], [12.0, 10.5]],
-    [[-11.7, -9.5], [-7.0, -6.0], [-3.3, -2.2], [0, 0], [4.0, -2.7]],
-    [[10.8, -9.7], [6.0, -7.0], [3.3, -3.0], [0, 0], [-4.0, -2.7]],
+    [[-12.5,-12],[-12.5,-4.5],[-12.5,3],[-12.5,10.5]],
+    [[-4,-12],[-4,-4.5],[-4.5,3],[-3.8,10.5]],
+    [[4.5,-12],[4.5,-4.5],[4.5,3],[5,10.5]],
+    [[12.5,-12],[12.5,-4.5],[12.5,3],[13,10.5]],
+    [[-12.5,3],[-4.5,3],[4.5,3],[12.5,3]],
+    [[-12.5,-4.5],[-4,-4.5],[4.5,-4.5],[12.5,-4.5]],
+    [[-12.5,10.5],[-3.8,10.5],[5,10.5],[13,10.5]],
+    [[-12.5,-12],[-4,-12],[4.5,-12],[12.5,-12]],
   ];
-
   return (
     <group>
-      {Array.from({ length: mars ? 8 : 4 }, (_, index) => (
+      {Array.from({ length: mars ? 9 : 6 }, (_, index) => (
         <HumanSettler
           key={index}
           route={routes[index % routes.length]}
@@ -1555,7 +1562,6 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
     </group>
   );
 }
-
 
 function CivicPlazaStatue({ position, mars }: { position: [number, number]; mars: boolean }) {
   const [x, z] = position;
@@ -1831,11 +1837,11 @@ function BuildingDetailTrim({
 
 
 function LandingPad({ mars }: { mars: boolean }) {
-  const y = terrainHeight(0, -13.2) + 0.08;
+  const y = terrainHeight(0, -20.0) + 0.08;
   const base = mars ? "#93604b" : "#85847d";
   const markings = mars ? "#e0ae8d" : "#d8d1bf";
   return (
-    <group position={[0, y, -13.2]}>
+    <group position={[0, y, -20.0]}>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[4.4, 4.65, 0.16, 16]} />
         <meshStandardMaterial color={base} roughness={0.96} />
@@ -1895,11 +1901,11 @@ function CityFloor({ mars }: { mars: boolean }) {
   return (
     <group>
       <mesh receiveShadow position={[0, terrainHeight(0, 0) + 0.055, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[36.6, 33.0]} />
+        <planeGeometry args={[40.0, 36.0]} />
         <meshStandardMaterial color={ground} roughness={1} />
       </mesh>
       <mesh receiveShadow position={[0, terrainHeight(0, 0) + 0.072, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[31.8, 28.2]} />
+        <planeGeometry args={[35.0, 31.0]} />
         <meshStandardMaterial color={inset} roughness={0.99} />
       </mesh>
       <mesh position={[0, terrainHeight(0, 0) + 0.085, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -2340,11 +2346,11 @@ function MissionScene(props: Props) {
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
 
-      <ambientLight intensity={1.04} color={mars ? "#ffe4d9" : "#eef4ff"} />
+      <ambientLight intensity={0.62} color={mars ? "#ffe4d9" : "#eef4ff"} />
       <hemisphereLight args={[mars ? "#ffeadd" : "#f7f8ff", mars ? "#43271f" : "#34323b", 1.02]} />
       <directionalLight
         position={[17, 33, 20]}
-        intensity={3.05}
+        intensity={1.65}
         color="#fff3dc"
         castShadow
         shadow-mapSize={[2048, 2048]}
@@ -2371,11 +2377,7 @@ function MissionScene(props: Props) {
               <CityRoadNetwork mars={mars} />
               <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
               <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
-              <PipeRuns />
-              <ColonyLighting mars={mars} />
 
-              <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
-              <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
 {props.tracks.map((track) => (
                 track.id !== "rover" ? (
                   <BuildingPlot
