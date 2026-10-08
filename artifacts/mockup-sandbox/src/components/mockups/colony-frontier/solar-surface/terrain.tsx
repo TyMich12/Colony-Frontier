@@ -8,11 +8,19 @@ const SIZE = 220;
 const SEGMENTS = 220;
 
 function heightAt(x: number, z: number): number {
+  // The colony has an engineered, level operating apron; natural terrain resumes
+  // beyond its perimeter so assets never sink into the surface.
+  if (Math.abs(x) <= 18 && Math.abs(z) <= 17) return 0;
+
   const d = Math.sqrt(x * x + z * z);
   const rough = (fbm(x * 0.05 + 10, z * 0.05 + 10, 5) - 0.5) * 6;
   const dunes = Math.sin(x * 0.06) * Math.cos(z * 0.05) * 0.8;
-  const pad = THREE.MathUtils.smoothstep(d, 9, 16);
-  return (rough + dunes) * pad;
+  const apronBlend = THREE.MathUtils.smoothstep(
+    Math.max(Math.abs(x), Math.abs(z)),
+    17,
+    24,
+  );
+  return (rough + dunes) * apronBlend;
 }
 
 export function terrainHeight(x: number, z: number) {
