@@ -243,8 +243,10 @@ function pickNextEvent(
     { value: metrics.habitat, eventId: "habitat-pressure" },
     { value: Math.max(0, 100 - Math.abs(metrics.temperature - 21) * 8), eventId: selected.thermal ? "thermal-drift" : "battery-thermal" },
     { value: metrics.power, eventId: selected.grid ? "grid-overload" : "core-power" },
-  ].map((candidate) => ({ ...candidate, event: has(candidate.eventId) }))
-    .filter((candidate): candidate is typeof candidate & { event: MissionEvent } => Boolean(candidate.event));
+  ].flatMap((candidate) => {
+    const event = has(candidate.eventId);
+    return event ? [{ ...candidate, event }] : [];
+  });
 
   const weakest = candidates.sort((a, b) => a.value - b.value)[0];
   if (weakest) return weakest.event;
@@ -911,7 +913,13 @@ export function MissionSimulation() {
   const selectedTracks = pending ? selectedTrackData(pending.selected) : [];
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
   const selectedTier = selectedTrack && pending ? pending.selected[selectedTrack.id] : undefined;
-  const activeEvent = activeEventId ? EVENT_DEFS.find((event) => event.id === activeEventId) ?? null : null;
+  const activeEventCandidate = activeEventId ? EVENT_DEFS.find((event) => event.id === activeEventId) ?? null : null;
+  const storedEventIsInvalid = Boolean(
+    activeEventId && pending && (!activeEventCandidate || !eventTargetIsDeployed(activeEventCandidate, pending.selected)),
+  );
+  const activeEvent = activeEventCandidate && pending && eventTargetIsDeployed(activeEventCandidate, pending.selected)
+    ? activeEventCandidate
+    : null;
   const activeTargetTrackId = activeEvent?.trackId === "power"
     ? (pending?.selected.grid ? "grid" : pending?.selected.battery ? "battery" : pending?.selected.solar ? "solar" : null)
     : activeEvent?.trackId ?? null;
@@ -920,6 +928,12 @@ export function MissionSimulation() {
     : undefined;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
+
+  useEffect(() => {
+    if (!storedEventIsInvalid) return;
+    setActiveEventId(null);
+    setAiMessage("A saved incident targeted hardware not included in this loadout. The stale alert was cleared, and the mission can continue.");
+  }, [storedEventIsInvalid, activeEventId]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
