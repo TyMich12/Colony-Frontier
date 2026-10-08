@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, RoundedBox, Text } from "@react-three/drei";
+import { Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime } from "./missionRuntime";
@@ -220,8 +220,8 @@ function Pad({ position, size, mars, accent }: { position: [number, number]; siz
         <boxGeometry args={[size, 0.08, size]} />
         <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
       </mesh>
-      <mesh position={[0, 0.046, 0]}>
-        <ringGeometry args={[size * 0.43, size * 0.46, 4]} rotation={undefined as never} />
+      <mesh position={[0, 0.046, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[size * 0.43, size * 0.46, 4]} />
         <meshBasicMaterial color={accent} transparent opacity={0.42} />
       </mesh>
       <mesh position={[0, 0.052, 0]}>
@@ -499,6 +499,39 @@ function LandingPad({ mars }: { mars:boolean }) {
   </group>;
 }
 
+function MissionGuide({ mars }: { mars: boolean }) {
+  return (
+    <Html fullscreen zIndexRange={[10, 20]} style={{ pointerEvents: "none" }}>
+      <div style={{
+        position: "absolute",
+        left: 16,
+        bottom: 16,
+        width: 285,
+        padding: "11px 13px",
+        border: "1px solid rgba(213,168,74,.58)",
+        borderRadius: 12,
+        background: "rgba(8,15,19,.86)",
+        boxShadow: "0 12px 30px rgba(0,0,0,.32)",
+        color: "#e7eeea",
+        fontFamily: "system-ui, sans-serif",
+        backdropFilter: "blur(8px)",
+      }}>
+        <div style={{fontSize:9,fontWeight:900,letterSpacing:".18em",textTransform:"uppercase",color:"#efc85f"}}>MISSION CONTROL · ${mars ? "MARS" : "MOON"}</div>
+        <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
+          <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable and complete the objectives.
+          <br/><b style={{color:"#e8eee9"}}>2.</b> When an alert appears, click the flashing facility and choose a response.
+          <br/><b style={{color:"#e8eee9"}}>3.</b> Click the rover or field marker to survey resources and improve your score.
+        </div>
+        <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
+          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
+          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#f0c45b",marginRight:4}}/>Degraded</span>
+          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#ff6558",marginRight:4}}/>Critical</span>
+        </div>
+      </div>
+    </Html>
+  );
+}
+
 function Scene({ props }: { props: Props }) {
   const mars=props.environmentLabel==="MARS";
   return <Canvas orthographic shadows dpr={[1,1.35]} camera={{position:[48,56,48],zoom:25,near:0.1,far:260}} gl={{antialias:true,powerPreference:"high-performance",toneMapping:THREE.ACESFilmicToneMapping}}>
@@ -510,6 +543,7 @@ function Scene({ props }: { props: Props }) {
     <Rocks kind={mars?"mars":"moon"}/>
     <Foundation mars={mars}/>
     <group>
+      <MissionGuide mars={mars}/>
       <RoadNetwork mars={mars}/>
       <LandingPad mars={mars}/>
       <CommandCenter/>
