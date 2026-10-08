@@ -10,7 +10,7 @@ const SEGMENTS = 220;
 function heightAt(x: number, z: number): number {
   // The colony has an engineered, level operating apron; natural terrain resumes
   // beyond its perimeter so assets never sink into the surface.
-  if (Math.abs(x) <= 18 && Math.abs(z) <= 17) return 0;
+  if (Math.abs(x) <= 18 && Math.abs(z) <= 22) return 0;
 
   const d = Math.sqrt(x * x + z * z);
   const rough = (fbm(x * 0.05 + 10, z * 0.05 + 10, 5) - 0.5) * 6;
