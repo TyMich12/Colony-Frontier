@@ -257,48 +257,44 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   if (id === "habitat") {
     return (
       <group>
-        <mesh castShadow position={[0, 0.58, 0]}>
-          <cylinderGeometry args={[2.45, 2.7, 0.82, 20]} />
-          <meshStandardMaterial color="#49565b" roughness={0.66} metalness={0.25} />
+        <mesh castShadow>
+          <cylinderGeometry args={[2.35, 2.48, 0.55, 24]} />
+          <meshStandardMaterial color="#46565e" roughness={0.62} metalness={0.38} />
         </mesh>
-        <mesh castShadow position={[0, 1.13, 0]}>
-          <sphereGeometry args={[2.18, 36, 22, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
-          <meshStandardMaterial color="#63cbd1" emissive="#154e58" emissiveIntensity={0.18} transparent opacity={0.94} roughness={0.24} />
+        <mesh position={[0, 0.31, 0]}>
+          <cylinderGeometry args={[2.36, 2.36, 0.12, 24]} />
+          <meshStandardMaterial color="#92a19e" roughness={0.38} metalness={0.65} />
         </mesh>
-        <mesh position={[0, 1.14, 0]}>
-          <torusGeometry args={[1.76, 0.08, 8, 36]} />
-          <meshStandardMaterial color="#f1c75f" metalness={0.6} roughness={0.22} />
+        <mesh castShadow position={[0, 0.57, 0]}>
+          <sphereGeometry args={[2.02, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.53]} />
+          <meshPhysicalMaterial color="#63cbd1" emissive="#164b56" emissiveIntensity={0.2} transparent opacity={0.82} roughness={0.2} metalness={0.16} clearcoat={0.7} depthWrite={false} />
         </mesh>
-        {[-1.35, -0.68, 0, 0.68, 1.35].map((x) => (
-          <mesh key={x} position={[x, 1.17, 2.05]} rotation={[0, 0, x * 0.07]}>
-            <boxGeometry args={[0.075, 1.05, 0.05]} />
-            <meshStandardMaterial color="#dce4df" metalness={0.62} roughness={0.22} />
-          </mesh>
-        ))}
-        {/* Pressurised entry vestibule, framed airlock door and visible hinges. */}
-        <group position={[0, 0.55, 2.48]}>
-          <RoundedBox args={[1.1, 0.72, 0.78]} radius={0.12} smoothness={4} position={[0, 0, 0.18]} castShadow>
-            <meshStandardMaterial color="#515f64" roughness={0.58} metalness={0.32} />
+        <mesh position={[0, 0.56, 0]}>
+          <torusGeometry args={[1.96, 0.075, 10, 44]} />
+          <meshStandardMaterial color="#e9c66c" metalness={0.66} roughness={0.25} />
+        </mesh>
+        {Array.from({ length: 10 }, (_, i) => {
+          const a = (i / 10) * Math.PI * 2;
+          return (
+            <group key={i} position={[Math.cos(a) * 1.92, 0.82, Math.sin(a) * 1.92]} rotation={[0, -a, 0]}>
+              <mesh castShadow><boxGeometry args={[0.055, 0.72, 0.065]} /><meshStandardMaterial color="#c6d0ca" metalness={0.7} roughness={0.3} /></mesh>
+              <mesh position={[0, -0.43, 0]}><boxGeometry args={[0.1, 0.08, 0.12]} /><meshStandardMaterial color="#35464c" metalness={0.55} /></mesh>
+            </group>
+          );
+        })}
+        <group position={[0, 0.28, 2.18]}>
+          <RoundedBox args={[1.0, 0.54, 0.74]} radius={0.11} smoothness={4} castShadow>
+            <meshStandardMaterial color="#596970" roughness={0.56} metalness={0.38} />
           </RoundedBox>
-          <RoundedBox args={[0.64, 0.5, 0.07]} radius={0.06} smoothness={3} position={[0, 0, 0.6]}>
-            <meshStandardMaterial color="#1c3039" roughness={0.5} metalness={0.35} />
+          <RoundedBox args={[0.62, 0.4, 0.08]} radius={0.05} smoothness={3} position={[0, 0, 0.39]}>
+            <meshStandardMaterial color="#1e3039" roughness={0.4} metalness={0.45} />
           </RoundedBox>
-          <mesh position={[0, 0.3, 0.62]}>
-            <boxGeometry args={[0.42, 0.035, 0.025]} />
-            <meshStandardMaterial color="#e6d59a" emissive="#c0a54c" emissiveIntensity={0.35} />
-          </mesh>
-          {[-0.25, 0.25].map((x) => (
-            <mesh key={x} position={[x, 0.08, 0.645]}>
-              <boxGeometry args={[0.035, 0.09, 0.035]} />
-              <meshStandardMaterial color="#b6c0ba" metalness={0.72} roughness={0.28} />
-            </mesh>
-          ))}
+          <mesh position={[0, 0.16, 0.44]}><boxGeometry args={[0.34, 0.035, 0.02]} /><meshStandardMaterial color="#f5d17b" emissive="#be8734" emissiveIntensity={0.6} /></mesh>
+          {[-0.23, 0.23].map((x) => <mesh key={x} position={[x, -0.02, 0.445]}><cylinderGeometry args={[0.035, 0.035, 0.05, 10]} /><meshStandardMaterial color="#c7d1ca" metalness={0.8} /></mesh>)}
         </group>
-        <mesh position={[0, 3.5, 0]}>
-          <cylinderGeometry args={[0.1, 0.15, 1.0, 10]} />
-          <meshStandardMaterial color="#dbe3df" metalness={0.7} roughness={0.2} />
-        </mesh>
-        <Beacon color={accent} active={false} />
+        <mesh position={[0, 1.05, 0]}><cylinderGeometry args={[0.07, 0.1, 1.05, 10]} /><meshStandardMaterial color="#ced6d0" metalness={0.76} roughness={0.28} /></mesh>
+        <mesh position={[0, 1.63, 0]}><boxGeometry args={[0.45, 0.08, 0.34]} /><meshStandardMaterial color="#4f6267" metalness={0.38} /></mesh>
+        <Beacon color={accent} active={false} height={2.15} />
       </group>
     );
   }
@@ -306,26 +302,22 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   if (id === "solar") {
     return (
       <group>
-        <RoundedBox args={[2.7, 0.34, 1.9]} radius={0.12} smoothness={3} castShadow>
-          <meshStandardMaterial color={p.body} roughness={0.58} metalness={0.22} />
+        <RoundedBox args={[2.7, 0.34, 1.9]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow>
+          <meshStandardMaterial color={p.body} roughness={0.58} metalness={0.3} />
         </RoundedBox>
-        {[-0.76, 0.76].map((x) => (
+        <mesh position={[0, 0.38, 0]}><cylinderGeometry args={[0.12, 0.16, 0.42, 10]} /><meshStandardMaterial color="#879592" metalness={0.75} /></mesh>
+        {[-0.85, 0.85].map((x) => (
           <group key={x} position={[x, 0.82, 0]}>
-            {/* Tilted photovoltaic wing with a metallic perimeter frame. */}
-            <mesh rotation={[0.18, 0, 0]} castShadow>
-              <boxGeometry args={[0.98, 0.055, 1.56]} />
-              <meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} />
-            </mesh>
-            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.9, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
-            {[-0.77, 0.77].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.02, 0.035, 0.035]} /><meshStandardMaterial color="#aeb8b4" metalness={0.72} roughness={0.32} /></mesh>)}
-            <mesh position={[0, -0.32, 0]} castShadow>
-              <cylinderGeometry args={[0.055, 0.07, 0.64, 10]} />
-              <meshStandardMaterial color="#7f8c8c" metalness={0.66} roughness={0.34} />
-            </mesh>
-            {[-0.48, 0.48].map((z) => <mesh key={z} position={[0, -0.3, z]} rotation={[0, 0, z * 0.45]}><boxGeometry args={[0.045, 0.58, 0.045]} /><meshStandardMaterial color="#78898d" metalness={0.6} roughness={0.36} /></mesh>)}
+            <mesh rotation={[0.18, 0, 0]} castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} /></mesh>
+            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
+            {[-0.47, 0, 0.47].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.018, 0.015, 1.53]} /><meshStandardMaterial color="#6c9fb3" /></mesh>)}
+            {[-0.8, 0.8].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.06, 0.04, 0.04]} /><meshStandardMaterial color="#b3beb9" metalness={0.75} /></mesh>)}
+            <mesh position={[0, -0.31, 0]} castShadow><cylinderGeometry args={[0.055, 0.065, 0.64, 10]} /><meshStandardMaterial color="#83918f" metalness={0.68} /></mesh>
+            {[-0.48, 0.48].map((z) => <mesh key={z} position={[0, -0.29, z]} rotation={[0, 0, z * 0.43]}><boxGeometry args={[0.045, 0.56, 0.045]} /><meshStandardMaterial color="#78898d" metalness={0.62} /></mesh>)}
           </group>
         ))}
-        <Beacon color={accent} active={false} />
+        <mesh position={[0, 0.38, 0.72]}><boxGeometry args={[0.65, 0.18, 0.12]} /><meshStandardMaterial color="#24343c" metalness={0.55} /></mesh>
+        <Beacon color={accent} active={false} height={0.72} />
       </group>
     );
   }
@@ -333,89 +325,193 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   if (id === "battery") {
     return (
       <group>
-        <RoundedBox args={[2.7, 0.42, 2.0]} radius={0.14} smoothness={4} castShadow>
-          <meshStandardMaterial color={p.body} roughness={0.55} metalness={0.22} />
+        <RoundedBox args={[2.7, 0.34, 2.0]} radius={0.14} smoothness={4} position={[0, 0.18, 0]} castShadow>
+          <meshStandardMaterial color={p.body} roughness={0.55} metalness={0.28} />
         </RoundedBox>
-        {[-0.8, 0, 0.8].map((x) => (
-          <group key={x} position={[x, 0.76, 0]}>
-            <RoundedBox args={[0.52, 1.1, 1.0]} radius={0.12} smoothness={4} castShadow>
-              <meshStandardMaterial color="#4a5b62" metalness={0.28} roughness={0.35} />
+        {[-0.82, 0, 0.82].map((x) => (
+          <group key={x} position={[x, 0.83, 0]}>
+            <RoundedBox args={[0.58, 1.02, 1.18]} radius={0.12} smoothness={4} castShadow>
+              <meshStandardMaterial color="#4a5b62" metalness={0.34} roughness={0.34} />
             </RoundedBox>
-            <mesh position={[0, 0.58, 0.52]}><boxGeometry args={[0.28, 0.08, 0.04]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} /></mesh>
-            {[-0.14, 0, 0.14].map((slot) => (
-              <mesh key={slot} position={[slot, 0.16, 0.526]}>
-                <boxGeometry args={[0.09, 0.025, 0.015]} />
-                <meshStandardMaterial color="#1d292d" roughness={0.9} />
-              </mesh>
-            ))}
+            <mesh position={[0, 0.52, 0.605]}><boxGeometry args={[0.32, 0.075, 0.025]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.9} /></mesh>
+            {[-0.18, 0, 0.18].map((slot) => <mesh key={slot} position={[slot, 0.13, 0.606]}><boxGeometry args={[0.085, 0.035, 0.02]} /><meshStandardMaterial color="#1d292d" roughness={0.9} /></mesh>)}
+            {[-0.36, 0.36].map((z) => <mesh key={z} position={[0, -0.02, z]}><boxGeometry args={[0.48, 0.035, 0.055]} /><meshStandardMaterial color="#a4afaa" metalness={0.72} /></mesh>)}
+            <mesh position={[0, 0.57, -0.61]}><cylinderGeometry args={[0.075, 0.075, 0.15, 8]} /><meshStandardMaterial color="#e0c76f" metalness={0.6} /></mesh>
           </group>
         ))}
-      </group>
-    );
-  }
-
-  if (id === "oxygen" || id === "water") {
-    return (
-      <group>
-        <RoundedBox args={[2.6, 0.38, 1.9]} radius={0.12} smoothness={3} castShadow>
-          <meshStandardMaterial color={p.body} roughness={0.62} metalness={0.18} />
-        </RoundedBox>
-        {[-0.72, 0.72].map((x) => (
-          <group key={x} position={[x, 0.72, 0]}>
-            <mesh castShadow><cylinderGeometry args={[0.48, 0.54, 1.18, 16]} /><meshStandardMaterial color="#aeb9b5" roughness={0.35} metalness={0.38} /></mesh>
-            <mesh position={[0, 0.64, 0]}><sphereGeometry args={[0.48, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color={id === "water" ? "#57c9e7" : "#9bd7c9"} transparent opacity={0.7} /></mesh>
-            <mesh position={[0, 1.28, 0]}><torusGeometry args={[0.36, 0.045, 7, 22]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} /></mesh>
-            {[-0.16, 0.18].map((bandY) => (
-              <mesh key={bandY} position={[0, bandY, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.49, 0.035, 7, 24]} />
-                <meshStandardMaterial color="#d6dcd4" metalness={0.7} roughness={0.28} />
-              </mesh>
-            ))}
-            <mesh position={[0, 0.25, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.08, 0.08, 0.18, 10]} />
-              <meshStandardMaterial color="#68787a" metalness={0.65} roughness={0.3} />
-            </mesh>
-          </group>
-        ))}
-      </group>
-    );
-  }
-
-  if (id === "comms" || id === "navigation") {
-    return (
-      <group>
-        <RoundedBox args={[2.3, 0.34, 1.8]} radius={0.12} smoothness={3} castShadow><meshStandardMaterial color={p.body} roughness={0.6} metalness={0.2} /></RoundedBox>
-        <mesh position={[0, 1.12, 0]}><cylinderGeometry args={[0.1, 0.15, 1.9, 10]} /><meshStandardMaterial color="#d7dfdb" metalness={0.7} roughness={0.2} /></mesh>
-        <mesh position={[0, 1.9, 0]} rotation={[Math.PI / 2.2, 0, 0]}><sphereGeometry args={[0.72, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.48]} /><meshStandardMaterial color="#dbe2df" roughness={0.24} metalness={0.4} side={THREE.DoubleSide} /></mesh>
-        {[-0.34, 0.34].map((x) => (
-          <mesh key={x} position={[x, 1.55, 0.04]} rotation={[0, 0, -x * 0.7]} castShadow>
-            <cylinderGeometry args={[0.035, 0.045, 0.88, 8]} />
-            <meshStandardMaterial color="#9eaaa7" metalness={0.76} roughness={0.3} />
-          </mesh>
-        ))}
-        <Beacon color={accent} active={false} />
-      </group>
-    );
-  }
-
-  if (id === "radiation" || id === "science") {
-    return (
-      <group>
-        <RoundedBox args={[2.7, 0.4, 2.05]} radius={0.16} smoothness={4} castShadow><meshStandardMaterial color={p.body} roughness={0.62} metalness={0.2} /></RoundedBox>
-        <mesh position={[0, 0.2, 0]}><sphereGeometry args={[1.28, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color={id === "science" ? "#74629d" : "#76699f"} transparent opacity={0.76} roughness={0.3} /></mesh>
-        <mesh position={[0, 0.22, 0]}><torusGeometry args={[1.03, 0.06, 8, 28]} /><meshStandardMaterial color={accent} metalness={0.45} roughness={0.25} /></mesh>
+        <mesh position={[0, 0.38, -0.9]}><boxGeometry args={[2.2, 0.18, 0.12]} /><meshStandardMaterial color="#26373d" metalness={0.48} /></mesh>
         <Beacon color={accent} active={false} height={1.55} />
       </group>
     );
   }
 
-  if (id === "extraction" || id === "isru") {
+  if (id === "oxygen" || id === "water") {
+    const liquidColor = id === "water" ? "#57c9e7" : "#9bd7c9";
     return (
       <group>
-        <RoundedBox args={[2.8, 0.44, 2.1]} radius={0.12} smoothness={3} castShadow><meshStandardMaterial color={p.body} roughness={0.65} metalness={0.18} /></RoundedBox>
-        {[-0.72, 0.72].map((x) => <mesh key={x} position={[x, 0.92, 0]} castShadow><cylinderGeometry args={[0.38, 0.47, 1.35, 14]} /><meshStandardMaterial color="#64716f" metalness={0.4} roughness={0.4} /></mesh>)}
-        <mesh position={[0, 1.68, 0]} rotation={[0, 0, 0.25]}><cylinderGeometry args={[0.11, 0.16, 1.5, 8]} /><meshStandardMaterial color="#d8dfda" metalness={0.72} roughness={0.2} /></mesh>
-        <mesh position={[0, 2.42, 0]}><octahedronGeometry args={[0.2, 0]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.85} /></mesh>
+        <RoundedBox args={[2.65, 0.28, 1.9]} radius={0.1} smoothness={3} position={[0, 0.15, 0]} castShadow>
+          <meshStandardMaterial color={p.body} roughness={0.62} metalness={0.28} />
+        </RoundedBox>
+        {[-0.78, 0.78].map((x) => (
+          <group key={x} position={[x, 0.92, 0]}>
+            <mesh castShadow><cylinderGeometry args={[0.47, 0.52, 1.35, 20]} /><meshStandardMaterial color="#aeb9b5" roughness={0.34} metalness={0.48} /></mesh>
+            <mesh position={[0, 0.72, 0]}><sphereGeometry args={[0.47, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color="#d8e0da" roughness={0.3} metalness={0.34} /></mesh>
+            <mesh position={[0, 0.2, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.49, 0.04, 8, 28]} /><meshStandardMaterial color="#d6dcd4" metalness={0.72} roughness={0.28} /></mesh>
+            <mesh position={[0, -0.28, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.49, 0.04, 8, 28]} /><meshStandardMaterial color="#d6dcd4" metalness={0.72} roughness={0.28} /></mesh>
+            <mesh position={[0, 0.64, 0]}><torusGeometry args={[0.36, 0.055, 8, 24]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} /></mesh>
+            <mesh position={[0, -0.02, 0.505]}><boxGeometry args={[0.24, 0.34, 0.04]} /><meshStandardMaterial color="#33454c" metalness={0.45} /></mesh>
+            <mesh position={[0, 0.1, 0.535]}><boxGeometry args={[0.14, 0.055, 0.02]} /><meshStandardMaterial color={liquidColor} emissive={liquidColor} emissiveIntensity={0.65} /></mesh>
+            <mesh position={[0.39, 0.26, 0.1]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.06, 0.06, 0.34, 10]} /><meshStandardMaterial color="#8d9b99" metalness={0.72} /></mesh>
+          </group>
+        ))}
+        <mesh position={[0, 0.49, 0]}><boxGeometry args={[0.12, 0.82, 0.12]} /><meshStandardMaterial color="#b3c0ba" metalness={0.72} /></mesh>
+        <mesh position={[0, 0.5, 0.14]}><boxGeometry args={[0.42, 0.36, 0.07]} /><meshStandardMaterial color="#27383e" metalness={0.48} /></mesh>
+        <mesh position={[0, 0.53, 0.19]}><boxGeometry args={[0.2, 0.16, 0.025]} /><meshStandardMaterial color={liquidColor} emissive={liquidColor} emissiveIntensity={0.8} /></mesh>
+        <Beacon color={accent} active={false} height={1.72} />
+      </group>
+    );
+  }
+
+  if (id === "co2") {
+    return (
+      <group>
+        <RoundedBox args={[2.72, 0.32, 2.0]} radius={0.12} smoothness={4} position={[0, 0.17, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.6} metalness={0.3} /></RoundedBox>
+        {[-0.76, 0, 0.76].map((x, i) => (
+          <group key={x} position={[x, 0.72, 0]}>
+            <mesh castShadow><cylinderGeometry args={[0.3, 0.34, 0.88, 16]} /><meshStandardMaterial color={i === 1 ? "#687d7b" : "#85928e"} roughness={0.38} metalness={0.56} /></mesh>
+            <mesh position={[0, 0.46, 0]}><cylinderGeometry args={[0.31, 0.31, 0.12, 16]} /><meshStandardMaterial color="#d4c9a0" metalness={0.55} /></mesh>
+            <mesh position={[0, -0.34, 0]}><torusGeometry args={[0.32, 0.045, 7, 20]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} /></mesh>
+            {[-0.12, 0.02, 0.16].map((y) => <mesh key={y} position={[0.343, y, 0]}><boxGeometry args={[0.04, 0.055, 0.16]} /><meshStandardMaterial color="#d6ddd7" metalness={0.68} /></mesh>)}
+          </group>
+        ))}
+        <mesh position={[0, 1.28, 0]}><boxGeometry args={[2.05, 0.13, 0.16]} /><meshStandardMaterial color="#bcc6c0" metalness={0.67} /></mesh>
+        {[-0.76, 0, 0.76].map((x) => <mesh key={x} position={[x, 1.1, 0]}><cylinderGeometry args={[0.055, 0.055, 0.35, 10]} /><meshStandardMaterial color="#d2b86b" metalness={0.5} /></mesh>)}
+        <mesh position={[1.1, 0.55, 0.44]}><boxGeometry args={[0.36, 0.38, 0.07]} /><meshStandardMaterial color="#1a2c35" metalness={0.4} /></mesh>
+        <mesh position={[1.1, 0.57, 0.485]}><boxGeometry args={[0.24, 0.19, 0.025]} /><meshStandardMaterial color="#76d8cc" emissive="#329e94" emissiveIntensity={0.6} /></mesh>
+        <Beacon color={accent} active={false} height={1.55} />
+      </group>
+    );
+  }
+
+  if (id === "thermal") {
+    return (
+      <group>
+        <RoundedBox args={[2.75, 0.34, 2.0]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color="#4b5b61" roughness={0.54} metalness={0.38} /></RoundedBox>
+        <RoundedBox args={[1.28, 0.88, 1.24]} radius={0.13} smoothness={4} position={[0, 0.78, 0]} castShadow><meshStandardMaterial color="#73554a" roughness={0.5} metalness={0.32} /></RoundedBox>
+        <mesh position={[0, 1.28, 0.03]}><boxGeometry args={[0.88, 0.12, 0.92]} /><meshStandardMaterial color="#323f43" metalness={0.6} /></mesh>
+        <mesh position={[0, 1.3, 0.5]}><boxGeometry args={[0.52, 0.2, 0.05]} /><meshStandardMaterial color="#202c32" metalness={0.36} /></mesh>
+        <mesh position={[0, 1.32, 0.535]}><boxGeometry args={[0.3, 0.08, 0.02]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.2} /></mesh>
+        {[-1, 1].map((side) => (
+          <group key={side} position={[side * 1.53, 0.92, 0]}>
+            <mesh castShadow><boxGeometry args={[0.13, 1.52, 2.28]} /><meshStandardMaterial color="#34484f" roughness={0.45} metalness={0.48} /></mesh>
+            <mesh position={[side * 0.09, 0, 0]}><boxGeometry args={[0.07, 1.36, 2.08]} /><meshStandardMaterial color="#667a80" roughness={0.32} metalness={0.58} /></mesh>
+            {Array.from({ length: 9 }, (_, i) => (
+              <mesh key={i} position={[side * 0.14, -0.59 + i * 0.145, 0]} castShadow>
+                <boxGeometry args={[0.18, 0.055, 2.0]} />
+                <meshStandardMaterial color={i % 2 === 0 ? "#c07a51" : "#8d6b58"} roughness={0.36} metalness={0.52} emissive={i % 3 === 0 ? "#6c2919" : "#000000"} emissiveIntensity={0.16} />
+              </mesh>
+            ))}
+            {[-0.72, 0.72].map((z) => <mesh key={z} position={[side * 0.12, -0.02, z]}><boxGeometry args={[0.22, 1.56, 0.06]} /><meshStandardMaterial color="#b7c1bb" metalness={0.66} /></mesh>)}
+            <mesh position={[0, 0.78, 1.19]}><boxGeometry args={[0.2, 0.22, 0.12]} /><meshStandardMaterial color="#e6bb66" emissive="#c17d31" emissiveIntensity={0.55} /></mesh>
+          </group>
+        ))}
+        {[-0.62, 0.62].map((z) => <mesh key={z} position={[0.92, 0.83, z]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.065, 0.065, 0.9, 10]} /><meshStandardMaterial color="#d5a568" metalness={0.62} roughness={0.28} /></mesh>)}
+        {[-0.36, 0.36].map((z) => <mesh key={z} position={[-0.9, 0.55, z]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.045, 0.045, 0.55, 10]} /><meshStandardMaterial color="#7ecbd0" metalness={0.5} emissive="#236d72" emissiveIntensity={0.25} /></mesh>)}
+        <Beacon color={accent} active={false} height={1.72} />
+      </group>
+    );
+  }
+
+  if (id === "comms" || id === "navigation") {
+    const nav = id === "navigation";
+    return (
+      <group>
+        <RoundedBox args={[2.45, 0.34, 1.9]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.56} metalness={0.32} /></RoundedBox>
+        <mesh position={[0, 0.45, 0]}><cylinderGeometry args={[0.22, 0.25, 0.2, 12]} /><meshStandardMaterial color="#83928e" metalness={0.68} /></mesh>
+        <mesh position={[0, 1.05, 0]} castShadow><cylinderGeometry args={[0.08, 0.13, 1.25, 12]} /><meshStandardMaterial color="#d7dfdb" metalness={0.76} roughness={0.22} /></mesh>
+        <mesh position={[0, 1.67, 0]}><cylinderGeometry args={[0.3, 0.1, 0.22, 12]} /><meshStandardMaterial color="#58696b" metalness={0.68} /></mesh>
+        <mesh position={[0, 1.86, 0.04]} rotation={[Math.PI / 2.25, 0, nav ? 0.38 : -0.28]} castShadow><sphereGeometry args={[nav ? 0.65 : 0.78, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.46]} /><meshStandardMaterial color="#d8e0db" roughness={0.26} metalness={0.46} side={THREE.DoubleSide} /></mesh>
+        {[-0.42, 0.42].map((x) => <mesh key={x} position={[x, 1.48, 0.1]} rotation={[0, 0, -x * 0.7]} castShadow><cylinderGeometry args={[0.04, 0.05, 0.78, 8]} /><meshStandardMaterial color="#9eaaa7" metalness={0.76} roughness={0.3} /></mesh>)}
+        <mesh position={[0.77, 0.5, 0.35]}><boxGeometry args={[0.42, 0.34, 0.07]} /><meshStandardMaterial color="#1c2b35" metalness={0.4} /></mesh>
+        <mesh position={[0.77, 0.51, 0.392]}><boxGeometry args={[0.25, 0.18, 0.02]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} /></mesh>
+        {[-0.65, 0.65].map((x) => <mesh key={x} position={[x, 0.24, -0.74]}><boxGeometry args={[0.25, 0.18, 0.22]} /><meshStandardMaterial color="#313f44" metalness={0.4} /></mesh>)}
+        <Beacon color={accent} active={false} height={2.16} />
+      </group>
+    );
+  }
+
+  if (id === "radiation") {
+    return (
+      <group>
+        <RoundedBox args={[2.78, 0.34, 2.08]} radius={0.15} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.62} metalness={0.3} /></RoundedBox>
+        <mesh castShadow position={[0, 0.62, 0]}><cylinderGeometry args={[1.0, 1.12, 0.58, 16]} /><meshStandardMaterial color="#515c65" roughness={0.58} metalness={0.42} /></mesh>
+        <mesh castShadow position={[0, 0.94, 0]}><sphereGeometry args={[1.02, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.52]} /><meshStandardMaterial color="#75699b" roughness={0.3} metalness={0.28} transparent opacity={0.8} depthWrite={false} /></mesh>
+        <mesh position={[0, 0.93, 0]}><torusGeometry args={[0.96, 0.075, 8, 32]} /><meshStandardMaterial color={accent} metalness={0.5} roughness={0.28} /></mesh>
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = (i / 8) * Math.PI * 2;
+          return <mesh key={i} position={[Math.cos(a) * 1.02, 0.72, Math.sin(a) * 1.02]} rotation={[0, -a, 0]}><boxGeometry args={[0.12, 0.48, 0.06]} /><meshStandardMaterial color="#abb4b1" metalness={0.65} roughness={0.4} /></mesh>;
+        })}
+        <mesh position={[0, 0.58, 1.08]}><boxGeometry args={[0.62, 0.38, 0.08]} /><meshStandardMaterial color="#1e2b32" metalness={0.4} /></mesh>
+        <mesh position={[0, 0.6, 1.13]}><boxGeometry args={[0.38, 0.2, 0.025]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.75} /></mesh>
+        <Beacon color={accent} active={false} height={1.78} />
+      </group>
+    );
+  }
+
+  if (id === "science") {
+    return (
+      <group>
+        <RoundedBox args={[2.78, 0.34, 2.08]} radius={0.14} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.6} metalness={0.34} /></RoundedBox>
+        <mesh castShadow position={[0, 0.48, 0]}><cylinderGeometry args={[1.06, 1.12, 0.3, 18]} /><meshStandardMaterial color="#424f5b" metalness={0.45} roughness={0.45} /></mesh>
+        <mesh castShadow position={[0, 0.9, 0]}><sphereGeometry args={[0.86, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color="#7060a0" emissive="#211b4d" emissiveIntensity={0.16} transparent opacity={0.86} roughness={0.25} depthWrite={false} /></mesh>
+        <mesh position={[0, 0.9, 0]}><torusGeometry args={[0.82, 0.065, 8, 32]} /><meshStandardMaterial color={accent} metalness={0.54} roughness={0.25} /></mesh>
+        <group position={[0.82, 0.58, 0.2]} rotation={[0, 0, -0.6]}>
+          <mesh position={[0, 0.26, 0]}><cylinderGeometry args={[0.07, 0.1, 0.54, 10]} /><meshStandardMaterial color="#bdc6c0" metalness={0.74} /></mesh>
+          <mesh position={[0, 0.58, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.13, 0.13, 0.38, 12]} /><meshStandardMaterial color="#202e37" metalness={0.54} /></mesh>
+          <mesh position={[0, 0.58, 0.2]}><circleGeometry args={[0.09, 16]} /><meshBasicMaterial color="#69e5ff" emissive="#69e5ff" emissiveIntensity={0.6} toneMapped={false} /></mesh>
+        </group>
+        {[-0.72, 0.72].map((x) => <mesh key={x} position={[x, 0.32, 0.86]}><boxGeometry args={[0.42, 0.16, 0.1]} /><meshStandardMaterial color="#a9b5af" metalness={0.68} /></mesh>)}
+        <mesh position={[0, 0.48, 1.1]}><boxGeometry args={[0.66, 0.28, 0.06]} /><meshStandardMaterial color="#1b2c34" metalness={0.44} /></mesh>
+        <mesh position={[0, 0.5, 1.14]}><boxGeometry args={[0.44, 0.14, 0.02]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.9} /></mesh>
+        <Beacon color={accent} active={false} height={1.75} />
+      </group>
+    );
+  }
+
+  if (id === "extraction") {
+    return (
+      <group>
+        <RoundedBox args={[2.78, 0.34, 2.08]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.62} metalness={0.32} /></RoundedBox>
+        {[-0.87, 0.87].map((x) => <mesh key={x} position={[x, 0.42, 0]}><boxGeometry args={[0.18, 0.48, 1.52]} /><meshStandardMaterial color="#3a4548" metalness={0.42} /></mesh>)}
+        {[-0.72, 0.72].map((x) => <mesh key={x} position={[x, 0.82, 0]} castShadow><cylinderGeometry args={[0.32, 0.42, 1.12, 14]} /><meshStandardMaterial color="#687673" metalness={0.44} roughness={0.4} /></mesh>)}
+        <mesh position={[0, 1.28, 0]}><boxGeometry args={[0.82, 0.26, 0.76]} /><meshStandardMaterial color="#d0b16a" metalness={0.42} /></mesh>
+        <mesh position={[0, 1.9, 0]} castShadow><cylinderGeometry args={[0.16, 0.19, 1.02, 12]} /><meshStandardMaterial color="#c6cfca" metalness={0.74} roughness={0.28} /></mesh>
+        <mesh position={[0, 2.5, 0]}><cylinderGeometry args={[0.07, 0.2, 0.4, 10]} /><meshStandardMaterial color="#596564" metalness={0.5} /></mesh>
+        <mesh position={[0, 2.75, 0]}><coneGeometry args={[0.13, 0.34, 8]} /><meshStandardMaterial color="#b4bcb5" metalness={0.62} /></mesh>
+        <mesh position={[0.42, 1.62, 0]} rotation={[0, 0, -0.5]}><cylinderGeometry args={[0.06, 0.08, 0.8, 8]} /><meshStandardMaterial color="#d8b56c" metalness={0.58} /></mesh>
+        <mesh position={[0.82, 1.38, 0]}><torusGeometry args={[0.24, 0.045, 7, 20]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} /></mesh>
+        <Beacon color={accent} active={false} height={3.0} />
+      </group>
+    );
+  }
+
+  if (id === "isru") {
+    return (
+      <group>
+        <RoundedBox args={[2.82, 0.34, 2.08]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.64} metalness={0.3} /></RoundedBox>
+        {[-0.82, 0, 0.82].map((x) => (
+          <group key={x} position={[x, 0.69, -0.05]}>
+            <mesh castShadow><cylinderGeometry args={[0.29, 0.33, 0.86, 16]} /><meshStandardMaterial color="#7f918b" metalness={0.48} roughness={0.36} /></mesh>
+            <mesh position={[0, 0.45, 0]}><torusGeometry args={[0.29, 0.035, 6, 20]} /><meshStandardMaterial color="#d7c37d" metalness={0.5} /></mesh>
+            <mesh position={[0, -0.14, 0]}><torusGeometry args={[0.3, 0.04, 6, 20]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.36} /></mesh>
+            <mesh position={[0, 0.52, 0]}><cylinderGeometry args={[0.075, 0.075, 0.18, 8]} /><meshStandardMaterial color="#d5dfd7" metalness={0.72} /></mesh>
+          </group>
+        ))}
+        <mesh position={[0, 1.24, 0.14]}><boxGeometry args={[2.08, 0.13, 0.15]} /><meshStandardMaterial color="#b4c0ba" metalness={0.68} /></mesh>
+        {[-0.82, 0.82].map((x) => <mesh key={x} position={[x, 1.06, 0.18]}><cylinderGeometry args={[0.055, 0.055, 0.34, 8]} /><meshStandardMaterial color="#e2b960" metalness={0.64} /></mesh>)}
+        <mesh position={[0.88, 0.5, 0.55]}><boxGeometry args={[0.38, 0.38, 0.06]} /><meshStandardMaterial color="#1d2e37" metalness={0.4} /></mesh>
+        <mesh position={[0.88, 0.52, 0.59]}><boxGeometry args={[0.24, 0.2, 0.02]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} /></mesh>
+        <Beacon color={accent} active={false} height={1.52} />
       </group>
     );
   }
@@ -423,24 +519,81 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   if (id === "agriculture") {
     return (
       <group>
-        <RoundedBox args={[2.9, 0.34, 2.05]} radius={0.14} smoothness={4} castShadow><meshStandardMaterial color={p.body} roughness={0.7} /></RoundedBox>
-        <RoundedBox args={[2.55, 1.18, 1.62]} radius={0.28} smoothness={5} position={[0, 0.76, 0]} castShadow><meshStandardMaterial color="#5ebd76" transparent opacity={0.4} roughness={0.2} /></RoundedBox>
-        {[-0.8,-0.27,0.27,0.8].map((x)=><mesh key={x} position={[x,0.82,0]}><sphereGeometry args={[0.13,10,8]} /><meshStandardMaterial color="#79ef89" emissive="#2ac95b" emissiveIntensity={0.45} /></mesh>)}
+        <RoundedBox args={[2.95, 0.32, 2.1]} radius={0.14} smoothness={4} position={[0, 0.17, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.66} metalness={0.26} /></RoundedBox>
+        <RoundedBox args={[2.55, 1.12, 1.72]} radius={0.26} smoothness={6} position={[0, 0.85, 0]} castShadow><meshStandardMaterial color="#5ebd76" transparent opacity={0.28} roughness={0.18} metalness={0.08} side={THREE.DoubleSide} depthWrite={false} /></RoundedBox>
+        {[-0.97, -0.49, 0, 0.49, 0.97].map((x) => <mesh key={x} position={[x, 0.84, 0]}><boxGeometry args={[0.035, 1.14, 1.84]} /><meshStandardMaterial color="#adc0b7" metalness={0.68} roughness={0.28} /></mesh>)}
+        {[-0.61, 0, 0.61].map((z) => <mesh key={z} position={[0, 0.55, z]}><boxGeometry args={[2.5, 0.08, 0.13]} /><meshStandardMaterial color="#2c4537" roughness={0.8} /></mesh>)}
+        {[-0.92, -0.46, 0, 0.46, 0.92].map((x) => (
+          <group key={x} position={[x, 0.59, -0.3]}>
+            <mesh position={[0, 0.14, 0]}><cylinderGeometry args={[0.025, 0.035, 0.28, 6]} /><meshStandardMaterial color="#6bd17b" /></mesh>
+            {[-0.08, 0.08].map((offset) => <mesh key={offset} position={[offset, 0.22, 0]} rotation={[0, 0, offset * 7]}><sphereGeometry args={[0.075, 9, 7]} /><meshStandardMaterial color="#52b968" emissive="#207735" emissiveIntensity={0.22} /></mesh>)}
+          </group>
+        ))}
+        <mesh position={[0, 1.45, 0]}><boxGeometry args={[1.7, 0.07, 0.08]} /><meshStandardMaterial color="#e0d17c" emissive="#8c7730" emissiveIntensity={0.35} /></mesh>
+        <mesh position={[0, 0.4, 1.08]}><boxGeometry args={[0.55, 0.26, 0.07]} /><meshStandardMaterial color="#1e2d35" metalness={0.4} /></mesh>
+        <mesh position={[0, 0.42, 1.125]}><boxGeometry args={[0.34, 0.12, 0.02]} /><meshStandardMaterial color="#6ee8a0" emissive="#23975f" emissiveIntensity={0.8} /></mesh>
+        <Beacon color={accent} active={false} height={1.63} />
+      </group>
+    );
+  }
+
+  if (id === "grid") {
+    return (
+      <group>
+        <RoundedBox args={[2.85, 0.34, 2.08]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.62} metalness={0.4} /></RoundedBox>
+        {[-0.78, 0, 0.78].map((x, i) => (
+          <group key={x} position={[x, 0.58, 0]}>
+            <RoundedBox args={[0.56, 0.58, 1.22]} radius={0.07} smoothness={3} castShadow><meshStandardMaterial color={i === 1 ? "#53686c" : "#34484f"} metalness={0.38} roughness={0.42} /></RoundedBox>
+            <mesh position={[0, 0.05, 0.63]}><boxGeometry args={[0.24, 0.2, 0.025]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} /></mesh>
+            {[-0.18, 0, 0.18].map((z) => <mesh key={z} position={[0, -0.14, z]}><boxGeometry args={[0.34, 0.035, 0.03]} /><meshStandardMaterial color="#bfc9c2" metalness={0.72} /></mesh>)}
+          </group>
+        ))}
+        {[-0.86, 0, 0.86].map((x) => (
+          <group key={x} position={[x, 1.02, -0.12]}>
+            <mesh><cylinderGeometry args={[0.16, 0.18, 0.12, 10]} /><meshStandardMaterial color="#8d9b98" metalness={0.62} /></mesh>
+            {[-0.1, 0, 0.1].map((y) => <mesh key={y} position={[0, y, 0]}><cylinderGeometry args={[0.105, 0.105, 0.055, 10]} /><meshStandardMaterial color="#d7c879" metalness={0.58} /></mesh>)}
+          </group>
+        ))}
+        <mesh position={[0, 1.28, -0.12]}><boxGeometry args={[2.16, 0.08, 0.08]} /><meshStandardMaterial color="#9eadaa" metalness={0.8} /></mesh>
+        {[-0.53, 0, 0.53].map((x) => <mesh key={x} position={[x, 1.22, -0.12]}><cylinderGeometry args={[0.035, 0.035, 0.16, 8]} /><meshStandardMaterial color="#e8cd67" metalness={0.6} /></mesh>)}
+        <mesh position={[0, 0.49, 0.74]}><boxGeometry args={[0.9, 0.18, 0.08]} /><meshStandardMaterial color="#1b2b31" metalness={0.4} /></mesh>
+        <mesh position={[0, 0.51, 0.79]}><boxGeometry args={[0.68, 0.1, 0.025]} /><meshStandardMaterial color="#56dfe8" emissive="#188994" emissiveIntensity={0.8} /></mesh>
+        <Beacon color={accent} active={false} height={1.5} />
+      </group>
+    );
+  }
+
+  if (id === "maintenance") {
+    return (
+      <group>
+        <RoundedBox args={[2.9, 0.34, 2.08]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.6} metalness={0.34} /></RoundedBox>
+        <mesh castShadow position={[0, 0.62, -0.12]}><boxGeometry args={[1.9, 0.72, 1.28]} /><meshStandardMaterial color="#4b5b61" roughness={0.58} metalness={0.38} /></mesh>
+        <mesh position={[0, 0.65, 0.54]}><boxGeometry args={[1.18, 0.56, 0.07]} /><meshStandardMaterial color="#18262c" roughness={0.5} metalness={0.3} /></mesh>
+        <mesh position={[0, 0.65, 0.59]}><boxGeometry args={[0.9, 0.4, 0.025]} /><meshStandardMaterial color="#283f43" metalness={0.32} /></mesh>
+        {[-0.3, 0, 0.3].map((x) => <mesh key={x} position={[x, 0.65, 0.61]}><boxGeometry args={[0.035, 0.29, 0.02]} /><meshStandardMaterial color="#d2b56a" metalness={0.38} /></mesh>)}
+        <group position={[0.98, 0.64, -0.16]}>
+          <mesh position={[0, 0.45, 0]}><cylinderGeometry args={[0.06, 0.06, 0.88, 8]} /><meshStandardMaterial color="#bcc7c0" metalness={0.74} /></mesh>
+          <mesh position={[0, 0.88, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.06, 0.06, 0.6, 8]} /><meshStandardMaterial color="#bcc7c0" metalness={0.74} /></mesh>
+          <mesh position={[-0.28, 0.88, 0]}><boxGeometry args={[0.08, 0.26, 0.08]} /><meshStandardMaterial color={accent} metalness={0.58} /></mesh>
+          <mesh position={[0.24, 0.65, 0]} rotation={[0, 0, 0.5]}><cylinderGeometry args={[0.04, 0.05, 0.4, 8]} /><meshStandardMaterial color="#c3cec4" metalness={0.72} /></mesh>
+        </group>
+        <mesh position={[-0.78, 0.38, 0.74]}><boxGeometry args={[0.46, 0.18, 0.08]} /><meshStandardMaterial color="#1d2d35" metalness={0.45} /></mesh>
+        <mesh position={[-0.78, 0.4, 0.79]}><boxGeometry args={[0.3, 0.1, 0.025]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} /></mesh>
+        <Beacon color={accent} active={false} height={1.45} />
       </group>
     );
   }
 
   return (
     <group>
-      <RoundedBox args={[2.65, 0.44, 1.95]} radius={0.13} smoothness={4} castShadow>
-        <meshStandardMaterial color={p.body} roughness={0.65} metalness={0.18} />
+      <RoundedBox args={[2.7, 0.34, 1.98]} radius={0.13} smoothness={4} position={[0, 0.18, 0]} castShadow>
+        <meshStandardMaterial color={p.body} roughness={0.63} metalness={0.28} />
       </RoundedBox>
-      <mesh position={[0, 0.72, 0]} castShadow>
-        <boxGeometry args={[1.75, 1.0, 1.25]} />
-        <meshStandardMaterial color={p.body} roughness={0.7} metalness={0.2} />
-      </mesh>
-      <mesh position={[0, 1.28, 0]}><boxGeometry args={[1.4,0.08,0.9]} /><meshStandardMaterial color={p.accent} emissive={p.accent} emissiveIntensity={0.28} /></mesh>
-      <Beacon color={accent} active={false} />
+      <mesh position={[0, 0.66, 0]} castShadow><boxGeometry args={[1.6, 0.7, 1.18]} /><meshStandardMaterial color={p.body} roughness={0.68} metalness={0.32} /></mesh>
+      <mesh position={[0, 1.06, 0.61]}><boxGeometry args={[0.84, 0.34, 0.05]} /><meshStandardMaterial color="#1c2a31" metalness={0.4} /></mesh>
+      <mesh position={[0, 1.08, 0.65]}><boxGeometry args={[0.6, 0.21, 0.025]} /><meshStandardMaterial color={p.accent} emissive={p.accent} emissiveIntensity={0.75} /></mesh>
+      {[-0.48, 0, 0.48].map((x) => <mesh key={x} position={[x, 0.3, -0.75]}><boxGeometry args={[0.22, 0.13, 0.18]} /><meshStandardMaterial color="#334448" metalness={0.48} /></mesh>)}
+      <Beacon color={accent} active={false} height={1.55} />
     </group>
   );
 }
