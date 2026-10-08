@@ -993,7 +993,7 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, buildings.solar?.dust, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
+  }, [activeEventId, buildings, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
 
   useEffect(() => {
     if (!pending || results) return;
@@ -1047,7 +1047,7 @@ export function MissionSimulation() {
     setDecisions((current) => [...current, { eventId: activeEvent.id, choiceId, label: choice?.label ?? choiceId }]);
     setResolvedEventIds((current) => current.includes(activeEvent.id) ? current : [...current, activeEvent.id]);
 
-    const level = tierLevel(pending.selected[activeEvent.trackId] ?? "Foundation");
+    const level = tierLevel(pending.selected[activeTargetTrackId ?? activeEvent.trackId] ?? "Foundation");
 
     switch (activeEvent.id) {
       case "solar-dust":
@@ -1883,9 +1883,9 @@ export function MissionSimulation() {
               <div className="flex items-center justify-between gap-3 bg-[#2a1620] px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff7180]">⚠ DISASTER · {activeEvent.title}</p>
-                  <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#e5bd64]">Situation report · {activeEvent.trackId}</p>
+                  <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#e5bd64]">Situation report · {activeTargetTrackId}</p>
                 </div>
-                <span className="shrink-0 rounded-full border border-[#ff5367]/50 px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-[#ffb39d]">Active</span>
+                <span className="shrink-0 rounded-full border border-[#ff5367]/50 px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-[#ffb39d]">{activeTargetTrackId}</span>
               </div>
               <div className="space-y-3 p-3">
                 <div>
