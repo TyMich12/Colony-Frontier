@@ -2270,6 +2270,7 @@ function ColonyBuilding({
   roverTask,
   resourceNodes,
   onClick,
+  mars,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -2474,6 +2475,7 @@ function MissionScene(props: Props) {
           roverTask={props.roverTask}
           resourceNodes={props.resourceNodes}
           onClick={() => props.onSelect(track.id)}
+          mars={mars}
         />
       ))}
 
