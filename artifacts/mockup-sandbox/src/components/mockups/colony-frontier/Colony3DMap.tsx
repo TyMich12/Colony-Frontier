@@ -49,7 +49,7 @@ const POSITIONS: Record<string, [number, number]> = {
   solar: [-4.2, -12.2],
   agriculture: [4.2, -12.2],
   navigation: [12.5, -12.2],
-  rover: [0, -17.2],
+  rover: [13, -14.5],
 };
 
 const BUILDING_ROTATIONS: Record<string, number> = {
@@ -197,9 +197,12 @@ function RoadNetwork({ mars }: { mars: boolean }) {
     .filter(([id]) => id !== "rover")
     .map(([id, [x, z]]) => {
       const roadX = ROAD_X.reduce((best, candidate) => Math.abs(candidate - x) < Math.abs(best - x) ? candidate : best, ROAD_X[0]);
+      const padHalfWidth = id === "habitat" ? 3.7 : 1.825;
+      const padEdgeX = x + Math.sign(roadX - x) * padHalfWidth;
       return {
         id,
-        a: [x, z] as [number, number],
+        // Stop the access spur at the pad edge instead of drawing a road through the building.
+        a: [padEdgeX, z] as [number, number],
         b: [roadX, z] as [number, number],
       };
     });
@@ -212,10 +215,10 @@ function RoadNetwork({ mars }: { mars: boolean }) {
   );
 }
 
-function Pad({ position, size, mars, accent }: { position: [number, number]; size: number; mars: boolean; accent: string }) {
+function Pad({ position, size, mars, accent, baseY = 0 }: { position: [number, number]; size: number; mars: boolean; accent: string; baseY?: number }) {
   const [x, z] = position;
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, baseY, z]}>
       <mesh receiveShadow>
         <boxGeometry args={[size, 0.08, size]} />
         <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
@@ -232,7 +235,7 @@ function Pad({ position, size, mars, accent }: { position: [number, number]; siz
   );
 }
 
-function Beacon({ color, active }: { color: string; active: boolean }) {
+function Beacon({ color, active, height = 2.1 }: { color: string; active: boolean; height?: number }) {
   const ref = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     if (!ref.current) return;
@@ -241,7 +244,7 @@ function Beacon({ color, active }: { color: string; active: boolean }) {
     ref.current.scale.setScalar(active ? 1 + (Math.sin(t * 5) + 1) * 0.08 : 0.9 + (Math.sin(t * 2) + 1) * 0.025);
   });
   return (
-    <mesh ref={ref} position={[0, 2.1, 0]}>
+    <mesh ref={ref} position={[0, height, 0]}>
       <octahedronGeometry args={[0.15, 0]} />
       <meshStandardMaterial color={active ? "#fff16b" : color} emissive={active ? "#ff9f28" : color} emissiveIntensity={active ? 1.5 : 0.7} />
     </mesh>
@@ -258,21 +261,21 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
           <cylinderGeometry args={[2.45, 2.7, 0.82, 20]} />
           <meshStandardMaterial color="#49565b" roughness={0.66} metalness={0.25} />
         </mesh>
-        <mesh castShadow position={[0, 1.35, 0]}>
+        <mesh castShadow position={[0, 1.13, 0]}>
           <sphereGeometry args={[2.18, 36, 22, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
           <meshStandardMaterial color="#63cbd1" emissive="#154e58" emissiveIntensity={0.18} transparent opacity={0.94} roughness={0.24} />
         </mesh>
-        <mesh position={[0, 1.38, 0]}>
+        <mesh position={[0, 1.14, 0]}>
           <torusGeometry args={[1.76, 0.08, 8, 36]} />
           <meshStandardMaterial color="#f1c75f" metalness={0.6} roughness={0.22} />
         </mesh>
         {[-1.35, -0.68, 0, 0.68, 1.35].map((x) => (
-          <mesh key={x} position={[x, 1.36, 2.05]} rotation={[0, 0, x * 0.07]}>
+          <mesh key={x} position={[x, 1.17, 2.05]} rotation={[0, 0, x * 0.07]}>
             <boxGeometry args={[0.075, 1.05, 0.05]} />
             <meshStandardMaterial color="#dce4df" metalness={0.62} roughness={0.22} />
           </mesh>
         ))}
-        <mesh position={[0, 2.75, 0]}>
+        <mesh position={[0, 3.5, 0]}>
           <cylinderGeometry args={[0.1, 0.15, 1.0, 10]} />
           <meshStandardMaterial color="#dbe3df" metalness={0.7} roughness={0.2} />
         </mesh>
@@ -351,9 +354,9 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
     return (
       <group>
         <RoundedBox args={[2.7, 0.4, 2.05]} radius={0.16} smoothness={4} castShadow><meshStandardMaterial color={p.body} roughness={0.62} metalness={0.2} /></RoundedBox>
-        <mesh position={[0, 1.02, 0]}><sphereGeometry args={[1.28, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color={id === "science" ? "#74629d" : "#76699f"} transparent opacity={0.76} roughness={0.3} /></mesh>
-        <mesh position={[0, 1.05, 0]}><torusGeometry args={[1.03, 0.06, 8, 28]} /><meshStandardMaterial color={accent} metalness={0.45} roughness={0.25} /></mesh>
-        <Beacon color={accent} active={false} />
+        <mesh position={[0, 0.2, 0]}><sphereGeometry args={[1.28, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color={id === "science" ? "#74629d" : "#76699f"} transparent opacity={0.76} roughness={0.3} /></mesh>
+        <mesh position={[0, 0.22, 0]}><torusGeometry args={[1.03, 0.06, 8, 28]} /><meshStandardMaterial color={accent} metalness={0.45} roughness={0.25} /></mesh>
+        <Beacon color={accent} active={false} height={1.55} />
       </group>
     );
   }
@@ -373,7 +376,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
     return (
       <group>
         <RoundedBox args={[2.9, 0.34, 2.05]} radius={0.14} smoothness={4} castShadow><meshStandardMaterial color={p.body} roughness={0.7} /></RoundedBox>
-        <RoundedBox args={[2.55, 1.18, 1.62]} radius={0.28} smoothness={5} position={[0, 0.96, 0]} castShadow><meshStandardMaterial color="#5ebd76" transparent opacity={0.4} roughness={0.2} /></RoundedBox>
+        <RoundedBox args={[2.55, 1.18, 1.62]} radius={0.28} smoothness={5} position={[0, 0.76, 0]} castShadow><meshStandardMaterial color="#5ebd76" transparent opacity={0.4} roughness={0.2} /></RoundedBox>
         {[-0.8,-0.27,0.27,0.8].map((x)=><mesh key={x} position={[x,0.82,0]}><sphereGeometry args={[0.13,10,8]} /><meshStandardMaterial color="#79ef89" emissive="#2ac95b" emissiveIntensity={0.45} /></mesh>)}
       </group>
     );
@@ -405,12 +408,12 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { 
     const phase = active ? (Math.sin(clock.getElapsedTime() * 0.24) + 1) / 2 : 0;
     const x = THREE.MathUtils.lerp(position[0], destination[0], phase);
     const z = THREE.MathUtils.lerp(position[1], destination[1], phase);
-    ref.current.position.set(x, terrainHeight(x, z) + 0.39, z);
+    ref.current.position.set(x, terrainHeight(x, z) + 0.47, z);
     ref.current.position.y += Math.sin(clock.getElapsedTime() * 2) * 0.008;
   });
   const wheelZ = [-0.55, 0, 0.55];
   return (
-    <group ref={ref} position={[position[0], PAD_Y + 0.39, position[1]]} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+    <group ref={ref} position={[position[0], PAD_Y + 0.47, position[1]]} onClick={(e) => { e.stopPropagation(); onClick(); }}>
       <mesh castShadow position={[0, 0.01, 0]}>
         <RoundedBox args={[1.72, 0.28, 1.12]} radius={0.12} smoothness={4}>
           <meshStandardMaterial color="#b99a5d" roughness={0.64} metalness={0.3} />
@@ -577,11 +580,11 @@ function CrewMember({ route,index,mars }:{route:Array<[number,number]>;index:num
     const i=Math.floor(p); const f=p-i;
     const [ax,az]=route[i], [bx,bz]=route[(i+1)%route.length];
     const x=THREE.MathUtils.lerp(ax,bx,f), z=THREE.MathUtils.lerp(az,bz,f);
-    ref.current.position.set(x,PAD_Y+0.32,z);
+    ref.current.position.set(x,-0.176,z);
     ref.current.rotation.y=Math.atan2(bx-ax,bz-az);
   });
   const suit=["#67c9d9","#e4bb61","#d47c69","#83b97d","#9d8bd1"][index%5];
-  return <group ref={ref} scale={0.45}>
+  return <group ref={ref} scale={1.6}>
     <mesh castShadow position={[0,0.43,0]}><capsuleGeometry args={[0.13,0.28,4,8]}/><meshStandardMaterial color={suit}/></mesh>
     <mesh castShadow position={[0,0.75,0]}><sphereGeometry args={[0.12,14,10]}/><meshStandardMaterial color={mars?"#b9c0bd":"#d2b65f"} metalness={0.15}/></mesh>
     <mesh position={[0,0.75,0.102]}><boxGeometry args={[0.13,0.055,0.018]}/><meshStandardMaterial color="#61e9f2" emissive="#218e99" emissiveIntensity={0.3}/></mesh>
@@ -601,7 +604,7 @@ function ColonyBuilding({
     : track.id === "extraction" || track.id === "isru" || track.id === "thermal" || track.id === "grid" || track.id === "maintenance" || track.id === "co2" ? 0.26
     : 0.21;
   return <group position={[x,y,z]} rotation={[0,BUILDING_ROTATIONS[track.id]??0,0]} onClick={(e)=>{e.stopPropagation();onClick();}} onPointerOver={()=>{document.body.style.cursor="pointer"}} onPointerOut={()=>{document.body.style.cursor=""}}>
-    <Pad position={[0,0]} size={track.id==="habitat"?9.4:3.65} mars={mars} accent={p.accent}/>
+    <Pad position={[0,0]} size={track.id==="habitat"?7.4:3.65} mars={mars} accent={p.accent}/>
     <group position={[0,artBaseOffset,0]} scale={track.id==="habitat"?1.12:1}>
       <BuildingArt id={track.id} accent={tierColor(tier)}/>
     </group>
@@ -615,7 +618,7 @@ function ColonyBuilding({
 }
 
 function CommandCenter() {
-  return <group position={[0,PAD_Y,0]}>
+  return <group position={[0,0.47,0]}>
     <mesh castShadow><cylinderGeometry args={[2.0,2.25,0.78,16]}/><meshStandardMaterial color="#4e5c60" roughness={0.66} metalness={0.22}/></mesh>
     <mesh castShadow position={[0,0.6,0]}><cylinderGeometry args={[1.72,1.86,0.22,16]}/><meshStandardMaterial color="#929d99" roughness={0.4} metalness={0.36}/></mesh>
     <mesh castShadow position={[0,1.25,0]}><sphereGeometry args={[1.55,30,18,0,Math.PI*2,0,Math.PI*0.5]}/><meshStandardMaterial color="#69ccd2" transparent opacity={0.9} emissive="#1b626b" emissiveIntensity={0.18}/></mesh>
@@ -627,7 +630,7 @@ function CommandCenter() {
 }
 
 function LandingPad({ mars }: { mars:boolean }) {
-  return <group position={[0,PAD_Y,-20.0]}>
+  return <group position={[0,0.15,-20.0]}>
     <mesh receiveShadow><cylinderGeometry args={[4.0,4.3,0.14,24]}/><meshStandardMaterial color={mars?"#875747":"#777976"} roughness={0.94}/></mesh>
     <mesh position={[0,0.08,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[3.1,3.18,32]}/><meshBasicMaterial color={mars?"#d8a183":"#d3cfbd"}/></mesh>
     <Text position={[0,0.22,0]} rotation={[-0.68,0,0]} fontSize={0.28} color={mars?"#f0c1a0":"#e3decb"} outlineWidth={0.035} outlineColor="#28221d" anchorX="center">LANDING PAD</Text>
@@ -651,7 +654,7 @@ function MissionGuide({ mars }: { mars: boolean }) {
         fontFamily: "system-ui, sans-serif",
         backdropFilter: "blur(8px)",
       }}>
-        <div style={{fontSize:9,fontWeight:900,letterSpacing:".18em",textTransform:"uppercase",color:"#efc85f"}}>MISSION CONTROL · ${mars ? "MARS" : "MOON"}</div>
+        <div style={{fontSize:9,fontWeight:900,letterSpacing:".18em",textTransform:"uppercase",color:"#efc85f"}}>MISSION CONTROL · {mars ? "MARS" : "MOON"}</div>
         <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
           <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable and complete the objectives.
           <br/><b style={{color:"#e8eee9"}}>2.</b> During a disaster, click the red-ringed facility. Read the situation report, then choose a response in its building panel.
@@ -683,7 +686,12 @@ function Scene({ props }: { props: Props }) {
       <LandingPad mars={mars}/>
       <CommandCenter/>
       {props.tracks.map((track)=>track.id!=="rover"&&<ColonyBuilding key={track.id} track={track} tier={props.selected[track.id]??"Foundation"} runtime={props.buildings[track.id]??{condition:100,dust:0,status:"ONLINE"}} selected={props.selectedBuildingId===track.id} alerted={props.activeEventTrackId===track.id} position={POSITIONS[track.id]??[0,0]} onClick={()=>props.onSelect(track.id)} mars={mars}/>)}
-      {props.tracks.some((track)=>track.id==="rover")&&<Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId==="rover"} alerted={props.activeEventTrackId==="rover"} onClick={()=>props.onSelect("rover")}/>}
+      {props.tracks.some((track)=>track.id==="rover")&&(
+        <>
+          <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04}/>
+          <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId==="rover"} alerted={props.activeEventTrackId==="rover"} onClick={()=>props.onSelect("rover")}/>
+        </>
+      )}
       <Crew mars={mars}/>
       {props.resourceNodes.map((node)=><ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId===node.id} onClick={()=>props.onSelectResource(node)}/>)}
       {props.activeEventTrackId&&POSITIONS[props.activeEventTrackId]&&<Text position={[POSITIONS[props.activeEventTrackId][0],4.1,POSITIONS[props.activeEventTrackId][1]]} rotation={[-0.68,0,0]} fontSize={0.22} color="#ff6672" outlineWidth={0.035} outlineColor="#26171a" anchorX="center">RESPOND HERE</Text>}
