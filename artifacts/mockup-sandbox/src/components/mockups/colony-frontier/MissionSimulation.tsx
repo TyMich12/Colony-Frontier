@@ -799,7 +799,7 @@ function ResourceInspector({
     </div>
   );
 }
-function getAiAnalysis(function getAiAnalysis(metrics: MissionMetrics, score: number): string {
+function getAiAnalysis(metrics: MissionMetrics, score: number): string {
   if (metrics.battery < 45) return "Your largest weakness was battery management during low-solar periods. Stored energy was used more aggressively than necessary.";
   if (metrics.water < 55) return "Your largest weakness was water recovery. The colony remained stable, but the recycling loop lost reserve that could have been protected earlier.";
   if (metrics.oxygen < 55) return "Your largest weakness was life-support margin. The oxygen loop remained functional, but several responses left less reserve than necessary.";
