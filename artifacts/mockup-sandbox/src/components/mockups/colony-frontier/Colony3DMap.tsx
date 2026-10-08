@@ -191,7 +191,7 @@ function CityRoadNetwork({ mars }: { mars: boolean }) {
   );
 }
 
-function Plaza(function Plaza({
+function Plaza({
   position,
   radius,
   mars,
