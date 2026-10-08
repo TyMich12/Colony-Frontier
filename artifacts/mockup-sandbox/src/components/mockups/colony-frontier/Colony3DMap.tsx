@@ -262,7 +262,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   if (id === "habitat") {
     return (
       <group>
-        <mesh castShadow>
+        <mesh castShadow position={[0, 0.28, 0]}>
           <cylinderGeometry args={[2.35, 2.48, 0.55, 24]} />
           <meshStandardMaterial color="#46565e" roughness={0.62} metalness={0.38} />
         </mesh>
@@ -859,7 +859,7 @@ function ColonyBuilding({
 
 function CommandCenter() {
   return (
-    <group position={[0, 0, 0]} frustumCulled={false}>
+    <group position={[0, 0.15, 0]} frustumCulled={false}>
       {/* Raised circular foundation, metallic rim and segmented anchor ring. */}
       <mesh castShadow receiveShadow position={[0, 0.15, 0]}>
         <cylinderGeometry args={[2.22, 2.36, 0.28, 24]} />
@@ -942,7 +942,7 @@ function CommandCenter() {
 }
 
 function LandingPad({ mars }: { mars:boolean }) {
-  return <group position={[0,0.15,-20.0]}>
+  return <group position={[0,0.22,-20.0]}>
     <mesh receiveShadow><cylinderGeometry args={[4.0,4.3,0.14,24]}/><meshStandardMaterial color={mars?"#875747":"#777976"} roughness={0.94}/></mesh>
     <mesh position={[0,0.08,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[3.1,3.18,32]}/><meshBasicMaterial color={mars?"#d8a183":"#d3cfbd"}/></mesh>
     <Text position={[0,0.22,0]} rotation={[-0.68,0,0]} fontSize={0.28} color={mars?"#f0c1a0":"#e3decb"} outlineWidth={0.035} outlineColor="#28221d" anchorX="center">LANDING PAD</Text>
