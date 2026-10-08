@@ -2430,12 +2430,13 @@ function MissionScene(props: Props) {
 
       <OrbitControls
         enableRotate={false}
-        enablePan={false}
+        enablePan={true}
         enableZoom
-        minZoom={18}
-        maxZoom={38}
+        panSpeed={0.85}
+        minZoom={15}
+        maxZoom={40}
         zoomSpeed={0.78}
-        target={[0, 0.9, 1.4]}
+        target={[0, 0.6, 0]}
       />
     </Canvas>
   );
