@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  Activity,
+  AlertTriangle,
   BatteryCharging,
   Car,
+  Clock,
   Check,
   CircleDot,
   Cloud,
@@ -39,8 +42,11 @@ import {
   saveMissionRuntime,
   type BuildingRuntime,
   type MissionDecision,
+  type ActiveFault,
   type MissionMetrics,
+  type MissionOperation,
   type PendingMission,
+  type SampleStage,
 } from "./missionRuntime";
 import { Colony3DMap } from "./Colony3DMap";
 
@@ -898,8 +904,14 @@ export function MissionSimulation() {
   const [roverTask, setRoverTask] = useState(runtime?.roverTask ?? "STANDBY");
   const [score, setScore] = useState(runtime?.score ?? 72);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
-  const [surveyedNodes, setSurveyedNodes] = useState<string[]>([]);
-  const [resourceYield, setResourceYield] = useState(0);
+  const [surveyedNodes, setSurveyedNodes] = useState<string[]>(() => runtime?.surveyedNodes ?? []);
+  const [sampleStages, setSampleStages] = useState<Record<string, SampleStage>>(() => runtime?.sampleStages ?? Object.fromEntries((runtime?.surveyedNodes ?? []).map((id) => [id, "SURVEYED" as SampleStage])));
+  const [resourceYield, setResourceYield] = useState(runtime?.resourceYield ?? 0);
+  const [activeOperation, setActiveOperation] = useState<MissionOperation | null>(() => runtime?.activeOperation ?? null);
+  const [operationResult, setOperationResult] = useState<string | null>(() => runtime?.operationResult ?? null);
+  const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+  const operationCompletionRef = useRef<string | null>(null);
   const [manualActions, setManualActions] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -929,6 +941,69 @@ export function MissionSimulation() {
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
 
+  const finishOperation = useCallback((operation: MissionOperation) => {
+    const node = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((item) => item.id === operation.targetId);
+    let message = "";
+
+    switch (operation.kind) {
+      case "SURVEY":
+        if (node) {
+          setSampleStages((current) => ({ ...current, [node.id]: "SURVEYED" }));
+          setSurveyedNodes((current) => current.includes(node.id) ? current : [...current, node.id]);
+          message = `SURVEY COMPLETE · ${node.label}. Terrain and spectral signatures are mapped. Next: collect a sealed physical sample from the marked location.`;
+          setRoverTask("SURVEY COMPLETE");
+          setScore((value) => clamp(value + (pending?.selected.rover ? 5 : 3)));
+        }
+        break;
+      case "COLLECT":
+        if (node) {
+          setSampleStages((current) => ({ ...current, [node.id]: "COLLECTED" }));
+          message = `SAMPLE SECURED · ${node.label}. The core is bagged and labelled with site coordinates and collection time. Next: transfer it to the analysis bench.`;
+          setRoverTask("SAMPLE SECURED");
+          setScore((value) => clamp(value + 4));
+        }
+        break;
+      case "TRANSFER":
+        if (node) {
+          setSampleStages((current) => ({ ...current, [node.id]: "DELIVERED" }));
+          message = `CHAIN OF CUSTODY COMPLETE · ${node.label} arrived in the lab. The sample is ready for mineralogical / compositional analysis.`;
+          setRoverTask("SAMPLE DELIVERED");
+          setScore((value) => clamp(value + 4));
+        }
+        break;
+      case "ANALYZE":
+        if (node) {
+          setSampleStages((current) => ({ ...current, [node.id]: "ANALYSED" }));
+          setResourceYield((value) => value + 1);
+          const scienceBonus = pending?.selected.science ? tierLevel(pending.selected.science) * 2 : 0;
+          setScore((value) => clamp(value + 9 + scienceBonus));
+          message = `ANALYSIS COMPLETE · ${node.label}. The lab recorded a usable field result. Research value: +${1 + scienceBonus} units. Your mission report now includes the result.`;
+          setRoverTask("ANALYSIS COMPLETE");
+        }
+        break;
+      case "UPGRADE": {
+        const track = technologyTracks.find((item) => item.id === operation.targetId);
+        const level = operation.targetLevel ?? 1;
+        setBuildings((current) => {
+          const previous = current[operation.targetId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
+          const upgradeLevel = Math.max(previous.upgradeLevel ?? 0, level);
+          const condition = clamp(previous.condition + 5);
+          return { ...current, [operation.targetId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
+        });
+        setScore((value) => clamp(value + 4));
+        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} now has field-upgrade level ${level}/2. The new hardware kit is online and its output / wear model has improved.`;
+        break;
+      }
+    }
+
+    if (message) {
+      setOperationResult(message);
+      setAiMessage(message);
+    }
+    setActionBusy(false);
+    setActiveOperation(null);
+  }, [pending]);
+
   useEffect(() => {
     if (!storedEventIsInvalid) return;
     setActiveEventId(null);
@@ -947,20 +1022,79 @@ export function MissionSimulation() {
 
 
   useEffect(() => {
-    if (!pending || results || manualPaused || activeEventId) return;
+    if (!activeOperation || results || manualPaused || activeEventId) return;
+
+    const timer = window.setInterval(() => {
+      setActiveOperation((current) => {
+        if (!current) return current;
+        const remaining = Math.max(0, current.remainingSeconds - speed);
+        if (remaining <= 0) {
+          if (operationCompletionRef.current !== current.id) {
+            operationCompletionRef.current = current.id;
+            window.setTimeout(() => finishOperation(current), 0);
+          }
+          return null;
+        }
+        return { ...current, remainingSeconds: remaining };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [activeOperation, activeEventId, finishOperation, manualPaused, results, speed]);
+
+  useEffect(() => {
+    if (!pending || results || manualPaused) return;
 
     const timer = window.setInterval(() => {
       setElapsed((current) => {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed);
 
         while (eventPointerRef.current < EVENT_TIMES.length && next >= EVENT_TIMES[eventPointerRef.current]) {
-          const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
-          eventPointerRef.current += 1;
-          setTimeout(() => {
-            setActiveEventId(event.id);
-            setAiMessage(`EVENT DETECTED: ${event.title}. Review the situation and choose a response.`);
-          }, 0);
-          break;
+          if (!activeEventId) {
+            const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
+            eventPointerRef.current += 1;
+            setTimeout(() => {
+              setActiveEventId(event.id);
+              setSelectedBuildingId(null);
+              setSelectedResourceId(null);
+              setAiMessage(`CRITICAL INCIDENT: ${event.title}. The affected system has taken an immediate hit. Life support and other systems continue to evolve until you respond.`);
+
+              const targetId = event.trackId === "power"
+                ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
+                : event.trackId;
+              setBuildings((current) => {
+                const previous = current[targetId];
+                if (!previous) return current;
+                const damage = 3 + Math.min(5, eventPointerRef.current * 0.4);
+                const condition = clamp(previous.condition - damage);
+                const next = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
+                if (event.id === "solar-dust" || event.id === "regional-dust-front") {
+                  next.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 12) };
+                }
+                return next;
+              });
+              setMetrics((current) => {
+                switch (event.id) {
+                  case "solar-dust":
+                  case "regional-dust-front": return { ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 3) };
+                  case "battery-thermal": return { ...current, battery: clamp(current.battery - 7), power: clamp(current.power - 2) };
+                  case "oxygen-filter":
+                  case "co2-scrubber-loading": return { ...current, oxygen: clamp(current.oxygen - 6) };
+                  case "water-filter": return { ...current, water: clamp(current.water - 6) };
+                  case "habitat-pressure": return { ...current, habitat: clamp(current.habitat - 5) };
+                  case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - 3) };
+                  case "radiation-burst": return { ...current, radiation: clamp(current.radiation + 7) };
+                  case "polar-shadow-cold-soak":
+                  case "thermal-drift": return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -1.0 : 1.0), 16, 28), battery: clamp(current.battery - 4) };
+                  case "grid-overload":
+                  case "core-power": return { ...current, power: clamp(current.power - 7), battery: clamp(current.battery - 4) };
+                  case "agriculture-stress": return { ...current, food: clamp(current.food - 6) };
+                  default: return current;
+                }
+              });
+            }, 0);
+            break;
+          }
         }
 
         if (next >= TOTAL_MISSION_SECONDS) {
@@ -987,17 +1121,17 @@ export function MissionSimulation() {
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const powerBase = 74 + solarTier * 7 + solarUpgrade * 4 - solarDust * 0.34 - optionalCount * 1.8 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 3 : 0);
         const demandPenalty = Math.max(0, 68 - powerBase);
-        const batteryDelta = (powerBase > 72 ? 0.012 : -0.042 - demandPenalty * 0.001) + batteryTier * 0.008 + batteryUpgrade * 0.012;
+        const batteryDelta = (powerBase > 84 ? 0.006 : powerBase > 72 ? -0.008 : -0.045 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.012;
 
         return {
           power: clamp(powerBase),
           battery: clamp(current.battery + batteryDelta * speed),
           oxygen: clamp(current.oxygen - (0.0085 - oxygenTier * 0.0018 - oxygenUpgrade * 0.0008) * speed),
           water: clamp(current.water - (0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007) * speed),
-          food: clamp(current.food - (0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0016 : 0) - foodUpgrade * 0.0008) * speed),
-          temperature: clamp(current.temperature + (21 - current.temperature) * (0.01 + (thermalTier + thermalUpgrade) * 0.004) * speed, 16, 28),
-          radiation: clamp(current.radiation + 0.0005 * speed),
-          habitat: clamp(current.habitat - Math.max(0.00025, 0.0012 - habitatUpgrade * 0.00035) * speed),
+          food: clamp(current.food - Math.max(0.0014, 0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0019 : 0) - foodUpgrade * 0.0011) * speed),
+          temperature: clamp(current.temperature + (21 - current.temperature) * (0.009 + (thermalTier + thermalUpgrade) * 0.0045) * speed, 16, 28),
+          radiation: clamp(current.radiation + 0.003 * speed),
+          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatUpgrade * 0.0012) * speed),
         };
       });
 
@@ -1006,20 +1140,27 @@ export function MissionSimulation() {
         for (const [trackId, state] of Object.entries(next)) {
           const tier = pending.selected[trackId];
           const level = tier ? tierLevel(tier) : 0;
-          const wear = trackId === "solar" ? 0.003 : 0.0016;
+          const wear = trackId === "solar" ? 0.013 : 0.0075;
           next[trackId] = {
             ...state,
             condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.00025 - (state.upgradeLevel ?? 0) * 0.0003) * speed),
             status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.00025 - (state.upgradeLevel ?? 0) * 0.0003) * speed)),
-            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.002, 0.012 - level * 0.0015 - (state.upgradeLevel ?? 0) * 0.002) * speed) : state.dust,
+            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.004) * speed) : state.dust,
           };
         }
         return next;
       });
+
+      const dt = 0.25 * speed;
+      if (Object.keys(activeFaults).length > 0) {
+        setActiveFaults((current) => Object.fromEntries(Object.entries(current)
+          .map(([key, fault]) => [key, { ...fault, remainingSeconds: Math.max(0, fault.remainingSeconds - dt) }])
+          .filter(([, fault]) => (fault as ActiveFault).remainingSeconds > 0)) as Record<string, ActiveFault>);
+      }
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, buildings, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
+  }, [activeEventId, activeFaults, buildings, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
 
   useEffect(() => {
     if (!pending || results) return;
@@ -1034,8 +1175,14 @@ export function MissionSimulation() {
       aiMessage,
       roverTask,
       score,
+      surveyedNodes,
+      sampleStages,
+      resourceYield,
+      activeOperation,
+      operationResult,
+      activeFaults,
     });
-  }, [activeEventId, aiMessage, buildings, decisions, elapsed, metrics, pending, resolvedEventIds, results, roverTask, score]);
+  }, [activeEventId, activeFaults, activeOperation, aiMessage, buildings, decisions, elapsed, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
