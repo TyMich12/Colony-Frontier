@@ -100,12 +100,18 @@ function roadEdgeColor(mars: boolean) {
 const ROAD_HORIZONTAL_Z = [-8.25, -0.75, 6.75] as const;
 const ROAD_VERTICAL_X = [-8.65, 0.25, 8.5] as const;
 const OUTER_ROAD = [
-  [-15.8, -14.5],
-  [15.8, -14.5],
-  [15.8, 13.8],
-  [-15.8, 13.8],
-  [-15.8, -14.5],
+  [-17.2, -17.2],
+  [17.2, -17.2],
+  [17.2, 17.0],
+  [-17.2, 17.0],
+  [-17.2, -17.2],
 ] as Array<[number, number]>;
+
+function nearestRoadX(x: number) {
+  return ROAD_VERTICAL_X.reduce((best, candidate) =>
+    Math.abs(candidate - x) < Math.abs(best - x) ? candidate : best,
+  ROAD_VERTICAL_X[0]);
+}
 
 function nearestRoadZ(z: number) {
   return ROAD_HORIZONTAL_Z.reduce((best, candidate) =>
@@ -170,11 +176,12 @@ function CityRoadNetwork({ mars }: { mars: boolean }) {
   const buildingAccess = Object.entries(POSITIONS)
     .filter(([id]) => id !== "rover")
     .map(([id, [x, z]]) => {
-      const roadZ = nearestRoadZ(z);
-      const approachZ = roadZ > z ? z + 2.0 : z - 2.0;
+      const roadX = nearestRoadX(x);
+      const halfPad = id === "habitat" ? 5.1 : id === "extraction" || id === "isru" ? 2.2 : 2.05;
+      const edgeX = x > roadX ? x - halfPad : x + halfPad;
       return {
         id,
-        points: [[x, approachZ], [x, roadZ]] as Array<[number, number]>,
+        points: [[edgeX, z], [roadX, z]] as Array<[number, number]>,
       };
     });
 
@@ -186,7 +193,7 @@ function CityRoadNetwork({ mars }: { mars: boolean }) {
       {buildingAccess.map((route) => (
         <PathStrip key={route.id} points={route.points} width={0.82} mars={mars} />
       ))}
-      <PathStrip points={[[0, -17.2], [0, -14.5]]} width={1.05} mars={mars} />
+      <PathStrip points={[[0, -17.2], [0, -17.0]]} width={1.05} mars={mars} />
     </group>
   );
 }
@@ -1542,11 +1549,11 @@ function HumanSettler({
 
 const CREW_ROUTES: Array<Array<[number, number]>> = [
   OUTER_ROAD,
-  [[-15.8, 6.75], [-8.65, 6.75], [-8.65, 13.8], [-8.65, 6.75], [0.25, 6.75], [0.25, 1.6], [0.25, -0.75], [-8.65, -0.75], [-15.8, -0.75], [-15.8, 6.75]],
-  [[-8.65, -14.5], [-8.65, -8.25], [-8.65, -0.75], [-8.65, 6.75], [-8.65, 13.8], [0.25, 13.8], [0.25, 6.75], [0.25, -0.75], [0.25, -8.25], [0.25, -14.5], [-8.65, -14.5]],
-  [[8.5, -14.5], [8.5, -8.25], [8.5, -0.75], [8.5, 6.75], [8.5, 13.8], [15.8, 13.8], [15.8, 6.75], [8.5, 6.75], [8.5, -0.75], [15.8, -0.75], [15.8, -8.25], [8.5, -8.25], [8.5, -14.5]],
-  [[-15.8, -8.25], [-8.65, -8.25], [0.25, -8.25], [8.5, -8.25], [15.8, -8.25], [15.8, -14.5], [8.5, -14.5], [0.25, -14.5], [-8.65, -14.5], [-15.8, -14.5], [-15.8, -8.25]],
-  [[-15.8, 13.8], [-8.65, 13.8], [-0.5, 13.8], [8.5, 13.8], [15.8, 13.8], [15.8, 6.75], [8.5, 6.75], [-0.5, 6.75], [-8.65, 6.75], [-15.8, 6.75], [-15.8, 13.8]],
+  [[-8.65, 6.75], [-8.65, 10.5], [-7.4, 10.5], [-8.65, 10.5], [-8.65, -0.75], [0.25, -0.75], [0.25, -3.1], [0.25, -0.75], [8.5, -0.75], [8.5, 3.0], [10.55, 3.0], [8.5, 3.0], [8.5, 6.75], [-8.65, 6.75]],
+  [[-8.65, 17.0], [-8.65, 13.8], [-8.65, 10.5], [-8.65, 3.0], [-10.45, 3.0], [-8.65, 3.0], [-8.65, -0.75], [-8.65, -8.25], [-8.65, -17.2], [0.25, -17.2], [0.25, -8.25], [0.25, -17.2], [-8.65, -17.2]],
+  [[8.5, -17.2], [8.5, -8.25], [12.45, -8.25], [8.5, -8.25], [8.5, -0.75], [8.5, 3.0], [6.55, 3.0], [8.5, 3.0], [8.5, 6.75], [8.5, 10.5], [10.55, 10.5], [8.5, 10.5], [8.5, 17.0], [17.2, 17.0], [17.2, -17.2], [8.5, -17.2]],
+  [[-17.2, -8.25], [-8.65, -8.25], [-8.65, -0.75], [-8.65, -3.0], [-8.65, -0.75], [0.25, -0.75], [0.25, -4.0], [0.25, -0.75], [8.5, -0.75], [8.5, -8.25], [8.5, -17.2], [-17.2, -17.2], [-17.2, -8.25]],
+  [[-17.2, 17.0], [-8.65, 17.0], [-8.65, 13.8], [0.25, 13.8], [0.25, 10.5], [5.0, 10.5], [0.25, 10.5], [0.25, 17.0], [17.2, 17.0], [17.2, 17.0]],
 ];
 
 function SettlerCrowd({ mars }: { mars: boolean }) {
@@ -2019,14 +2026,14 @@ function RoverWorld({
   const destination = targetResource ? nodeWorldPosition(targetResource) : home;
 
   const roverWaypoints = useMemo<[number, number][]>(() => {
-    if (!resource) return [home, [home[0], -14.5], [15.8, -14.5], [15.8, home[1]]];
+    if (!resource) return [home, [home[0], -17.2], [17.2, -17.2], [17.2, home[1]]];
     const [dx, dz] = destination;
     const exitX = dx < 0 ? -15.8 : 15.8;
-    const approachZ = Math.abs(dz) > 12 ? (dz < 0 ? -14.5 : 13.8) : (dz >= 0 ? 6.75 : -8.25);
+    const approachZ = Math.abs(dz) > 12 ? (dz < 0 ? -17.2 : 17.0) : (dz >= 0 ? 6.75 : -8.25);
     return [
       home,
-      [home[0], -14.5],
-      [exitX, -14.5],
+      [home[0], -17.2],
+      [exitX, -17.2],
       [exitX, approachZ],
       [dx < 0 ? Math.max(-15.8, dx) : Math.min(15.8, dx), approachZ],
       destination,
@@ -2342,8 +2349,8 @@ function UtilityCartWorld({ index }: { index: number }) {
   const ref = useRef<THREE.Group>(null);
   const route = useMemo<Array<[number, number]>>(() => (
     index % 2 === 0
-      ? [[-15.8, -8.25], [-8.65, -8.25], [-8.65, -0.75], [0.25, -0.75], [0.25, -8.25], [8.5, -8.25], [8.5, -14.5], [-15.8, -14.5], [-15.8, -8.25]]
-      : [[15.8, 6.75], [8.5, 6.75], [8.5, -0.75], [0.25, -0.75], [0.25, 6.75], [-8.65, 6.75], [-8.65, 13.8], [15.8, 13.8], [15.8, 6.75]]
+      ? [[-17.2, -8.25], [-8.65, -8.25], [-8.65, -0.75], [0.25, -0.75], [0.25, -8.25], [8.5, -8.25], [8.5, -17.2], [-17.2, -17.2], [-17.2, -8.25]]
+      : [[17.2, 6.75], [8.5, 6.75], [8.5, -0.75], [0.25, -0.75], [0.25, 6.75], [-8.65, 6.75], [-8.65, 17.0], [17.2, 17.0], [17.2, 6.75]]
   ), [index]);
 
   useFrame(({ clock }) => {
