@@ -2005,13 +2005,17 @@ function RoverWorld({
   selected: boolean;
   alerted: boolean;
   onClick: () => void;
+  mars: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const scannerRef = useRef<THREE.Mesh>(null);
+  const lastResourceRef = useRef<MissionResourceNode | null>(null);
   const home = position;
   const targetName = task.startsWith("SURVEYING ") ? task.slice("SURVEYING ".length) : "";
   const resource = resourceNodes.find((node) => node.label === targetName);
-  const destination = resource ? nodeWorldPosition(resource) : home;
+  if (resource) lastResourceRef.current = resource;
+  const targetResource = resource ?? (task === "RETURNING" ? lastResourceRef.current : null);
+  const destination = targetResource ? nodeWorldPosition(targetResource) : home;
 
   const roverWaypoints = useMemo<[number, number][]>(() => {
     if (!resource) return [home, [home[0], -14.5], [15.8, -14.5], [15.8, home[1]]];
@@ -2026,7 +2030,7 @@ function RoverWorld({
       [dx < 0 ? Math.max(-15.8, dx) : Math.min(15.8, dx), approachZ],
       destination,
     ];
-  }, [destination, home, resource]);
+  }, [destination, home, targetResource]);
 
   const roverPathLengths = useMemo(() => {
     const lengths: number[] = [];
@@ -2082,7 +2086,7 @@ function RoverWorld({
   return (
     <group>
       {showRoute && (
-        <PathStrip points={[routeEndpoint, destination]} width={0.68} mars={false} />
+        <PathStrip points={[routeEndpoint, destination]} width={0.68} mars={mars} />
       )}
       <group
         ref={ref}
@@ -2276,6 +2280,7 @@ function ColonyBuilding({
   roverTask: string;
   resourceNodes: MissionResourceNode[];
   onClick: () => void;
+  mars: boolean;
 }) {
   const y = terrainHeight(position[0], position[1]);
   const color = tierColor(tier);
@@ -2291,6 +2296,7 @@ function ColonyBuilding({
           selected={selected}
           alerted={alerted}
           onClick={onClick}
+          mars={mars}
         />
       </group>
     );
@@ -2426,7 +2432,7 @@ function MissionScene(props: Props) {
                   <BuildingPlot
                     key={`plot-${track.id}`}
                     position={POSITIONS[track.id] ?? [0, 0]}
-                    size={track.id === "habitat" ? 6.6 : track.id === "extraction" || track.id === "isru" ? 4.0 : 3.5}
+                    size={track.id === "habitat" ? 10.0 : track.id === "extraction" || track.id === "isru" ? 4.2 : 4.0}
                     mars={mars}
                   />
                 ) : null
