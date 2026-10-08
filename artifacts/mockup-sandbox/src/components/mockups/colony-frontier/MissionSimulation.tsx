@@ -283,6 +283,26 @@ function getEventChoices(event: MissionEvent, selected: Record<string, Tier>): E
       { id: "maintain", label: "Maintain surface operations", detail: "Keep the colony productive but accept higher radiation exposure." },
       { id: "ignore", label: "Ignore the alert", detail: "Continue everything normally and take the largest radiation penalty." },
     ],
+    "micrometeoroid-impact": [
+      { id: "inspect", label: "Inspect exposed hardware", detail: "Use the rover or crew procedures to identify the damaged external subsystem before returning to full operations." },
+      { id: "isolate", label: "Isolate the affected circuit", detail: "Protect the habitat power network while sacrificing a small amount of available capacity." },
+      { id: "defer", label: "Defer inspection", detail: "Keep the base operating, but accept additional equipment and habitat safety margin loss." },
+    ],
+    "polar-shadow-cold-soak": [
+      { id: "heat", label: "Increase heater power", detail: "Use electrical power to keep exposed hardware above its qualified minimum temperature." },
+      { id: "reroute", label: "Reroute power from non-critical loads", detail: "Protect thermal survival by shedding optional loads first." },
+      { id: "defer", label: "Accept cold-soak", detail: "Conserve stored energy and accept reduced equipment condition." },
+    ],
+    "regional-dust-front": [
+      { id: "shed", label: "Shed non-critical loads", detail: "Prepare for lower solar input and preserve battery reserve." },
+      { id: "protect", label: "Protect and monitor arrays", detail: "Reduce exposure of vulnerable equipment while the dust front passes." },
+      { id: "battery", label: "Maintain full operations on storage", detail: "Keep the colony productive using stored energy while solar input falls." },
+    ],
+    "mars-comm-relay-loss": [
+      { id: "autonomy", label: "Enter autonomous operations", detail: "Continue critical control and science without relying on continuous Earth commands." },
+      { id: "repoint", label: "Repoint the relay", detail: "Use the remaining link margin to restore a stable high-gain connection." },
+      { id: "hold", label: "Hold current configuration", detail: "Wait for the link to recover while accepting lower communications reliability." },
+    ],
     "thermal-drift": [
       { id: "rebalance", label: "Rebalance thermal system", detail: "Restore the preferred temperature band with a small power cost." },
       { id: "conserve", label: "Conserve stored energy", detail: "Accept a slower thermal correction to protect the battery." },
@@ -935,6 +955,84 @@ export function MissionSimulation() {
           setMetrics((current) => ({ ...current, habitat: clamp(current.habitat - 9 + level) }));
           setScore((value) => clamp(value - 8));
           setAiMessage("The habitat anomaly was ignored. The colony survived, but structural margin was unnecessarily lost.");
+        }
+        break;
+
+      case "micrometeoroid-impact":
+        if (choiceId === "inspect") {
+          setBuildings((current) => ({
+            ...current,
+            habitat: { ...(current.habitat ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.habitat?.condition ?? 100) - 1), status: buildingStatus(clamp((current.habitat?.condition ?? 100) - 1)) },
+          }));
+          setScore((value) => clamp(value + 8));
+          setAiMessage("External hardware was inspected after the impact. No pressure-shell breach was indicated, and the damaged equipment was isolated.");
+        } else if (choiceId === "isolate") {
+          setMetrics((current) => ({ ...current, power: clamp(current.power - 2), battery: clamp(current.battery - 2) }));
+          setScore((value) => clamp(value + 6));
+          setAiMessage("The affected circuit was isolated. Some capability was lost, but the primary habitat power path remained protected.");
+        } else {
+          setBuildings((current) => ({
+            ...current,
+            habitat: { ...(current.habitat ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.habitat?.condition ?? 100) - 7), status: buildingStatus(clamp((current.habitat?.condition ?? 100) - 7)) },
+          }));
+          setScore((value) => clamp(value - 7));
+          setAiMessage("The impact was left uninspected. The base stayed pressurised, but exposed-system condition deteriorated.");
+        }
+        break;
+
+      case "polar-shadow-cold-soak":
+        if (choiceId === "heat") {
+          setMetrics((current) => ({ ...current, battery: clamp(current.battery - 7), temperature: clamp(current.temperature - 0.4, 16, 28) }));
+          setScore((value) => clamp(value + 7));
+          setAiMessage("Heater power was increased to protect exposed hardware during the cold-soak transition.");
+        } else if (choiceId === "reroute") {
+          setMetrics((current) => ({ ...current, battery: clamp(current.battery + 2), power: clamp(current.power + 3), temperature: clamp(current.temperature - 0.8, 16, 28) }));
+          setScore((value) => clamp(value + 8));
+          setAiMessage("Non-critical electrical loads were shed and thermal protection was prioritized.");
+        } else {
+          setBuildings((current) => {
+            const next = { ...current };
+            for (const id of ["thermal", "solar"]) {
+              if (!next[id]) continue;
+              next[id] = { ...next[id], condition: clamp(next[id].condition - 7), status: buildingStatus(clamp(next[id].condition - 7)) };
+            }
+            return next;
+          });
+          setScore((value) => clamp(value - 7));
+          setAiMessage("Cold-soak was accepted to preserve energy. Exposed hardware took a measurable condition penalty.");
+        }
+        break;
+
+      case "regional-dust-front":
+        if (choiceId === "shed") {
+          setMetrics((current) => ({ ...current, power: clamp(current.power + 3), battery: clamp(current.battery + 9) }));
+          setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 7) } }));
+          setScore((value) => clamp(value + 8));
+          setAiMessage("The dust front reduced solar input, so optional loads were shed and battery reserve was protected.");
+        } else if (choiceId === "protect") {
+          setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 3) } }));
+          setMetrics((current) => ({ ...current, power: clamp(current.power - 4) }));
+          setScore((value) => clamp(value + 6));
+          setAiMessage("Array operations were reduced while the dust front passed. Solar losses stayed manageable.");
+        } else {
+          setMetrics((current) => ({ ...current, power: clamp(current.power - 12), battery: clamp(current.battery - 10) }));
+          setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 8) } }));
+          setScore((value) => clamp(value - 8));
+          setAiMessage("Full operations were maintained during the dust front, consuming substantial stored energy.");
+        }
+        break;
+
+      case "mars-comm-relay-loss":
+        if (choiceId === "autonomy") {
+          setScore((value) => clamp(value + 7));
+          setAiMessage("Autonomous control retained essential operations while the Mars relay path was degraded.");
+        } else if (choiceId === "repoint") {
+          setBuildings((current) => ({ ...current, comms: { ...(current.comms ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.comms?.condition ?? 100) + 7), status: "ONLINE" } }));
+          setScore((value) => clamp(value + 8));
+          setAiMessage("The relay antenna was repointed and the communications margin recovered.");
+        } else {
+          setScore((value) => clamp(value - 5));
+          setAiMessage("The degraded link was held without intervention. Critical autonomy remained available, but communications margin stayed low.");
         }
         break;
 
