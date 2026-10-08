@@ -38,12 +38,12 @@ const POSITIONS: Record<string, [number, number]> = {
   isru: [4.2, 11.0],
   radiation: [12.5, 11.0],
   oxygen: [-12.5, 3.3],
-  comms: [-6.4, 3.3],
-  maintenance: [6.4, 3.3],
+  comms: [-7.0, 3.3],
+  maintenance: [7.0, 3.3],
   water: [-12.5, 11.0],
   co2: [-12.5, -4.5],
-  grid: [-6.4, -4.5],
-  science: [6.4, -4.5],
+  grid: [-7.0, -4.5],
+  science: [7.0, -4.5],
   battery: [12.5, -4.5],
   thermal: [-12.5, -12.2],
   solar: [-4.2, -12.2],
@@ -71,7 +71,7 @@ const BUILDING_ROTATIONS: Record<string, number> = {
   maintenance: 0.2,
 };
 
-const ROAD_X = [-8.45, 0, 8.45];
+const ROAD_X = [-9.5, 0, 9.5];
 const ROAD_Z = [-8.35, -0.6, 7.15];
 const ROAD_EDGE = 18.4;
 const PAD_Y = 0.12;
@@ -187,11 +187,11 @@ function RoadNetwork({ mars }: { mars: boolean }) {
   const roads = [
     ...ROAD_X.filter((x) => x !== 0).map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
     // The main access lanes deliberately split around the single, enlarged habitat complex.
-    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -4.55] as [number, number], level: 0 },
-    { a: [0, 4.55] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
+    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -5.0] as [number, number], level: 0 },
+    { a: [0, 5.0] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
     ...ROAD_Z.filter((z) => z !== -0.6).map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
-    { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-4.55, -0.6] as [number, number], level: 1 },
-    { a: [4.55, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
+    { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-5.0, -0.6] as [number, number], level: 1 },
+    { a: [5.0, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
     { a: [-18.4, -18.4] as [number, number], b: [18.4, -18.4] as [number, number], level: 0.5 },
     { a: [18.4, -18.4] as [number, number], b: [18.4, 18.4] as [number, number], level: 0 },
     { a: [18.4, 18.4] as [number, number], b: [-18.4, 18.4] as [number, number], level: 0.5 },
@@ -272,12 +272,12 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         </mesh>
 
         {/* Main cylindrical pressure hull and reinforced end bulkheads. */}
-        <mesh castShadow receiveShadow position={[0, 1.0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <mesh castShadow receiveShadow position={[0, 1.42, 0]} rotation={[0, 0, Math.PI / 2]}>
           <cylinderGeometry args={[1.08, 1.08, 4.6, 32]} />
           <meshStandardMaterial color="#9aa6a4" metalness={0.48} roughness={0.35} />
         </mesh>
         {[-2.28, 2.28].map((x) => (
-          <group key={x} position={[x, 1.0, 0]}>
+          <group key={x} position={[x, 1.42, 0]}>
             <mesh castShadow scale={[0.42, 1, 1]}>
               <sphereGeometry args={[1.07, 24, 18]} />
               <meshStandardMaterial color="#657579" metalness={0.42} roughness={0.42} />
@@ -289,7 +289,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
           </group>
         ))}
         {[-1.68, -0.84, 0, 0.84, 1.68].map((x) => (
-          <mesh key={x} position={[x, 1.0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <mesh key={x} position={[x, 1.42, 0]} rotation={[0, Math.PI / 2, 0]}>
             <torusGeometry args={[1.08, 0.035, 8, 32]} />
             <meshStandardMaterial color="#c4ceca" metalness={0.76} roughness={0.28} />
           </mesh>
@@ -298,12 +298,12 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         {/* Two side sleeping/laboratory modules with pressure-rated connecting tunnels. */}
         {[-1, 1].map((side) => (
           <group key={side}>
-            <mesh castShadow receiveShadow position={[0.12, 0.78, side * 1.55]} rotation={[0, 0, Math.PI / 2]}>
+            <mesh castShadow receiveShadow position={[0.12, 1.0, side * 1.55]} rotation={[0, 0, Math.PI / 2]}>
               <cylinderGeometry args={[0.67, 0.67, 2.45, 24]} />
               <meshStandardMaterial color={side < 0 ? "#71858a" : "#60767c"} metalness={0.42} roughness={0.38} />
             </mesh>
             {[-0.98, 0.0, 0.98].map((x) => (
-              <mesh key={x} position={[x, 0.78, side * 1.55]} rotation={[0, Math.PI / 2, 0]}>
+              <mesh key={x} position={[x, 1.0, side * 1.55]} rotation={[0, Math.PI / 2, 0]}>
                 <torusGeometry args={[0.65, 0.035, 8, 28]} />
                 <meshStandardMaterial color="#d2d8d2" metalness={0.72} roughness={0.3} />
               </mesh>
@@ -312,7 +312,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
               <meshStandardMaterial color="#52666b" metalness={0.44} roughness={0.48} />
             </RoundedBox>
             {[-0.62, 0.0, 0.62].map((x) => (
-              <group key={x} position={[x, 0.84, side * 2.17]}>
+              <group key={x} position={[x, 1.04, side * 2.17]}>
                 <RoundedBox args={[0.34, 0.26, 0.045]} radius={0.04} smoothness={3} castShadow>
                   <meshStandardMaterial color="#162e3a" metalness={0.28} roughness={0.25} />
                 </RoundedBox>
@@ -329,7 +329,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         {[-1.62, -0.54, 0.54, 1.62].map((x) => (
           <group key={x}>
             {[-1, 1].map((side) => (
-              <group key={side} position={[x, 1.02, side * 1.06]}>
+              <group key={side} position={[x, 1.42, side * 1.06]}>
                 <RoundedBox args={[0.5, 0.36, 0.075]} radius={0.07} smoothness={4}>
                   <meshStandardMaterial color="#d2c995" metalness={0.64} roughness={0.32} />
                 </RoundedBox>
@@ -374,7 +374,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
 
         {/* Exterior life-support skids, tanks and insulated thermal lines. */}
         {[-1.72, 1.72].map((x) => (
-          <group key={x} position={[x, 0.4, 0]}>
+          <group key={x} position={[x, 0.76, 0]}>
             <mesh castShadow>
               <cylinderGeometry args={[0.21, 0.21, 0.7, 14]} />
               <meshStandardMaterial color="#d5d8d0" metalness={0.68} roughness={0.34} />
@@ -403,37 +403,37 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         ))}
 
         {/* Redundant comms mast and sensor crossbar: a functional habitat roofline, not a central dome. */}
-        <mesh position={[0, 2.27, -0.24]}>
+        <mesh position={[0, 3.2, -0.24]}>
           <cylinderGeometry args={[0.045, 0.075, 1.65, 10]} />
           <meshStandardMaterial color="#e0e0d2" metalness={0.76} roughness={0.26} />
         </mesh>
-        <mesh position={[0, 2.79, -0.24]}>
+        <mesh position={[0, 3.72, -0.24]}>
           <boxGeometry args={[0.72, 0.09, 0.14]} />
           <meshStandardMaterial color="#52676c" metalness={0.6} roughness={0.3} />
         </mesh>
         {[-0.28, 0.28].map((x) => (
-          <mesh key={x} position={[x, 2.79, -0.16]}>
+          <mesh key={x} position={[x, 3.72, -0.16]}>
             <sphereGeometry args={[0.075, 12, 8]} />
             <meshStandardMaterial color="#63e6ee" emissive="#2598a1" emissiveIntensity={0.85} />
           </mesh>
         ))}
-        <mesh position={[0, 1.78, 0.22]}>
+        <mesh position={[0, 1.6, 1.1]}>
           <boxGeometry args={[0.55, 0.34, 0.11]} />
           <meshStandardMaterial color="#1a2c34" metalness={0.44} roughness={0.33} />
         </mesh>
-        <mesh position={[0, 1.8, 0.285]}>
+        <mesh position={[0, 1.62, 1.17]}>
           <boxGeometry args={[0.37, 0.21, 0.025]} />
           <meshStandardMaterial color="#4ed3df" emissive="#176b75" emissiveIntensity={0.85} />
         </mesh>
-        <mesh position={[-2.1, 0.22, -1.55]}>
+        <mesh position={[-2.1, 0.41, -1.55]}>
           <boxGeometry args={[0.5, 0.11, 0.45]} />
           <meshStandardMaterial color="#37484b" metalness={0.48} roughness={0.42} />
         </mesh>
-        <mesh position={[2.1, 0.22, -1.55]}>
+        <mesh position={[2.1, 0.41, -1.55]}>
           <boxGeometry args={[0.5, 0.11, 0.45]} />
           <meshStandardMaterial color="#37484b" metalness={0.48} roughness={0.42} />
         </mesh>
-        <Beacon color={accent} active={false} height={3.35} />
+        <Beacon color={accent} active={false} height={4.05} />
       </group>
     );
   }
@@ -918,8 +918,8 @@ function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionRe
 
 function Crew({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number,number]>> = [
-    [[-8.45,7.15],[-8.45,11],[-4.2,11],[-8.45,11],[-8.45,-0.6],[-4.62,-0.6],[-4.62,-5.8],[4.62,-5.8],[4.62,-0.6],[8.45,-0.6],[8.45,7.15]],
-    [[8.45,-12.2],[8.45,-8.35],[0,-8.35],[0,-12.2],[-4.2,-12.2]],
+    [[-9.5,7.15],[-9.5,11],[-4.2,11],[-9.5,11],[-9.5,-0.6],[-4.75,-0.6],[-4.75,-6.9],[4.75,-6.9],[4.75,-0.6],[9.5,-0.6],[9.5,7.15]],
+    [[9.5,-12.2],[9.5,-8.35],[0,-8.35],[0,-12.2],[-4.2,-12.2]],
     [[-12.5,3.3],[-8.45,3.3],[-8.45,-8.35],[-12.5,-8.35],[-12.5,3.3]],
   ];
   return <group>{Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}</group>;
