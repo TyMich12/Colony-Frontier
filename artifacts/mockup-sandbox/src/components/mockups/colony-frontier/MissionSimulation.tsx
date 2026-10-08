@@ -179,7 +179,7 @@ function initialBuildings(selected: Record<string, Tier>): Record<string, Buildi
   return Object.fromEntries(
     Object.keys(selected).map((trackId) => [
       trackId,
-      { condition: 100, dust: 0, status: "ONLINE" },
+      { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 },
     ]),
   );
 }
@@ -612,6 +612,11 @@ function BuildingInspector({
   onClose,
   hasMaintenance,
   actionBusy,
+  activeEvent,
+  eventChoices,
+  onEventChoice,
+  power,
+  battery,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -620,6 +625,11 @@ function BuildingInspector({
   onClose: () => void;
   hasMaintenance: boolean;
   actionBusy: boolean;
+  activeEvent: MissionEvent | null;
+  eventChoices: EventChoice[];
+  onEventChoice: (choiceId: string) => void;
+  power: number;
+  battery: number;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -696,10 +706,12 @@ function BuildingInspector({
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
+  const upgradeLevel = runtime.upgradeLevel ?? 0;
+  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
-      <div className="pointer-events-auto w-[min(94vw,520px)] overflow-hidden rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.97] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
+      <div className="pointer-events-auto max-h-[84vh] w-[min(94vw,520px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
         <div className="relative overflow-hidden border-b border-[#30454b] bg-gradient-to-r from-[#172b32] via-[#152329] to-[#111a1f] px-5 py-4">
           <div className="absolute right-[-30px] top-[-40px] h-32 w-32 rounded-full bg-[#f4c75e]/[0.06] blur-2xl" />
           <div className="relative flex items-start gap-3">
@@ -732,6 +744,36 @@ function BuildingInspector({
           </div>
         </div>
 
+        {activeEvent && eventChoices.length > 0 && (
+          <section className="border-b border-[#733943] bg-[#21151b] p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#ff5367]/15 text-[#ff7380]"><CircleDot className="h-4 w-4" /></span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#ff7783]">Disaster response required</p>
+                <h3 className="mt-0.5 text-xs font-black uppercase tracking-[0.06em] text-white">{activeEvent.title}</h3>
+              </div>
+            </div>
+            <p className="mt-2 text-[10px] leading-4 text-[#d2bec4]">{activeEvent.summary}</p>
+            <div className="mt-3 grid gap-2">
+              {eventChoices.map((choice, index) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  onClick={() => onEventChoice(choice.id)}
+                  disabled={actionBusy}
+                  className="rounded-xl border border-[#71404b] bg-[#2a1b22] p-2.5 text-left transition hover:border-[#f4cd6c] hover:bg-[#33222a] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#ff5367]/15 text-[9px] font-black text-[#ffd875]">{index + 1}</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.04em] text-white">{choice.label}</span>
+                  </span>
+                  <span className="mt-1 block pl-8 text-[9px] leading-4 text-[#c2afb7]">{choice.detail}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
           {actions.map((action, index) => (
             <button
@@ -748,6 +790,25 @@ function BuildingInspector({
               <span className="mt-2 block text-[9px] leading-4 text-[#8da2a7]">{action.detail}</span>
             </button>
           ))}
+        </div>
+        <div className="mx-4 mb-4 rounded-2xl border border-[#40575b] bg-[#101f24] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Level {upgradeLevel}/2 · costs 8 power and 5 battery reserve · improves performance and condition.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAction("upgrade")}
+              disabled={actionBusy || !canUpgrade}
+              className="shrink-0 rounded-xl border border-[#8b7445] bg-[#d9b555] px-3 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-[#1b211d] transition hover:bg-[#f0cd70] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {upgradeLevel >= 2 ? "MAX LEVEL" : "UPGRADE"}
+            </button>
+          </div>
+          {!canUpgrade && upgradeLevel < 2 && (
+            <p className="mt-2 text-[9px] text-[#e3a2a0]">Requires at least 8 power and 5 battery reserve.</p>
+          )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
           <span className={`text-[9px] font-bold uppercase tracking-[0.16em] ${actionBusy ? "text-[#f0c85f]" : "text-[#70858a]"}`}>{actionBusy ? "OPERATION IN PROGRESS" : runtime.status}</span>
@@ -891,20 +952,26 @@ export function MissionSimulation() {
         const thermalTier = tierLevel(pending.selected.thermal ?? "Foundation");
         const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
         const solarDust = buildings.solar?.dust ?? 0;
-        const powerBase = 74 + solarTier * 7 - solarDust * 0.34 - optionalCount * 1.8 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 3 : 0);
+        const solarUpgrade = buildings.solar?.upgradeLevel ?? 0;
+        const batteryUpgrade = buildings.battery?.upgradeLevel ?? 0;
+        const oxygenUpgrade = buildings.oxygen?.upgradeLevel ?? 0;
+        const waterUpgrade = buildings.water?.upgradeLevel ?? 0;
+        const foodUpgrade = buildings.agriculture?.upgradeLevel ?? 0;
+        const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
+        const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
+        const powerBase = 74 + solarTier * 7 + solarUpgrade * 4 - solarDust * 0.34 - optionalCount * 1.8 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 3 : 0);
         const demandPenalty = Math.max(0, 68 - powerBase);
-        const batteryDelta = (powerBase > 72 ? 0.012 : -0.042 - demandPenalty * 0.001) + batteryTier * 0.008;
-        const temperaturePull = (21 - current.temperature) * (0.01 + thermalTier * 0.004);
+        const batteryDelta = (powerBase > 72 ? 0.012 : -0.042 - demandPenalty * 0.001) + batteryTier * 0.008 + batteryUpgrade * 0.012;
 
         return {
           power: clamp(powerBase),
           battery: clamp(current.battery + batteryDelta * speed),
-          oxygen: clamp(current.oxygen - (0.0085 - oxygenTier * 0.0018) * speed),
-          water: clamp(current.water - (0.0075 - waterTier * 0.0016) * speed),
-          food: clamp(current.food - (0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0016 : 0)) * speed),
-          temperature: clamp(current.temperature + temperaturePull * speed, 16, 28),
+          oxygen: clamp(current.oxygen - (0.0085 - oxygenTier * 0.0018 - oxygenUpgrade * 0.0008) * speed),
+          water: clamp(current.water - (0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007) * speed),
+          food: clamp(current.food - (0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0016 : 0) - foodUpgrade * 0.0008) * speed),
+          temperature: clamp(current.temperature + (21 - current.temperature) * (0.01 + (thermalTier + thermalUpgrade) * 0.004) * speed, 16, 28),
           radiation: clamp(current.radiation + 0.0005 * speed),
-          habitat: clamp(current.habitat - 0.0012 * speed),
+          habitat: clamp(current.habitat - Math.max(0.00025, 0.0012 - habitatUpgrade * 0.00035) * speed),
         };
       });
 
@@ -916,9 +983,9 @@ export function MissionSimulation() {
           const wear = trackId === "solar" ? 0.003 : 0.0016;
           next[trackId] = {
             ...state,
-            condition: clamp(state.condition - Math.max(0.0004, wear - level * 0.00025) * speed),
-            status: buildingStatus(state.condition),
-            dust: trackId === "solar" ? clamp(state.dust + (0.012 - level * 0.0015) * speed) : state.dust,
+            condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.00025 - (state.upgradeLevel ?? 0) * 0.0003) * speed),
+            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.00025 - (state.upgradeLevel ?? 0) * 0.0003) * speed)),
+            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.002, 0.012 - level * 0.0015 - (state.upgradeLevel ?? 0) * 0.002) * speed) : state.dust,
           };
         }
         return next;
@@ -1369,6 +1436,17 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || actionBusy) return;
+    if (action === "upgrade") {
+      const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
+      if ((current.upgradeLevel ?? 0) >= 2) {
+        setAiMessage(`${trackId.toUpperCase()} has reached its maximum module upgrade level.`);
+        return;
+      }
+      if (metrics.power < 8 || metrics.battery < 5) {
+        setAiMessage("Upgrade unavailable: reserve at least 8 power and 5 battery before modifying this module.");
+        return;
+      }
+    }
     setActionBusy(true);
     window.setTimeout(() => setActionBusy(false), 1100);
     setManualActions((value) => value + 1);
@@ -1382,6 +1460,18 @@ export function MissionSimulation() {
     };
 
     switch (action) {
+      case "upgrade": {
+        setMetrics((current) => ({ ...current, power: clamp(current.power - 8), battery: clamp(current.battery - 5) }));
+        setBuildings((current) => {
+          const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
+          const upgradeLevel = Math.min(2, (previous.upgradeLevel ?? 0) + 1);
+          const condition = clamp(previous.condition + 8);
+          return { ...current, [trackId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
+        });
+        setScore((value) => clamp(value + 4));
+        setAiMessage(`${trackId.toUpperCase()} upgraded to module level ${Math.min(2, (buildings[trackId]?.upgradeLevel ?? 0) + 1)}. Ongoing performance and equipment wear have improved.`);
+        break;
+      }
       case "clean": {
         const recovery = pending.selected.rover ? 24 : 16;
         setBuildings((current) => ({
@@ -1770,44 +1860,54 @@ export function MissionSimulation() {
           />
         )}
 
-        {selectedTrack && selectedTier && !activeEvent && !selectedResource && (
+        {selectedTrack && selectedTier && !selectedResource && (!activeEvent || selectedBuildingId === activeTargetTrackId) && (
           <BuildingInspector
             track={selectedTrack}
             tier={selectedTier}
-            runtime={buildings[selectedTrack.id] ?? { condition: 100, dust: 0, status: "ONLINE" }}
+            runtime={buildings[selectedTrack.id] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 }}
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => setSelectedBuildingId(null)}
             hasMaintenance={pending.selected.maintenance !== undefined}
             actionBusy={actionBusy}
+            activeEvent={activeEvent && selectedBuildingId === activeTargetTrackId ? activeEvent : null}
+            eventChoices={activeEvent && selectedBuildingId === activeTargetTrackId ? getEventChoices(activeEvent, pending.selected) : []}
+            onEventChoice={handleEventChoice}
+            power={metrics.power}
+            battery={metrics.battery}
           />
         )}
 
         {activeEvent && (
           <div className="pointer-events-none absolute right-3 top-3 z-40 flex justify-end px-0">
-            <div className="pointer-events-auto w-[min(92vw,400px)] overflow-hidden rounded-2xl border-2 border-[#ff5367] bg-[#120f16]/95 shadow-[0_14px_40px_rgba(0,0,0,0.5)]">
+            <div className="pointer-events-auto max-h-[55vh] w-[min(92vw,400px)] overflow-y-auto rounded-2xl border-2 border-[#ff5367] bg-[#120f16]/[0.96] shadow-[0_14px_40px_rgba(0,0,0,0.5)]">
               <div className="flex items-center justify-between gap-3 bg-[#2a1620] px-3 py-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-[#ff7180]">⚠ {activeEvent.title}</p>
-                  <p className="truncate text-[7px] uppercase tracking-[0.1em] text-[#e5bd64]">Tap the flashing building, then choose your response</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff7180]">⚠ DISASTER · {activeEvent.title}</p>
+                  <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#e5bd64]">Situation report · {activeEvent.trackId}</p>
                 </div>
-                <span className="shrink-0 text-[7px] font-black uppercase tracking-[0.14em] text-[#ffb39d]">{activeEvent.trackId}</span>
+                <span className="shrink-0 rounded-full border border-[#ff5367]/50 px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-[#ffb39d]">Active</span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5 p-2">
-                {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
-                  <button
-                    key={choice.id}
-                    type="button"
-                    disabled={selectedBuildingId !== activeTargetTrackId}
-                    onClick={() => handleEventChoice(choice.id)}
-                    className="min-w-0 rounded-xl border border-[#60404c] bg-[#241922] px-2.5 py-2 text-left hover:border-[#f6cd63] hover:bg-[#31202c] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#ff5367]/20 text-[8px] font-black text-[#ffd96d]">{index + 1}</span>
-                      <span className="truncate text-[8px] font-black uppercase tracking-[0.08em] text-white">{choice.label}</span>
-                    </span>
-                    <span className="mt-1 block line-clamp-2 text-[7px] leading-3 text-[#bca9b3]">{choice.detail}</span>
-                  </button>
-                ))}
+              <div className="space-y-3 p-3">
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#ff9aa3]">What is happening</p>
+                  <p className="mt-1 text-[10px] leading-4 text-[#e4d6da]">{activeEvent.subtitle}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-[#bfaeb5]">{activeEvent.summary}</p>
+                </div>
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#f1cd75]">Possible responses</p>
+                  <div className="mt-1.5 space-y-2">
+                    {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
+                      <div key={choice.id} className="border-l-2 border-[#76505b] pl-2.5">
+                        <p className="text-[9px] font-bold text-white">{index + 1}. {choice.label}</p>
+                        <p className="mt-0.5 text-[8px] leading-3.5 text-[#bca9b3]">{choice.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#78424b] bg-[#281820] px-2.5 py-2">
+                  <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#ffb0b7]">Your next step</p>
+                  <p className="mt-1 text-[9px] leading-4 text-[#e1c6cb]">Click the red-ringed building. Its information panel will give you the response options. No response is chosen for you.</p>
+                </div>
               </div>
             </div>
           </div>
