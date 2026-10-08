@@ -1094,9 +1094,10 @@ function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionRe
 
 function Crew({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number,number]>> = [
-    [[-9.5,7.15],[-9.5,11],[-4.2,11],[-9.5,11],[-9.5,-0.6],[-4.75,-0.6],[-4.75,-6.9],[4.75,-6.9],[4.75,-0.6],[9.5,-0.6],[9.5,7.15]],
-    [[9.5,-12.2],[9.5,-8.35],[0,-8.35],[0,-12.2],[-4.2,-12.2]],
-    [[-12.5,3.3],[-8.45,3.3],[-8.45,-8.35],[-12.5,-8.35],[-12.5,3.3]],
+    // Crew stays on the service lanes and skirts the raised habitat deck.
+    [[-9.5,7.15],[-9.5,11],[-9.5,7.15],[-9.5,-0.6],[-9.5,-8.35],[0,-8.35],[9.5,-8.35],[9.5,-0.6],[9.5,7.15]],
+    [[9.5,-12.2],[9.5,-8.35],[0,-8.35],[0,-18.4],[9.5,-18.4],[9.5,-12.2]],
+    [[-18.4,7.15],[-9.5,7.15],[-9.5,-0.6],[-18.4,-0.6],[-18.4,7.15]],
   ];
   return <group>{Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}</group>;
 }
