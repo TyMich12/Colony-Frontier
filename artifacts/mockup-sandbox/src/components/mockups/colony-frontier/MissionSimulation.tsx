@@ -620,39 +620,135 @@ function BuildingInspector({
   hasMaintenance: boolean;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
-    solar: [{ id: "clean", label: "Clean", detail: "Reduce solar dust." }, { id: "inspect", label: "Inspect", detail: "Check condition." }],
-    habitat: [{ id: "repair", label: "Repair", detail: hasMaintenance ? "Use maintenance for a stronger repair." : "Repair the habitat seal." }, { id: "inspect", label: "Inspect", detail: "Check structure." }],
-    battery: [{ id: "balance", label: "Balance", detail: "Rebalance storage." }, { id: "inspect", label: "Inspect", detail: "Check storage." }],
-    rover: [{ id: "survey", label: "Survey", detail: "Send the rover to a site." }, { id: "return", label: "Return", detail: "Call it back to base." }, { id: "inspect", label: "Inspect", detail: "Check wheels and payload." }],
-    water: [{ id: "flush", label: "Flush", detail: "Restore filtration." }, { id: "inspect", label: "Inspect", detail: "Check recovery." }],
-    oxygen: [{ id: "reset", label: "Reset", detail: "Reset processing." }, { id: "inspect", label: "Inspect", detail: "Check flow." }],
-    maintenance: [{ id: "service", label: "Service", detail: "Service the weakest system." }, { id: "inspect", label: "Inspect", detail: "Scan the colony." }],
+    solar: [
+      { id: "clean", label: "Clean array", detail: "Remove accumulated dust and recover generation." },
+      { id: "tune", label: "Tune tracking", detail: "Optimise the array for the current Sun angle." },
+    ],
+    battery: [
+      { id: "balance", label: "Balance cells", detail: "Rebalance charge across the storage bank." },
+      { id: "reserve", label: "Set reserve", detail: "Protect emergency storage and reshape the power margin." },
+    ],
+    oxygen: [
+      { id: "reset", label: "Reset loop", detail: "Cycle the atmospheric processing hardware." },
+      { id: "boost", label: "Boost output", detail: "Increase oxygen processing for a short high-load cycle." },
+    ],
+    water: [
+      { id: "flush", label: "Flush loop", detail: "Clean the recovery path and restore throughput." },
+      { id: "purify", label: "Deep purify", detail: "Use extra power to recover more usable water." },
+    ],
+    co2: [
+      { id: "scrub", label: "Run scrubber", detail: "Increase CO₂ removal to protect cabin air quality." },
+      { id: "recover", label: "Recover carbon", detail: "Run the recovery stage for a small efficiency gain." },
+    ],
+    thermal: [
+      { id: "dump", label: "Dump heat", detail: "Push stored heat toward the radiator loop." },
+      { id: "insulate", label: "Protect thermal", detail: "Reduce thermal drift at a small power cost." },
+    ],
+    comms: [
+      { id: "repoint", label: "Repoint antenna", detail: "Correct the high-gain dish pointing solution." },
+      { id: "test", label: "Link test", detail: "Run a communications health check." },
+    ],
+    habitat: [
+      { id: "repair", label: "Repair seal", detail: hasMaintenance ? "Use maintenance support for a stronger repair." : "Patch the most likely pressure-leak path." },
+      { id: "seal", label: "Pressure check", detail: "Run a focused leak isolation and sealing cycle." },
+    ],
+    radiation: [
+      { id: "shield", label: "Check shielding", detail: "Inspect shelter layers and improve protection." },
+      { id: "shelter", label: "Shelter protocol", detail: "Move the crew into protected operating mode." },
+    ],
+    grid: [
+      { id: "balance-grid", label: "Balance bus", detail: "Rebalance loads before a distribution fault develops." },
+      { id: "prioritize", label: "Prioritize critical", detail: "Reserve power for life support and habitat systems." },
+    ],
+    science: [
+      { id: "calibrate", label: "Calibrate", detail: "Recalibrate the science stack for cleaner measurements." },
+      { id: "experiment", label: "Run experiment", detail: "Turn the current environment into a research result." },
+    ],
+    navigation: [
+      { id: "nav-calibrate", label: "Calibrate nav", detail: "Tighten positioning and route accuracy." },
+      { id: "route", label: "Plan route", detail: "Recalculate the safest colony vehicle route." },
+    ],
+    rover: [
+      { id: "survey", label: "Survey site", detail: "Dispatch the rover along the marked field route." },
+      { id: "return", label: "Return home", detail: "Recall the rover to the launch lane." },
+      { id: "inspect", label: "Inspect rover", detail: "Check wheels, payload, and navigation health." },
+    ],
+    extraction: [
+      { id: "extract-test", label: "Test drill", detail: "Run a short extraction test at the surveyed deposit." },
+      { id: "extract", label: "Extract sample", detail: "Use power to collect a larger resource yield." },
+    ],
+    isru: [
+      { id: "process", label: "Process feed", detail: "Convert surveyed local material into useful stock." },
+      { id: "purge", label: "Purge line", detail: "Clear the feed system and reduce pressure risk." },
+    ],
+    agriculture: [
+      { id: "tune-crops", label: "Tune crops", detail: "Optimise the controlled environment for food growth." },
+      { id: "harvest", label: "Harvest", detail: "Collect the current mature crop output." },
+    ],
+    maintenance: [
+      { id: "service", label: "Service", detail: "Preventatively service the weakest colony system." },
+      { id: "diagnostics", label: "Diagnostics", detail: "Scan for developing faults before they become events." },
+    ],
   };
-  const actions = actionMap[track.id] ?? [{ id: "inspect", label: "Inspect", detail: "Check this system." }];
+  const actions = actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }];
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
+  const condition = Math.round(runtime.condition);
+  const dust = Math.round(runtime.dust);
 
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[min(92vw,360px)]">
-      <div className="pointer-events-auto overflow-hidden rounded-2xl border-2 border-[#eecb61] bg-[#141c22]/96 shadow-[0_12px_35px_rgba(0,0,0,0.52)]">
-        <div className="flex items-center gap-2 border-b border-[#405158] bg-[#23333b] px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#10181d]"><Icon className="h-4 w-4" style={{ color: tierMeta[tier].color }} /></div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-white">{track.tiers[tier].name}</p>
-            <p className="truncate text-[7px] uppercase tracking-[0.1em]" style={{ color: tierMeta[tier].color }}>{track.category} · {tier}</p>
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
+      <div className="pointer-events-auto w-[min(94vw,520px)] overflow-hidden rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.97] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
+        <div className="relative overflow-hidden border-b border-[#30454b] bg-gradient-to-r from-[#172b32] via-[#152329] to-[#111a1f] px-5 py-4">
+          <div className="absolute right-[-30px] top-[-40px] h-32 w-32 rounded-full bg-[#f4c75e]/[0.06] blur-2xl" />
+          <div className="relative flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#415961] bg-[#081116]">
+              <Icon className="h-6 w-6" style={{ color: tierMeta[tier].color }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: tierMeta[tier].color }}>{track.category} · {tier}</p>
+              <h2 className="mt-1 truncate text-lg font-black uppercase tracking-[0.06em] text-white sm:text-xl">{track.tiers[tier].name}</h2>
+              <p className="mt-1 text-[11px] leading-4 text-[#9fb0b2]">{track.description}</p>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3c5056] bg-[#0a1317] text-xl text-[#9fb0b3] transition hover:border-[#f0c964] hover:text-white" aria-label="Close building panel">×</button>
           </div>
-          <span className="font-mono text-xs font-black" style={{ color: resourceColor(runtime.condition) }}>{Math.round(runtime.condition)}%</span>
-          <button type="button" onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-md text-sm text-[#9fb0b5] hover:bg-[#344a52] hover:text-white" aria-label="Close inspector">×</button>
+          <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.16em]">
+                <span className="text-[#87999d]">System condition</span>
+                <span style={{ color: resourceColor(runtime.condition) }}>{condition}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[#22343a]">
+                <div className="h-full rounded-full transition-all" style={{ width: `${condition}%`, background: resourceColor(runtime.condition) }} />
+              </div>
+            </div>
+            {track.id === "solar" && (
+              <div className="text-right">
+                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#87999d]">Dust load</p>
+                <p className="mt-0.5 font-mono text-sm text-[#e9c865]">{dust}%</p>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-1.5 p-2">
+
+        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
           {actions.map((action, index) => (
-            <button key={action.id} type="button" onClick={() => onAction(action.id)} className="rounded-xl border border-[#3f5860] bg-[#1c3038] px-2.5 py-2 text-left hover:border-[#f3cf63] hover:bg-[#29434c]">
-              <span className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0c171d] text-[7px] font-black text-[#f4d16a]">{index + 1}</span>
-                <span className="truncate text-[8px] font-black uppercase tracking-[0.08em] text-white">{action.label}</span>
+            <button
+              key={action.id}
+              type="button"
+              onClick={() => onAction(action.id)}
+              className="group min-w-0 rounded-2xl border border-[#35505a] bg-[#14262d] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f2cd64] hover:bg-[#1b343d] active:translate-y-0"
+            >
+              <span className="flex items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#0a1519] text-[10px] font-black text-[#f4cf65]">{index + 1}</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.05em] text-white">{action.label}</span>
               </span>
-              <span className="mt-1 block truncate text-[7px] text-[#8da1a6]">{action.detail}</span>
+              <span className="mt-2 block text-[9px] leading-4 text-[#8da2a7]">{action.detail}</span>
             </button>
           ))}
+        </div>
+        <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
+          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#70858a]">{runtime.status}</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#7e9398]">Tap another facility to switch</span>
         </div>
       </div>
     </div>
@@ -670,28 +766,32 @@ function ResourceInspector({
   onClose: () => void;
 }) {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[min(92vw,330px)]">
-      <div className="pointer-events-auto overflow-hidden rounded-2xl border-2 border-[#d8ad5c] bg-[#17231d]/96 shadow-[0_12px_35px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-2 bg-[#28402e] px-3 py-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[8px] font-black uppercase tracking-[0.15em] text-[#f2d27a]">{node.label}</p>
-            <p className="mt-0.5 text-[7px] uppercase tracking-[0.1em] text-[#9fb8a6]">{node.kind} · {surveyed ? "SURVEYED" : "UNSURVEYED"}</p>
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
+      <div className="pointer-events-auto w-[min(94vw,470px)] overflow-hidden rounded-[26px] border border-[#6b7e68] bg-[#101a16]/[0.97] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
+        <div className="flex items-start gap-3 border-b border-[#334b3b] bg-gradient-to-r from-[#183025] to-[#13221b] px-5 py-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#49664d] bg-[#0a1510]">
+            <CircleDot className="h-6 w-6 text-[#f0cf69]" />
           </div>
-          <button type="button" onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-md text-sm text-[#9bb0a1] hover:bg-[#3c5842] hover:text-white" aria-label="Close resource inspector">×</button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#86b88d]">{node.kind} DEPOSIT · {surveyed ? "SURVEYED" : "UNSURVEYED"}</p>
+            <h2 className="mt-1 text-lg font-black uppercase tracking-[0.06em] text-white">{node.label}</h2>
+            <p className="mt-1 text-[11px] leading-4 text-[#9eb2a4]">{node.description}</p>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#43584b] bg-[#0c1711] text-xl text-[#9bb0a0] hover:border-[#f0cf69] hover:text-white" aria-label="Close resource panel">×</button>
         </div>
-        <div className="grid grid-cols-2 gap-1.5 p-2">
-          <button type="button" onClick={() => onAction("survey")} className="rounded-xl border border-[#4e6d57] bg-[#1b3625] px-2.5 py-2 text-left hover:border-[#f0cf68]">
-            <span className="block text-[8px] font-black uppercase tracking-[0.08em] text-white">{surveyed ? "Resurvey" : "Survey"}</span>
-            <span className="mt-1 block truncate text-[7px] text-[#91ab98]">{hasRover ? "Send rover." : "Use sensors."}</span>
+        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
+          <button type="button" onClick={() => onAction("survey")} className="rounded-2xl border border-[#3b654b] bg-[#173326] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f0cf69]">
+            <span className="block text-[10px] font-black uppercase tracking-[0.05em] text-white">{surveyed ? "Resurvey" : "Survey"}</span>
+            <span className="mt-2 block text-[9px] leading-4 text-[#91ad99]">{hasRover ? "Dispatch rover." : "Use local sensors."}</span>
           </button>
-          <button type="button" disabled={!surveyed} onClick={() => onAction("sample")} className="rounded-xl border border-[#4e6d57] bg-[#1b3625] px-2.5 py-2 text-left disabled:opacity-40 hover:border-[#f0cf68]">
-            <span className="block text-[8px] font-black uppercase tracking-[0.08em] text-white">Sample</span>
-            <span className="mt-1 block truncate text-[7px] text-[#91ab98]">Collect a result.</span>
+          <button type="button" disabled={!surveyed} onClick={() => onAction("sample")} className="rounded-2xl border border-[#3b654b] bg-[#173326] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f0cf69] disabled:cursor-not-allowed disabled:opacity-35">
+            <span className="block text-[10px] font-black uppercase tracking-[0.05em] text-white">Collect sample</span>
+            <span className="mt-2 block text-[9px] leading-4 text-[#91ad99]">Turn field data into research.</span>
           </button>
           {hasExtraction && surveyed && (
-            <button type="button" onClick={() => onAction("extract")} className="col-span-2 rounded-xl border border-[#806640] bg-[#332a1c] px-2.5 py-2 text-left hover:border-[#f0cf68]">
-              <span className="block text-[8px] font-black uppercase tracking-[0.08em] text-[#ffe7b0]">Test extraction point</span>
-              <span className="mt-1 block truncate text-[7px] text-[#b69f79]">Spend power for a small resource yield.</span>
+            <button type="button" onClick={() => onAction("extract")} className="rounded-2xl border border-[#725e35] bg-[#302715] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f0cf69] sm:col-span-1">
+              <span className="block text-[10px] font-black uppercase tracking-[0.05em] text-[#ffeab2]">Test extraction</span>
+              <span className="mt-2 block text-[9px] leading-4 text-[#b8a27d]">Spend power for a resource yield.</span>
             </button>
           )}
         </div>
@@ -699,7 +799,7 @@ function ResourceInspector({
     </div>
   );
 }
-function getAiAnalysis(metrics: MissionMetrics, score: number): string {
+function getAiAnalysis(function getAiAnalysis(metrics: MissionMetrics, score: number): string {
   if (metrics.battery < 45) return "Your largest weakness was battery management during low-solar periods. Stored energy was used more aggressively than necessary.";
   if (metrics.water < 55) return "Your largest weakness was water recovery. The colony remained stable, but the recycling loop lost reserve that could have been protected earlier.";
   if (metrics.oxygen < 55) return "Your largest weakness was life-support margin. The oxygen loop remained functional, but several responses left less reserve than necessary.";
@@ -743,6 +843,17 @@ export function MissionSimulation() {
     : undefined;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setSelectedBuildingId(null);
+      setSelectedResourceId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
 
   useEffect(() => {
     if (!pending || results || manualPaused || activeEventId) return;
@@ -1256,66 +1367,216 @@ export function MissionSimulation() {
     if (!pending?.selected[trackId]) return;
     setManualActions((value) => value + 1);
 
-    if (action === "clean" && trackId === "solar") {
-      setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) - (pending.selected.rover ? 24 : 16)) } }));
-      setMetrics((current) => ({ ...current, power: clamp(current.power + 4) }));
-      setAiMessage(pending.selected.rover ? "Manual command accepted. Rover-assisted cleaning would recover more output." : "Solar surface cleaned. Power margin improved slightly.");
-      return;
-    }
+    const conditionBoost = (amount: number) => {
+      setBuildings((current) => {
+        const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE" };
+        const condition = clamp(previous.condition + amount);
+        return { ...current, [trackId]: { ...previous, condition, status: buildingStatus(condition) } };
+      });
+    };
 
-    if (action === "repair" && trackId === "habitat") {
-      const amount = pending.selected.maintenance ? 28 : 14;
-      setBuildings((current) => ({ ...current, habitat: { ...(current.habitat ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.habitat?.condition ?? 100) + amount), status: buildingStatus(clamp((current.habitat?.condition ?? 100) + amount)) } }));
-      setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + 5), battery: clamp(current.battery - 2) }));
-      setAiMessage(pending.selected.maintenance ? "Maintenance capability accelerated the habitat repair and restored extra structural margin." : "Basic habitat repair completed. The structure is stable again.");
-      return;
-    }
-
-    if (action === "balance" && trackId === "battery") {
-      setMetrics((current) => ({ ...current, battery: clamp(current.battery + 5), power: clamp(current.power + 2) }));
-      setAiMessage("Battery discharge was balanced against current colony demand.");
-      return;
-    }
-
-    if (trackId === "rover" && action === "survey") {
-      const nodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
-      const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
-      setRoverTask(nextNode ? "SURVEYING " + nextNode.label : "SURVEYING");
-      setScore((value) => clamp(value + 2));
-      setAiMessage(nextNode ? "Rover dispatched to " + nextNode.label + ". It will travel there, scan the site, and return." : "Rover mission started. The rover is surveying nearby terrain.");
-      return;
-    }
-
-    if (trackId === "rover" && action === "return") {
-      setRoverTask("RETURNING");
-      setAiMessage("Rover recall issued. It is returning to the habitat.");
-      return;
-    }
-
-    if (action === "flush" && trackId === "water") {
-      setMetrics((current) => ({ ...current, water: clamp(current.water + 4), power: clamp(current.power - 2) }));
-      setAiMessage("Water loop flushed. Recovery performance has improved.");
-      return;
-    }
-
-    if (action === "reset" && trackId === "oxygen") {
-      setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 3), power: clamp(current.power - 2) }));
-      setAiMessage("Atmospheric processing loop reset completed.");
-      return;
-    }
-
-    if (action === "service" && trackId === "maintenance") {
-      const candidates = Object.entries(buildings).sort(([, a], [, b]) => a.condition - b.condition);
-      const target = candidates[0]?.[0];
-      if (target) {
-        setBuildings((current) => ({ ...current, [target]: { ...current[target], condition: clamp(current[target].condition + 10), status: buildingStatus(clamp(current[target].condition + 10)) } }));
-        setAiMessage(`Maintenance scan complete. ${target.toUpperCase()} received preventative service.`);
+    switch (action) {
+      case "clean": {
+        const recovery = pending.selected.rover ? 24 : 16;
+        setBuildings((current) => ({
+          ...current,
+          solar: {
+            ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }),
+            dust: clamp((current.solar?.dust ?? 0) - recovery),
+            condition: clamp((current.solar?.condition ?? 100) + 1),
+            status: buildingStatus(clamp((current.solar?.condition ?? 100) + 1)),
+          },
+        }));
+        setMetrics((current) => ({ ...current, power: clamp(current.power + 4) }));
+        setAiMessage(pending.selected.rover ? "Solar array cleaned by a rover-assisted operation. Generation margin recovered." : "Solar array cleaned. Generation margin recovered.");
+        break;
       }
-      return;
+      case "tune": {
+        setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.solar?.condition ?? 100) + 1) } }));
+        setMetrics((current) => ({ ...current, power: clamp(current.power + 3) }));
+        setAiMessage("Solar tracking solution tuned for the current illumination angle.");
+        break;
+      }
+      case "balance":
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery + 5), power: clamp(current.power + 2) }));
+        setAiMessage("Battery cells balanced against the colony load. Reserve margin improved.");
+        break;
+      case "reserve":
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery + 8), power: clamp(current.power - 2) }));
+        setAiMessage("Emergency reserve mode engaged. Stored energy is protected at the expense of available load.");
+        break;
+      case "reset":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 3), power: clamp(current.power - 2) }));
+        setAiMessage("Atmospheric processing loop reset completed.");
+        break;
+      case "boost":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 6), power: clamp(current.power - 4) }));
+        conditionBoost(-1);
+        setAiMessage("Oxygen output temporarily increased. The extra processing load is drawing power.");
+        break;
+      case "flush":
+        setMetrics((current) => ({ ...current, water: clamp(current.water + 4), power: clamp(current.power - 2) }));
+        setAiMessage("Water recovery loop flushed. Differential pressure has fallen.");
+        break;
+      case "purify":
+        setMetrics((current) => ({ ...current, water: clamp(current.water + 6), power: clamp(current.power - 4) }));
+        setAiMessage("Deep purification cycle completed. Water reserve improved at a higher energy cost.");
+        break;
+      case "scrub":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 2), power: clamp(current.power - 1) }));
+        setAiMessage("CO₂ scrubber cycle increased. Cabin atmospheric margin improved.");
+        break;
+      case "recover":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 1), power: clamp(current.power - 1) }));
+        conditionBoost(1);
+        setAiMessage("Carbon-recovery stage completed and the scrubber was left in a stable state.");
+        break;
+      case "dump": {
+        setMetrics((current) => ({
+          ...current,
+          temperature: clamp(current.temperature + (21 - current.temperature) * 0.36, 16, 28),
+          power: clamp(current.power - 2),
+        }));
+        setAiMessage("Thermal loop was opened to dump stored heat and pull the habitat back toward its target temperature.");
+        break;
+      }
+      case "insulate":
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.22, 16, 28), power: clamp(current.power - 1) }));
+        conditionBoost(1);
+        setAiMessage("Thermal protection mode engaged. Temperature drift has been reduced.");
+        break;
+      case "repoint":
+        conditionBoost(1);
+        setScore((value) => clamp(value + 3));
+        setAiMessage("High-gain antenna repointed. Communications geometry is back inside the preferred link budget.");
+        break;
+      case "test":
+        setScore((value) => clamp(value + 2));
+        setAiMessage("Communications link test passed. The relay is tracking the current Earth-facing solution.");
+        break;
+      case "repair": {
+        const amount = pending.selected.maintenance ? 28 : 14;
+        const next = clamp((buildings.habitat?.condition ?? 100) + amount);
+        setBuildings((current) => ({ ...current, habitat: { ...(current.habitat ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: next, status: buildingStatus(next) } }));
+        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + 5), battery: clamp(current.battery - 2) }));
+        setAiMessage(pending.selected.maintenance ? "Maintenance support completed a stronger habitat seal repair." : "Basic habitat seal repair completed. Structural margin restored.");
+        break;
+      }
+      case "seal":
+        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + 3), battery: clamp(current.battery - 1) }));
+        conditionBoost(3);
+        setAiMessage("Pressure-isolation cycle completed. Habitat leak margin improved.");
+        break;
+      case "shield":
+        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - 2), battery: clamp(current.battery - 1) }));
+        conditionBoost(1);
+        setAiMessage("Shielding inspection completed. The protected volume is better prepared for elevated radiation.");
+        break;
+      case "shelter":
+        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - 3), battery: clamp(current.battery - 2), power: clamp(current.power - 1) }));
+        setAiMessage("Shelter protocol enabled. Crew exposure risk is reduced while the protective mode is active.");
+        break;
+      case "balance-grid":
+        setMetrics((current) => ({ ...current, power: clamp(current.power + 3), battery: clamp(current.battery + 2) }));
+        conditionBoost(1);
+        setAiMessage("Power distribution bus balanced across active loads.");
+        break;
+      case "prioritize":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 1), water: clamp(current.water + 1), battery: clamp(current.battery + 3), power: clamp(current.power - 1) }));
+        setAiMessage("Critical-load priority enabled. Life support and habitat systems now receive first access to reserve power.");
+        break;
+      case "calibrate":
+        setScore((value) => clamp(value + 4));
+        conditionBoost(1);
+        setAiMessage("Science instruments calibrated against the current environmental baseline.");
+        break;
+      case "experiment":
+        setResourceYield((value) => value + 1);
+        setScore((value) => clamp(value + 7));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - 2) }));
+        setAiMessage("Experiment completed. A field observation has been converted into a research result.");
+        break;
+      case "nav-calibrate":
+        setScore((value) => clamp(value + 3));
+        conditionBoost(1);
+        setAiMessage("Navigation solution recalibrated. Vehicle route confidence improved.");
+        break;
+      case "route":
+        setScore((value) => clamp(value + 2));
+        setAiMessage("Colony route planner recalculated the safest travel corridors around the current work sites.");
+        break;
+      case "survey": {
+        const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
+        const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
+        if (nextNode) {
+          setRoverTask("SURVEYING " + nextNode.label);
+          setScore((value) => clamp(value + 2));
+          setAiMessage("Rover dispatched to " + nextNode.label + ". It is following the marked road network to the field site.");
+        }
+        break;
+      }
+      case "return":
+        setRoverTask("RETURNING");
+        setAiMessage("Rover recall issued. It is returning along the colony road network to the launch lane.");
+        break;
+      case "inspect":
+        setScore((value) => clamp(value + 1));
+        setAiMessage(`Inspection complete — ${trackId.toUpperCase()} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
+        break;
+      case "extract-test":
+        setResourceYield((value) => value + 4);
+        setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 1) }));
+        conditionBoost(-1);
+        setScore((value) => clamp(value + 5));
+        setAiMessage("Short drill test complete. A usable resource signature was confirmed at the surveyed deposit.");
+        break;
+      case "extract":
+        setResourceYield((value) => value + 5);
+        setMetrics((current) => ({ ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 2) }));
+        setScore((value) => clamp(value + 7));
+        setAiMessage("Extraction sample collected. Resource yield increased, but the operation consumed colony power.");
+        break;
+      case "process":
+        setResourceYield((value) => value + 3);
+        setMetrics((current) => ({ ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 1) }));
+        setScore((value) => clamp(value + 5));
+        setAiMessage("ISRU feed processed. Local material was converted into a useful colony stockpile.");
+        break;
+      case "purge":
+        conditionBoost(2);
+        setMetrics((current) => ({ ...current, power: clamp(current.power - 1) }));
+        setAiMessage("ISRU feed line purged. Pressure margin and process stability improved.");
+        break;
+      case "tune-crops":
+        setMetrics((current) => ({ ...current, food: clamp(current.food + 5), water: clamp(current.water - 2), power: clamp(current.power - 2) }));
+        conditionBoost(1);
+        setAiMessage("Controlled crop environment tuned. Food production increased with a modest water and power cost.");
+        break;
+      case "harvest":
+        setMetrics((current) => ({ ...current, food: clamp(current.food + 7), water: clamp(current.water - 2) }));
+        setResourceYield((value) => value + 1);
+        setScore((value) => clamp(value + 3));
+        setAiMessage("Harvest cycle complete. Fresh food output has been added to the colony reserve.");
+        break;
+      case "service":
+        {
+          const candidates = Object.entries(buildings).sort(([, a], [, b]) => a.condition - b.condition);
+          const target = candidates[0]?.[0];
+          if (target) {
+            const next = clamp(buildings[target].condition + 10);
+            setBuildings((current) => ({ ...current, [target]: { ...current[target], condition: next, status: buildingStatus(next) } }));
+            setAiMessage(`Maintenance service complete. ${target.toUpperCase()} received preventative service.`);
+          }
+        }
+        break;
+      case "diagnostics":
+        setScore((value) => clamp(value + 3));
+        setAiMessage("Predictive diagnostic sweep complete. No immediate critical failure is present.");
+        break;
+      default:
+        setAiMessage(`Inspection complete — ${trackId.toUpperCase()} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
+        break;
     }
-
-    const track = technologyTracks.find((item) => item.id === trackId);
-    setAiMessage(`INSPECTION COMPLETE — ${track?.category ?? trackId} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
   };
 
   const askMissionAi = () => {
