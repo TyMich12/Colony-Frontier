@@ -748,15 +748,9 @@ export function MissionLoadout() {
       setReplaceActiveMission(true);
       setConfirmed(false);
       setNotice(
-        `UNFINISHED DEPLOYMENT FOUND — ${existingPendingMission.missionTitle} is still saved. Your current loadout is shown below. Press "Replace & Deploy" once more to abandon that run, recover its loadout credit allocation, and start with the systems selected here.` ,
+        `UNFINISHED DEPLOYMENT FOUND — ${existingPendingMission.missionTitle} is still saved. Your current loadout is shown below. Press "Replace & Deploy" once more to abandon that run, recover its loadout credit allocation, and start with the systems selected here.`,
       );
       return;
-    }
-
-    if (existingPendingMission && replaceActiveMission) {
-      clearPendingMission();
-      clearMissionRuntime();
-      setReplaceActiveMission(false);
     }
 
     if (missionLocked) {
@@ -819,6 +813,13 @@ export function MissionLoadout() {
           ". Reduce the loadout cost before replaying.",
       );
       return;
+    }
+
+    // Do not discard the previous save until the new loadout has passed every validation.
+    if (existingPendingMission && replaceActiveMission) {
+      clearPendingMission();
+      clearMissionRuntime();
+      setReplaceActiveMission(false);
     }
 
     deployingRef.current = true;
