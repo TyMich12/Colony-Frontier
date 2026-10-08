@@ -90,11 +90,11 @@ function tierColor(tier: Tier) {
 }
 
 function surfaceRoadColor(mars: boolean) {
-  return mars ? "#c28a69" : "#cbbf9f";
+  return mars ? "#b77f62" : "#b7ad96";
 }
 
 function roadEdgeColor(mars: boolean) {
-  return mars ? "#e7bd9b" : "#eadfc3";
+  return mars ? "#d3a17f" : "#d8ceb9";
 }
 
 function PathStrip({
@@ -1473,12 +1473,13 @@ function HumanSettler({
         <meshStandardMaterial color={helmetColor} roughness={0.74} metalness={0.22} />
       </mesh>
       <mesh castShadow position={[0, 0.73, 0]}>
-        <sphereGeometry args={[0.105, 12, 8]} />
-        <meshStandardMaterial color={skin} roughness={0.86} />
+        <sphereGeometry args={[0.108, 14, 10]} />
+        <meshStandardMaterial color={helmetColor} roughness={0.7} metalness={0.18} />
       </mesh>
-      <mesh position={[0, 0.74, 0.085]}>
-        <boxGeometry args={[0.12, 0.055, 0.018]} />
-        <meshStandardMaterial color={index % 2 ? "#7ddfe7" : "#f4d267"} emissive={index % 2 ? "#238c95" : "#8e6513"} emissiveIntensity={0.4} metalness={0.24} roughness={0.28} />
+      <mesh position={[0, 0.73, 0.092]}>
+        <RoundedBox args={[0.13, 0.055, 0.018]} radius={0.02} smoothness={2}>
+          <meshStandardMaterial color={index % 2 ? "#6fe9f1" : "#f3cf63"} emissive={index % 2 ? "#238c95" : "#8e6513"} emissiveIntensity={0.32} metalness={0.28} roughness={0.22} />
+        </RoundedBox>
       </mesh>
       <mesh castShadow position={[0, 0.82, 0]}>
         <sphereGeometry args={[0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
@@ -1496,21 +1497,21 @@ function HumanSettler({
       <group ref={leftArmRef} position={[-0.16, 0.48, 0]}>
         <mesh castShadow position={[0, -0.13, 0]}>
           <capsuleGeometry args={[0.035, 0.2, 3, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.88} />
+          <meshStandardMaterial color={bodyColor} roughness={0.82} />
         </mesh>
         <mesh castShadow position={[0, -0.25, 0]}>
           <sphereGeometry args={[0.045, 8, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.9} />
+          <meshStandardMaterial color={bodyColor} roughness={0.82} />
         </mesh>
       </group>
       <group ref={rightArmRef} position={[0.16, 0.48, 0]}>
         <mesh castShadow position={[0, -0.13, 0]}>
           <capsuleGeometry args={[0.035, 0.2, 3, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.88} />
+          <meshStandardMaterial color={bodyColor} roughness={0.82} />
         </mesh>
         <mesh castShadow position={[0, -0.25, 0]}>
           <sphereGeometry args={[0.045, 8, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.9} />
+          <meshStandardMaterial color={bodyColor} roughness={0.82} />
         </mesh>
       </group>
 
@@ -1896,8 +1897,8 @@ function UtilityCable({ from, to }: { from: [number, number]; to: [number, numbe
   );
 }
 function CityFloor({ mars }: { mars: boolean }) {
-  const ground = mars ? "#ae664f" : "#879d78";
-  const inset = mars ? "#c47a5b" : "#a9ba92";
+  const ground = mars ? "#995b45" : "#77746d";
+  const inset = mars ? "#ad6b52" : "#8b8880";
   return (
     <group>
       <mesh receiveShadow position={[0, terrainHeight(0, 0) + 0.055, 0]} rotation={[-Math.PI / 2, 0, 0]}>
