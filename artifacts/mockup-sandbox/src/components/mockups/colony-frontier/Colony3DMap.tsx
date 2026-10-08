@@ -506,6 +506,80 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         <mesh position={[0, 0.49, 0]}><boxGeometry args={[0.12, 0.82, 0.12]} /><meshStandardMaterial color="#b3c0ba" metalness={0.72} /></mesh>
         <mesh position={[0, 0.5, 0.14]}><boxGeometry args={[0.42, 0.36, 0.07]} /><meshStandardMaterial color="#27383e" metalness={0.48} /></mesh>
         <mesh position={[0, 0.53, 0.19]}><boxGeometry args={[0.2, 0.16, 0.025]} /><meshStandardMaterial color={liquidColor} emissive={liquidColor} emissiveIntensity={0.8} /></mesh>
+        {id === "water" && (
+          <group>
+            {/* Blue recovery loop, membrane canister, shut-off valves and insulated return plumbing. */}
+            <mesh position={[0, 0.39, 0.59]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.045, 0.045, 1.42, 10]} />
+              <meshStandardMaterial color="#4cc9ee" emissive="#125779" emissiveIntensity={0.28} metalness={0.28} roughness={0.4} />
+            </mesh>
+            {[-0.62, 0.62].map((x) => (
+              <group key={x}>
+                <mesh position={[x, 0.56, 0.57]}>
+                  <cylinderGeometry args={[0.045, 0.045, 0.32, 10]} />
+                  <meshStandardMaterial color="#55d6f2" metalness={0.38} roughness={0.34} />
+                </mesh>
+                <mesh position={[x, 0.71, 0.57]}>
+                  <torusGeometry args={[0.09, 0.022, 6, 16]} />
+                  <meshStandardMaterial color="#e1c879" metalness={0.65} roughness={0.28} />
+                </mesh>
+              </group>
+            ))}
+            <group position={[0, 0.66, 0.7]}>
+              <mesh castShadow>
+                <cylinderGeometry args={[0.17, 0.19, 0.55, 16]} />
+                <meshStandardMaterial color="#5d8c9a" metalness={0.55} roughness={0.36} />
+              </mesh>
+              {[-0.17, 0.17].map((y) => (
+                <mesh key={y} position={[0, y, 0]}>
+                  <torusGeometry args={[0.18, 0.026, 7, 20]} />
+                  <meshStandardMaterial color="#c4d1cf" metalness={0.72} roughness={0.26} />
+                </mesh>
+              ))}
+              <mesh position={[0, 0.02, 0.176]}>
+                <boxGeometry args={[0.1, 0.24, 0.025]} />
+                <meshStandardMaterial color="#53dafa" emissive="#1491b4" emissiveIntensity={0.9} />
+              </mesh>
+            </group>
+            {[-0.34, 0.34].map((x) => (
+              <mesh key={x} position={[x, 0.96, 0.55]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.026, 0.026, 0.58, 8]} />
+                <meshStandardMaterial color="#c2ceca" metalness={0.72} roughness={0.3} />
+              </mesh>
+            ))}
+          </group>
+        )}
+        {id === "oxygen" && (
+          <group>
+            {/* Pressure regulators and a redundant high-pressure feed manifold. */}
+            <mesh position={[0, 1.42, -0.58]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.055, 0.055, 1.55, 10]} />
+              <meshStandardMaterial color="#d5dfd8" metalness={0.72} roughness={0.28} />
+            </mesh>
+            {[-0.78, 0.78].map((x) => (
+              <group key={x} position={[x, 1.43, -0.58]}>
+                <mesh>
+                  <cylinderGeometry args={[0.12, 0.12, 0.23, 12]} />
+                  <meshStandardMaterial color="#5ed9c2" metalness={0.4} roughness={0.3} />
+                </mesh>
+                <mesh position={[0, 0.15, 0]}>
+                  <sphereGeometry args={[0.065, 10, 8]} />
+                  <meshStandardMaterial color="#f2c96b" emissive="#7e5527" emissiveIntensity={0.5} />
+                </mesh>
+                <mesh position={[0.16, 0, 0.03]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.025, 0.025, 0.2, 8]} />
+                  <meshStandardMaterial color="#d0d8d2" metalness={0.68} roughness={0.32} />
+                </mesh>
+              </group>
+            ))}
+            {[-0.52, 0.52].map((x) => (
+              <mesh key={x} position={[x, 1.62, 0.22]}>
+                <boxGeometry args={[0.16, 0.1, 0.08]} />
+                <meshStandardMaterial color="#273b40" metalness={0.42} />
+              </mesh>
+            ))}
+          </group>
+        )}
         <Beacon color={accent} active={false} height={1.72} />
       </group>
     );
@@ -561,15 +635,117 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
     );
   }
 
-  if (id === "comms" || id === "navigation") {
-    const nav = id === "navigation";
+  if (id === "navigation") {
+    return (
+      <group>
+        {/* Autonomous navigation / survey package: compact star tracker, inertial core and sensor gantry. */}
+        <RoundedBox args={[2.55, 0.34, 1.92]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow>
+          <meshStandardMaterial color={p.body} roughness={0.54} metalness={0.38} />
+        </RoundedBox>
+        <mesh position={[0, 0.39, 0]}>
+          <boxGeometry args={[2.32, 0.08, 1.65]} />
+          <meshStandardMaterial color="#a8b6ae" metalness={0.72} roughness={0.32} />
+        </mesh>
+        {/* Triangulated stabiliser legs and isolation mounts. */}
+        {[
+          [-0.85, -0.62, -0.26],
+          [0.85, -0.62, 0.26],
+          [-0.85, 0.62, 0.26],
+          [0.85, 0.62, -0.26],
+        ].map(([x, z, angle], i) => (
+          <group key={i} position={[x, 0.46, z]} rotation={[0, 0, angle]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.045, 0.07, 0.54, 8]} />
+              <meshStandardMaterial color="#d0d8d0" metalness={0.76} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, -0.24, 0]}>
+              <cylinderGeometry args={[0.1, 0.1, 0.08, 8]} />
+              <meshStandardMaterial color="#374a50" metalness={0.48} roughness={0.44} />
+            </mesh>
+          </group>
+        ))}
+        {/* Inertial measurement unit with layered gimbal rings. */}
+        <RoundedBox args={[0.92, 0.45, 0.85]} radius={0.1} smoothness={4} position={[0, 0.69, 0]} castShadow>
+          <meshStandardMaterial color="#3f565f" metalness={0.48} roughness={0.36} />
+        </RoundedBox>
+        <mesh position={[0, 0.96, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.36, 0.035, 8, 28]} />
+          <meshStandardMaterial color="#ddc87a" metalness={0.72} roughness={0.25} />
+        </mesh>
+        <mesh position={[0, 1.03, 0]} rotation={[0.26, 0.34, 0]}>
+          <torusGeometry args={[0.28, 0.027, 8, 24]} />
+          <meshStandardMaterial color="#829f9f" metalness={0.74} roughness={0.26} />
+        </mesh>
+        {/* Three independent optical sensor heads, each with a glass objective and sun hood. */}
+        {[
+          { x: -0.75, y: 1.18, z: 0.27, color: "#70e3ee" },
+          { x: 0.0, y: 1.44, z: 0.18, color: "#c1a1ff" },
+          { x: 0.75, y: 1.18, z: 0.27, color: "#65d8be" },
+        ].map((sensor, i) => (
+          <group key={i} position={[sensor.x, sensor.y, sensor.z]}>
+            <RoundedBox args={[0.42, 0.34, 0.38]} radius={0.06} smoothness={3} castShadow>
+              <meshStandardMaterial color="#54676b" metalness={0.46} roughness={0.36} />
+            </RoundedBox>
+            <mesh position={[0, 0, 0.2]}>
+              <cylinderGeometry args={[0.12, 0.15, 0.14, 16]} />
+              <meshStandardMaterial color="#263a42" metalness={0.52} roughness={0.26} />
+            </mesh>
+            <mesh position={[0, 0, 0.28]}>
+              <circleGeometry args={[0.09, 16]} />
+              <meshPhysicalMaterial color={sensor.color} emissive={sensor.color} emissiveIntensity={0.35} transparent opacity={0.92} roughness={0.14} metalness={0.28} />
+            </mesh>
+            <mesh position={[0, 0.19, -0.02]}>
+              <boxGeometry args={[0.49, 0.045, 0.45]} />
+              <meshStandardMaterial color="#9eaaa5" metalness={0.66} roughness={0.3} />
+            </mesh>
+          </group>
+        ))}
+        {/* GNSS-style redundant antenna mast and crossbar. */}
+        <mesh position={[0, 1.72, -0.58]}>
+          <cylinderGeometry args={[0.035, 0.055, 1.12, 10]} />
+          <meshStandardMaterial color="#cbd7d1" metalness={0.78} roughness={0.25} />
+        </mesh>
+        <mesh position={[0, 2.22, -0.58]}>
+          <boxGeometry args={[0.94, 0.07, 0.12]} />
+          <meshStandardMaterial color="#4a5f65" metalness={0.56} roughness={0.32} />
+        </mesh>
+        {[-0.38, 0, 0.38].map((x, i) => (
+          <group key={x} position={[x, 2.22, -0.5]}>
+            <mesh>
+              <cylinderGeometry args={[0.11, 0.12, 0.08, 12]} />
+              <meshStandardMaterial color="#364c53" metalness={0.48} roughness={0.36} />
+            </mesh>
+            <mesh position={[0, 0.06, 0]}>
+              <sphereGeometry args={[0.06, 12, 8]} />
+              <meshStandardMaterial color={i === 1 ? "#c5a5ff" : "#66e0df"} emissive={i === 1 ? "#5a3489" : "#176d72"} emissiveIntensity={0.8} />
+            </mesh>
+          </group>
+        ))}
+        {/* Clearly readable diagnostic panel and orientation marks. */}
+        <RoundedBox args={[0.48, 0.36, 0.08]} radius={0.04} smoothness={3} position={[0.9, 0.62, 0.45]} castShadow>
+          <meshStandardMaterial color="#1b2d35" metalness={0.42} roughness={0.3} />
+        </RoundedBox>
+        <mesh position={[0.9, 0.63, 0.5]}>
+          <boxGeometry args={[0.28, 0.22, 0.02]} />
+          <meshStandardMaterial color="#c5a5ff" emissive="#5a3489" emissiveIntensity={0.72} />
+        </mesh>
+        <mesh position={[-0.95, 0.4, 0.28]}>
+          <boxGeometry args={[0.28, 0.08, 0.1]} />
+          <meshStandardMaterial color="#e4cb78" metalness={0.66} roughness={0.28} />
+        </mesh>
+        <Beacon color={accent} active={false} height={2.62} />
+      </group>
+    );
+  }
+
+  if (id === "comms") {
     return (
       <group>
         <RoundedBox args={[2.45, 0.34, 1.9]} radius={0.12} smoothness={4} position={[0, 0.18, 0]} castShadow><meshStandardMaterial color={p.body} roughness={0.56} metalness={0.32} /></RoundedBox>
         <mesh position={[0, 0.45, 0]}><cylinderGeometry args={[0.22, 0.25, 0.2, 12]} /><meshStandardMaterial color="#83928e" metalness={0.68} /></mesh>
         <mesh position={[0, 1.05, 0]} castShadow><cylinderGeometry args={[0.08, 0.13, 1.25, 12]} /><meshStandardMaterial color="#d7dfdb" metalness={0.76} roughness={0.22} /></mesh>
         <mesh position={[0, 1.67, 0]}><cylinderGeometry args={[0.3, 0.1, 0.22, 12]} /><meshStandardMaterial color="#58696b" metalness={0.68} /></mesh>
-        <mesh position={[0, 1.86, 0.04]} rotation={[Math.PI / 2.25, 0, nav ? 0.38 : -0.28]} castShadow><sphereGeometry args={[nav ? 0.65 : 0.78, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.46]} /><meshStandardMaterial color="#d8e0db" roughness={0.26} metalness={0.46} side={THREE.DoubleSide} /></mesh>
+        <mesh position={[0, 1.86, 0.04]} rotation={[Math.PI / 2.25, 0, -0.28]} castShadow><sphereGeometry args={[0.78, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.46]} /><meshStandardMaterial color="#d8e0db" roughness={0.26} metalness={0.46} side={THREE.DoubleSide} /></mesh>
         {[-0.42, 0.42].map((x) => <mesh key={x} position={[x, 1.48, 0.1]} rotation={[0, 0, -x * 0.7]} castShadow><cylinderGeometry args={[0.04, 0.05, 0.78, 8]} /><meshStandardMaterial color="#9eaaa7" metalness={0.76} roughness={0.3} /></mesh>)}
         <mesh position={[0.77, 0.5, 0.35]}><boxGeometry args={[0.42, 0.34, 0.07]} /><meshStandardMaterial color="#1c2b35" metalness={0.4} /></mesh>
         <mesh position={[0.77, 0.51, 0.392]}><boxGeometry args={[0.25, 0.18, 0.02]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} /></mesh>
