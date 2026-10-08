@@ -13,19 +13,23 @@ const SEGMENTS = 220;
 const FOUNDATION_X = 22.5;
 const FOUNDATION_Z = 22.5;
 const FOUNDATION_FADE = 28;
+const FOUNDATION_TERRAIN_DEPTH = -0.32;
 
 function heightAt(x: number, z: number): number {
   const ax = Math.abs(x);
   const az = Math.abs(z);
+  const edge = Math.max(ax, az);
 
-  if (ax <= FOUNDATION_X && az <= FOUNDATION_Z) return 0;
-
+  // The natural terrain must sit below the engineered foundation, not pass
+  // through its upper layers. Feather the depression into the terrain outside
+  // the slab so the join remains smooth when the camera moves.
+  const depression = 1 - THREE.MathUtils.smoothstep(edge, FOUNDATION_X, FOUNDATION_FADE);
   const rough = (fbm(x * 0.045 + 10, z * 0.045 + 10, 5) - 0.5) * 5.2;
   const dunes = Math.sin(x * 0.055) * Math.cos(z * 0.047) * 0.7;
-  const edge = Math.max(ax, az);
-  const blend = THREE.MathUtils.smoothstep(edge, FOUNDATION_FADE, FOUNDATION_FADE + 8);
+  const outerBlend = THREE.MathUtils.smoothstep(edge, FOUNDATION_FADE, FOUNDATION_FADE + 8);
+  const naturalHeight = (rough + dunes) * outerBlend;
 
-  return (rough + dunes) * blend;
+  return THREE.MathUtils.lerp(naturalHeight, FOUNDATION_TERRAIN_DEPTH, depression);
 }
 
 export function terrainHeight(x: number, z: number) {
@@ -72,13 +76,18 @@ export function Rocks({ kind }: { kind: TerrainKind }) {
     const rnd = mulberry32(kind === "moon" ? 7 : 99);
     const arr: { p: THREE.Vector3; s: number; r: number }[] = [];
 
-    for (let i = 0; i < 64; i += 1) {
+    let attempts = 0;
+    while (arr.length < 64 && attempts < 1024) {
+      attempts += 1;
       const angle = rnd() * Math.PI * 2;
-      // Never spawn natural rocks on or immediately beside the engineered base.
       const radius = 31 + rnd() * 31;
       const s = 0.12 + rnd() * (rnd() > 0.9 ? 1.9 : 0.65);
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
+
+      // Reject diagonal rocks as well as those beside the straight edges:
+      // polar samples near 45 degrees could otherwise land on the base corners.
+      if (Math.abs(x) < 26 && Math.abs(z) < 26) continue;
 
       arr.push({
         p: new THREE.Vector3(x, heightAt(x, z) + s * 0.32, z),
