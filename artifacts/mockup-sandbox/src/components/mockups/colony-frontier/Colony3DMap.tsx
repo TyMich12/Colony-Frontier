@@ -1998,6 +1998,7 @@ function RoverWorld({
   selected,
   alerted,
   onClick,
+  mars,
 }: {
   task: string;
   position: [number, number];
