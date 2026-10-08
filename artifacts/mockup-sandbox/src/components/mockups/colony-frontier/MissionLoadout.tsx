@@ -38,7 +38,7 @@ import {
   type Tier,
 } from "./_shared/gameData";
 import { loadGameState, saveGameState } from "./gameState";
-import { loadPendingMission, savePendingMission } from "./missionRuntime";
+import { clearMissionRuntime, clearPendingMission, loadPendingMission, savePendingMission } from "./missionRuntime";
 import { marsMissions, moonMissions } from "./CampaignMapRefresh";
 
 const categoryIcons = {
@@ -486,7 +486,12 @@ function createInitialSelection(
 }
 
 export function MissionLoadout() {
-  const gameState = loadGameState();
+  // An unfinished payload can be reconfigured from here, but only after an explicit second confirmation.
+  const activePendingAtStart = loadPendingMission();
+  const storedGameState = loadGameState();
+  const gameState = activePendingAtStart
+    ? { ...storedGameState, credits: storedGameState.credits + activePendingAtStart.spend }
+    : storedGameState;
   const params = new URLSearchParams(window.location.search);
   const moonCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("moon-")).length;
   const marsCompletedCount = gameState.completedMissions.filter((id) => id.startsWith("mars-")).length;
@@ -518,6 +523,7 @@ export function MissionLoadout() {
   const [selected, setSelected] = useState<Record<string, Tier>>(() =>
     createInitialSelection(gameState, missionCapacity),
   );
+  const [replaceActiveMission, setReplaceActiveMission] = useState(false);
 
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [hoverEnabled, setHoverEnabled] = useState(true);
@@ -559,6 +565,7 @@ export function MissionLoadout() {
   const missionBlocked = missionLocked || blockedEssentialCategories.length > 0;
 
   function selectTier(track: TechnologyTrack, tier: Tier) {
+    setReplaceActiveMission(false);
     const previousTier = selected[track.id];
 
     if (previousTier === tier) {
@@ -737,12 +744,19 @@ export function MissionLoadout() {
     if (deployingRef.current) return;
 
     const existingPendingMission = loadPendingMission();
-    if (existingPendingMission) {
+    if (existingPendingMission && !replaceActiveMission) {
+      setReplaceActiveMission(true);
+      setConfirmed(false);
       setNotice(
-        "MISSION ALREADY DEPLOYED — resume the active mission simulation before starting another deployment.",
+        `UNFINISHED DEPLOYMENT FOUND — ${existingPendingMission.missionTitle} is still saved. Your current loadout is shown below. Press "Replace & Deploy" once more to abandon that run, recover its loadout credit allocation, and start with the systems selected here.` ,
       );
-      window.location.href = "/preview/MissionSimulation";
       return;
+    }
+
+    if (existingPendingMission && replaceActiveMission) {
+      clearPendingMission();
+      clearMissionRuntime();
+      setReplaceActiveMission(false);
     }
 
     if (missionLocked) {
@@ -1180,9 +1194,11 @@ export function MissionLoadout() {
                     ? "Mission locked"
                     : blockedEssentialCategories.length > 0
                       ? "Mission blocked"
-                      : alreadyCompleted
-                        ? "Replay Mission"
-                        : "Deploy Mission"}
+                      : replaceActiveMission
+                        ? "Replace & Deploy"
+                        : alreadyCompleted
+                          ? "Replay Mission"
+                          : "Deploy Mission"}
               </button>
 
 
