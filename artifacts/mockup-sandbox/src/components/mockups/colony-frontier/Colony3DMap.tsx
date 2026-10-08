@@ -185,8 +185,13 @@ function Road({
 
 function RoadNetwork({ mars }: { mars: boolean }) {
   const roads = [
-    ...ROAD_X.map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
-    ...ROAD_Z.map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
+    ...ROAD_X.filter((x) => x !== 0).map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
+    // The main access lanes deliberately split around the central command hub.
+    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -3.35] as [number, number], level: 0 },
+    { a: [0, 3.35] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
+    ...ROAD_Z.filter((z) => z !== -0.6).map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
+    { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-3.35, -0.6] as [number, number], level: 1 },
+    { a: [3.35, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
     { a: [-18.4, -18.4] as [number, number], b: [18.4, -18.4] as [number, number], level: 0.5 },
     { a: [18.4, -18.4] as [number, number], b: [18.4, 18.4] as [number, number], level: 0 },
     { a: [18.4, 18.4] as [number, number], b: [-18.4, 18.4] as [number, number], level: 0.5 },
@@ -468,7 +473,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         <group position={[0.82, 0.58, 0.2]} rotation={[0, 0, -0.6]}>
           <mesh position={[0, 0.26, 0]}><cylinderGeometry args={[0.07, 0.1, 0.54, 10]} /><meshStandardMaterial color="#bdc6c0" metalness={0.74} /></mesh>
           <mesh position={[0, 0.58, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.13, 0.13, 0.38, 12]} /><meshStandardMaterial color="#202e37" metalness={0.54} /></mesh>
-          <mesh position={[0, 0.58, 0.2]}><circleGeometry args={[0.09, 16]} /><meshBasicMaterial color="#69e5ff" emissive="#69e5ff" emissiveIntensity={0.6} toneMapped={false} /></mesh>
+          <mesh position={[0, 0.58, 0.2]}><circleGeometry args={[0.09, 16]} /><meshBasicMaterial color="#69e5ff" toneMapped={false} /></mesh>
         </group>
         {[-0.72, 0.72].map((x) => <mesh key={x} position={[x, 0.32, 0.86]}><boxGeometry args={[0.42, 0.16, 0.1]} /><meshStandardMaterial color="#a9b5af" metalness={0.68} /></mesh>)}
         <mesh position={[0, 0.48, 1.1]}><boxGeometry args={[0.66, 0.28, 0.06]} /><meshStandardMaterial color="#1b2c34" metalness={0.44} /></mesh>
@@ -722,33 +727,46 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { 
 
 function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected: boolean; alerted: boolean; radius: number; height?: number }) {
   const ref = useRef<THREE.Mesh>(null);
+  const haloRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (!ref.current) return;
     const t = clock.getElapsedTime();
-    const pulse = alerted ? 1 + (Math.sin(t * 5.2) + 1) * 0.045 : selected ? 1.025 : 1;
-    ref.current.scale.set(pulse, pulse, pulse);
+    const pulse = alerted ? 1 + (Math.sin(t * 5.2) + 1) * 0.055 : selected ? 1.025 : 1;
+    if (ref.current) ref.current.scale.set(pulse, pulse, pulse);
+    if (haloRef.current && alerted) {
+      const glow = 0.1 + (Math.sin(t * 4.1) + 1) * 0.045;
+      const material = haloRef.current.material as THREE.MeshBasicMaterial;
+      material.opacity = glow;
+    }
   });
   if (!selected && !alerted) return null;
-  const color = alerted ? "#ff344f" : "#ffe36d";
+  const color = alerted ? "#ff2846" : "#ffe36d";
   return (
-    <>
+    <group frustumCulled={false}>
       {alerted && (
-        <mesh position={[0, height - 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[radius + 0.16, 64]} />
-          <meshBasicMaterial color="#ff263f" transparent opacity={0.15} depthWrite={false} toneMapped={false} />
-        </mesh>
+        <>
+          {/* A broad, above-ground emissive pool makes the affected asset obvious at every zoom. */}
+          <mesh ref={haloRef} position={[0, height - 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={20}>
+            <circleGeometry args={[radius + 0.22, 72]} />
+            <meshBasicMaterial color="#ff1f3c" transparent opacity={0.14} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, height + 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={21}>
+            <ringGeometry args={[radius + 0.10, radius + 0.18, 72]} />
+            <meshBasicMaterial color="#ff4b61" transparent opacity={0.95} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <pointLight position={[0, height + 0.28, 0]} color="#ff1f3c" intensity={3.2} distance={Math.max(4.5, radius * 2.8)} decay={2} />
+        </>
       )}
-      <mesh ref={ref} position={[0, height, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[radius, radius + (alerted ? 0.17 : 0.12), 64]} />
-        <meshBasicMaterial color={color} transparent opacity={alerted ? 1 : 0.92} depthWrite={false} toneMapped={false} />
+      <mesh ref={ref} position={[0, height + 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}>
+        <ringGeometry args={[radius, radius + (alerted ? 0.17 : 0.12), 72]} />
+        <meshBasicMaterial color={color} transparent opacity={alerted ? 1 : 0.94} depthWrite={false} toneMapped={false} />
       </mesh>
       {alerted && (
-        <mesh position={[0, height + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[radius + 0.24, radius + 0.30, 64]} />
-          <meshBasicMaterial color="#ff6574" transparent opacity={0.82} depthWrite={false} toneMapped={false} />
+        <mesh position={[0, height + 0.022, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={23}>
+          <ringGeometry args={[radius + 0.29, radius + 0.35, 72]} />
+          <meshBasicMaterial color="#ff7988" transparent opacity={0.9} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
-    </>
+    </group>
   );
 }
 
