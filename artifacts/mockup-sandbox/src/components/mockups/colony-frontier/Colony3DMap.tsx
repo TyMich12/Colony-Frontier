@@ -735,9 +735,20 @@ function BuildingPlot({
         <ringGeometry args={[size * 0.38, size * 0.405, 64]} />
         <meshStandardMaterial color={mars ? "#b8795f" : "#969189"} roughness={1} transparent opacity={0.34} />
       </mesh>
+      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle, index) => (
+        <mesh
+          key={index}
+          position={[Math.cos(angle) * size * 0.47, 0.02, Math.sin(angle) * size * 0.47]}
+          rotation={[-Math.PI / 2, 0, angle]}
+        >
+          <planeGeometry args={[0.16, 0.42]} />
+          <meshStandardMaterial color={index % 2 ? accent : (mars ? "#b7755d" : "#aaa59a")} roughness={0.98} transparent opacity={0.58} />
+        </mesh>
+      ))}
     </group>
   );
 }
+
 
 function buildingPalette(id: string) {
   const palette: Record<string, { body: string; roof: string; accent: string; glow: string }> = {
@@ -2132,14 +2143,39 @@ function SelectionRing({
   alerted: boolean;
   radius: number;
 }) {
+  const outerRef = useRef<THREE.Mesh>(null);
+  const innerRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const pulse = 0.94 + (Math.sin(t * 4.4) + 1) * 0.035;
+    if (outerRef.current) {
+      outerRef.current.scale.setScalar(pulse);
+      outerRef.current.rotation.z = t * 0.16;
+    }
+    if (innerRef.current) {
+      innerRef.current.scale.setScalar(0.98 + (Math.sin(t * 3.1 + 0.8) + 1) * 0.025);
+    }
+  });
+
   if (!selected && !alerted) return null;
+  const primary = alerted ? "#ff4b55" : "#ffe36d";
+  const secondary = alerted ? "#ff8c6b" : "#fff0a7";
+
   return (
-    <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[radius, radius + 0.15, 36]} />
-      <meshBasicMaterial color={alerted ? "#ff4b55" : "#ffe36d"} />
-    </mesh>
+    <group>
+      <mesh ref={outerRef} position={[0, 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[radius, radius + 0.12, 64]} />
+        <meshBasicMaterial color={primary} transparent opacity={alerted ? 0.92 : 0.82} />
+      </mesh>
+      <mesh ref={innerRef} position={[0, 0.205, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[radius * 0.84, radius * 0.855, 64]} />
+        <meshBasicMaterial color={secondary} transparent opacity={alerted ? 0.54 : 0.36} />
+      </mesh>
+    </group>
   );
 }
+
 
 function TaskMarker({
   position,
