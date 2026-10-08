@@ -41,6 +41,28 @@ export type MissionDecision = {
   label: string;
 };
 
+export type SampleStage = "UNSURVEYED" | "SURVEYED" | "COLLECTED" | "DELIVERED" | "ANALYSED";
+
+export type MissionOperationKind = "SURVEY" | "COLLECT" | "TRANSFER" | "ANALYZE" | "UPGRADE";
+
+export type MissionOperation = {
+  id: string;
+  kind: MissionOperationKind;
+  targetId: string;
+  label: string;
+  totalSeconds: number;
+  remainingSeconds: number;
+  targetLevel?: number;
+};
+
+export type ActiveFault = {
+  eventId: string;
+  targetTrackId: string;
+  title: string;
+  remainingSeconds: number;
+  severity: number;
+};
+
 export type MissionRuntimeSnapshot = {
   missionId: string;
   elapsedSeconds: number;
@@ -52,6 +74,13 @@ export type MissionRuntimeSnapshot = {
   aiMessage: string;
   roverTask: string;
   score: number;
+  /** Field-work progression. Optional to keep older saved missions compatible. */
+  surveyedNodes?: string[];
+  sampleStages?: Record<string, SampleStage>;
+  resourceYield?: number;
+  activeOperation?: MissionOperation | null;
+  operationResult?: string | null;
+  activeFaults?: Record<string, ActiveFault>;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
