@@ -31,6 +31,8 @@ export type BuildingRuntime = {
   condition: number;
   dust: number;
   status: string;
+  /** Temporary in-mission module upgrades (0–2), independent of unlocked technology tier. */
+  upgradeLevel?: number;
 };
 
 export type MissionDecision = {
