@@ -49,7 +49,7 @@ const POSITIONS: Record<string, [number, number]> = {
   solar: [-4.2, -12.2],
   agriculture: [4.2, -12.2],
   navigation: [12.5, -12.2],
-  rover: [13, -14.5],
+  rover: [16.25, -14.5],
 };
 
 const BUILDING_ROTATIONS: Record<string, number> = {
@@ -199,10 +199,10 @@ function RoadNetwork({ mars }: { mars: boolean }) {
   ];
 
   const access = Object.entries(POSITIONS)
-    .filter(([id]) => id !== "rover" && id !== "habitat")
+    .filter(([id]) => id !== "habitat")
     .map(([id, [x, z]]) => {
       const roadX = ROAD_X.reduce((best, candidate) => Math.abs(candidate - x) < Math.abs(best - x) ? candidate : best, ROAD_X[0]);
-      const padHalfWidth = id === "habitat" ? 3.7 : 1.825;
+      const padHalfWidth = id === "habitat" ? 3.7 : id === "rover" ? 1.9 : 1.825;
       const padEdgeX = x + Math.sign(roadX - x) * padHalfWidth;
       return {
         id,
