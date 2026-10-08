@@ -394,11 +394,19 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   );
 }
 
-function Rover({ task, position, onClick, selected, alerted }: { task: string; position: [number, number]; onClick: () => void; selected: boolean; alerted: boolean }) {
+function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; onClick: () => void; selected: boolean; alerted: boolean }) {
   const ref = useRef<THREE.Group>(null);
+  const targetLabel = task.startsWith("SURVEYING ") ? task.slice("SURVEYING ".length) : "";
+  const target = resourceNodes.find((node) => node.label === targetLabel);
+  const destination = target ? nodeWorldPosition(target) : position;
   useFrame(({ clock }) => {
     if (!ref.current) return;
-    ref.current.position.y = PAD_Y + 0.35 + Math.sin(clock.getElapsedTime() * 2) * 0.018;
+    const active = !!target && task.startsWith("SURVEYING ");
+    const phase = active ? (Math.sin(clock.getElapsedTime() * 0.24) + 1) / 2 : 0;
+    const x = THREE.MathUtils.lerp(position[0], destination[0], phase);
+    const z = THREE.MathUtils.lerp(position[1], destination[1], phase);
+    ref.current.position.set(x, terrainHeight(x, z) + 0.35, z);
+    ref.current.position.y += Math.sin(clock.getElapsedTime() * 2) * 0.018;
   });
   return (
     <group ref={ref} position={[position[0], PAD_Y + 0.35, position[1]]} onClick={(e)=>{e.stopPropagation();onClick();}}>
@@ -548,7 +556,7 @@ function Scene({ props }: { props: Props }) {
       <LandingPad mars={mars}/>
       <CommandCenter/>
       {props.tracks.map((track)=>track.id!=="rover"&&<ColonyBuilding key={track.id} track={track} tier={props.selected[track.id]??"Foundation"} runtime={props.buildings[track.id]??{condition:100,dust:0,status:"ONLINE"}} selected={props.selectedBuildingId===track.id} alerted={props.activeEventTrackId===track.id} position={POSITIONS[track.id]??[0,0]} onClick={()=>props.onSelect(track.id)} mars={mars}/>)}
-      {props.tracks.some((track)=>track.id==="rover")&&<Rover task={props.roverTask} position={POSITIONS.rover} selected={props.selectedBuildingId==="rover"} alerted={props.activeEventTrackId==="rover"} onClick={()=>props.onSelect("rover")}/>}
+      {props.tracks.some((track)=>track.id==="rover")&&<Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId==="rover"} alerted={props.activeEventTrackId==="rover"} onClick={()=>props.onSelect("rover")}/>}
       <Crew mars={mars}/>
       {props.resourceNodes.map((node)=><ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId===node.id} onClick={()=>props.onSelectResource(node)}/>)}
       {props.activeEventTrackId&&POSITIONS[props.activeEventTrackId]&&<Text position={[POSITIONS[props.activeEventTrackId][0],4.1,POSITIONS[props.activeEventTrackId][1]]} rotation={[-0.68,0,0]} fontSize={0.22} color="#ff6672" outlineWidth={0.035} outlineColor="#26171a" anchorX="center">RESPOND HERE</Text>}
