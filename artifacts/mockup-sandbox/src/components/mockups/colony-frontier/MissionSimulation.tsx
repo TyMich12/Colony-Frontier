@@ -81,6 +81,7 @@ const categoryIcons = {
 type MissionEvent = {
   id: string;
   trackId: string;
+  environment?: "MOON" | "MARS" | "BOTH";
   title: string;
   subtitle: string;
   summary: string;
@@ -102,22 +103,26 @@ type ResourceNode = {
 };
 
 const EVENT_DEFS: MissionEvent[] = [
-  { id: "solar-dust", trackId: "solar", title: "Solar output falling", subtitle: "Surface dust is reducing array performance.", summary: "A new dust layer is building across the deployed solar array. Power generation is falling faster than baseline demand." },
-  { id: "battery-thermal", trackId: "battery", title: "Battery thermal spike", subtitle: "One storage module is operating above its ideal temperature.", summary: "Battery efficiency is dropping. The colony can rebalance its loads, isolate the affected storage path, or continue at the cost of stored energy." },
-  { id: "oxygen-filter", trackId: "oxygen", title: "Oxygen loop restriction", subtitle: "The atmospheric processing loop is becoming less efficient.", summary: "The oxygen system has detected a flow restriction. A controlled reset is possible, but it briefly increases power demand." },
-  { id: "water-filter", trackId: "water", title: "Water filtration blockage", subtitle: "The recycling loop is processing below target.", summary: "The water loop has accumulated contaminants. Flushing the filter costs power but restores recovery performance." },
-  { id: "habitat-pressure", trackId: "habitat", title: "Habitat pressure anomaly", subtitle: "A small structural seal has registered abnormal movement.", summary: "The habitat remains pressurised, but the structure needs attention before the problem grows." },
+  { id: "solar-dust", trackId: "solar", title: "Dust deposition on solar array", subtitle: "Surface dust is reducing usable solar input.", summary: "On the Moon, electrostatically active regolith can adhere to exposed hardware; on Mars, airborne dust can reduce solar input. Array output is falling." },
+  { id: "battery-thermal", trackId: "battery", title: "Battery thermal-control excursion", subtitle: "One storage module is outside its preferred thermal operating range.", summary: "Battery efficiency is dropping. The colony can rebalance its loads, isolate the affected storage path, or continue at the cost of stored energy." },
+  { id: "oxygen-filter", trackId: "oxygen", title: "Cabin air revitalization filter loading", subtitle: "A filtration stage in the cabin air-revitalization loop is showing increasing pressure drop.", summary: "Airflow resistance is reducing processing margin. The crew can isolate the affected stage, change operating mode, or accept reduced margin." },
+  { id: "water-filter", trackId: "water", title: "Water recovery loop pressure rise", subtitle: "Pressure across the water-recovery hardware is rising above the normal operating band.", summary: "The recovery loop is showing elevated differential pressure. Cleaning or bypassing the affected stage protects recovery capacity." },
+  { id: "habitat-pressure", trackId: "habitat", title: "Pressure decay detected", subtitle: "Pressure sensors have detected a small change in the cabin leak rate.", summary: "The habitat remains pressurised, but a growing leak would reduce life-support margin and force an EVA-independent repair response." },
   { id: "radiation-burst", trackId: "radiation", title: "Solar particle event", subtitle: "Radiation levels are rising across the exposed surface.", summary: "A short radiation spike is crossing the colony. Protective shelter mode is available, but it limits some active operations." },
-  { id: "thermal-drift", trackId: "thermal", title: "Thermal regulation drift", subtitle: "The habitat temperature is moving outside the preferred band.", summary: "A thermal control loop has become less efficient. The colony needs to decide whether to rebalance heat or conserve stored energy." },
-  { id: "comms-drift", trackId: "comms", title: "Communications drift", subtitle: "The main communications link is losing alignment.", summary: "The settlement is still connected, but the signal margin is falling. A quick realignment can restore a stable link." },
-  { id: "grid-overload", trackId: "grid", title: "Power bus overload", subtitle: "The colony distribution grid is approaching its safe load.", summary: "Several systems are drawing power at the same time. Smart load shedding can prevent a larger cascade." },
-  { id: "rover-wheel", trackId: "rover", title: "Rover wheel obstruction", subtitle: "Surface debris is restricting rover movement.", summary: "The rover has stopped during a short survey run. A safe reroute costs time; forcing movement risks equipment condition." },
-  { id: "extraction-lock", trackId: "extraction", title: "Extraction torque lock", subtitle: "The subsurface tool has met unexpected resistance.", summary: "The extraction rig can be throttled and restarted, or the player can abandon this resource opportunity." },
-  { id: "isru-pressure", trackId: "isru", title: "ISRU processing surge", subtitle: "Local-material processing is consuming more power than expected.", summary: "The local resource processor is operating beyond its preferred envelope. Reducing throughput prevents a power cascade." },
-  { id: "agriculture-stress", trackId: "agriculture", title: "Greenhouse stress", subtitle: "The controlled crop environment is drifting away from its ideal state.", summary: "The greenhouse can be stabilised by increasing power to its environmental controls, or by conserving resources and accepting slower growth." },
-  { id: "science-anomaly", trackId: "science", title: "Science instrument anomaly", subtitle: "A field instrument has returned an unexpected reading.", summary: "The colony has a valuable research opportunity. Securing the data safely takes attention, while pushing the instrument risks damaging it." },
-  { id: "maintenance-alert", trackId: "maintenance", title: "Predictive maintenance alert", subtitle: "A subsystem is showing early signs of wear.", summary: "The maintenance system has spotted a developing fault before it becomes serious. Early intervention protects the colony." },
-  { id: "core-power", trackId: "power", title: "Reduced power margin", subtitle: "Colony demand is temporarily exceeding comfortable generation.", summary: "The settlement is still stable, but the power margin is shrinking. The player can preserve reserves or accept a deeper battery draw." },
+  { id: "micrometeoroid-impact", trackId: "habitat", environment: "MOON", title: "Micrometeoroid impact nearby", subtitle: "A small impact has damaged exposed hardware near the habitat.", summary: "A micrometeoroid strike has created a localized equipment fault. The pressure shell is still stable, but exposed systems need inspection before normal operations continue." },
+  { id: "polar-shadow-cold-soak", trackId: "thermal", environment: "MOON", title: "Polar shadow cold-soak", subtitle: "A surface asset is entering a much colder illuminated-to-shadow transition.", summary: "Equipment near a permanently shadowed region is losing thermal margin. Heaters and power routing must be managed before components fall below their qualified operating range." },
+  { id: "regional-dust-front", trackId: "solar", environment: "MARS", title: "Regional dust front", subtitle: "An advancing dust front is reducing sunlight reaching the surface arrays.", summary: "A regional Martian dust event is lowering solar irradiance and increasing dust loading on exposed hardware. The colony must protect energy reserves while the front passes." },
+  { id: "mars-comm-relay-loss", trackId: "comms", environment: "MARS", title: "Surface relay link degraded", subtitle: "The primary relay path has lost signal margin.", summary: "A combination of pointing error and atmospheric dust has reduced the available communications link. Autonomous operations can bridge the gap while the relay recovers." },
+  { id: "thermal-drift", trackId: "thermal", title: "Radiator thermal-control drift", subtitle: "The habitat temperature is moving outside the preferred band.", summary: "Heat rejection is drifting away from its expected operating point. The colony needs to decide whether to rebalance heat or conserve stored energy." },
+  { id: "comms-drift", trackId: "comms", title: "High-gain antenna pointing drift", subtitle: "The surface high-gain antenna has lost part of its pointing margin.", summary: "The link remains usable, but falling signal margin can interrupt high-rate science and command traffic." },
+  { id: "grid-overload", trackId: "grid", title: "Power distribution bus trip risk", subtitle: "A power distribution bus is approaching its protection threshold.", summary: "A simultaneous high load could trip a protective breaker and disconnect downstream systems." },
+  { id: "rover-wheel", trackId: "rover", title: "Rover wheel traction loss", subtitle: "The rover is reporting wheel slip and reduced traction on loose regolith.", summary: "The rover has lost traction on loose surface material. Repeated wheel spin could increase wear and bury the vehicle deeper." },
+  { id: "extraction-lock", trackId: "extraction", title: "Regolith excavation torque increase", subtitle: "The excavation system is seeing higher-than-expected torque in the regolith.", summary: "The tool can be slowed to reduce mechanical load, or the run can be aborted before the actuator exceeds its limit." },
+  { id: "isru-pressure", trackId: "isru", title: "ISRU feed-system pressure rise", subtitle: "A local-resource processing line is showing rising pressure and feed resistance.", summary: "Reducing throughput can bring the process back inside its operating envelope before it stresses pumps, heaters, or the power system." },
+  { id: "agriculture-stress", trackId: "agriculture", title: "Controlled-environment crop stress", subtitle: "A controlled growing module is drifting outside its preferred temperature, CO₂, or nutrient range.", summary: "The crop system can be stabilised by restoring environmental controls, or the colony can conserve power and accept reduced production." },
+  { id: "science-anomaly", trackId: "science", title: "Science instrument calibration drift", subtitle: "A science instrument is showing calibration drift relative to its reference measurement.", summary: "The measurement may still be scientifically useful, but the instrument should be checked against a reference before committing to a high-value observation." },
+  { id: "maintenance-alert", trackId: "maintenance", title: "Predictive wear indication", subtitle: "A sensor trend indicates developing mechanical or electrical wear.", summary: "Early maintenance is available before the trend becomes a hard failure." },
+  { id: "core-power", trackId: "power", title: "Power margin reduced", subtitle: "Current load is leaving less generation margin than planned.", summary: "The colony can shed non-critical loads, rebalance distribution, or draw down storage while the margin is low." },
 ];
 
 function isTier(value: unknown): value is Tier {
@@ -184,6 +189,7 @@ function selectedTrackData(selected: Record<string, Tier>): TechnologyTrack[] {
 }
 
 function pickNextEvent(
+  environmentLabel: "MOON" | "MARS",
   selected: Record<string, Tier>,
   resolvedEventIds: string[],
   scheduleIndex: number,
@@ -193,6 +199,22 @@ function pickNextEvent(
 
   if (scheduleIndex === 0) {
     return EVENT_DEFS.find((event) => event.id === "solar-dust")!;
+  }
+
+  const environmentEventId =
+    scheduleIndex === 1
+      ? environmentLabel === "MOON"
+        ? "micrometeoroid-impact"
+        : "regional-dust-front"
+      : scheduleIndex === 3
+        ? environmentLabel === "MOON"
+          ? "polar-shadow-cold-soak"
+          : "mars-comm-relay-loss"
+        : null;
+
+  if (environmentEventId && !resolvedEventIds.includes(environmentEventId)) {
+    const environmentEvent = EVENT_DEFS.find((event) => event.id === environmentEventId);
+    if (environmentEvent) return environmentEvent;
   }
 
   const unusedOptional = selectedOptional
@@ -710,7 +732,7 @@ export function MissionSimulation() {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed);
 
         while (eventPointerRef.current < EVENT_TIMES.length && next >= EVENT_TIMES[eventPointerRef.current]) {
-          const event = pickNextEvent(pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
+          const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
           eventPointerRef.current += 1;
           setTimeout(() => {
             setActiveEventId(event.id);
@@ -1039,7 +1061,7 @@ export function MissionSimulation() {
         } else {
           setMetrics((current) => ({ ...current, food: clamp(current.food - 10) }));
           setScore((value) => clamp(value - 7));
-          setAiMessage("Greenhouse stress was left unresolved, reducing food-production reserve.");
+          setAiMessage("Controlled-environment crop stress was left unresolved, reducing food-production reserve.");
         }
         break;
 
