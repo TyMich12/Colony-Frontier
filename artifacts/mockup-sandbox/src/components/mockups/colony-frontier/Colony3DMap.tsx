@@ -113,12 +113,6 @@ function nearestRoadX(x: number) {
   ROAD_VERTICAL_X[0]);
 }
 
-function nearestRoadZ(z: number) {
-  return ROAD_HORIZONTAL_Z.reduce((best, candidate) =>
-    Math.abs(candidate - z) < Math.abs(best - z) ? candidate : best,
-  ROAD_HORIZONTAL_Z[0]);
-}
-
 function PathStrip({
   points,
   width = 0.86,
@@ -164,11 +158,11 @@ function CityRoadNetwork({ mars }: { mars: boolean }) {
   const routes: Array<{ points: Array<[number, number]>; width: number }> = [
     { points: OUTER_ROAD, width: 1.18 },
     ...ROAD_HORIZONTAL_Z.map((z) => ({
-      points: [[-15.8, z], [15.8, z]] as Array<[number, number]>,
+      points: [[-17.2, z], [17.2, z]] as Array<[number, number]>,
       width: 1.02,
     })),
     ...ROAD_VERTICAL_X.map((x) => ({
-      points: [[x, -14.5], [x, 13.8]] as Array<[number, number]>,
+      points: [[x, -17.2], [x, 17.0]] as Array<[number, number]>,
       width: 1.02,
     })),
   ];
