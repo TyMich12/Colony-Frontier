@@ -2105,6 +2105,8 @@ function RoverWorld({
         ref={ref}
         position={[position[0], terrainHeight(position[0], position[1]) + 0.43, position[1]]}
         onClick={(event) => { event.stopPropagation(); onClick(); }}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = ""; }}
       >
         <SelectionRing selected={selected} alerted={alerted} radius={1.06} />
         <mesh castShadow>
@@ -2348,6 +2350,12 @@ function ColonyBuilding({
       onClick={(event) => {
         event.stopPropagation();
         onClick();
+      }}
+      onPointerOver={() => {
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "";
       }}
     >
       <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.6 : 1.38} />
