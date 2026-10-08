@@ -1707,6 +1707,43 @@ export function MissionSimulation() {
           roverTask={roverTask}
         />
 
+        <div className="pointer-events-none absolute left-3 bottom-3 z-20 w-[min(86vw,390px)]">
+          <div className="rounded-2xl border border-[#3d555b] bg-[#0b1519]/[0.90] px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm">
+            <div className="flex items-start gap-2.5">
+              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#e8bd56]/[0.16] text-[#f2cd67]">
+                <Zap className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#d6e0dd]">Mission feed</p>
+                <p className="mt-0.5 text-[10px] leading-4 text-[#94aaa9]">{aiMessage}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pointer-events-auto absolute right-3 bottom-3 z-20 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setManualPaused((value) => !value)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#40565b] bg-[#0b1519]/[0.92] text-[#e8eeee] shadow-[0_8px_25px_rgba(0,0,0,0.38)] backdrop-blur-sm hover:border-[#f0ca63]"
+            aria-label={manualPaused ? "Resume mission" : "Pause mission"}
+            title={manualPaused ? "Resume" : "Pause"}
+          >
+            {manualPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </button>
+          {[1, 2, 4].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSpeed(value)}
+              className={`rounded-xl border px-2.5 py-2 text-[8px] font-black tracking-[0.1em] shadow-[0_8px_25px_rgba(0,0,0,0.38)] backdrop-blur-sm ${speed === value ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519]/[0.92] text-[#aab8b9] hover:border-[#f0ca63]"}`}
+              aria-label={`Set mission speed to ${value}x`}
+            >
+              {value}×
+            </button>
+          ))}
+        </div>
+
         <MissionTaskRibbon
           pending={pending}
           elapsed={elapsed}
