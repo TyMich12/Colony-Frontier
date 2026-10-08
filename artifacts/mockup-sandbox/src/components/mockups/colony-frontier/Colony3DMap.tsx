@@ -1543,7 +1543,7 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
 
   return (
     <group>
-      {Array.from({ length: 10 }, (_, index) => (
+      {Array.from({ length: mars ? 8 : 4 }, (_, index) => (
         <HumanSettler
           key={index}
           route={routes[index % routes.length]}
@@ -1829,6 +1829,66 @@ function BuildingDetailTrim({
 }
 
 
+
+function LandingPad({ mars }: { mars: boolean }) {
+  const y = terrainHeight(0, -13.2) + 0.08;
+  const base = mars ? "#93604b" : "#85847d";
+  const markings = mars ? "#e0ae8d" : "#d8d1bf";
+  return (
+    <group position={[0, y, -13.2]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[4.4, 4.65, 0.16, 16]} />
+        <meshStandardMaterial color={base} roughness={0.96} />
+      </mesh>
+      <mesh position={[0, 0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[3.45, 3.52, 32]} />
+        <meshBasicMaterial color={markings} />
+      </mesh>
+      <mesh position={[0, 0.092, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.72, 0.78, 16]} />
+        <meshBasicMaterial color={markings} />
+      </mesh>
+      {[0,1,2,3,4,5,6,7].map((index) => {
+        const a = (index / 8) * Math.PI * 2;
+        return (
+          <mesh key={index} position={[Math.cos(a) * 3.86, 0.14, Math.sin(a) * 3.86]}>
+            <sphereGeometry args={[0.08, 8, 6]} />
+            <meshStandardMaterial color="#ffd56b" emissive="#ffb929" emissiveIntensity={0.7} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function RegolithBerm({ mars }: { mars: boolean }) {
+  const color = mars ? "#754638" : "#64615b";
+  return (
+    <group>
+      {[[-12.6,-11.4],[12.6,-11.4],[-12.7,11.8],[12.7,11.8]].map(([x,z],index)=>( 
+        <mesh key={index} castShadow receiveShadow position={[x,terrainHeight(x,z)+0.42,z]} rotation={[0,index%2?0.18:-0.18,0]}>
+          <coneGeometry args={[2.1,0.84,7]} />
+          <meshStandardMaterial color={color} roughness={1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function UtilityCable({ from, to }: { from: [number, number]; to: [number, number] }) {
+  const dx = to[0] - from[0];
+  const dz = to[1] - from[1];
+  const length = Math.hypot(dx, dz);
+  const angle = Math.atan2(dx, dz);
+  const mx = (from[0] + to[0]) / 2;
+  const mz = (from[1] + to[1]) / 2;
+  return (
+    <mesh position={[mx, terrainHeight(mx, mz) + 0.11, mz]} rotation={[0, angle, 0]}>
+      <cylinderGeometry args={[0.035, 0.035, length, 7]} />
+      <meshStandardMaterial color="#252d30" roughness={0.48} metalness={0.68} />
+    </mesh>
+  );
+}
 function CityFloor({ mars }: { mars: boolean }) {
   const ground = mars ? "#ae664f" : "#879d78";
   const inset = mars ? "#c47a5b" : "#a9ba92";
@@ -2269,16 +2329,6 @@ function ColonyBuilding({
 function MissionScene(props: Props) {
   const mars = props.environmentLabel === "MARS";
 
-  const gardens = [
-    [-11.8, -5.1, 0.72],
-    [11.7, 8.9, 0.68],
-  ] as Array<[number, number, number]>;
-
-  const lamps = [
-    [-9.1, -9.6], [9.1, -9.7],
-    [-8.2, 1.0], [8.2, 1.2],
-    [-5.7, 10.7], [6.0, 10.9],
-  ] as Array<[number, number]>;
 
   return (
     <Canvas
@@ -2289,7 +2339,6 @@ function MissionScene(props: Props) {
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={[mars ? "#8f4c3b" : "#69666b"]} />
-      <fog attach="fog" args={[mars ? "#a3604d" : "#737177", 58, 115]} />
 
       <ambientLight intensity={1.04} color={mars ? "#ffe4d9" : "#eef4ff"} />
       <hemisphereLight args={[mars ? "#ffeadd" : "#f7f8ff", mars ? "#43271f" : "#34323b", 1.02]} />
@@ -2312,55 +2361,22 @@ function MissionScene(props: Props) {
 
       <group scale={[1.28, 1.28, 1.28]}>
               <CityFloor mars={mars} />
-              <SettlementWall mars={mars} />
-              <SettlementGate mars={mars} />
+              <LandingPad mars={mars} />
+              <RegolithBerm mars={mars} />
+              <UtilityCable from={[0, 0]} to={[0, -6.6]} />
+              <UtilityCable from={[0, 0]} to={[-8.7, -8.1]} />
+              <UtilityCable from={[0, 0]} to={[8.4, -3.3]} />
+              <UtilityCable from={[0, 0]} to={[-8.2, 3.0]} />
+              <UtilityCable from={[0, 0]} to={[8.4, 4.8]} />
               <CityRoadNetwork mars={mars} />
               <PathStrip points={[[-13.8, -3.8], [-8.8, -3.8], [-3.0, -3.8], [0, -3.8], [4.0, -3.8], [9.0, -3.8], [13.5, -3.8]]} width={0.72} mars={mars} />
               <PathStrip points={[[-9.3, 6.8], [-5.2, 6.8], [0, 6.8], [5.0, 6.8], [9.6, 6.8]]} width={0.7} mars={mars} />
               <PipeRuns />
               <ColonyLighting mars={mars} />
-              <GoldenCivicArch position={[0, -10.2]} color="#62e7ec" />
-              <StatueRow z={-2.9} color="#56dce6" />
-              <CargoCart position={[-10.9, -4.9]} mars={mars} />
-              <CargoCart position={[10.9, 6.6]} mars={mars} />
 
               <UrbanBlock position={[-8.9, -3.5]} width={3.3} depth={2.4} mars={mars} accent="#59dce5" />
               <UrbanBlock position={[8.7, -3.7]} width={3.2} depth={2.4} mars={mars} accent="#f1c75c" />
-
-              <ColonyMonument position={[0, 6.6]} color="#b97bf0" />
-
-              
-              <CivicPlazaStatue position={[0, -3.25]} mars={mars} />
-              <ColonyBanner position={[-4.0, -2.9]} accent="#54dfe9" mars={mars} />
-              <ColonyBanner position={[4.0, 7.0]} accent="#5ed9e5" mars={mars} />
-              <WorkshopYard position={[-13.0, -2.0]} index={0} />
-              <WorkshopYard position={[12.8, 4.8]} index={1} />
-
-              {gardens.map(([x, z, scale], index) => (
-                <GardenPatch key={index} position={[x, z]} scale={scale} flower={!mars || index % 2 === 0} />
-              ))}
-
-              {lamps.map(([x, z], index) => (
-                <StreetLamp key={index} position={[x, z]} mars={mars} />
-              ))}
-
-              <SmallColonyBuilding position={[-14.1, -8.9]} index={2} mars={mars} />
-              <SmallColonyBuilding position={[10.9, -9.0]} index={3} mars={mars} />
-              <SmallColonyBuilding position={[-13.4, 4.2]} index={1} mars={mars} />
-              <SmallColonyBuilding position={[13.6, 4.2]} index={0} mars={mars} />
-              <SmallColonyBuilding position={[-13.2, 8.8]} index={3} mars={mars} />
-              <SmallColonyBuilding position={[13.0, 9.2]} index={4} mars={mars} />
-              <StorageYard position={[-13.1, -4.0]} mars={mars} />
-              <CanopyMarket position={[3.1, -9.0]} mars={mars} />
-              <HydroponicPlanter position={[-7.9, -8.4]} mars={mars} />
-              <HydroponicPlanter position={[7.8, 8.8]} mars={mars} />
-              <FenceRow from={[-14.8, 1.8]} to={[-12.0, 1.8]} />
-              <FenceRow from={[11.5, 5.2]} to={[14.8, 5.2]} />
-              <CrateCluster position={[-13.7, -6.7]} large />
-              <PlazaTower position={[-2.65, -2.65]} color="#57dce7" />
-              <PlazaTower position={[2.65, 2.65]} color="#57dce7" />
-
-              {props.tracks.map((track) => (
+{props.tracks.map((track) => (
                 track.id !== "rover" ? (
                   <BuildingPlot
                     key={`plot-${track.id}`}
