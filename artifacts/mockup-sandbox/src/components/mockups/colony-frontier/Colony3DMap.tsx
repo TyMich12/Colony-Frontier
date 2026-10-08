@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
+import { Billboard, Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime } from "./missionRuntime";
@@ -33,17 +33,17 @@ type Props = {
 };
 
 const POSITIONS: Record<string, [number, number]> = {
-  habitat: [-12.5, 11.0],
+  habitat: [0, 0],
   extraction: [-4.2, 11.0],
   isru: [4.2, 11.0],
   radiation: [12.5, 11.0],
   oxygen: [-12.5, 3.3],
-  comms: [-4.2, 3.3],
-  maintenance: [4.2, 3.3],
-  water: [12.5, 3.3],
+  comms: [-6.4, 3.3],
+  maintenance: [6.4, 3.3],
+  water: [-12.5, 11.0],
   co2: [-12.5, -4.5],
-  grid: [-4.2, -4.5],
-  science: [4.2, -4.5],
+  grid: [-6.4, -4.5],
+  science: [6.4, -4.5],
   battery: [12.5, -4.5],
   thermal: [-12.5, -12.2],
   solar: [-4.2, -12.2],
@@ -186,12 +186,12 @@ function Road({
 function RoadNetwork({ mars }: { mars: boolean }) {
   const roads = [
     ...ROAD_X.filter((x) => x !== 0).map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
-    // The main access lanes deliberately split around the central command hub.
-    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -3.35] as [number, number], level: 0 },
-    { a: [0, 3.35] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
+    // The main access lanes deliberately split around the single, enlarged habitat complex.
+    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -4.55] as [number, number], level: 0 },
+    { a: [0, 4.55] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
     ...ROAD_Z.filter((z) => z !== -0.6).map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
-    { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-3.35, -0.6] as [number, number], level: 1 },
-    { a: [3.35, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
+    { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-4.55, -0.6] as [number, number], level: 1 },
+    { a: [4.55, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
     { a: [-18.4, -18.4] as [number, number], b: [18.4, -18.4] as [number, number], level: 0.5 },
     { a: [18.4, -18.4] as [number, number], b: [18.4, 18.4] as [number, number], level: 0 },
     { a: [18.4, 18.4] as [number, number], b: [-18.4, 18.4] as [number, number], level: 0.5 },
@@ -199,7 +199,7 @@ function RoadNetwork({ mars }: { mars: boolean }) {
   ];
 
   const access = Object.entries(POSITIONS)
-    .filter(([id]) => id !== "rover")
+    .filter(([id]) => id !== "rover" && id !== "habitat")
     .map(([id, [x, z]]) => {
       const roadX = ROAD_X.reduce((best, candidate) => Math.abs(candidate - x) < Math.abs(best - x) ? candidate : best, ROAD_X[0]);
       const padHalfWidth = id === "habitat" ? 3.7 : 1.825;
@@ -262,44 +262,178 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   if (id === "habitat") {
     return (
       <group>
-        <mesh castShadow position={[0, 0.28, 0]}>
-          <cylinderGeometry args={[2.35, 2.48, 0.55, 24]} />
-          <meshStandardMaterial color="#46565e" roughness={0.62} metalness={0.38} />
+        {/* Three linked pressure modules: a large surface habitat rather than another command dome. */}
+        <RoundedBox args={[6.35, 0.24, 4.9]} radius={0.16} smoothness={4} position={[0, 0.2, 0]} castShadow>
+          <meshStandardMaterial color="#343f43" metalness={0.5} roughness={0.54} />
+        </RoundedBox>
+        <mesh position={[0, 0.335, 0]}>
+          <boxGeometry args={[5.96, 0.045, 4.5]} />
+          <meshStandardMaterial color="#a1aaa2" metalness={0.68} roughness={0.34} />
         </mesh>
-        <mesh position={[0, 0.31, 0]}>
-          <cylinderGeometry args={[2.36, 2.36, 0.12, 24]} />
-          <meshStandardMaterial color="#92a19e" roughness={0.38} metalness={0.65} />
+
+        {/* Main cylindrical pressure hull and reinforced end bulkheads. */}
+        <mesh castShadow receiveShadow position={[0, 1.0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[1.08, 1.08, 4.6, 32]} />
+          <meshStandardMaterial color="#9aa6a4" metalness={0.48} roughness={0.35} />
         </mesh>
-        <mesh castShadow position={[0, 0.57, 0]}>
-          <sphereGeometry args={[2.02, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.53]} />
-          <meshPhysicalMaterial color="#63cbd1" emissive="#164b56" emissiveIntensity={0.2} transparent opacity={0.82} roughness={0.2} metalness={0.16} clearcoat={0.7} depthWrite={false} />
-        </mesh>
-        <mesh position={[0, 0.56, 0]}>
-          <torusGeometry args={[1.96, 0.075, 10, 44]} />
-          <meshStandardMaterial color="#e9c66c" metalness={0.66} roughness={0.25} />
-        </mesh>
-        {Array.from({ length: 10 }, (_, i) => {
-          const a = (i / 10) * Math.PI * 2;
-          return (
-            <group key={i} position={[Math.cos(a) * 1.92, 0.82, Math.sin(a) * 1.92]} rotation={[0, -a, 0]}>
-              <mesh castShadow><boxGeometry args={[0.055, 0.72, 0.065]} /><meshStandardMaterial color="#c6d0ca" metalness={0.7} roughness={0.3} /></mesh>
-              <mesh position={[0, -0.43, 0]}><boxGeometry args={[0.1, 0.08, 0.12]} /><meshStandardMaterial color="#35464c" metalness={0.55} /></mesh>
-            </group>
-          );
-        })}
-        <group position={[0, 0.28, 2.18]}>
-          <RoundedBox args={[1.0, 0.54, 0.74]} radius={0.11} smoothness={4} castShadow>
-            <meshStandardMaterial color="#596970" roughness={0.56} metalness={0.38} />
+        {[-2.28, 2.28].map((x) => (
+          <group key={x} position={[x, 1.0, 0]}>
+            <mesh castShadow scale={[0.42, 1, 1]}>
+              <sphereGeometry args={[1.07, 24, 18]} />
+              <meshStandardMaterial color="#657579" metalness={0.42} roughness={0.42} />
+            </mesh>
+            <mesh rotation={[0, Math.PI / 2, 0]}>
+              <torusGeometry args={[1.02, 0.07, 10, 36]} />
+              <meshStandardMaterial color="#d6bd77" metalness={0.7} roughness={0.28} />
+            </mesh>
+          </group>
+        ))}
+        {[-1.68, -0.84, 0, 0.84, 1.68].map((x) => (
+          <mesh key={x} position={[x, 1.0, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <torusGeometry args={[1.08, 0.035, 8, 32]} />
+            <meshStandardMaterial color="#c4ceca" metalness={0.76} roughness={0.28} />
+          </mesh>
+        ))}
+
+        {/* Two side sleeping/laboratory modules with pressure-rated connecting tunnels. */}
+        {[-1, 1].map((side) => (
+          <group key={side}>
+            <mesh castShadow receiveShadow position={[0.12, 0.78, side * 1.55]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.67, 0.67, 2.45, 24]} />
+              <meshStandardMaterial color={side < 0 ? "#71858a" : "#60767c"} metalness={0.42} roughness={0.38} />
+            </mesh>
+            {[-0.98, 0.0, 0.98].map((x) => (
+              <mesh key={x} position={[x, 0.78, side * 1.55]} rotation={[0, Math.PI / 2, 0]}>
+                <torusGeometry args={[0.65, 0.035, 8, 28]} />
+                <meshStandardMaterial color="#d2d8d2" metalness={0.72} roughness={0.3} />
+              </mesh>
+            ))}
+            <RoundedBox args={[1.35, 0.38, 0.54]} radius={0.1} smoothness={3} position={[0.0, 0.56, side * 1.18]} castShadow>
+              <meshStandardMaterial color="#52666b" metalness={0.44} roughness={0.48} />
+            </RoundedBox>
+            {[-0.62, 0.0, 0.62].map((x) => (
+              <group key={x} position={[x, 0.84, side * 2.17]}>
+                <RoundedBox args={[0.34, 0.26, 0.045]} radius={0.04} smoothness={3} castShadow>
+                  <meshStandardMaterial color="#162e3a" metalness={0.28} roughness={0.25} />
+                </RoundedBox>
+                <mesh position={[0, 0, side * 0.03]}>
+                  <boxGeometry args={[0.24, 0.16, 0.012]} />
+                  <meshStandardMaterial color={side < 0 ? "#5bcbd8" : "#8ed7ba"} emissive={side < 0 ? "#1d6670" : "#2e7a61"} emissiveIntensity={0.48} />
+                </mesh>
+              </group>
+            ))}
+          </group>
+        ))}
+
+        {/* Main hull windows, mounted in thick frames instead of floating panes. */}
+        {[-1.62, -0.54, 0.54, 1.62].map((x) => (
+          <group key={x}>
+            {[-1, 1].map((side) => (
+              <group key={side} position={[x, 1.02, side * 1.06]}>
+                <RoundedBox args={[0.5, 0.36, 0.075]} radius={0.07} smoothness={4}>
+                  <meshStandardMaterial color="#d2c995" metalness={0.64} roughness={0.32} />
+                </RoundedBox>
+                <RoundedBox args={[0.41, 0.27, 0.085]} radius={0.05} smoothness={4} position={[0, 0, side * 0.04]}>
+                  <meshPhysicalMaterial color="#65d2e2" emissive="#164c61" emissiveIntensity={0.2} roughness={0.18} metalness={0.18} clearcoat={0.8} />
+                </RoundedBox>
+              </group>
+            ))}
+          </group>
+        ))}
+
+        {/* Front airlock, hatch window, access steps, handrails and illuminated wayfinding. */}
+        <group position={[0, 0.58, 2.48]}>
+          <RoundedBox args={[1.25, 0.82, 0.88]} radius={0.14} smoothness={4} castShadow>
+            <meshStandardMaterial color="#465b61" metalness={0.48} roughness={0.44} />
           </RoundedBox>
-          <RoundedBox args={[0.62, 0.4, 0.08]} radius={0.05} smoothness={3} position={[0, 0, 0.39]}>
-            <meshStandardMaterial color="#1e3039" roughness={0.4} metalness={0.45} />
+          <RoundedBox args={[0.62, 0.53, 0.08]} radius={0.055} smoothness={4} position={[0, 0.02, 0.49]}>
+            <meshStandardMaterial color="#1a303a" metalness={0.34} roughness={0.28} />
           </RoundedBox>
-          <mesh position={[0, 0.16, 0.44]}><boxGeometry args={[0.34, 0.035, 0.02]} /><meshStandardMaterial color="#f5d17b" emissive="#be8734" emissiveIntensity={0.6} /></mesh>
-          {[-0.23, 0.23].map((x) => <mesh key={x} position={[x, -0.02, 0.445]}><cylinderGeometry args={[0.035, 0.035, 0.05, 10]} /><meshStandardMaterial color="#c7d1ca" metalness={0.8} /></mesh>)}
+          <RoundedBox args={[0.43, 0.35, 0.04]} radius={0.04} smoothness={3} position={[0, 0.03, 0.545]}>
+            <meshStandardMaterial color="#324b52" metalness={0.3} roughness={0.32} />
+          </RoundedBox>
+          <mesh position={[0, 0.27, 0.58]}>
+            <boxGeometry args={[0.34, 0.04, 0.02]} />
+            <meshStandardMaterial color="#f7d47c" emissive="#ba842f" emissiveIntensity={0.9} />
+          </mesh>
+          {[-0.53, 0.53].map((x) => (
+            <mesh key={x} position={[x, 0.0, 0.44]}>
+              <cylinderGeometry args={[0.035, 0.035, 0.7, 10]} />
+              <meshStandardMaterial color="#cbd2cb" metalness={0.76} roughness={0.28} />
+            </mesh>
+          ))}
+          <mesh position={[0, -0.34, 0.75]} castShadow>
+            <boxGeometry args={[0.98, 0.12, 0.74]} />
+            <meshStandardMaterial color="#7d8985" metalness={0.38} roughness={0.54} />
+          </mesh>
+          <mesh position={[0, -0.41, 1.04]}>
+            <boxGeometry args={[0.82, 0.025, 0.035]} />
+            <meshStandardMaterial color="#f2ce72" emissive="#8e6e2d" emissiveIntensity={0.65} />
+          </mesh>
         </group>
-        <mesh position={[0, 1.05, 0]}><cylinderGeometry args={[0.07, 0.1, 1.05, 10]} /><meshStandardMaterial color="#ced6d0" metalness={0.76} roughness={0.28} /></mesh>
-        <mesh position={[0, 1.63, 0]}><boxGeometry args={[0.45, 0.08, 0.34]} /><meshStandardMaterial color="#4f6267" metalness={0.38} /></mesh>
-        <Beacon color={accent} active={false} height={2.15} />
+
+        {/* Exterior life-support skids, tanks and insulated thermal lines. */}
+        {[-1.72, 1.72].map((x) => (
+          <group key={x} position={[x, 0.4, 0]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.21, 0.21, 0.7, 14]} />
+              <meshStandardMaterial color="#d5d8d0" metalness={0.68} roughness={0.34} />
+            </mesh>
+            <mesh position={[0, 0.36, 0]}>
+              <torusGeometry args={[0.2, 0.035, 8, 20]} />
+              <meshStandardMaterial color="#d7b76c" metalness={0.65} roughness={0.28} />
+            </mesh>
+            <mesh position={[0, 0.0, 0.22]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.22, 0.025, 8, 20]} />
+              <meshStandardMaterial color="#789196" metalness={0.7} roughness={0.3} />
+            </mesh>
+          </group>
+        ))}
+        {[-1, 1].map((side) => (
+          <group key={side} position={[0, 0.82, side * 1.02]}>
+            <mesh position={[0, -0.1, 0]}>
+              <cylinderGeometry args={[0.045, 0.045, 1.1, 10]} />
+              <meshStandardMaterial color="#dfc27a" metalness={0.56} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, -0.4, 0]}>
+              <cylinderGeometry args={[0.03, 0.03, 0.46, 8]} />
+              <meshStandardMaterial color="#d1d7d0" metalness={0.76} roughness={0.25} />
+            </mesh>
+          </group>
+        ))}
+
+        {/* Redundant comms mast and sensor crossbar: a functional habitat roofline, not a central dome. */}
+        <mesh position={[0, 2.27, -0.24]}>
+          <cylinderGeometry args={[0.045, 0.075, 1.65, 10]} />
+          <meshStandardMaterial color="#e0e0d2" metalness={0.76} roughness={0.26} />
+        </mesh>
+        <mesh position={[0, 2.79, -0.24]}>
+          <boxGeometry args={[0.72, 0.09, 0.14]} />
+          <meshStandardMaterial color="#52676c" metalness={0.6} roughness={0.3} />
+        </mesh>
+        {[-0.28, 0.28].map((x) => (
+          <mesh key={x} position={[x, 2.79, -0.16]}>
+            <sphereGeometry args={[0.075, 12, 8]} />
+            <meshStandardMaterial color="#63e6ee" emissive="#2598a1" emissiveIntensity={0.85} />
+          </mesh>
+        ))}
+        <mesh position={[0, 1.78, 0.22]}>
+          <boxGeometry args={[0.55, 0.34, 0.11]} />
+          <meshStandardMaterial color="#1a2c34" metalness={0.44} roughness={0.33} />
+        </mesh>
+        <mesh position={[0, 1.8, 0.285]}>
+          <boxGeometry args={[0.37, 0.21, 0.025]} />
+          <meshStandardMaterial color="#4ed3df" emissive="#176b75" emissiveIntensity={0.85} />
+        </mesh>
+        <mesh position={[-2.1, 0.22, -1.55]}>
+          <boxGeometry args={[0.5, 0.11, 0.45]} />
+          <meshStandardMaterial color="#37484b" metalness={0.48} roughness={0.42} />
+        </mesh>
+        <mesh position={[2.1, 0.22, -1.55]}>
+          <boxGeometry args={[0.5, 0.11, 0.45]} />
+          <meshStandardMaterial color="#37484b" metalness={0.48} roughness={0.42} />
+        </mesh>
+        <Beacon color={accent} active={false} height={3.35} />
       </group>
     );
   }
@@ -720,7 +854,7 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { 
         <meshStandardMaterial color="#4b6264" metalness={0.4} roughness={0.48} />
       </mesh>
       <SelectionRing selected={selected} alerted={alerted} radius={1.34} height={-0.32} />
-      {task !== "STANDBY" && <Text position={[0, 1.14, 0]} rotation={[-0.7, 0, 0]} fontSize={0.17} color="#fff0a8" outlineWidth={0.025} outlineColor="#1c1815" anchorX="center">{task}</Text>}
+      {task !== "STANDBY" && <Billboard position={[0, 1.35, 0]} follow><Text frustumCulled={false} fontSize={0.26} color="#fff0a8" outlineWidth={0.03} outlineColor="#1c1815" anchorX="center">{task}</Text></Billboard>}
     </group>
   );
 }
@@ -778,36 +912,172 @@ function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionRe
   return <group ref={ref} position={[x,terrainHeight(x,z)+0.5,z]} onClick={(e)=>{e.stopPropagation();onClick();}}>
     <mesh castShadow><octahedronGeometry args={[0.38,0]}/><meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected?0.9:0.45}/></mesh>
     <mesh position={[0,-0.34,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.48,selected?0.74:0.62,24]}/><meshBasicMaterial color={color} transparent opacity={0.82}/></mesh>
-    {selected && <Text position={[0,0.72,0]} rotation={[-0.7,0,0]} fontSize={0.18} color="#fff2c0" outlineWidth={0.025} outlineColor="#3a2d20" anchorX="center">{surveyed?"SURVEYED":node.label}</Text>}
+    {selected && <Billboard position={[0,0.82,0]} follow><Text frustumCulled={false} fontSize={0.25} color="#fff2c0" outlineWidth={0.03} outlineColor="#11191d" anchorX="center">{surveyed?"SURVEYED":node.label}</Text></Billboard>}
   </group>;
 }
 
 function Crew({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number,number]>> = [
-    [[-8.45,7.15],[-8.45,11],[-4.2,11],[-8.45,11],[-8.45,-0.6],[0,-0.6],[0,3.3],[8.45,3.3],[8.45,7.15]],
+    [[-8.45,7.15],[-8.45,11],[-4.2,11],[-8.45,11],[-8.45,-0.6],[-4.62,-0.6],[-4.62,-5.8],[4.62,-5.8],[4.62,-0.6],[8.45,-0.6],[8.45,7.15]],
     [[8.45,-12.2],[8.45,-8.35],[0,-8.35],[0,-12.2],[-4.2,-12.2]],
     [[-12.5,3.3],[-8.45,3.3],[-8.45,-8.35],[-12.5,-8.35],[-12.5,3.3]],
   ];
   return <group>{Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}</group>;
 }
 
-function CrewMember({ route,index,mars }:{route:Array<[number,number]>;index:number;mars:boolean}) {
-  const ref=useRef<THREE.Group>(null);
-  useFrame(({clock})=>{
-    if(!ref.current)return;
-    const p=((clock.getElapsedTime()*0.14)+index*0.22)%(route.length);
-    const i=Math.floor(p); const f=p-i;
-    const [ax,az]=route[i], [bx,bz]=route[(i+1)%route.length];
-    const x=THREE.MathUtils.lerp(ax,bx,f), z=THREE.MathUtils.lerp(az,bz,f);
-    ref.current.position.set(x,-0.176,z);
-    ref.current.rotation.y=Math.atan2(bx-ax,bz-az);
+function CrewMember({ route, index, mars }: { route: Array<[number, number]>; index: number; mars: boolean }) {
+  const ref = useRef<THREE.Group>(null);
+  const leftArm = useRef<THREE.Group>(null);
+  const rightArm = useRef<THREE.Group>(null);
+  const leftLeg = useRef<THREE.Group>(null);
+  const rightLeg = useRef<THREE.Group>(null);
+  const phaseOffset = index * 1.17;
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const time = clock.getElapsedTime();
+    const p = ((time * 0.14) + index * 0.22) % route.length;
+    const i = Math.floor(p);
+    const f = p - i;
+    const [ax, az] = route[i];
+    const [bx, bz] = route[(i + 1) % route.length];
+    const x = THREE.MathUtils.lerp(ax, bx, f);
+    const z = THREE.MathUtils.lerp(az, bz, f);
+    ref.current.position.set(x, -0.176 + Math.abs(Math.sin(time * 5 + phaseOffset)) * 0.025, z);
+    ref.current.rotation.y = Math.atan2(bx - ax, bz - az);
+
+    const gait = Math.sin(time * 5.2 + phaseOffset) * 0.28;
+    if (leftArm.current) leftArm.current.rotation.x = gait;
+    if (rightArm.current) rightArm.current.rotation.x = -gait;
+    if (leftLeg.current) leftLeg.current.rotation.x = -gait * 0.72;
+    if (rightLeg.current) rightLeg.current.rotation.x = gait * 0.72;
   });
-  const suit=["#67c9d9","#e4bb61","#d47c69","#83b97d","#9d8bd1"][index%5];
-  return <group ref={ref} scale={1.6}>
-    <mesh castShadow position={[0,0.43,0]}><capsuleGeometry args={[0.13,0.28,4,8]}/><meshStandardMaterial color={suit}/></mesh>
-    <mesh castShadow position={[0,0.75,0]}><sphereGeometry args={[0.12,14,10]}/><meshStandardMaterial color={mars?"#b9c0bd":"#d2b65f"} metalness={0.15}/></mesh>
-    <mesh position={[0,0.75,0.102]}><boxGeometry args={[0.13,0.055,0.018]}/><meshStandardMaterial color="#61e9f2" emissive="#218e99" emissiveIntensity={0.3}/></mesh>
-  </group>;
+
+  const suit = ["#67c9d9", "#e4bb61", "#d47c69", "#83b97d", "#9d8bd1", "#e0e3dd", "#5c9bcc"][index % 7];
+  const trim = mars ? "#c5a08c" : "#d7d6b7";
+  return (
+    <group ref={ref} scale={1.42}>
+      {/* Separate boots, lower legs and articulated knee joints. */}
+      {[-1, 1].map((side) => (
+        <group key={side} ref={side < 0 ? leftLeg : rightLeg} position={[side * 0.105, 0.38, 0]}>
+          <mesh castShadow position={[0, -0.13, 0]}>
+            <capsuleGeometry args={[0.073, 0.22, 4, 10]} />
+            <meshStandardMaterial color={suit} roughness={0.72} />
+          </mesh>
+          <mesh position={[0, -0.12, 0.035]}>
+            <sphereGeometry args={[0.082, 12, 10]} />
+            <meshStandardMaterial color={trim} metalness={0.18} roughness={0.5} />
+          </mesh>
+          <RoundedBox args={[0.17, 0.13, 0.24]} radius={0.04} smoothness={3} position={[0, -0.28, 0.055]} castShadow>
+            <meshStandardMaterial color="#202b30" roughness={0.92} metalness={0.08} />
+          </RoundedBox>
+          <mesh position={[0, -0.346, 0.06]}>
+            <boxGeometry args={[0.145, 0.022, 0.18]} />
+            <meshStandardMaterial color="#8e9993" metalness={0.6} roughness={0.35} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Torso shell, flexible joints and a practical chest control panel. */}
+      <mesh castShadow position={[0, 0.72, 0]}>
+        <capsuleGeometry args={[0.185, 0.34, 5, 12]} />
+        <meshStandardMaterial color={suit} roughness={0.68} metalness={0.08} />
+      </mesh>
+      <mesh position={[0, 0.47, 0.01]}>
+        <torusGeometry args={[0.16, 0.035, 8, 22]} />
+        <meshStandardMaterial color={trim} metalness={0.32} roughness={0.44} />
+      </mesh>
+      <RoundedBox args={[0.25, 0.18, 0.045]} radius={0.035} smoothness={3} position={[0, 0.76, 0.18]} castShadow>
+        <meshStandardMaterial color="#27383d" metalness={0.48} roughness={0.3} />
+      </RoundedBox>
+      <mesh position={[0, 0.785, 0.207]}>
+        <boxGeometry args={[0.16, 0.075, 0.016]} />
+        <meshStandardMaterial color={mars ? "#ffc49c" : "#66e1e8"} emissive={mars ? "#9e4b2e" : "#1c8e9b"} emissiveIntensity={0.9} />
+      </mesh>
+      {[-0.07, 0, 0.07].map((x, i) => (
+        <mesh key={x} position={[x, 0.665, 0.21]}>
+          <sphereGeometry args={[0.022, 8, 8]} />
+          <meshStandardMaterial color={["#ed625d", "#e8c867", "#6fe09b"][i]} emissive={["#b02b28", "#92702b", "#288e52"][i]} emissiveIntensity={0.6} />
+        </mesh>
+      ))}
+      {/* Safety harness, shoulder bars and small suit patches. */}
+      {[-1, 1].map((side) => (
+        <group key={side}>
+          <mesh position={[side * 0.12, 0.81, 0.04]} rotation={[0, 0, -side * 0.34]}>
+            <boxGeometry args={[0.065, 0.44, 0.045]} />
+            <meshStandardMaterial color={trim} metalness={0.36} roughness={0.42} />
+          </mesh>
+          <RoundedBox args={[0.14, 0.11, 0.14]} radius={0.04} smoothness={3} position={[side * 0.22, 0.86, 0]} castShadow>
+            <meshStandardMaterial color="#6d7b7a" metalness={0.38} roughness={0.44} />
+          </RoundedBox>
+          <mesh position={[side * 0.235, 0.865, 0.079]}>
+            <sphereGeometry args={[0.035, 10, 8]} />
+            <meshStandardMaterial color={side < 0 ? "#73dfb5" : "#ffd16b"} emissive={side < 0 ? "#207a60" : "#92652a"} emissiveIntensity={0.95} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Backpack with stacked life-support panels, service ports and antenna. */}
+      <group position={[0, 0.73, -0.19]}>
+        <RoundedBox args={[0.31, 0.43, 0.19]} radius={0.05} smoothness={3} castShadow>
+          <meshStandardMaterial color="#3c4b51" metalness={0.48} roughness={0.42} />
+        </RoundedBox>
+        <mesh position={[0, 0.08, -0.105]}>
+          <boxGeometry args={[0.2, 0.19, 0.025]} />
+          <meshStandardMaterial color="#6c7d80" metalness={0.5} roughness={0.4} />
+        </mesh>
+        {[-0.095, 0.095].map((x) => (
+          <mesh key={x} position={[x, -0.06, -0.12]}>
+            <boxGeometry args={[0.045, 0.2, 0.025]} />
+            <meshStandardMaterial color="#d2d6cb" metalness={0.64} roughness={0.3} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0.27, -0.015]}>
+          <cylinderGeometry args={[0.016, 0.025, 0.23, 8]} />
+          <meshStandardMaterial color="#b7c4bc" metalness={0.74} roughness={0.3} />
+        </mesh>
+      </group>
+
+      {/* Shoulder-pivot arms, forearm seals and bulky gloves. */}
+      {[-1, 1].map((side) => (
+        <group key={side} ref={side < 0 ? leftArm : rightArm} position={[side * 0.22, 0.84, 0]}>
+          <mesh castShadow position={[side * 0.025, -0.14, 0]} rotation={[0, 0, -side * 0.08]}>
+            <capsuleGeometry args={[0.075, 0.24, 4, 10]} />
+            <meshStandardMaterial color={suit} roughness={0.68} />
+          </mesh>
+          <mesh position={[side * 0.03, -0.27, 0.015]} rotation={[0, 0, -side * 0.08]}>
+            <cylinderGeometry args={[0.077, 0.077, 0.065, 12]} />
+            <meshStandardMaterial color={trim} metalness={0.36} roughness={0.42} />
+          </mesh>
+          <RoundedBox args={[0.13, 0.12, 0.14]} radius={0.04} smoothness={3} position={[side * 0.035, -0.34, 0.035]} castShadow>
+            <meshStandardMaterial color="#d3d6cc" metalness={0.24} roughness={0.52} />
+          </RoundedBox>
+        </group>
+      ))}
+
+      {/* Helmet ring, pressure shell, dark polarized visor and headlamp. */}
+      <mesh castShadow position={[0, 1.15, 0]}>
+        <sphereGeometry args={[0.205, 20, 16]} />
+        <meshStandardMaterial color={trim} metalness={0.28} roughness={0.25} />
+      </mesh>
+      <mesh position={[0, 1.15, 0.155]} scale={[0.82, 0.64, 0.22]}>
+        <sphereGeometry args={[0.17, 20, 14]} />
+        <meshPhysicalMaterial color="#112b38" emissive="#0b2630" emissiveIntensity={0.28} roughness={0.16} metalness={0.2} clearcoat={1} />
+      </mesh>
+      <mesh position={[0, 1.07, 0.17]}>
+        <boxGeometry args={[0.18, 0.022, 0.012]} />
+        <meshStandardMaterial color="#66e4ee" emissive="#1d8793" emissiveIntensity={1.2} />
+      </mesh>
+      <mesh position={[0.13, 1.28, 0.02]}>
+        <sphereGeometry args={[0.036, 10, 8]} />
+        <meshStandardMaterial color="#ffe7a1" emissive="#b98734" emissiveIntensity={0.9} />
+      </mesh>
+      <mesh position={[0, 1.35, -0.02]}>
+        <torusGeometry args={[0.145, 0.018, 8, 26]} />
+        <meshStandardMaterial color="#d5bf78" metalness={0.72} roughness={0.25} />
+      </mesh>
+    </group>
+  );
 }
 
 function ColonyBuilding({
@@ -833,7 +1103,7 @@ function ColonyBuilding({
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = ""; }}
     >
-      <Pad position={[0, 0]} size={track.id === "habitat" ? 7.4 : 3.65} mars={mars} accent={p.accent} />
+      <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
         <BuildingArt id={track.id} accent={tierColor(tier)} />
       </group>
@@ -849,94 +1119,20 @@ function ColonyBuilding({
           <meshBasicMaterial color="#efc85f" transparent opacity={0.98} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
-      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.0 : 2.05} height={0.12} />
-      <Text frustumCulled={false} position={[0, track.id === "habitat" ? 4.0 : track.id === "extraction" ? 3.65 : 2.75, 0]} rotation={[-0.68, 0, 0]} fontSize={track.id === "habitat" ? 0.28 : 0.2} color={selected ? "#fff0a2" : "#d6e3df"} outlineWidth={0.035} outlineColor="#1d1a18" anchorX="center">{track.category.toUpperCase()}</Text>
-      <Text frustumCulled={false} position={[0, track.id === "habitat" ? 3.63 : track.id === "extraction" ? 3.34 : 2.46, 0]} rotation={[-0.68, 0, 0]} fontSize={0.12} color="#9bb1ad" outlineWidth={0.02} outlineColor="#1d1a18" anchorX="center">{tier.toUpperCase()}</Text>
-      {alerted && <Text frustumCulled={false} position={[0, track.id === "habitat" ? 4.65 : track.id === "extraction" ? 4.0 : 3.28, 0]} rotation={[-0.68, 0, 0]} fontSize={0.19} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center">EVENT</Text>}
-    </group>
-  );
-}
-
-function CommandCenter() {
-  return (
-    <group position={[0, 0.15, 0]} frustumCulled={false}>
-      {/* Raised circular foundation, metallic rim and segmented anchor ring. */}
-      <mesh castShadow receiveShadow position={[0, 0.15, 0]}>
-        <cylinderGeometry args={[2.22, 2.36, 0.28, 24]} />
-        <meshStandardMaterial color="#46545a" roughness={0.7} metalness={0.38} />
-      </mesh>
-      <mesh position={[0, 0.3, 0]}>
-        <torusGeometry args={[2.12, 0.075, 10, 48]} />
-        <meshStandardMaterial color="#ddbd69" metalness={0.68} roughness={0.25} />
-      </mesh>
-      <mesh position={[0, 0.34, 0]}>
-        <cylinderGeometry args={[1.85, 1.95, 0.18, 12]} />
-        <meshStandardMaterial color="#71817f" roughness={0.44} metalness={0.58} />
-      </mesh>
-      {/* Four pressure-rated access corridors visibly connect to the central module. */}
-      {[
-        { position: [1.77, 0.42, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] },
-        { position: [-1.77, 0.42, 0] as [number, number, number], rotation: [0, Math.PI, 0] as [number, number, number] },
-        { position: [0, 0.42, 1.77] as [number, number, number], rotation: [0, Math.PI / 2, 0] as [number, number, number] },
-        { position: [0, 0.42, -1.77] as [number, number, number], rotation: [0, -Math.PI / 2, 0] as [number, number, number] },
-      ].map((arm, i) => (
-        <group key={i} position={arm.position} rotation={arm.rotation}>
-          <RoundedBox args={[1.18, 0.4, 0.58]} radius={0.12} smoothness={4} castShadow>
-            <meshStandardMaterial color="#53656a" roughness={0.58} metalness={0.36} />
-          </RoundedBox>
-          <mesh position={[0, 0.07, 0.3]}>
-            <boxGeometry args={[0.78, 0.17, 0.035]} />
-            <meshStandardMaterial color="#1c3038" roughness={0.35} metalness={0.28} />
-          </mesh>
-          {[-0.22, 0.22].map((x) => <mesh key={x} position={[x, 0, 0.32]}><boxGeometry args={[0.045, 0.26, 0.045]} /><meshStandardMaterial color="#bdc8c0" metalness={0.7} /></mesh>)}
-          <mesh position={[0, -0.18, -0.27]}><boxGeometry args={[0.84, 0.07, 0.065]} /><meshStandardMaterial color="#d8ba67" metalness={0.6} /></mesh>
-        </group>
-      ))}
-      {/* Octagonal command pressure hull with service panels and a glazed dome. */}
-      <mesh castShadow position={[0, 0.66, 0]}>
-        <cylinderGeometry args={[1.63, 1.79, 0.68, 12]} />
-        <meshStandardMaterial color="#526168" roughness={0.52} metalness={0.36} />
-      </mesh>
-      <mesh position={[0, 0.98, 0]}>
-        <torusGeometry args={[1.59, 0.075, 10, 44]} />
-        <meshStandardMaterial color="#e7c66f" metalness={0.68} roughness={0.23} />
-      </mesh>
-      <mesh castShadow position={[0, 1.0, 0]}>
-        <sphereGeometry args={[1.56, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.53]} />
-        <meshPhysicalMaterial color="#68cbd0" emissive="#164e59" emissiveIntensity={0.2} transparent opacity={0.83} roughness={0.18} metalness={0.12} clearcoat={0.7} depthWrite={false} />
-      </mesh>
-      <mesh position={[0, 1.0, 0]}>
-        <torusGeometry args={[1.5, 0.05, 8, 42]} />
-        <meshStandardMaterial color="#e6c66a" metalness={0.65} roughness={0.23} />
-      </mesh>
-      {Array.from({ length: 12 }, (_, i) => {
-        const a = (i / 12) * Math.PI * 2;
-        return (
-          <group key={i} position={[Math.cos(a) * 1.48, 1.24, Math.sin(a) * 1.48]} rotation={[0, -a, 0]}>
-            <mesh castShadow><boxGeometry args={[0.035, 0.58, 0.045]} /><meshStandardMaterial color="#d4ddd4" metalness={0.75} roughness={0.25} /></mesh>
-            <mesh position={[0, -0.32, 0]}><boxGeometry args={[0.08, 0.07, 0.09]} /><meshStandardMaterial color="#33454b" metalness={0.5} /></mesh>
-          </group>
-        );
-      })}
-      {/* A clear forward-facing airlock, light strip, and mechanical access rails. */}
-      <group position={[0, 0.38, 2.05]}>
-        <RoundedBox args={[0.94, 0.66, 0.62]} radius={0.1} smoothness={4} castShadow>
-          <meshStandardMaterial color="#5c6b70" roughness={0.54} metalness={0.42} />
-        </RoundedBox>
-        <RoundedBox args={[0.55, 0.45, 0.06]} radius={0.045} smoothness={3} position={[0, 0, 0.34]}>
-          <meshStandardMaterial color="#1d3038" roughness={0.36} metalness={0.4} />
-        </RoundedBox>
-        <mesh position={[0, 0.16, 0.38]}><boxGeometry args={[0.35, 0.035, 0.02]} /><meshStandardMaterial color="#f4d37c" emissive="#b98232" emissiveIntensity={0.65} /></mesh>
-        {[-0.24, 0.24].map((x) => <mesh key={x} position={[x, -0.05, 0.38]}><cylinderGeometry args={[0.03, 0.03, 0.08, 10]} /><meshStandardMaterial color="#c6d0ca" metalness={0.8} /></mesh>)}
-      </group>
-      {/* Communications mast, sensor crossbar and instrument beacons. */}
-      <mesh position={[0, 2.15, 0]}><cylinderGeometry args={[0.06, 0.1, 1.55, 10]} /><meshStandardMaterial color="#d1dad3" metalness={0.76} roughness={0.24} /></mesh>
-      <mesh position={[0, 2.58, 0]}><boxGeometry args={[0.72, 0.09, 0.14]} /><meshStandardMaterial color="#465b60" metalness={0.54} /></mesh>
-      {[-0.28, 0.28].map((x) => <mesh key={x} position={[x, 2.58, 0.08]}><sphereGeometry args={[0.08, 12, 8]} /><meshStandardMaterial color="#62e5f0" emissive="#2297a2" emissiveIntensity={0.7} /></mesh>)}
-      <mesh position={[0.55, 1.42, 0.55]}><boxGeometry args={[0.3, 0.2, 0.1]} /><meshStandardMaterial color="#1b2c34" metalness={0.4} /></mesh>
-      <mesh position={[0.55, 1.44, 0.61]}><boxGeometry args={[0.2, 0.11, 0.02]} /><meshStandardMaterial color="#68dfe6" emissive="#168a93" emissiveIntensity={0.7} /></mesh>
-      <Beacon color="#55e7ef" active={false} height={2.82} />
-      <Text frustumCulled={false} position={[0, 3.24, 0]} rotation={[-0.68, 0, 0]} fontSize={0.22} color="#fff0a8" outlineWidth={0.03} outlineColor="#241f18" anchorX="center">COMMAND HUB</Text>
+      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.24 : 2.05} height={0.12} />
+      <Billboard
+        position={[0, track.id === "habitat" ? 5.0 : track.id === "extraction" ? 4.35 : 3.35, 0]}
+        follow
+        frustumCulled={false}
+      >
+        <mesh position={[0, -0.04, -0.045]} renderOrder={12}>
+          <planeGeometry args={[Math.max(2.35, Math.min(5.4, track.category.length * 0.19 + 0.7)), alerted ? 0.96 : 0.76]} />
+          <meshBasicMaterial color="#071117" transparent opacity={0.78} depthWrite={false} toneMapped={false} />
+        </mesh>
+        <Text frustumCulled={false} position={[0, 0.16, 0]} fontSize={track.id === "habitat" ? 0.48 : 0.36} color={selected ? "#fff0a2" : "#f0f5ef"} outlineWidth={0.035} outlineColor="#11191d" anchorX="center" anchorY="middle">{track.category.toUpperCase()}</Text>
+        <Text frustumCulled={false} position={[0, -0.16, 0]} fontSize={0.2} color={tierColor(tier)} outlineWidth={0.025} outlineColor="#11191d" anchorX="center" anchorY="middle">{tier.toUpperCase()}</Text>
+        {alerted && <Text frustumCulled={false} position={[0, -0.43, 0]} fontSize={0.24} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center" anchorY="middle">EVENT · RESPOND</Text>}
+      </Billboard>
     </group>
   );
 }
@@ -945,7 +1141,7 @@ function LandingPad({ mars }: { mars:boolean }) {
   return <group position={[0,0.22,-20.0]}>
     <mesh receiveShadow><cylinderGeometry args={[4.0,4.3,0.14,24]}/><meshStandardMaterial color={mars?"#875747":"#777976"} roughness={0.94}/></mesh>
     <mesh position={[0,0.08,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[3.1,3.18,32]}/><meshBasicMaterial color={mars?"#d8a183":"#d3cfbd"}/></mesh>
-    <Text position={[0,0.22,0]} rotation={[-0.68,0,0]} fontSize={0.28} color={mars?"#f0c1a0":"#e3decb"} outlineWidth={0.035} outlineColor="#28221d" anchorX="center">LANDING PAD</Text>
+    <Billboard position={[0,0.55,0]} follow><Text frustumCulled={false} fontSize={0.34} color={mars?"#f0c1a0":"#e3decb"} outlineWidth={0.035} outlineColor="#28221d" anchorX="center">LANDING PAD</Text></Billboard>
   </group>;
 }
 
@@ -1003,7 +1199,6 @@ function Scene({ props }: { props: Props }) {
         <MissionGuide mars={mars} />
         <RoadNetwork mars={mars} />
         <LandingPad mars={mars} />
-        <CommandCenter />
         {props.tracks.map((track) => track.id !== "rover" && (
           <ColonyBuilding
             key={track.id}
@@ -1026,7 +1221,9 @@ function Scene({ props }: { props: Props }) {
         <Crew mars={mars} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
         {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
-          <Text frustumCulled={false} position={[POSITIONS[props.activeEventTrackId][0], 4.25, POSITIONS[props.activeEventTrackId][1]]} rotation={[-0.68, 0, 0]} fontSize={0.22} color="#ff6672" outlineWidth={0.035} outlineColor="#26171a" anchorX="center">RESPOND HERE</Text>
+          <Billboard position={[POSITIONS[props.activeEventTrackId][0], props.activeEventTrackId === "habitat" ? 5.9 : props.activeEventTrackId === "extraction" ? 5.0 : 4.25, POSITIONS[props.activeEventTrackId][1]]} follow frustumCulled={false}>
+            <Text frustumCulled={false} fontSize={0.34} color="#ff6672" outlineWidth={0.045} outlineColor="#26171a" anchorX="center" anchorY="middle">RESPOND HERE</Text>
+          </Billboard>
         )}
       </group>
       <OrbitControls
