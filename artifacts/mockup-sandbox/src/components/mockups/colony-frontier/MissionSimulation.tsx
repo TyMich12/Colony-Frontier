@@ -611,6 +611,7 @@ function BuildingInspector({
   onAction,
   onClose,
   hasMaintenance,
+  actionBusy,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -618,6 +619,7 @@ function BuildingInspector({
   onAction: (action: string) => void;
   onClose: () => void;
   hasMaintenance: boolean;
+  actionBusy: boolean;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -736,7 +738,8 @@ function BuildingInspector({
               key={action.id}
               type="button"
               onClick={() => onAction(action.id)}
-              className="group min-w-0 rounded-2xl border border-[#35505a] bg-[#14262d] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f2cd64] hover:bg-[#1b343d] active:translate-y-0"
+              disabled={actionBusy}
+              className="group min-w-0 rounded-2xl border border-[#35505a] bg-[#14262d] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f2cd64] hover:bg-[#1b343d] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
             >
               <span className="flex items-center gap-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#0a1519] text-[10px] font-black text-[#f4cf65]">{index + 1}</span>
@@ -747,7 +750,7 @@ function BuildingInspector({
           ))}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
-          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#70858a]">{runtime.status}</span>
+          <span className={`text-[9px] font-bold uppercase tracking-[0.16em] ${actionBusy ? "text-[#f0c85f]" : "text-[#70858a]"}`}>{actionBusy ? "OPERATION IN PROGRESS" : runtime.status}</span>
           <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#7e9398]">Tap another facility to switch</span>
         </div>
       </div>
@@ -828,6 +831,7 @@ export function MissionSimulation() {
   const [manualPaused, setManualPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [results, setResults] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const eventPointerRef = useRef(
     (runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0),
   );
@@ -1364,7 +1368,9 @@ export function MissionSimulation() {
     }
   };
   const handleBuildingAction = (trackId: string, action: string) => {
-    if (!pending?.selected[trackId]) return;
+    if (!pending?.selected[trackId] || actionBusy) return;
+    setActionBusy(true);
+    window.setTimeout(() => setActionBusy(false), 1100);
     setManualActions((value) => value + 1);
 
     const conditionBoost = (amount: number) => {
@@ -1772,6 +1778,7 @@ export function MissionSimulation() {
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => setSelectedBuildingId(null)}
             hasMaintenance={pending.selected.maintenance !== undefined}
+            actionBusy={actionBusy}
           />
         )}
 
