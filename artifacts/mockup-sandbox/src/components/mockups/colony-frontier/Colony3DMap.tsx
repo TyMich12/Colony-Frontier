@@ -793,41 +793,134 @@ function CrewMember({ route,index,mars }:{route:Array<[number,number]>;index:num
 }
 
 function ColonyBuilding({
-  track,tier,runtime,selected,alerted,position,onClick,mars
-}:{track:TechnologyTrack;tier:Tier;runtime:BuildingRuntime;selected:boolean;alerted:boolean;position:[number,number];onClick:()=>void;mars:boolean}) {
-  const [x,z]=position;
-  const p=palette(track.id);
-  const y=PAD_Y+0.07;
-  const artBaseOffset = track.id === "habitat" ? -0.13
-    : track.id === "battery" ? 0.25
-    : track.id === "oxygen" || track.id === "water" ? 0.23
-    : track.id === "radiation" || track.id === "science" ? 0.24
-    : track.id === "extraction" || track.id === "isru" || track.id === "thermal" || track.id === "grid" || track.id === "maintenance" || track.id === "co2" ? 0.26
-    : 0.21;
-  return <group position={[x,y,z]} rotation={[0,BUILDING_ROTATIONS[track.id]??0,0]} onClick={(e)=>{e.stopPropagation();onClick();}} onPointerOver={()=>{document.body.style.cursor="pointer"}} onPointerOut={()=>{document.body.style.cursor=""}}>
-    <Pad position={[0,0]} size={track.id==="habitat"?7.4:3.65} mars={mars} accent={p.accent}/>
-    <group position={[0,artBaseOffset,0]} scale={track.id==="habitat"?1.12:1}>
-      <BuildingArt id={track.id} accent={tierColor(tier)}/>
+  track, tier, runtime, selected, alerted, position, onClick, mars
+}: {
+  track: TechnologyTrack;
+  tier: Tier;
+  runtime: BuildingRuntime;
+  selected: boolean;
+  alerted: boolean;
+  position: [number, number];
+  onClick: () => void;
+  mars: boolean;
+}) {
+  const [x, z] = position;
+  const p = palette(track.id);
+  return (
+    <group
+      position={[x, PAD_Y + 0.07, z]}
+      rotation={[0, BUILDING_ROTATIONS[track.id] ?? 0, 0]}
+      frustumCulled={false}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+      onPointerOut={() => { document.body.style.cursor = ""; }}
+    >
+      <Pad position={[0, 0]} size={track.id === "habitat" ? 7.4 : 3.65} mars={mars} accent={p.accent} />
+      <group position={[0, 0.04, 0]} frustumCulled={false}>
+        <BuildingArt id={track.id} accent={tierColor(tier)} />
+      </group>
+      {track.id !== "habitat" && (
+        <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
+          <ringGeometry args={[1.42, 1.54, 40]} />
+          <meshBasicMaterial color={statusColor(runtime.condition)} transparent opacity={0.94} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      {(runtime.upgradeLevel ?? 0) > 0 && (
+        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
+          <ringGeometry args={[1.62, 1.69, 40]} />
+          <meshBasicMaterial color="#efc85f" transparent opacity={0.98} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.0 : 2.05} height={0.12} />
+      <Text frustumCulled={false} position={[0, track.id === "habitat" ? 4.0 : track.id === "extraction" ? 3.65 : 2.75, 0]} rotation={[-0.68, 0, 0]} fontSize={track.id === "habitat" ? 0.28 : 0.2} color={selected ? "#fff0a2" : "#d6e3df"} outlineWidth={0.035} outlineColor="#1d1a18" anchorX="center">{track.category.toUpperCase()}</Text>
+      <Text frustumCulled={false} position={[0, track.id === "habitat" ? 3.63 : track.id === "extraction" ? 3.34 : 2.46, 0]} rotation={[-0.68, 0, 0]} fontSize={0.12} color="#9bb1ad" outlineWidth={0.02} outlineColor="#1d1a18" anchorX="center">{tier.toUpperCase()}</Text>
+      {alerted && <Text frustumCulled={false} position={[0, track.id === "habitat" ? 4.65 : track.id === "extraction" ? 4.0 : 3.28, 0]} rotation={[-0.68, 0, 0]} fontSize={0.19} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center">EVENT</Text>}
     </group>
-    {track.id!=="habitat" && <mesh position={[0,0.07,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[1.42,1.54,32]}/><meshBasicMaterial color={statusColor(runtime.condition)} transparent opacity={0.82} depthWrite={false}/></mesh>}
-    {(runtime.upgradeLevel ?? 0) > 0 && <mesh position={[0,0.075,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[1.62,1.69,32]}/><meshBasicMaterial color="#efc85f" transparent opacity={0.82} depthWrite={false}/></mesh>}
-    <SelectionRing selected={selected} alerted={alerted} radius={track.id==="habitat"?5.1:2.05} height={0.065}/>
-    <Text position={[0,track.id==="habitat"?4.0:2.75,0]} rotation={[-0.68,0,0]} fontSize={track.id==="habitat"?0.28:0.2} color={selected?"#fff0a2":"#d6e3df"} outlineWidth={0.035} outlineColor="#1d1a18" anchorX="center">{track.category.toUpperCase()}</Text>
-    <Text position={[0,track.id==="habitat"?3.63:2.46,0]} rotation={[-0.68,0,0]} fontSize={0.12} color="#9bb1ad" outlineWidth={0.02} outlineColor="#1d1a18" anchorX="center">{tier.toUpperCase()}</Text>
-    {alerted && <Text position={[0,track.id==="habitat"?4.65:3.28,0]} rotation={[-0.68,0,0]} fontSize={0.19} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center">EVENT</Text>}
-  </group>;
+  );
 }
 
 function CommandCenter() {
-  return <group position={[0,0.47,0]}>
-    <mesh castShadow><cylinderGeometry args={[2.0,2.25,0.78,16]}/><meshStandardMaterial color="#4e5c60" roughness={0.66} metalness={0.22}/></mesh>
-    <mesh castShadow position={[0,0.6,0]}><cylinderGeometry args={[1.72,1.86,0.22,16]}/><meshStandardMaterial color="#929d99" roughness={0.4} metalness={0.36}/></mesh>
-    <mesh castShadow position={[0,1.25,0]}><sphereGeometry args={[1.55,30,18,0,Math.PI*2,0,Math.PI*0.5]}/><meshStandardMaterial color="#69ccd2" transparent opacity={0.9} emissive="#1b626b" emissiveIntensity={0.18}/></mesh>
-    <mesh position={[0,1.3,0]}><torusGeometry args={[1.2,0.07,8,30]}/><meshStandardMaterial color="#f0c85e" metalness={0.55} roughness={0.22}/></mesh>
-    <mesh position={[0,2.3,0]}><cylinderGeometry args={[0.09,0.14,1.3,10]}/><meshStandardMaterial color="#dbe2de" metalness={0.7}/></mesh>
-    <Beacon color="#55e7ef" active={false}/>
-    <Text position={[0,3.1,0]} rotation={[-0.68,0,0]} fontSize={0.22} color="#fff0a8" outlineWidth={0.03} outlineColor="#241f18" anchorX="center">COMMAND</Text>
-  </group>;
+  return (
+    <group position={[0, 0, 0]} frustumCulled={false}>
+      {/* Raised circular foundation, metallic rim and segmented anchor ring. */}
+      <mesh castShadow receiveShadow position={[0, 0.15, 0]}>
+        <cylinderGeometry args={[2.22, 2.36, 0.28, 24]} />
+        <meshStandardMaterial color="#46545a" roughness={0.7} metalness={0.38} />
+      </mesh>
+      <mesh position={[0, 0.3, 0]}>
+        <torusGeometry args={[2.12, 0.075, 10, 48]} />
+        <meshStandardMaterial color="#ddbd69" metalness={0.68} roughness={0.25} />
+      </mesh>
+      <mesh position={[0, 0.34, 0]}>
+        <cylinderGeometry args={[1.85, 1.95, 0.18, 12]} />
+        <meshStandardMaterial color="#71817f" roughness={0.44} metalness={0.58} />
+      </mesh>
+      {/* Four pressure-rated access corridors visibly connect to the central module. */}
+      {[
+        { position: [1.77, 0.42, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] },
+        { position: [-1.77, 0.42, 0] as [number, number, number], rotation: [0, Math.PI, 0] as [number, number, number] },
+        { position: [0, 0.42, 1.77] as [number, number, number], rotation: [0, Math.PI / 2, 0] as [number, number, number] },
+        { position: [0, 0.42, -1.77] as [number, number, number], rotation: [0, -Math.PI / 2, 0] as [number, number, number] },
+      ].map((arm, i) => (
+        <group key={i} position={arm.position} rotation={arm.rotation}>
+          <RoundedBox args={[1.18, 0.4, 0.58]} radius={0.12} smoothness={4} castShadow>
+            <meshStandardMaterial color="#53656a" roughness={0.58} metalness={0.36} />
+          </RoundedBox>
+          <mesh position={[0, 0.07, 0.3]}>
+            <boxGeometry args={[0.78, 0.17, 0.035]} />
+            <meshStandardMaterial color="#1c3038" roughness={0.35} metalness={0.28} />
+          </mesh>
+          {[-0.22, 0.22].map((x) => <mesh key={x} position={[x, 0, 0.32]}><boxGeometry args={[0.045, 0.26, 0.045]} /><meshStandardMaterial color="#bdc8c0" metalness={0.7} /></mesh>)}
+          <mesh position={[0, -0.18, -0.27]}><boxGeometry args={[0.84, 0.07, 0.065]} /><meshStandardMaterial color="#d8ba67" metalness={0.6} /></mesh>
+        </group>
+      ))}
+      {/* Octagonal command pressure hull with service panels and a glazed dome. */}
+      <mesh castShadow position={[0, 0.66, 0]}>
+        <cylinderGeometry args={[1.63, 1.79, 0.68, 12]} />
+        <meshStandardMaterial color="#526168" roughness={0.52} metalness={0.36} />
+      </mesh>
+      <mesh position={[0, 0.98, 0]}>
+        <torusGeometry args={[1.59, 0.075, 10, 44]} />
+        <meshStandardMaterial color="#e7c66f" metalness={0.68} roughness={0.23} />
+      </mesh>
+      <mesh castShadow position={[0, 1.0, 0]}>
+        <sphereGeometry args={[1.56, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.53]} />
+        <meshPhysicalMaterial color="#68cbd0" emissive="#164e59" emissiveIntensity={0.2} transparent opacity={0.83} roughness={0.18} metalness={0.12} clearcoat={0.7} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 1.0, 0]}>
+        <torusGeometry args={[1.5, 0.05, 8, 42]} />
+        <meshStandardMaterial color="#e6c66a" metalness={0.65} roughness={0.23} />
+      </mesh>
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2;
+        return (
+          <group key={i} position={[Math.cos(a) * 1.48, 1.24, Math.sin(a) * 1.48]} rotation={[0, -a, 0]}>
+            <mesh castShadow><boxGeometry args={[0.035, 0.58, 0.045]} /><meshStandardMaterial color="#d4ddd4" metalness={0.75} roughness={0.25} /></mesh>
+            <mesh position={[0, -0.32, 0]}><boxGeometry args={[0.08, 0.07, 0.09]} /><meshStandardMaterial color="#33454b" metalness={0.5} /></mesh>
+          </group>
+        );
+      })}
+      {/* A clear forward-facing airlock, light strip, and mechanical access rails. */}
+      <group position={[0, 0.38, 2.05]}>
+        <RoundedBox args={[0.94, 0.66, 0.62]} radius={0.1} smoothness={4} castShadow>
+          <meshStandardMaterial color="#5c6b70" roughness={0.54} metalness={0.42} />
+        </RoundedBox>
+        <RoundedBox args={[0.55, 0.45, 0.06]} radius={0.045} smoothness={3} position={[0, 0, 0.34]}>
+          <meshStandardMaterial color="#1d3038" roughness={0.36} metalness={0.4} />
+        </RoundedBox>
+        <mesh position={[0, 0.16, 0.38]}><boxGeometry args={[0.35, 0.035, 0.02]} /><meshStandardMaterial color="#f4d37c" emissive="#b98232" emissiveIntensity={0.65} /></mesh>
+        {[-0.24, 0.24].map((x) => <mesh key={x} position={[x, -0.05, 0.38]}><cylinderGeometry args={[0.03, 0.03, 0.08, 10]} /><meshStandardMaterial color="#c6d0ca" metalness={0.8} /></mesh>)}
+      </group>
+      {/* Communications mast, sensor crossbar and instrument beacons. */}
+      <mesh position={[0, 2.15, 0]}><cylinderGeometry args={[0.06, 0.1, 1.55, 10]} /><meshStandardMaterial color="#d1dad3" metalness={0.76} roughness={0.24} /></mesh>
+      <mesh position={[0, 2.58, 0]}><boxGeometry args={[0.72, 0.09, 0.14]} /><meshStandardMaterial color="#465b60" metalness={0.54} /></mesh>
+      {[-0.28, 0.28].map((x) => <mesh key={x} position={[x, 2.58, 0.08]}><sphereGeometry args={[0.08, 12, 8]} /><meshStandardMaterial color="#62e5f0" emissive="#2297a2" emissiveIntensity={0.7} /></mesh>)}
+      <mesh position={[0.55, 1.42, 0.55]}><boxGeometry args={[0.3, 0.2, 0.1]} /><meshStandardMaterial color="#1b2c34" metalness={0.4} /></mesh>
+      <mesh position={[0.55, 1.44, 0.61]}><boxGeometry args={[0.2, 0.11, 0.02]} /><meshStandardMaterial color="#68dfe6" emissive="#168a93" emissiveIntensity={0.7} /></mesh>
+      <Beacon color="#55e7ef" active={false} height={2.82} />
+      <Text frustumCulled={false} position={[0, 3.24, 0]} rotation={[-0.68, 0, 0]} fontSize={0.22} color="#fff0a8" outlineWidth={0.03} outlineColor="#241f18" anchorX="center">COMMAND HUB</Text>
+    </group>
+  );
 }
 
 function LandingPad({ mars }: { mars:boolean }) {
@@ -872,35 +965,69 @@ function MissionGuide({ mars }: { mars: boolean }) {
 }
 
 function Scene({ props }: { props: Props }) {
-  const mars=props.environmentLabel==="MARS";
-  return <Canvas orthographic shadows dpr={[1,1.35]} camera={{position:[48,56,48],zoom:25,near:0.1,far:260}} gl={{antialias:true,powerPreference:"high-performance",toneMapping:THREE.ACESFilmicToneMapping}}>
-    <color attach="background" args={[mars?"#7b4638":"#55545a"]}/>
-    <ambientLight intensity={0.68} color={mars?"#ffe6db":"#edf3ff"}/>
-    <hemisphereLight args={[mars?"#ffe5da":"#f7f9ff",mars?"#3d2722":"#2f3035",1.0]}/>
-    <directionalLight position={[18,34,20]} intensity={1.7} castShadow shadow-mapSize={[2048,2048]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52}/>
-    <Terrain kind={mars?"mars":"moon"}/>
-    <Rocks kind={mars?"mars":"moon"}/>
-    <Foundation mars={mars}/>
-    <group>
-      <MissionGuide mars={mars}/>
-      <RoadNetwork mars={mars}/>
-      <LandingPad mars={mars}/>
-      <CommandCenter/>
-      {props.tracks.map((track)=>track.id!=="rover"&&<ColonyBuilding key={track.id} track={track} tier={props.selected[track.id]??"Foundation"} runtime={props.buildings[track.id]??{condition:100,dust:0,status:"ONLINE"}} selected={props.selectedBuildingId===track.id} alerted={props.activeEventTrackId===track.id} position={POSITIONS[track.id]??[0,0]} onClick={()=>props.onSelect(track.id)} mars={mars}/>)}
-      {props.tracks.some((track)=>track.id==="rover")&&(
-        <>
-          <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04}/>
-          <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId==="rover"} alerted={props.activeEventTrackId==="rover"} onClick={()=>props.onSelect("rover")}/>
-        </>
-      )}
-      <Crew mars={mars}/>
-      {props.resourceNodes.map((node)=><ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId===node.id} onClick={()=>props.onSelectResource(node)}/>)}
-      {props.activeEventTrackId&&POSITIONS[props.activeEventTrackId]&&<Text position={[POSITIONS[props.activeEventTrackId][0],4.1,POSITIONS[props.activeEventTrackId][1]]} rotation={[-0.68,0,0]} fontSize={0.22} color="#ff6672" outlineWidth={0.035} outlineColor="#26171a" anchorX="center">RESPOND HERE</Text>}
-      <mesh position={[0,0.21,0]} rotation={[-Math.PI/2,0,0]}><circleGeometry args={[2.8,48]}/><meshStandardMaterial color={mars?"#71463b":"#3f4749"} roughness={0.98}/></mesh>
-      <Text position={[0,0.26,0]} rotation={[-0.68,0,0]} fontSize={0.16} color="#8fa7a3" outlineWidth={0.02} outlineColor="#171a1b" anchorX="center">COLONY CORE</Text>
-    </group>
-    <OrbitControls enableRotate={false} enablePan enableZoom screenSpacePanning panSpeed={1.0} minZoom={14} maxZoom={42} zoomSpeed={0.85} mouseButtons={{LEFT:THREE.MOUSE.PAN}} touches={{ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_PAN}} target={[0,0,0]}/>
-  </Canvas>;
+  const mars = props.environmentLabel === "MARS";
+  return (
+    <Canvas
+      orthographic
+      shadows
+      dpr={[1, 1.35]}
+      camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
+    >
+      <color attach="background" args={[mars ? "#7b4638" : "#55545a"]} />
+      <ambientLight intensity={0.68} color={mars ? "#ffe6db" : "#edf3ff"} />
+      <hemisphereLight args={[mars ? "#ffe5da" : "#f7f9ff", mars ? "#3d2722" : "#2f3035", 1.0]} />
+      <directionalLight position={[18, 34, 20]} intensity={1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
+      <Terrain kind={mars ? "mars" : "moon"} />
+      <Rocks kind={mars ? "mars" : "moon"} />
+      <Foundation mars={mars} />
+      <group frustumCulled={false}>
+        <MissionGuide mars={mars} />
+        <RoadNetwork mars={mars} />
+        <LandingPad mars={mars} />
+        <CommandCenter />
+        {props.tracks.map((track) => track.id !== "rover" && (
+          <ColonyBuilding
+            key={track.id}
+            track={track}
+            tier={props.selected[track.id] ?? "Foundation"}
+            runtime={props.buildings[track.id] ?? { condition: 100, dust: 0, status: "ONLINE" }}
+            selected={props.selectedBuildingId === track.id}
+            alerted={props.activeEventTrackId === track.id}
+            position={POSITIONS[track.id] ?? [0, 0]}
+            onClick={() => props.onSelect(track.id)}
+            mars={mars}
+          />
+        ))}
+        {props.tracks.some((track) => track.id === "rover") && (
+          <>
+            <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} onClick={() => props.onSelect("rover")} />
+          </>
+        )}
+        <Crew mars={mars} />
+        {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
+        {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
+          <Text frustumCulled={false} position={[POSITIONS[props.activeEventTrackId][0], 4.25, POSITIONS[props.activeEventTrackId][1]]} rotation={[-0.68, 0, 0]} fontSize={0.22} color="#ff6672" outlineWidth={0.035} outlineColor="#26171a" anchorX="center">RESPOND HERE</Text>
+        )}
+      </group>
+      <OrbitControls
+        enableRotate={false}
+        enablePan
+        enableZoom
+        enableDamping
+        dampingFactor={0.08}
+        screenSpacePanning
+        panSpeed={1.0}
+        minZoom={14}
+        maxZoom={42}
+        zoomSpeed={0.85}
+        mouseButtons={{ LEFT: THREE.MOUSE.PAN }}
+        touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN }}
+        target={[0, 0, 0]}
+      />
+    </Canvas>
+  );
 }
 
 export function Colony3DMap(props: Props) {
