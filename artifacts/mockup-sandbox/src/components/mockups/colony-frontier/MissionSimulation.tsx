@@ -107,6 +107,7 @@ const EVENT_DEFS: MissionEvent[] = [
   { id: "battery-thermal", trackId: "battery", title: "Battery thermal-control excursion", subtitle: "One storage module is outside its preferred thermal operating range.", summary: "Battery efficiency is dropping. The colony can rebalance its loads, isolate the affected storage path, or continue at the cost of stored energy." },
   { id: "oxygen-filter", trackId: "oxygen", title: "Cabin air revitalization filter loading", subtitle: "A filtration stage in the cabin air-revitalization loop is showing increasing pressure drop.", summary: "Airflow resistance is reducing processing margin. The crew can isolate the affected stage, change operating mode, or accept reduced margin." },
   { id: "water-filter", trackId: "water", title: "Water recovery loop pressure rise", subtitle: "Pressure across the water-recovery hardware is rising above the normal operating band.", summary: "The recovery loop is showing elevated differential pressure. Cleaning or bypassing the affected stage protects recovery capacity." },
+  { id: "co2-scrubber-loading", trackId: "co2", title: "CO₂ scrubber bed loading", subtitle: "The cabin scrubber is losing removal margin as the filter bed loads.", summary: "The air system remains within its safe operating range, but the CO₂ scrubber needs a purge or recovery cycle before cabin air quality margin narrows." },
   { id: "habitat-pressure", trackId: "habitat", title: "Pressure decay detected", subtitle: "Pressure sensors have detected a small change in the cabin leak rate.", summary: "The habitat remains pressurised, but a growing leak would reduce life-support margin and force an EVA-independent repair response." },
   { id: "radiation-burst", trackId: "radiation", title: "Solar particle event", subtitle: "Radiation levels are rising across the exposed surface.", summary: "A short radiation spike is crossing the colony. Protective shelter mode is available, but it limits some active operations." },
   { id: "micrometeoroid-impact", trackId: "habitat", environment: "MOON", title: "Micrometeoroid impact nearby", subtitle: "A small impact has damaged exposed hardware near the habitat.", summary: "A micrometeoroid strike has created a localized equipment fault. The pressure shell is still stable, but exposed systems need inspection before normal operations continue." },
@@ -188,6 +189,14 @@ function selectedTrackData(selected: Record<string, Tier>): TechnologyTrack[] {
   return technologyTracks.filter((track) => isTier(selected[track.id]));
 }
 
+function eventTargetIsDeployed(event: MissionEvent, selected: Record<string, Tier>): boolean {
+  // A power event uses the grid only when it was deployed; otherwise it targets the always-required battery.
+  const targetId = event.trackId === "power"
+    ? (selected.grid ? "grid" : selected.battery ? "battery" : selected.solar ? "solar" : null)
+    : event.trackId;
+  return Boolean(targetId && isTier(selected[targetId]));
+}
+
 function pickNextEvent(
   environmentLabel: "MOON" | "MARS",
   selected: Record<string, Tier>,
@@ -195,57 +204,53 @@ function pickNextEvent(
   scheduleIndex: number,
   metrics: MissionMetrics,
 ): MissionEvent {
-  const selectedOptional = Object.keys(selected).filter((trackId) => !starterCategories.has(trackId));
+  const available = EVENT_DEFS.filter((event) => eventTargetIsDeployed(event, selected));
+  const unresolved = available.filter((event) => !resolvedEventIds.includes(event.id));
+  const has = (eventId: string) => {
+    const event = available.find((candidate) => candidate.id === eventId);
+    return event ?? null;
+  };
 
+  // Scripted moments are preferred, but only when their actual target exists in this loadout.
   if (scheduleIndex === 0) {
-    return EVENT_DEFS.find((event) => event.id === "solar-dust")!;
+    const dustEvent = has("solar-dust");
+    if (dustEvent) return dustEvent;
   }
 
   const environmentEventId =
     scheduleIndex === 1
-      ? environmentLabel === "MOON"
-        ? "micrometeoroid-impact"
-        : "regional-dust-front"
+      ? environmentLabel === "MOON" ? "micrometeoroid-impact" : "regional-dust-front"
       : scheduleIndex === 3
-        ? environmentLabel === "MOON"
-          ? "polar-shadow-cold-soak"
-          : "mars-comm-relay-loss"
+        ? environmentLabel === "MOON" ? "polar-shadow-cold-soak" : "mars-comm-relay-loss"
         : null;
 
   if (environmentEventId && !resolvedEventIds.includes(environmentEventId)) {
-    const environmentEvent = EVENT_DEFS.find((event) => event.id === environmentEventId);
+    const environmentEvent = has(environmentEventId);
     if (environmentEvent) return environmentEvent;
   }
 
-  const unusedOptional = selectedOptional
-    .map((trackId) => EVENT_DEFS.find((event) => event.trackId === trackId))
-    .filter((event): event is MissionEvent => Boolean(event))
-    .filter((event) => !resolvedEventIds.includes(event.id));
-
-  if (scheduleIndex % 2 === 1 && unusedOptional.length > 0) {
-    const index = Math.floor((scheduleIndex - 1) / 2) % unusedOptional.length;
-    return unusedOptional[index] ?? unusedOptional[0];
+  // Prefer incidents on optional modules that the player actually packed.
+  const optionalIds = Object.keys(selected).filter((id) => !starterCategories.has(id) && isTier(selected[id]));
+  const optionalEvents = unresolved.filter((event) => optionalIds.includes(event.trackId));
+  if (scheduleIndex % 2 === 1 && optionalEvents.length > 0) {
+    return optionalEvents[Math.floor((scheduleIndex - 1) / 2) % optionalEvents.length];
   }
 
-  const weakest = [
-    { value: metrics.battery, event: "battery-thermal" },
-    { value: metrics.oxygen, event: "oxygen-filter" },
-    { value: metrics.water, event: "water-filter" },
-    { value: metrics.habitat, event: "habitat-pressure" },
-    {
-      value: metrics.power,
-      event: selected.grid ? "grid-overload" : "core-power",
-    },
-    {
-      value: Math.max(0, 100 - Math.abs(metrics.temperature - 21) * 8),
-      event: selected.thermal ? "thermal-drift" : "habitat-pressure",
-    },
-  ].sort((a, b) => a.value - b.value)[0];
+  const candidates = [
+    { value: metrics.battery, eventId: "battery-thermal" },
+    { value: metrics.oxygen, eventId: "oxygen-filter" },
+    { value: metrics.water, eventId: "water-filter" },
+    { value: metrics.habitat, eventId: "habitat-pressure" },
+    { value: Math.max(0, 100 - Math.abs(metrics.temperature - 21) * 8), eventId: selected.thermal ? "thermal-drift" : "battery-thermal" },
+    { value: metrics.power, eventId: selected.grid ? "grid-overload" : "core-power" },
+  ].map((candidate) => ({ ...candidate, event: has(candidate.eventId) }))
+    .filter((candidate): candidate is typeof candidate & { event: MissionEvent } => Boolean(candidate.event));
 
-  return (
-    EVENT_DEFS.find((event) => event.id === weakest.event) ??
-    EVENT_DEFS.find((event) => event.id === "core-power")!
-  );
+  const weakest = candidates.sort((a, b) => a.value - b.value)[0];
+  if (weakest) return weakest.event;
+
+  // Final safety net: choose any deployed system event; never strand the player at an unbuilt facility.
+  return unresolved[0] ?? available[0] ?? EVENT_DEFS.find((event) => event.trackId === "battery")!;
 }
 
 function getEventChoices(event: MissionEvent, selected: Record<string, Tier>): EventChoice[] {
@@ -267,6 +272,11 @@ function getEventChoices(event: MissionEvent, selected: Record<string, Tier>): E
       { id: "reset", label: "Reset oxygen processing loop", detail: "Spend a brief power spike to restore atmospheric processing." },
       { id: "reduce", label: "Reduce non-essential habitation load", detail: "Give the oxygen loop extra margin while keeping the colony online." },
       { id: "ignore", label: "Continue normally", detail: "Accept faster oxygen depletion and let the system recover slowly." },
+    ],
+    "co2-scrubber-loading": [
+      { id: "scrub", label: "Purge the scrubber bed", detail: "Run the regeneration cycle and restore CO₂ removal margin." },
+      { id: "recover", label: "Recover carbon compounds", detail: "Use the recovery stage for a slower cycle that preserves useful carbon feedstock." },
+      { id: "ignore", label: "Continue with reduced margin", detail: "Save power for now, but accept lower air-quality margin until the next cycle." },
     ],
     "water-filter": [
       { id: "flush", label: "Flush filtration system", detail: "Use extra power to restore the water recovery loop." },
@@ -902,7 +912,9 @@ export function MissionSimulation() {
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
   const selectedTier = selectedTrack && pending ? pending.selected[selectedTrack.id] : undefined;
   const activeEvent = activeEventId ? EVENT_DEFS.find((event) => event.id === activeEventId) ?? null : null;
-  const activeTargetTrackId = activeEvent?.trackId === "power" ? "battery" : activeEvent?.trackId ?? null;
+  const activeTargetTrackId = activeEvent?.trackId === "power"
+    ? (pending?.selected.grid ? "grid" : pending?.selected.battery ? "battery" : pending?.selected.solar ? "solar" : null)
+    : activeEvent?.trackId ?? null;
   const selectedResource = selectedResourceId
     ? RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === selectedResourceId)
     : undefined;
@@ -1101,6 +1113,25 @@ export function MissionSimulation() {
           setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - (13 - level * 2)) }));
           setScore((value) => clamp(value - 8));
           setAiMessage("The filter restriction was left untreated, so the oxygen reserve fell faster than necessary.");
+        }
+        break;
+
+      case "co2-scrubber-loading":
+        if (choiceId === "scrub") {
+          setBuildings((current) => ({ ...current, co2: { ...(current.co2 ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.co2?.condition ?? 100) + 8 + level * 2), status: "ONLINE" } }));
+          setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 4), power: clamp(current.power - 3) }));
+          setScore((value) => clamp(value + 7));
+          setAiMessage("The CO₂ scrubber bed was regenerated. Cabin air-quality margin improved.");
+        } else if (choiceId === "recover") {
+          setBuildings((current) => ({ ...current, co2: { ...(current.co2 ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.co2?.condition ?? 100) + 4 + level), status: "ONLINE" } }));
+          setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 2), food: clamp(current.food + 1), power: clamp(current.power - 2) }));
+          setScore((value) => clamp(value + 6));
+          setAiMessage("Carbon recovery completed at a lower throughput; air quality and material recovery both benefited.");
+        } else {
+          setBuildings((current) => ({ ...current, co2: { ...(current.co2 ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.co2?.condition ?? 100) - 7), status: buildingStatus(clamp((current.co2?.condition ?? 100) - 7)) } }));
+          setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 3) }));
+          setScore((value) => clamp(value - 6));
+          setAiMessage("Scrubber loading was left unresolved. Cabin air-quality margin narrowed.");
         }
         break;
 
