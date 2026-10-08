@@ -275,6 +275,25 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
             <meshStandardMaterial color="#dce4df" metalness={0.62} roughness={0.22} />
           </mesh>
         ))}
+        {/* Pressurised entry vestibule, framed airlock door and visible hinges. */}
+        <group position={[0, 0.55, 2.48]}>
+          <RoundedBox args={[1.1, 0.72, 0.78]} radius={0.12} smoothness={4} position={[0, 0, 0.18]} castShadow>
+            <meshStandardMaterial color="#515f64" roughness={0.58} metalness={0.32} />
+          </RoundedBox>
+          <RoundedBox args={[0.64, 0.5, 0.07]} radius={0.06} smoothness={3} position={[0, 0, 0.6]}>
+            <meshStandardMaterial color="#1c3039" roughness={0.5} metalness={0.35} />
+          </RoundedBox>
+          <mesh position={[0, 0.3, 0.62]}>
+            <boxGeometry args={[0.42, 0.035, 0.025]} />
+            <meshStandardMaterial color="#e6d59a" emissive="#c0a54c" emissiveIntensity={0.35} />
+          </mesh>
+          {[-0.25, 0.25].map((x) => (
+            <mesh key={x} position={[x, 0.08, 0.645]}>
+              <boxGeometry args={[0.035, 0.09, 0.035]} />
+              <meshStandardMaterial color="#b6c0ba" metalness={0.72} roughness={0.28} />
+            </mesh>
+          ))}
+        </group>
         <mesh position={[0, 3.5, 0]}>
           <cylinderGeometry args={[0.1, 0.15, 1.0, 10]} />
           <meshStandardMaterial color="#dbe3df" metalness={0.7} roughness={0.2} />
@@ -292,11 +311,18 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         </RoundedBox>
         {[-0.76, 0.76].map((x) => (
           <group key={x} position={[x, 0.82, 0]}>
+            {/* Tilted photovoltaic wing with a metallic perimeter frame. */}
             <mesh rotation={[0.18, 0, 0]} castShadow>
-              <boxGeometry args={[0.9, 0.055, 1.48]} />
-              <meshStandardMaterial color="#193e61" roughness={0.25} metalness={0.48} />
+              <boxGeometry args={[0.98, 0.055, 1.56]} />
+              <meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} />
             </mesh>
-            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.82, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" /></mesh>)}
+            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.9, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
+            {[-0.77, 0.77].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.02, 0.035, 0.035]} /><meshStandardMaterial color="#aeb8b4" metalness={0.72} roughness={0.32} /></mesh>)}
+            <mesh position={[0, -0.32, 0]} castShadow>
+              <cylinderGeometry args={[0.055, 0.07, 0.64, 10]} />
+              <meshStandardMaterial color="#7f8c8c" metalness={0.66} roughness={0.34} />
+            </mesh>
+            {[-0.48, 0.48].map((z) => <mesh key={z} position={[0, -0.3, z]} rotation={[0, 0, z * 0.45]}><boxGeometry args={[0.045, 0.58, 0.045]} /><meshStandardMaterial color="#78898d" metalness={0.6} roughness={0.36} /></mesh>)}
           </group>
         ))}
         <Beacon color={accent} active={false} />
@@ -316,6 +342,12 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
               <meshStandardMaterial color="#4a5b62" metalness={0.28} roughness={0.35} />
             </RoundedBox>
             <mesh position={[0, 0.58, 0.52]}><boxGeometry args={[0.28, 0.08, 0.04]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} /></mesh>
+            {[-0.14, 0, 0.14].map((slot) => (
+              <mesh key={slot} position={[slot, 0.16, 0.526]}>
+                <boxGeometry args={[0.09, 0.025, 0.015]} />
+                <meshStandardMaterial color="#1d292d" roughness={0.9} />
+              </mesh>
+            ))}
           </group>
         ))}
       </group>
@@ -333,6 +365,16 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
             <mesh castShadow><cylinderGeometry args={[0.48, 0.54, 1.18, 16]} /><meshStandardMaterial color="#aeb9b5" roughness={0.35} metalness={0.38} /></mesh>
             <mesh position={[0, 0.64, 0]}><sphereGeometry args={[0.48, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color={id === "water" ? "#57c9e7" : "#9bd7c9"} transparent opacity={0.7} /></mesh>
             <mesh position={[0, 1.28, 0]}><torusGeometry args={[0.36, 0.045, 7, 22]} /><meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} /></mesh>
+            {[-0.16, 0.18].map((bandY) => (
+              <mesh key={bandY} position={[0, bandY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.49, 0.035, 7, 24]} />
+                <meshStandardMaterial color="#d6dcd4" metalness={0.7} roughness={0.28} />
+              </mesh>
+            ))}
+            <mesh position={[0, 0.25, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.08, 0.08, 0.18, 10]} />
+              <meshStandardMaterial color="#68787a" metalness={0.65} roughness={0.3} />
+            </mesh>
           </group>
         ))}
       </group>
@@ -345,6 +387,12 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         <RoundedBox args={[2.3, 0.34, 1.8]} radius={0.12} smoothness={3} castShadow><meshStandardMaterial color={p.body} roughness={0.6} metalness={0.2} /></RoundedBox>
         <mesh position={[0, 1.12, 0]}><cylinderGeometry args={[0.1, 0.15, 1.9, 10]} /><meshStandardMaterial color="#d7dfdb" metalness={0.7} roughness={0.2} /></mesh>
         <mesh position={[0, 1.9, 0]} rotation={[Math.PI / 2.2, 0, 0]}><sphereGeometry args={[0.72, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.48]} /><meshStandardMaterial color="#dbe2df" roughness={0.24} metalness={0.4} side={THREE.DoubleSide} /></mesh>
+        {[-0.34, 0.34].map((x) => (
+          <mesh key={x} position={[x, 1.55, 0.04]} rotation={[0, 0, -x * 0.7]} castShadow>
+            <cylinderGeometry args={[0.035, 0.045, 0.88, 8]} />
+            <meshStandardMaterial color="#9eaaa7" metalness={0.76} roughness={0.3} />
+          </mesh>
+        ))}
         <Beacon color={accent} active={false} />
       </group>
     );
@@ -387,11 +435,11 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
       <RoundedBox args={[2.65, 0.44, 1.95]} radius={0.13} smoothness={4} castShadow>
         <meshStandardMaterial color={p.body} roughness={0.65} metalness={0.18} />
       </RoundedBox>
-      <mesh position={[0, 0.86, 0]} castShadow>
+      <mesh position={[0, 0.72, 0]} castShadow>
         <boxGeometry args={[1.75, 1.0, 1.25]} />
         <meshStandardMaterial color={p.body} roughness={0.7} metalness={0.2} />
       </mesh>
-      <mesh position={[0, 1.48, 0]}><boxGeometry args={[1.4,0.08,0.9]} /><meshStandardMaterial color={p.accent} emissive={p.accent} emissiveIntensity={0.28} /></mesh>
+      <mesh position={[0, 1.28, 0]}><boxGeometry args={[1.4,0.08,0.9]} /><meshStandardMaterial color={p.accent} emissive={p.accent} emissiveIntensity={0.28} /></mesh>
       <Beacon color={accent} active={false} />
     </group>
   );
