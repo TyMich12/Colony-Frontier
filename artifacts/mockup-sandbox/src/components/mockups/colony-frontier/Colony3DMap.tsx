@@ -738,7 +738,7 @@ function BuildingPlot({
   );
 }
 
-function buildingPalette(function buildingPalette(id: string) {
+function buildingPalette(id: string) {
   const palette: Record<string, { body: string; roof: string; accent: string; glow: string }> = {
     habitat: { body: "#d9e1d8", roof: "#2f9eb2", accent: "#f0c85e", glow: "#43d7e8" },
     solar: { body: "#4a6f82", roof: "#2879b8", accent: "#67d9ee", glow: "#43dff1" },
@@ -1565,7 +1565,7 @@ function SettlerCrowd({ mars }: { mars: boolean }) {
   );
 }
 
-function CivicPlazaStatue(function CivicPlazaStatue({ position, mars }: { position: [number, number]; mars: boolean }) {
+function CivicPlazaStatue({ position, mars }: { position: [number, number]; mars: boolean }) {
   const [x, z] = position;
   const y = terrainHeight(x, z) + 0.06;
   const glowRef = useRef<THREE.Mesh>(null);
@@ -1918,7 +1918,7 @@ function CityFloor({ mars }: { mars: boolean }) {
   );
 }
 
-function Archway(function Archway({ position, color }: { position: [number, number]; color: string }) {
+function Archway({ position, color }: { position: [number, number]; color: string }) {
   const [x, z] = position;
   const y = terrainHeight(x, z) + 0.04;
   return (
@@ -2121,7 +2121,7 @@ function RoverWorld({
   );
 }
 
-function SelectionRing(function SelectionRing({
+function SelectionRing({
   selected,
   alerted,
   radius,
