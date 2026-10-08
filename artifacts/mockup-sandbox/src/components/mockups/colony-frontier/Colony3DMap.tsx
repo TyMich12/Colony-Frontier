@@ -122,7 +122,7 @@ function Foundation({ mars }: { mars: boolean }) {
   const curb = mars ? "#b4775e" : "#96928a";
   return (
     <group>
-      <mesh receiveShadow position={[0, -0.18, 0]}>
+      <mesh receiveShadow position={[0, -0.205, 0]}>
         <boxGeometry args={[44, 0.36, 44]} />
         <meshStandardMaterial color={ground} roughness={0.98} />
       </mesh>
@@ -163,17 +163,17 @@ function Road({
   const angle = Math.atan2(dx, dz);
   const x = (x1 + x2) / 2;
   const z = (z1 + z2) / 2;
-  const y = 0.19 + level * 0.035;
+  const y = 0.19 + level * 0.014;
 
   return (
     <group position={[x, y, z]} rotation={[0, angle, 0]}>
-      <mesh receiveShadow>
+      <mesh>
         <boxGeometry args={[width + 0.26, 0.055, length + 0.18]} />
-        <meshStandardMaterial color={mars ? "#b2765f" : "#aaa69d"} roughness={0.94} />
+        <meshStandardMaterial color={mars ? "#b2765f" : "#aaa69d"} roughness={0.94} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
       </mesh>
-      <mesh position={[0, 0.032, 0]} receiveShadow>
+      <mesh position={[0, 0.032, 0]}>
         <boxGeometry args={[width, 0.034, length]} />
-        <meshStandardMaterial color={mars ? "#71483d" : "#676a6b"} roughness={0.98} />
+        <meshStandardMaterial color={mars ? "#71483d" : "#676a6b"} roughness={0.98} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
       </mesh>
       <mesh position={[0, 0.053, 0]}>
         <boxGeometry args={[0.045, 0.012, Math.max(0.2, length - 0.4)]} />
@@ -187,9 +187,9 @@ function RoadNetwork({ mars }: { mars: boolean }) {
   const roads = [
     ...ROAD_X.map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
     ...ROAD_Z.map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
-    { a: [-18.4, -18.4] as [number, number], b: [18.4, -18.4] as [number, number], level: 0 },
+    { a: [-18.4, -18.4] as [number, number], b: [18.4, -18.4] as [number, number], level: 0.5 },
     { a: [18.4, -18.4] as [number, number], b: [18.4, 18.4] as [number, number], level: 0 },
-    { a: [18.4, 18.4] as [number, number], b: [-18.4, 18.4] as [number, number], level: 0 },
+    { a: [18.4, 18.4] as [number, number], b: [-18.4, 18.4] as [number, number], level: 0.5 },
     { a: [-18.4, 18.4] as [number, number], b: [-18.4, -18.4] as [number, number], level: 0 },
   ];
 
@@ -215,7 +215,7 @@ function RoadNetwork({ mars }: { mars: boolean }) {
 function Pad({ position, size, mars, accent }: { position: [number, number]; size: number; mars: boolean; accent: string }) {
   const [x, z] = position;
   return (
-    <group position={[x, PAD_Y, z]}>
+    <group position={[x, 0, z]}>
       <mesh receiveShadow>
         <boxGeometry args={[size, 0.08, size]} />
         <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
@@ -405,26 +405,147 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { 
     const phase = active ? (Math.sin(clock.getElapsedTime() * 0.24) + 1) / 2 : 0;
     const x = THREE.MathUtils.lerp(position[0], destination[0], phase);
     const z = THREE.MathUtils.lerp(position[1], destination[1], phase);
-    ref.current.position.set(x, terrainHeight(x, z) + 0.35, z);
-    ref.current.position.y += Math.sin(clock.getElapsedTime() * 2) * 0.018;
+    ref.current.position.set(x, terrainHeight(x, z) + 0.39, z);
+    ref.current.position.y += Math.sin(clock.getElapsedTime() * 2) * 0.008;
   });
+  const wheelZ = [-0.55, 0, 0.55];
   return (
-    <group ref={ref} position={[position[0], PAD_Y + 0.35, position[1]]} onClick={(e)=>{e.stopPropagation();onClick();}}>
-      <mesh castShadow><RoundedBox args={[1.55,0.3,0.95]} radius={0.1} smoothness={3}><meshStandardMaterial color="#d2ae59" roughness={0.62} metalness={0.28}/></RoundedBox></mesh>
-      <mesh castShadow position={[0,0.38,0]}><boxGeometry args={[0.46,0.5,0.46]}/><meshStandardMaterial color="#35dfe7" emissive="#0cc7d0" emissiveIntensity={0.5}/></mesh>
-      {[[-0.55,-0.36],[-0.55,0.36],[0.55,-0.36],[0.55,0.36]].map(([x,z])=><mesh key={String(x)+String(z)} position={[x,-0.2,z]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[0.19,0.19,0.16,12]}/><meshStandardMaterial color="#20272b" roughness={0.92}/></mesh>)}
-      <SelectionRing selected={selected} alerted={alerted} radius={1.12}/>
-      {task !== "STANDBY" && <Text position={[0,1.0,0]} rotation={[-0.7,0,0]} fontSize={0.17} color="#fff0a8" outlineWidth={0.025} outlineColor="#1c1815" anchorX="center">{task}</Text>}
+    <group ref={ref} position={[position[0], PAD_Y + 0.39, position[1]]} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+      <mesh castShadow position={[0, 0.01, 0]}>
+        <RoundedBox args={[1.72, 0.28, 1.12]} radius={0.12} smoothness={4}>
+          <meshStandardMaterial color="#b99a5d" roughness={0.64} metalness={0.3} />
+        </RoundedBox>
+      </mesh>
+      <mesh castShadow position={[0, 0.22, 0.02]}>
+        <RoundedBox args={[1.22, 0.18, 0.82]} radius={0.08} smoothness={3}>
+          <meshStandardMaterial color="#d7bd7a" roughness={0.55} metalness={0.24} />
+        </RoundedBox>
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={side}>
+          <mesh castShadow position={[side * 0.68, -0.12, 0]} rotation={[0, 0, side * 0.08]}>
+            <boxGeometry args={[0.09, 0.07, 1.36]} />
+            <meshStandardMaterial color="#515b5d" metalness={0.58} roughness={0.36} />
+          </mesh>
+          {wheelZ.map((z) => (
+            <group key={z} position={[side * 0.82, -0.16, z]}>
+              <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.235, 0.235, 0.19, 20]} />
+                <meshStandardMaterial color="#1e2528" roughness={0.96} metalness={0.04} />
+              </mesh>
+              <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.145, 0.145, 0.205, 16]} />
+                <meshStandardMaterial color="#8d9997" roughness={0.36} metalness={0.76} />
+              </mesh>
+              <mesh position={[side * 0.108, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <torusGeometry args={[0.157, 0.024, 6, 20]} />
+                <meshStandardMaterial color="#c7b16f" metalness={0.56} roughness={0.34} />
+              </mesh>
+              {Array.from({ length: 10 }, (_, i) => (
+                <mesh key={i} position={[side * 0.1, Math.sin(i * Math.PI / 5) * 0.19, Math.cos(i * Math.PI / 5) * 0.19]} rotation={[i * Math.PI / 5, 0, 0]}>
+                  <boxGeometry args={[0.018, 0.045, 0.07]} />
+                  <meshStandardMaterial color="#343b3d" roughness={0.88} />
+                </mesh>
+              ))}
+            </group>
+          ))}
+        </group>
+      ))}
+      <mesh position={[0, 0.326, -0.02]}>
+        <boxGeometry args={[0.88, 0.026, 0.58]} />
+        <meshStandardMaterial color="#17364d" roughness={0.26} metalness={0.48} />
+      </mesh>
+      {[-0.27, -0.09, 0.09, 0.27].map((x) => (
+        <mesh key={x} position={[x, 0.342, -0.02]}>
+          <boxGeometry args={[0.012, 0.008, 0.56]} />
+          <meshStandardMaterial color="#80b7cb" metalness={0.34} roughness={0.3} />
+        </mesh>
+      ))}
+      {[-0.18, 0, 0.18].map((z) => (
+        <mesh key={z} position={[0, 0.342, z - 0.02]}>
+          <boxGeometry args={[0.88, 0.008, 0.012]} />
+          <meshStandardMaterial color="#80b7cb" metalness={0.34} roughness={0.3} />
+        </mesh>
+      ))}
+      <mesh castShadow position={[0, 0.57, 0.25]}>
+        <cylinderGeometry args={[0.035, 0.055, 0.5, 10]} />
+        <meshStandardMaterial color="#aab4ad" metalness={0.78} roughness={0.28} />
+      </mesh>
+      <mesh castShadow position={[0, 0.84, 0.25]}>
+        <RoundedBox args={[0.43, 0.18, 0.22]} radius={0.045} smoothness={3}>
+          <meshStandardMaterial color="#d3c18a" metalness={0.25} roughness={0.42} />
+        </RoundedBox>
+      </mesh>
+      {[-0.12, 0.12].map((x) => (
+        <mesh key={x} position={[x, 0.84, 0.126]}>
+          <sphereGeometry args={[0.055, 14, 10]} />
+          <meshStandardMaterial color="#49d7ea" emissive="#1a8796" emissiveIntensity={0.8} metalness={0.5} roughness={0.18} />
+        </mesh>
+      ))}
+      <mesh position={[-0.58, 0.43, -0.12]} rotation={[0.4, 0, 0.3]}>
+        <cylinderGeometry args={[0.24, 0.09, 0.08, 22, 1, true]} />
+        <meshStandardMaterial color="#c3c8c0" side={THREE.DoubleSide} metalness={0.45} roughness={0.36} />
+      </mesh>
+      {[-0.42, 0.42].map((x) => (
+        <mesh key={x} position={[x, 0.02, 0.58]}>
+          <sphereGeometry args={[0.07, 12, 8]} />
+          <meshStandardMaterial color="#fff0a6" emissive="#ffca63" emissiveIntensity={1.15} />
+        </mesh>
+      ))}
+      <group position={[0.48, 0.14, 0.53]} rotation={[0.1, 0, -0.22]}>
+        <mesh position={[0, 0.15, 0.18]} rotation={[0.55, 0, 0]}>
+          <cylinderGeometry args={[0.045, 0.055, 0.4, 9]} />
+          <meshStandardMaterial color="#aeb8b1" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, 0.29, 0.36]} rotation={[0.9, 0, 0]}>
+          <cylinderGeometry args={[0.025, 0.035, 0.25, 8]} />
+          <meshStandardMaterial color="#d1bd7d" metalness={0.62} roughness={0.38} />
+        </mesh>
+        <mesh position={[0, 0.39, 0.47]}>
+          <coneGeometry args={[0.065, 0.16, 8]} />
+          <meshStandardMaterial color="#6b7673" metalness={0.65} roughness={0.35} />
+        </mesh>
+      </group>
+      <mesh position={[0, 0.38, -0.42]}>
+        <boxGeometry args={[0.3, 0.12, 0.24]} />
+        <meshStandardMaterial color="#4b6264" metalness={0.4} roughness={0.48} />
+      </mesh>
+      <SelectionRing selected={selected} alerted={alerted} radius={1.34} height={-0.32} />
+      {task !== "STANDBY" && <Text position={[0, 1.14, 0]} rotation={[-0.7, 0, 0]} fontSize={0.17} color="#fff0a8" outlineWidth={0.025} outlineColor="#1c1815" anchorX="center">{task}</Text>}
     </group>
   );
 }
 
-function SelectionRing({ selected, alerted, radius }: { selected: boolean; alerted: boolean; radius: number }) {
-  const ref=useRef<THREE.Mesh>(null);
-  useFrame(({clock})=>{ if(ref.current) ref.current.rotation.z=clock.getElapsedTime()*0.18; });
-  if(!selected && !alerted) return null;
-  const color=alerted?"#ff4f5d":"#ffe36d";
-  return <mesh ref={ref} position={[0,0.23,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[radius,radius+0.12,64]}/><meshBasicMaterial color={color} transparent opacity={0.9}/></mesh>;
+function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected: boolean; alerted: boolean; radius: number; height?: number }) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    const pulse = alerted ? 1 + (Math.sin(t * 5.2) + 1) * 0.045 : selected ? 1.025 : 1;
+    ref.current.scale.set(pulse, pulse, pulse);
+  });
+  if (!selected && !alerted) return null;
+  const color = alerted ? "#ff344f" : "#ffe36d";
+  return (
+    <>
+      {alerted && (
+        <mesh position={[0, height - 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[radius + 0.16, 64]} />
+          <meshBasicMaterial color="#ff263f" transparent opacity={0.15} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      <mesh ref={ref} position={[0, height, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[radius, radius + (alerted ? 0.17 : 0.12), 64]} />
+        <meshBasicMaterial color={color} transparent opacity={alerted ? 1 : 0.92} depthWrite={false} toneMapped={false} />
+      </mesh>
+      {alerted && (
+        <mesh position={[0, height + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius + 0.24, radius + 0.30, 64]} />
+          <meshBasicMaterial color="#ff6574" transparent opacity={0.82} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+    </>
+  );
 }
 
 function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionResourceNode; selected: boolean; surveyed: boolean; onClick: ()=>void }) {
@@ -473,14 +594,20 @@ function ColonyBuilding({
   const [x,z]=position;
   const p=palette(track.id);
   const y=PAD_Y+0.07;
-  const level=tier==="Foundation"?0:tier==="Frontier"?1:tier==="Apex"?2:3;
+  const artBaseOffset = track.id === "habitat" ? -0.13
+    : track.id === "battery" ? 0.25
+    : track.id === "oxygen" || track.id === "water" ? 0.23
+    : track.id === "radiation" || track.id === "science" ? 0.24
+    : track.id === "extraction" || track.id === "isru" || track.id === "thermal" || track.id === "grid" || track.id === "maintenance" || track.id === "co2" ? 0.26
+    : 0.21;
   return <group position={[x,y,z]} rotation={[0,BUILDING_ROTATIONS[track.id]??0,0]} onClick={(e)=>{e.stopPropagation();onClick();}} onPointerOver={()=>{document.body.style.cursor="pointer"}} onPointerOut={()=>{document.body.style.cursor=""}}>
     <Pad position={[0,0]} size={track.id==="habitat"?9.4:3.65} mars={mars} accent={p.accent}/>
-    <group position={[0,0.02,0]} scale={track.id==="habitat"?1.12:1}>
+    <group position={[0,artBaseOffset,0]} scale={track.id==="habitat"?1.12:1}>
       <BuildingArt id={track.id} accent={tierColor(tier)}/>
-      {track.id!=="habitat" && <mesh position={[0,0.05,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.12,0.2,18]}/><meshBasicMaterial color={statusColor(runtime.condition)}/></mesh>}
     </group>
-    <SelectionRing selected={selected} alerted={alerted} radius={track.id==="habitat"?5.1:2.05}/>
+    {track.id!=="habitat" && <mesh position={[0,0.07,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[1.42,1.54,32]}/><meshBasicMaterial color={statusColor(runtime.condition)} transparent opacity={0.82} depthWrite={false}/></mesh>}
+    {(runtime.upgradeLevel ?? 0) > 0 && <mesh position={[0,0.075,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[1.62,1.69,32]}/><meshBasicMaterial color="#efc85f" transparent opacity={0.82} depthWrite={false}/></mesh>}
+    <SelectionRing selected={selected} alerted={alerted} radius={track.id==="habitat"?5.1:2.05} height={0.065}/>
     <Text position={[0,track.id==="habitat"?4.0:2.75,0]} rotation={[-0.68,0,0]} fontSize={track.id==="habitat"?0.28:0.2} color={selected?"#fff0a2":"#d6e3df"} outlineWidth={0.035} outlineColor="#1d1a18" anchorX="center">{track.category.toUpperCase()}</Text>
     <Text position={[0,track.id==="habitat"?3.63:2.46,0]} rotation={[-0.68,0,0]} fontSize={0.12} color="#9bb1ad" outlineWidth={0.02} outlineColor="#1d1a18" anchorX="center">{tier.toUpperCase()}</Text>
     {alerted && <Text position={[0,track.id==="habitat"?4.65:3.28,0]} rotation={[-0.68,0,0]} fontSize={0.19} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center">EVENT</Text>}
