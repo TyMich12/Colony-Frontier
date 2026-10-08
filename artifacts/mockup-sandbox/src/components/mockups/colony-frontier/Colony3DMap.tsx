@@ -2080,13 +2080,13 @@ function RoverWorld({
     }
   });
 
-  const showRoute = resource && task !== "STANDBY";
-  const routeEndpoint = roverWaypoints[roverWaypoints.length - 2] ?? home;
+  const showRoute = !!resource && task !== "STANDBY";
+  const visibleRoute = task === "RETURNING" ? [...roverWaypoints].reverse() : roverWaypoints;
 
   return (
     <group>
       {showRoute && (
-        <PathStrip points={[routeEndpoint, destination]} width={0.68} mars={mars} />
+        <PathStrip points={visibleRoute} width={0.72} mars={mars} />
       )}
       <group
         ref={ref}
