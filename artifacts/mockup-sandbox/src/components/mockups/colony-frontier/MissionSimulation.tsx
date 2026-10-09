@@ -1144,8 +1144,12 @@ export function MissionSimulation() {
       setElapsed((current) => {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed);
 
-        if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= EVENT_TIMES[eventPointerRef.current]) {
-          const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
+        const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
+        const scheduleShift = Math.min(18, (missionStage - 1) * 2.2) + (pending.campaign === "mars" ? 4 : 0);
+        const nextEventAt = Math.max(22, EVENT_TIMES[eventPointerRef.current] - scheduleShift);
+        if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= nextEventAt) {
+          const eventIndex = eventPointerRef.current;
+          const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventIndex, metrics);
           eventPointerRef.current += 1;
           setTimeout(() => {
             eventResponseRef.current = null;
@@ -1153,40 +1157,56 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setOperationResult(null);
-            setAiMessage(`CRITICAL INCIDENT: ${event.title}. The affected system has taken an immediate hit. Life support and other systems continue to evolve until you respond.`);
+            setAiMessage(`CRITICAL INCIDENT: ${event.title}. The fault is live now; stored power, consumables and equipment condition continue to change until you respond.`);
 
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
+            const shock = 1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0));
+            const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
+            const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25);
+
+            // The fault is live while the incident panel is open, not merely a one-off score penalty.
+            setActiveFaults((current) => ({
+              ...current,
+              [event.id]: { eventId: event.id, targetTrackId: targetId, title: event.title, remainingSeconds: responseWindow, severity: faultSeverity },
+            }));
             setBuildings((current) => {
               const previous = current[targetId];
               if (!previous) return current;
-              const damage = 3 + Math.min(5, eventPointerRef.current * 0.4);
+              const damage = Math.min(18, (5 + eventIndex * 0.65) * shock);
               const condition = clamp(previous.condition - damage);
               const nextBuildings = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
               if (event.id === "solar-dust" || event.id === "regional-dust-front") {
-                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 12) };
+                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 12 * shock) };
               }
               return nextBuildings;
             });
             setMetrics((current) => {
               switch (event.id) {
                 case "solar-dust":
-                case "regional-dust-front": return { ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 3) };
-                case "battery-thermal": return { ...current, battery: clamp(current.battery - 7), power: clamp(current.power - 2) };
+                case "regional-dust-front": return { ...current, power: clamp(current.power - 5 * shock), battery: clamp(current.battery - 3 * shock) };
+                case "battery-thermal": return { ...current, battery: clamp(current.battery - 7 * shock), power: clamp(current.power - 2 * shock) };
                 case "oxygen-filter":
-                case "co2-scrubber-loading": return { ...current, oxygen: clamp(current.oxygen - 6) };
-                case "water-filter": return { ...current, water: clamp(current.water - 6) };
-                case "habitat-pressure": return { ...current, habitat: clamp(current.habitat - 5) };
-                case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - 3) };
-                case "radiation-burst": return { ...current, radiation: clamp(current.radiation + 7) };
+                case "co2-scrubber-loading": return { ...current, oxygen: clamp(current.oxygen - 6 * shock) };
+                case "water-filter": return { ...current, water: clamp(current.water - 6 * shock) };
+                case "habitat-pressure": return { ...current, habitat: clamp(current.habitat - 5 * shock) };
+                case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - 3 * shock), power: clamp(current.power - 2 * shock) };
+                case "radiation-burst": return { ...current, radiation: clamp(current.radiation + 7 * shock) };
                 case "polar-shadow-cold-soak":
-                  return { ...current, temperature: clamp(current.temperature - 2.5, 16, 28), battery: clamp(current.battery - 5), power: clamp(current.power - 2) };
+                  return { ...current, temperature: clamp(current.temperature - 2.5 * shock, 16, 28), battery: clamp(current.battery - 5 * shock), power: clamp(current.power - 2 * shock) };
                 case "thermal-drift":
-                  return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -2.0 : 2.0), 16, 28), battery: clamp(current.battery - 4) };
+                  return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -2.0 : 2.0) * shock, 16, 28), battery: clamp(current.battery - 4 * shock) };
                 case "grid-overload":
-                case "core-power": return { ...current, power: clamp(current.power - 7), battery: clamp(current.battery - 4) };
-                case "agriculture-stress": return { ...current, food: clamp(current.food - 6) };
+                case "core-power": return { ...current, power: clamp(current.power - 7 * shock), battery: clamp(current.battery - 4 * shock) };
+                case "agriculture-stress": return { ...current, food: clamp(current.food - 6 * shock), water: clamp(current.water - 2 * shock) };
+                case "comms-drift":
+                case "mars-comm-relay-loss": return { ...current, power: clamp(current.power - 2 * shock) };
+                case "rover-wheel":
+                case "extraction-lock":
+                case "isru-pressure": return { ...current, power: clamp(current.power - 3 * shock), battery: clamp(current.battery - 2 * shock) };
+                case "science-anomaly":
+                case "maintenance-alert": return { ...current, power: clamp(current.power - 1.5 * shock) };
                 default: return current;
               }
             });
