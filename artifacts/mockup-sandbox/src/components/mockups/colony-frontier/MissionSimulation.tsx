@@ -1167,7 +1167,7 @@ export function MissionSimulation() {
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "DELIVERED" }));
           message = `CHAIN OF CUSTODY COMPLETE · ${node.label} arrived in the lab. The sample is ready for mineralogical / compositional analysis.`;
-          setRoverTask(hasRover ? "RETURNING" : "SAMPLE DELIVERED");
+          setRoverTask(pending?.selected.rover ? "RETURNING" : "SAMPLE DELIVERED");
           setScore((value) => clamp(value + 4));
         }
         break;
@@ -1188,7 +1188,7 @@ export function MissionSimulation() {
           setResourceYield((value) => value + (confidence >= 82 ? 2 : 1));
           setScore((value) => clamp(value + Math.round(4 + confidence / 18 + scienceBonus)));
           message = `LAB RESULT · ${node.label}. Confidence: ${Math.round(confidence)}% · specimen integrity ${Math.round(integrity)}%. ${finding} Research value: +${(confidence >= 82 ? 2 : 1) + scienceBonus} units. The result is logged with its uncertainty instead of being treated as absolute proof.`;
-          setRoverTask("ANALYSIS COMPLETE");
+          // Keep lab analysis from overwriting the rover’s independent travel state.
         }
         break;
       case "SYSTEM_ACTION": {
@@ -1259,7 +1259,6 @@ export function MissionSimulation() {
       setOperationResult(message);
       if (operation.kind !== "SYSTEM_ACTION") setAiMessage(message);
     }
-    operationCompletionRef.current.delete(operation.id);
     setActiveOperations((current) => {
       const entry = Object.entries(current).find(([, candidate]) => candidate.id === operation.id);
       if (!entry) return current;
