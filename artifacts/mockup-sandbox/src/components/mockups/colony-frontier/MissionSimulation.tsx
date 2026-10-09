@@ -464,7 +464,13 @@ function getActionBlockers(
   }
   if (actionId === "sample" && node) {
     if (stage !== "SURVEYED") blockers.push("Survey this site before collecting a specimen");
-    if ((node.kind === "ICE" || node.kind === "MINERAL")) collectSystemBlockers("extraction", context, blockers);
+    if ((node.kind === "ICE" || node.kind === "MINERAL")) {
+      collectSystemBlockers("extraction", context, blockers);
+      collectSystemBlockers("rover", context, blockers);
+      collectSystemBlockers("navigation", context, blockers);
+    } else {
+      collectSystemBlockers("rover", context, blockers);
+    }
   }
   if (actionId === "transfer" && node && stage !== "COLLECTED") blockers.push("Secure a specimen at this site before returning it");
   if (actionId === "analyze" && node && stage !== "DELIVERED") blockers.push("Return the sealed specimen to the habitat laboratory first");
@@ -1217,7 +1223,7 @@ function BuildingInspector({
       { id: "maintenance-overhaul", label: "Telemetry-guided overhaul", detail: "Comms + navigation + grid let maintenance service multiple systems more effectively." },
     ],
   };
-  const actions = actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }];
+  const actions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
@@ -1392,8 +1398,9 @@ function BuildingInspector({
               : fallbackRemaining > 0
                 ? `Emergency backup recharge · ${Math.ceil(fallbackRemaining)} simulated seconds`
                 : "";
-            const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[action.id] ?? 6);
-            const actionMultiplier = systemPerformanceMultiplier(selected[track.id] ?? tier, upgradeLevel);
+            const variant = decodeActionVariant(track.id, action.id);
+            const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[variant?.baseActionId ?? action.id] ?? 6);
+            const actionMultiplier = operationPerformanceMultiplier(track.id, selected, { [track.id]: runtime }, variant?.supportSystems ?? []);
             return (
             <button
               key={action.id}
