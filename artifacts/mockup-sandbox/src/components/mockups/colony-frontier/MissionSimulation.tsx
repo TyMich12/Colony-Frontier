@@ -480,17 +480,19 @@ function BuildingShape({
 }
 
 const RESOURCE_NODES: Record<"MOON" | "MARS", ResourceNode[]> = {
+  // Field sites sit beyond the traffic lanes and facility pads so the crew can
+  // actually reach them without resource markers hiding on top of road junctions.
   MOON: [
-    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: 165, y: 190, description: "A cold-trap site with a strong water-ice signature." },
-    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 820, y: 285, description: "A bright mineral ridge worth a future extraction run." },
-    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 730, y: 145, description: "Fresh crater ejecta may contain useful scientific data." },
-    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: 225, y: 420, description: "A broad regolith field suitable for rover mapping." },
+    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: 82, y: 200, description: "A cold-trap site with a strong water-ice signature." },
+    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 896, y: 340, description: "A bright mineral ridge worth a future extraction run." },
+    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 852, y: 150, description: "Fresh crater ejecta may contain useful scientific data." },
+    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: 82, y: 410, description: "A broad regolith field suitable for rover mapping." },
   ],
   MARS: [
-    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: 175, y: 205, description: "Orbital data suggests shallow buried water ice." },
-    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 825, y: 275, description: "A high-value iron-rich ridge sits beyond the outpost." },
-    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 725, y: 145, description: "An exposed basalt layer is ideal for geological sampling." },
-    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: 225, y: 425, description: "A wide dust plain offers an easy autonomous mapping route." },
+    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: 60, y: 200, description: "Orbital data suggests shallow buried water ice." },
+    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 918, y: 340, description: "A high-value iron-rich ridge sits beyond the outpost." },
+    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 852, y: 150, description: "An exposed basalt layer is ideal for geological sampling." },
+    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: 82, y: 410, description: "A wide dust plain offers an easy autonomous mapping route." },
   ],
 };
 
