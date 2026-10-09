@@ -51,7 +51,7 @@ import {
 import { Colony3DMap } from "./Colony3DMap";
 
 const TOTAL_MISSION_SECONDS = 14 * 30;
-const EVENT_TIMES = [60, 120, 195, 255, 315, 375];
+const EVENT_TIMES = [42, 88, 135, 183, 232, 282, 332, 382];
 
 const starterCategories = new Set([
   "solar",
@@ -171,11 +171,11 @@ function initialMetrics(selected: Record<string, Tier>): MissionMetrics {
   const optionalCount = Object.keys(selected).filter((id) => !starterCategories.has(id)).length;
 
   return {
-    power: clamp(78 + solar * 6 + Math.max(0, radiation - 1) * 2 - optionalCount * 2),
-    battery: clamp(74 + battery * 6 - optionalCount * 3),
-    oxygen: clamp(93 + oxygen * 2),
-    water: clamp(91 + water * 2),
-    food: clamp(84 + (selected.agriculture ? tierLevel(selected.agriculture) * 4 : 0)),
+    power: clamp(73 + solar * 5.5 + Math.max(0, radiation - 1) * 2 - optionalCount * 3),
+    battery: clamp(68 + battery * 5 - optionalCount * 3),
+    oxygen: clamp(88 + oxygen * 2),
+    water: clamp(86 + water * 2),
+    food: clamp(84 + (selected.agriculture ? tierLevel(selected.agriculture) * 3 : -6)),
     temperature: clamp(21 + thermal * 0.15, 16, 28),
     radiation: clamp(10 - radiation * 1.5),
     habitat: clamp(94 + habitat * 2),
@@ -195,12 +195,17 @@ function selectedTrackData(selected: Record<string, Tier>): TechnologyTrack[] {
   return technologyTracks.filter((track) => isTier(selected[track.id]));
 }
 
-function eventTargetIsDeployed(event: MissionEvent, selected: Record<string, Tier>): boolean {
-  // A power event uses the grid only when it was deployed; otherwise it targets the always-required battery.
+function eventTargetIsDeployed(
+  event: MissionEvent,
+  selected: Record<string, Tier>,
+  environmentLabel: "MOON" | "MARS",
+): boolean {
+  const matchesEnvironment = !event.environment || event.environment === "BOTH" || event.environment === environmentLabel;
+  // A power incident targets the grid if installed, otherwise the required battery / solar bus.
   const targetId = event.trackId === "power"
     ? (selected.grid ? "grid" : selected.battery ? "battery" : selected.solar ? "solar" : null)
     : event.trackId;
-  return Boolean(targetId && isTier(selected[targetId]));
+  return matchesEnvironment && Boolean(targetId && isTier(selected[targetId]));
 }
 
 function pickNextEvent(
@@ -210,11 +215,11 @@ function pickNextEvent(
   scheduleIndex: number,
   metrics: MissionMetrics,
 ): MissionEvent {
-  const available = EVENT_DEFS.filter((event) => eventTargetIsDeployed(event, selected));
+  const available = EVENT_DEFS.filter((event) => eventTargetIsDeployed(event, selected, environmentLabel));
   const unresolved = available.filter((event) => !resolvedEventIds.includes(event.id));
   const has = (eventId: string) => {
     const event = available.find((candidate) => candidate.id === eventId);
-    return event ?? null;
+    return event && !resolvedEventIds.includes(event.id) ? event : null;
   };
 
   // Scripted moments are preferred, but only when their actual target exists in this loadout.
@@ -992,10 +997,12 @@ export function MissionSimulation() {
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [surveyedNodes, setSurveyedNodes] = useState<string[]>(() => runtime?.surveyedNodes ?? []);
   const [sampleStages, setSampleStages] = useState<Record<string, SampleStage>>(() => runtime?.sampleStages ?? Object.fromEntries((runtime?.surveyedNodes ?? []).map((id) => [id, "SURVEYED" as SampleStage])));
+  const [sampleQuality, setSampleQuality] = useState<Record<string, number>>(() => runtime?.sampleQuality ?? {});
   const [resourceYield, setResourceYield] = useState(runtime?.resourceYield ?? 0);
   const [activeOperation, setActiveOperation] = useState<MissionOperation | null>(() => runtime?.activeOperation ?? null);
   const [operationResult, setOperationResult] = useState<string | null>(() => runtime?.operationResult ?? null);
   const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
+  const [emergencyPowerMode, setEmergencyPowerMode] = useState(runtime?.emergencyPowerMode ?? false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const operationCompletionRef = useRef<string | null>(null);
   const [manualActions, setManualActions] = useState(0);
@@ -1004,7 +1011,7 @@ export function MissionSimulation() {
   const [results, setResults] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const eventPointerRef = useRef(
-    (runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0),
+    runtime?.eventsTriggered ?? ((runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0)),
   );
   const eventResponseRef = useRef<string | null>(null);
   const completionSavedRef = useRef(false);
@@ -1013,10 +1020,11 @@ export function MissionSimulation() {
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
   const selectedTier = selectedTrack && pending ? pending.selected[selectedTrack.id] : undefined;
   const activeEventCandidate = activeEventId ? EVENT_DEFS.find((event) => event.id === activeEventId) ?? null : null;
+  const missionEnvironmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const storedEventIsInvalid = Boolean(
-    activeEventId && pending && (!activeEventCandidate || !eventTargetIsDeployed(activeEventCandidate, pending.selected)),
+    activeEventId && pending && (!activeEventCandidate || !eventTargetIsDeployed(activeEventCandidate, pending.selected, missionEnvironmentLabel)),
   );
-  const activeEvent = activeEventCandidate && pending && eventTargetIsDeployed(activeEventCandidate, pending.selected)
+  const activeEvent = activeEventCandidate && pending && eventTargetIsDeployed(activeEventCandidate, pending.selected, missionEnvironmentLabel)
     ? activeEventCandidate
     : null;
   const activeTargetTrackId = activeEvent?.trackId === "power"
@@ -1307,8 +1315,11 @@ export function MissionSimulation() {
       activeOperation,
       operationResult,
       activeFaults,
+      sampleQuality,
+      emergencyPowerMode,
+      eventsTriggered: eventPointerRef.current,
     });
-  }, [activeEventId, activeFaults, activeOperation, aiMessage, buildings, decisions, elapsed, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleStages, score, surveyedNodes]);
+  }, [activeEventId, activeFaults, activeOperation, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
