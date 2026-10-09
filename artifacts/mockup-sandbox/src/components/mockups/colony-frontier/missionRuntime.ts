@@ -43,7 +43,7 @@ export type MissionDecision = {
 
 export type SampleStage = "UNSURVEYED" | "SURVEYED" | "COLLECTED" | "DELIVERED" | "ANALYSED";
 
-export type MissionOperationKind = "SURVEY" | "COLLECT" | "TRANSFER" | "ANALYZE" | "UPGRADE";
+export type MissionOperationKind = "SURVEY" | "COLLECT" | "TRANSFER" | "ANALYZE" | "UPGRADE" | "REPAIR";
 
 export type MissionOperation = {
   id: string;
@@ -53,6 +53,8 @@ export type MissionOperation = {
   totalSeconds: number;
   remainingSeconds: number;
   targetLevel?: number;
+  /** Sample integrity score captured when a sealed sample is collected. */
+  sampleQuality?: number;
 };
 
 export type ActiveFault = {
@@ -81,6 +83,10 @@ export type MissionRuntimeSnapshot = {
   activeOperation?: MissionOperation | null;
   operationResult?: string | null;
   activeFaults?: Record<string, ActiveFault>;
+  /** Quality is frozen at collection so later lab analysis uses the actual specimen. */
+  sampleQuality?: Record<string, number>;
+  /** Temporary load-shedding state, persisted across refreshes. */
+  emergencyPowerMode?: boolean;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
