@@ -1220,9 +1220,11 @@ export function MissionSimulation() {
         }
         break;
       case "SYSTEM_ACTION": {
-        applyBuildingActionRef.current(operation.targetId, operation.actionId ?? "inspect");
+        const actionId = operation.actionId ?? "inspect";
+        applyBuildingActionRef.current(operation.targetId, actionId);
         const track = technologyTracks.find((item) => item.id === operation.targetId);
-        message = `ACTION COMPLETE · ${track?.category ?? operation.targetId} · ${operation.actionId ?? "inspect"}. The completed work has been applied to the colony.`;
+        const outcome = SYSTEM_ACTION_EFFECTS[actionId];
+        message = `ACTION COMPLETE · ${track?.category ?? operation.targetId} · ${actionId}. ${outcome ? `Recorded outcome: ${outcome}.` : "The completed work has been applied to the colony."}`;
         break;
       }
       case "UPGRADE": {
@@ -2102,7 +2104,7 @@ export function MissionSimulation() {
     const hasRover = pending.selected.rover !== undefined;
     const hasExtraction = pending.selected.extraction !== undefined;
     const hasScience = pending.selected.science !== undefined;
-    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"));
+    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover") || (hasRover && operation.kind === "SYSTEM_ACTION" && operation.targetId === "solar" && operation.actionId === "clean") || (hasRover && operation.kind === "REPAIR" && roverTask.startsWith("REPAIRING ")));
     if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress) || (hasScience && activeOperationsRef.current.science)) return;
     const roverTier = tierLevel(pending.selected.rover ?? "Foundation");
     const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
@@ -2167,7 +2169,7 @@ export function MissionSimulation() {
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
     const roverOnFieldJob = pending.selected.rover !== undefined && Object.values(activeOperationsRef.current).some((operation) =>
-      operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"),
+      operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover") || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "solar" && operation.actionId === "clean") || (operation.kind === "REPAIR" && roverTask.startsWith("REPAIRING ")),
     );
     if (roverOnFieldJob && (trackId === "rover" || action === "survey" || action === "return" || (action === "clean" && pending.selected.rover))) {
       setOperationResult("ROVER UNAVAILABLE · The rover is already committed to field work. Finish that job or return it to base before dispatching it elsewhere.");
