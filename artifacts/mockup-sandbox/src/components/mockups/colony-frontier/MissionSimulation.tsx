@@ -1172,7 +1172,7 @@ export function MissionSimulation() {
           }, 0);
         }
 
-        if (next >= TOTAL_MISSION_SECONDS) {
+        if (next >= TOTAL_MISSION_SECONDS && !activeEventId && !activeOperation) {
           setTimeout(() => setResults(true), 0);
         }
 
@@ -1253,9 +1253,15 @@ export function MissionSimulation() {
 
       const dt = 0.25 * speed;
       if (Object.keys(activeFaults).length > 0) {
-        setActiveFaults((current) => Object.fromEntries(Object.entries(current)
-          .map(([key, fault]) => [key, { ...fault, remainingSeconds: Math.max(0, fault.remainingSeconds - dt) }])
-          .filter(([, fault]) => (fault as ActiveFault).remainingSeconds > 0)) as Record<string, ActiveFault>);
+        setActiveFaults((current) => Object.fromEntries(Object.entries(current).map(([key, fault]) => {
+          const overdue = fault.remainingSeconds <= dt;
+          return [key, {
+            ...fault,
+            remainingSeconds: Math.max(0, fault.remainingSeconds - dt),
+            // After the response window expires, the fault cascades until a real repair action clears it.
+            severity: overdue ? Math.min(3, fault.severity + 0.025 * dt) : fault.severity,
+          }];
+        })) as Record<string, ActiveFault>);
       }
     }, 250);
 
@@ -2343,7 +2349,7 @@ export function MissionSimulation() {
                     <div className="mt-2 space-y-2">
                       {Object.values(activeFaults).map((fault) => (
                         <div key={fault.eventId} className="rounded-xl border border-[#713b44] bg-[#26161d] p-2.5">
-                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{Math.ceil(fault.remainingSeconds)}s</span></div>
+                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{fault.remainingSeconds > 0 ? `${Math.ceil(fault.remainingSeconds)}s` : "OVERDUE"}</span></div>
                           <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#d59097]">Degrading {fault.targetTrackId.toUpperCase()} · severity {fault.severity.toFixed(1)}×</p>
                         </div>
                       ))}
