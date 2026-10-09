@@ -845,6 +845,10 @@ function ResourceInspector({
   hasRover,
   hasExtraction,
   hasScience,
+  roverTier,
+  extractionTier,
+  scienceTier,
+  navigationTier,
   operation,
   actionBusy,
   onAction,
@@ -855,6 +859,10 @@ function ResourceInspector({
   hasRover: boolean;
   hasExtraction: boolean;
   hasScience: boolean;
+  roverTier: number;
+  extractionTier: number;
+  scienceTier: number;
+  navigationTier: number;
   operation: MissionOperation | null;
   actionBusy: boolean;
   onAction: (action: string) => void;
@@ -871,10 +879,10 @@ function ResourceInspector({
   const isThisOperation = Boolean(operation && operation.targetId === node.id);
   const canStart = !operation && !actionBusy;
   const nextAction =
-    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Start rover survey" : "Start remote survey", seconds: hasRover ? 12 : 22, detail: hasRover ? "Rover mapping + close-range instrument readings." : "Orbital / fixed-sensor scan; slower and lower confidence." } :
-    stage === "SURVEYED" ? { id: "sample", label: hasExtraction ? "Collect core sample" : "Collect field sample", seconds: hasExtraction ? (hasRover ? 16 : 21) : (hasRover ? 24 : 30), detail: hasExtraction ? "Drill / sampler consumes energy; sealed core retained for analysis." : "Crew EVA sampler is slower and increases exposure." } :
-    stage === "COLLECTED" ? { id: "transfer", label: hasRover ? "Return sample to lab" : "Carry sample to lab", seconds: hasRover ? 12 : 22, detail: hasRover ? "Rover transports the sealed sample along the site route." : "Crew transfer takes longer and adds EVA exposure." } :
-    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Run lab analysis" : "Run portable assay", seconds: hasScience ? 20 : 32, detail: hasScience ? "Spectrometry with the selected science system." : "Portable assay is slower and produces a lower-confidence result." } :
+    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Start rover survey" : "Start remote survey", seconds: hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2), detail: hasRover ? "Rover mapping + close-range instrument readings." : "Orbital / fixed-sensor scan; slower and lower confidence." } :
+    stage === "SURVEYED" ? { id: "sample", label: hasExtraction ? "Collect core sample" : "Collect field sample", seconds: hasExtraction ? Math.max(10, (hasRover ? 16 : 21) - extractionTier * 2) : hasRover ? Math.max(16, 24 - roverTier * 1.4) : 30, detail: hasExtraction ? "Drill / sampler consumes energy; sealed core retained for analysis." : "Crew EVA sampler is slower and increases exposure." } :
+    stage === "COLLECTED" ? { id: "transfer", label: hasRover ? "Return sample to lab" : "Carry sample to lab", seconds: hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5), detail: hasRover ? "Rover transports the sealed sample along the site route." : "Crew transfer takes longer and adds EVA exposure." } :
+    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Run lab analysis" : "Run portable assay", seconds: hasScience ? Math.max(12, 20 - scienceTier * 2) : 32, detail: hasScience ? "Spectrometry with the selected science system." : "Portable assay is slower and produces a lower-confidence result." } :
     null;
   const progress = isThisOperation && operation ? Math.round(100 * (1 - operation.remainingSeconds / operation.totalSeconds)) : 0;
 
@@ -1183,8 +1191,11 @@ export function MissionSimulation() {
         const solarTier = tierLevel(pending.selected.solar ?? "Foundation");
         const batteryTier = tierLevel(pending.selected.battery ?? "Foundation");
         const oxygenTier = tierLevel(pending.selected.oxygen ?? "Foundation");
+        const co2Tier = tierLevel(pending.selected.co2 ?? "Foundation");
         const waterTier = tierLevel(pending.selected.water ?? "Foundation");
         const thermalTier = tierLevel(pending.selected.thermal ?? "Foundation");
+        const radiationTier = tierLevel(pending.selected.radiation ?? "Foundation");
+        const habitatTier = tierLevel(pending.selected.habitat ?? "Foundation");
         const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
         const solarDust = buildings.solar?.dust ?? 0;
         const solarUpgrade = buildings.solar?.upgradeLevel ?? 0;
@@ -1197,6 +1208,8 @@ export function MissionSimulation() {
         const powerBase = 72 + solarTier * 7.5 + solarUpgrade * 4.5 - solarDust * 0.4 - optionalCount * 2.0 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0);
         const demandPenalty = Math.max(0, 70 - powerBase);
         const batteryDelta = (powerBase > 84 ? 0.008 : powerBase > 73 ? 0.002 : powerBase > 64 ? -0.012 - demandPenalty * 0.0005 : -0.024 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.014;
+        const oxygenDrain = Math.max(0.0014, 0.0085 - oxygenTier * 0.0018 - co2Tier * 0.0007 - oxygenUpgrade * 0.0008);
+        const waterDrain = Math.max(0.0012, 0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007);
         const dt = 0.25 * speed;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
           const amount = dt * fault.severity;
@@ -1223,12 +1236,12 @@ export function MissionSimulation() {
         return {
           power: clamp(powerBase - faultImpact.power),
           battery: clamp(current.battery + batteryDelta * speed - faultImpact.battery),
-          oxygen: clamp(current.oxygen - (0.0085 - oxygenTier * 0.0018 - oxygenUpgrade * 0.0008) * speed - faultImpact.oxygen),
-          water: clamp(current.water - (0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007) * speed - faultImpact.water),
+          oxygen: clamp(current.oxygen - oxygenDrain * speed - faultImpact.oxygen),
+          water: clamp(current.water - waterDrain * speed - faultImpact.water),
           food: clamp(current.food - Math.max(0.0014, 0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0019 : 0) - foodUpgrade * 0.0011) * speed - faultImpact.food),
           temperature: clamp(current.temperature + (21 - current.temperature) * (0.009 + (thermalTier + thermalUpgrade) * 0.0045) * speed + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
-          radiation: clamp(current.radiation + 0.003 * speed + faultImpact.radiation),
-          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatUpgrade * 0.0012) * speed - faultImpact.habitat),
+          radiation: clamp(current.radiation + Math.max(0.0006, 0.003 - radiationTier * 0.00065) * speed + faultImpact.radiation),
+          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.0012) * speed - faultImpact.habitat),
         };
       });
 
@@ -1299,7 +1312,8 @@ export function MissionSimulation() {
     const firstTime = !pending.replay && !alreadyComplete;
     const analysedSamples = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
     // Field science earns extra XP only on the first clear; replay farming is intentionally limited.
-    const researchBonusXp = firstTime ? analysedSamples * 120 : 0;
+    const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
+    const researchBonusXp = firstTime ? analysedSamples * (120 + scienceTier * 20) : 0;
     const missionXpReward = pending.rewardXp + researchBonusXp;
     const nextState = {
       ...finalState,
@@ -1741,27 +1755,31 @@ export function MissionSimulation() {
     const hasRover = pending.selected.rover !== undefined;
     const hasExtraction = pending.selected.extraction !== undefined;
     const hasScience = pending.selected.science !== undefined;
+    const roverTier = tierLevel(pending.selected.rover ?? "Foundation");
+    const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
+    const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
+    const navigationTier = tierLevel(pending.selected.navigation ?? "Foundation");
 
     if (action === "survey" && stage === "UNSURVEYED") {
-      const duration = hasRover ? 12 : 22;
+      const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2);
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration);
       setRoverTask(hasRover ? `MAPPING ${node.label.toUpperCase()}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
     if (action === "sample" && stage === "SURVEYED") {
-      const duration = hasExtraction ? (hasRover ? 16 : 21) : (hasRover ? 24 : 30);
+      const duration = hasExtraction ? Math.max(10, (hasRover ? 16 : 21) - extractionTier * 2) : hasRover ? Math.max(16, 24 - roverTier * 1.4) : 30;
       if (metrics.power < 7 || metrics.battery < 3) {
         setOperationResult("COLLECTION HELD · Sampling requires at least 7% power and 3% battery reserve. Restore the energy margin first.");
         return;
       }
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, duration);
-      setMetrics((current) => ({ ...current, power: clamp(current.power - (hasExtraction ? 5 : 3)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
+      setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
       setRoverTask(hasExtraction ? "DRILLING CORE" : hasRover ? "SAMPLING SITE" : "EVA SAMPLING");
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
-      const duration = hasRover ? 12 : 22;
+      const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5);
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration);
       setRoverTask(hasRover ? "CARRYING SAMPLE" : "EVA SAMPLE RETURN");
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
@@ -2114,7 +2132,7 @@ export function MissionSimulation() {
 
   if (results) {
     const analysedSamples = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
-    const researchBonusXp = pending && !pending.replay ? analysedSamples * 120 : 0;
+    const researchBonusXp = pending && !pending.replay ? analysedSamples * (120 + tierLevel(pending.selected.science ?? "Foundation") * 20) : 0;
     const checks: [string, boolean][] = [
       ["SURVIVAL", true],
       ["POWER STABILITY", performance.colonyHealth >= 55],
@@ -2391,6 +2409,10 @@ export function MissionSimulation() {
             hasRover={pending.selected.rover !== undefined}
             hasExtraction={pending.selected.extraction !== undefined}
             hasScience={pending.selected.science !== undefined}
+            roverTier={tierLevel(pending.selected.rover ?? "Foundation")}
+            extractionTier={tierLevel(pending.selected.extraction ?? "Foundation")}
+            scienceTier={tierLevel(pending.selected.science ?? "Foundation")}
+            navigationTier={tierLevel(pending.selected.navigation ?? "Foundation")}
             operation={activeOperation}
             actionBusy={actionBusy}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
