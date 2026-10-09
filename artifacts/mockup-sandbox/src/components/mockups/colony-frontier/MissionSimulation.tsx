@@ -877,6 +877,7 @@ function BuildingInspector({
   onEventChoice,
   power,
   battery,
+  getBlockers,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -892,6 +893,7 @@ function BuildingInspector({
   onEventChoice: (choiceId: string) => void;
   power: number;
   battery: number;
+  getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -969,7 +971,13 @@ function BuildingInspector({
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
   const upgradeLevel = runtime.upgradeLevel ?? 0;
-  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5 && !operation;
+  const connection = SYSTEM_CONNECTIONS[track.id] ?? {};
+  const downstream = Object.entries(SYSTEM_CONNECTIONS).filter(([, links]) => links.outputs?.includes(track.id)).map(([id]) => id);
+  const connectionText = [
+    ...(connection.all ?? []).map((id) => SYSTEM_LABELS[id] ?? id),
+    ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
+  ];
+  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -1005,6 +1013,15 @@ function BuildingInspector({
             )}
           </div>
         </div>
+
+        <section className="mx-4 mt-3 rounded-xl border border-[#2d4d53] bg-[#0d2025] p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#8dc9b6]">System connections</p>
+            <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${connectionText.length && connectionText.every((label) => getBlockers(track.id, "inspect").length === 0) ? "bg-[#173d32] text-[#8ce3b0]" : "bg-[#253438] text-[#9ab0ae]"}`}>Live dependency graph</span>
+          </div>
+          <p className="mt-1.5 text-[9px] leading-4 text-[#a5c0c1]">{connectionText.length ? `Requires: ${connectionText.join(" · ")}` : "Upstream source system — produces or anchors a core colony resource."}</p>
+          <p className="mt-1 text-[9px] leading-4 text-[#6fa294]">Feeds: {downstream.length ? downstream.map((id) => SYSTEM_LABELS[id] ?? id).join(" · ") : "No direct downstream consumer"}</p>
+        </section>
 
         {operation && (
           <section className="mx-4 mt-4 rounded-2xl border border-[#5c9e87] bg-gradient-to-r from-[#12392f] to-[#10262c] p-4 shadow-[0_0_28px_rgba(79,210,158,0.10)]">
@@ -1082,12 +1099,15 @@ function BuildingInspector({
         )}
 
         <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
-          {actions.map((action, index) => (
+          {actions.map((action, index) => {
+            const blockers = getBlockers(track.id, action.id);
+            const locked = blockers.length > 0;
+            return (
             <button
               key={action.id}
               type="button"
               onClick={() => onAction(action.id)}
-              disabled={actionBusy || Boolean(operation)}
+              disabled={actionBusy || Boolean(operation) || locked}
               className="group min-w-0 rounded-2xl border border-[#35505a] bg-[#14262d] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f2cd64] hover:bg-[#1b343d] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
             >
               <span className="flex items-start gap-2">
@@ -1098,6 +1118,7 @@ function BuildingInspector({
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">~{SYSTEM_ACTION_SECONDS[action.id] ?? 6}s</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}</span>
+                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">LOCKED · {blockers.join(" · ")}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
                 </span>
               </span></button>
           ))}
@@ -1118,7 +1139,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] text-[#e3a2a0]">Requires at least 8 power and 5 battery reserve.</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || "Requires at least 8% power and 5% battery reserve."}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -2250,6 +2271,25 @@ export function MissionSimulation() {
     setActiveEventId(null);
   };
 
+  const checkActionPrerequisites = (systemId: string, actionId: string, nodeId?: string) => {
+    const nodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
+    const node = nodeId ? nodes.find((item) => item.id === nodeId) : undefined;
+    return getActionBlockers(
+      systemId,
+      actionId,
+      {
+        selected: pending?.selected ?? {},
+        buildings,
+        activeFaults,
+        metrics,
+        surveyedNodes,
+        sampleStages,
+        resourceYield,
+      },
+      node,
+    );
+  };
+
   const beginOperation = (
     kind: MissionOperation["kind"],
     targetId: string,
@@ -2287,6 +2327,12 @@ export function MissionSimulation() {
     const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
     const node = nodes.find((item) => item.id === nodeId);
     if (!node) return;
+    const blockers = checkActionPrerequisites("field", action, nodeId);
+    if (blockers.length > 0) {
+      setOperationResult(`FIELD OPERATION LOCKED · ${blockers.join(" · ")}.`);
+      setAiMessage(`FIELD OPERATION LOCKED · ${blockers.join(" · ")}.`);
+      return;
+    }
     const stage = sampleStages[nodeId] ?? (surveyedNodes.includes(nodeId) ? "SURVEYED" : "UNSURVEYED");
     const hasRover = pending.selected.rover !== undefined;
     const hasExtraction = pending.selected.extraction !== undefined;
@@ -2301,7 +2347,7 @@ export function MissionSimulation() {
     if (action === "survey" && stage === "UNSURVEYED") {
       const duration = hasRover ? Math.max(9, 12 - roverTier * 1.0 - navigationTier * 0.35) : Math.max(17, 22 - navigationTier * 1.2);
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
-      setRoverTask(hasRover ? `SURVEYING ${node.label}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
+      setRoverTask(`SURVEYING ${node.label}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
@@ -2322,7 +2368,7 @@ export function MissionSimulation() {
     if (action === "transfer" && stage === "COLLECTED") {
       const duration = hasRover ? Math.max(11, 14 - roverTier * 1.0) : Math.max(16, 22 - navigationTier * 1.5);
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
-      setRoverTask(hasRover ? `TRANSFERRING ${node.label}` : "EVA SAMPLE RETURN");
+      setRoverTask(`TRANSFERRING ${node.label}`);
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
       return;
     }
@@ -2355,6 +2401,12 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
+    const blockers = checkActionPrerequisites(trackId, action);
+    if (blockers.length > 0) {
+      setOperationResult(`ACTION LOCKED · ${blockers.join(" · ")}.`);
+      setAiMessage(`ACTION LOCKED · ${blockers.join(" · ")}.`);
+      return;
+    }
     const roverOnFieldJob = pending.selected.rover !== undefined && Object.values(activeOperationsRef.current).some((operation) =>
       operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover") || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "solar" && operation.actionId === "clean") || (operation.kind === "REPAIR" && roverTask.startsWith("REPAIRING ")),
     );
