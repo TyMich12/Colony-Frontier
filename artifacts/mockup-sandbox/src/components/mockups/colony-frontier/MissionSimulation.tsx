@@ -1250,7 +1250,10 @@ function BuildingInspector({
       { id: "maintenance-overhaul", label: "Telemetry-guided overhaul", detail: "Comms + navigation + grid let maintenance service multiple systems more effectively." },
     ],
   };
-  const actions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
+  const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
+  const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
+  const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
+  const actions = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return !variant || variant.mask === 0 || showIntegratedMethods; });
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
@@ -1420,7 +1423,18 @@ function BuildingInspector({
           </div>
           <p className="mt-1.5 text-[9px] leading-4 text-[#91aaa8]">Every facility has a small fallback intervention. Specialist methods unlock when their required systems are deployed, connected, and healthy.</p>
         </section>
-        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
+        {integratedOptionCount > 0 && (
+          <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#344e52] bg-[#0d1c21] px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#c6d7d0]">Integrated methods</p>
+              <p className="mt-0.5 text-[8px] leading-4 text-[#819d98]">Combine up to three connected systems for better efficiency.</p>
+            </div>
+            <button type="button" onClick={() => setShowIntegratedMethods((open) => !open)} className="shrink-0 rounded-lg border border-[#607c70] bg-[#19352c] px-3 py-2 text-[8px] font-black uppercase tracking-[0.08em] text-[#b7f0ca] hover:border-[#e7c567]">
+              {showIntegratedMethods ? "Hide combinations" : "Show " + integratedOptionCount + " combinations"}
+            </button>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3>
           {actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
             const emergencyOverride = action.id.startsWith("fallback-") && fallbackEmergencyOverride(action.id, track.id, metrics, Boolean(activeFault));
