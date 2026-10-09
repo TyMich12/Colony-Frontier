@@ -526,6 +526,33 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
   return Math.max(0, 20 - tierLevel(tier) * 4.8 - Math.max(0, Math.min(2, upgradeLevel)) * 2);
 }
 
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number): { label: string; value: string } {
+  const performance = systemPerformanceMultiplier(tier, upgradeLevel);
+  const outputs: Record<string, { label: string; base: number; unit: string; digits?: number }> = {
+    solar: { label: "Array energy delivered", base: 220, unit: "kJ / 10 sim s", digits: 0 },
+    battery: { label: "Usable stored energy", base: 12, unit: "kWh", digits: 1 },
+    oxygen: { label: "Oxygen production", base: 0.84, unit: "kg O₂ / crew-day", digits: 2 },
+    water: { label: "Water recovery", base: 96, unit: "L / day", digits: 1 },
+    co2: { label: "CO₂ removal capacity", base: 3.6, unit: "kg / crew-day", digits: 2 },
+    thermal: { label: "Thermal control capacity", base: 4.5, unit: "kW thermal", digits: 2 },
+    comms: { label: "Data-link throughput", base: 2.4, unit: "Mbit/s", digits: 2 },
+    habitat: { label: "Cabin operating pressure", base: 70, unit: "kPa", digits: 1 },
+    radiation: { label: "Shelter dose-rate target", base: 0.18, unit: "mSv / day", digits: 2 },
+    grid: { label: "Power distribution capacity", base: 8, unit: "kW", digits: 2 },
+    science: { label: "Sample analyses", base: 3, unit: "samples / day", digits: 1 },
+    navigation: { label: "Position uncertainty", base: 1.5, unit: "m (lower is better)", digits: 2 },
+    rover: { label: "Cruise speed", base: 0.4, unit: "m/s", digits: 2 },
+    extraction: { label: "Core recovery rate", base: 1.5, unit: "kg / h", digits: 2 },
+    isru: { label: "O₂ from local feedstock", base: 0.7, unit: "kg / day", digits: 2 },
+    agriculture: { label: "Edible biomass yield", base: 0.8, unit: "kg / day", digits: 2 },
+    maintenance: { label: "Repair throughput", base: 1.2, unit: "work units / h", digits: 2 },
+    power: { label: "Managed power margin", base: 8, unit: "kW", digits: 2 },
+  };
+  const output = outputs[systemId] ?? { label: "Nominal system throughput", base: 1, unit: "units / day", digits: 2 };
+  const value = systemId === "navigation" ? output.base / performance : output.base * performance;
+  return { label: output.label, value: value.toFixed(output.digits ?? 2) + " " + output.unit };
+}
+
 function combinedPerformanceMultiplier(...values: number[]): number {
   if (values.length === 0) return 1;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -1252,6 +1279,14 @@ function BuildingInspector({
               <p className="mt-1 text-[11px] leading-4 text-[#9fb0b2]">{track.description}</p>
             </div>
             <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3c5056] bg-[#0a1317] text-xl text-[#9fb0b3] transition hover:border-[#f0c964] hover:text-white" aria-label="Close building panel">×</button>
+          </div>
+          <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
+            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
+            <div className="mt-1 flex items-baseline justify-between gap-3">
+              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel).label}</span>
+              <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel).value}</span>
+            </div>
+            <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes this rated output. A higher technology tier is a larger improvement than both retrofit steps combined.</p>
           </div>
           <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
             <div>
