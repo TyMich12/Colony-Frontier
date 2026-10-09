@@ -168,8 +168,8 @@ const SYSTEM_CONNECTIONS: Record<string, { all?: string[]; any?: string[]; outpu
   extraction: { all: ["rover", "navigation", "water"], any: ["grid", "battery"], outputs: ["isru"] },
   isru: { all: ["extraction", "water"], any: ["grid", "battery"], outputs: ["agriculture"] },
   science: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], outputs: [] },
-  agriculture: { all: ["water", "co2", "oxygen", "thermal", "isru"], any: ["grid", "battery"], outputs: [] },
-  maintenance: { all: ["comms", "grid"], any: ["battery"], outputs: ["all systems"] },
+  agriculture: { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], outputs: [] },
+  maintenance: { all: ["comms"], any: ["grid", "battery"], outputs: ["all systems"] },
 };
 
 type ActionRequirementRule = {
@@ -215,10 +215,10 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
   extract: { all: ["rover", "navigation", "water"], any: ["grid", "battery"], minPower: 7, minBattery: 3, surveyedSite: true },
   process: { all: ["extraction", "water"], any: ["grid", "battery"], minPower: 5, minBattery: 2, extractedFeed: true },
   purge: { all: ["extraction", "water"], any: ["grid", "battery"], minPower: 2 },
-  "tune-crops": { all: ["water", "co2", "oxygen", "thermal", "isru", "habitat"], any: ["grid", "battery"], minPower: 4 },
-  harvest: { all: ["water", "co2", "oxygen", "thermal", "isru", "habitat"], any: ["grid", "battery"], minPower: 2 },
-  service: { all: ["comms", "grid"], any: ["battery"], minPower: 2 },
-  diagnostics: { all: ["comms", "grid"], any: ["battery"], minPower: 2 },
+  "tune-crops": { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], minPower: 4 },
+  harvest: { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], minPower: 2 },
+  service: { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
+  diagnostics: { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
   "repair-active": { minPower: 5, minBattery: 2 },
   upgrade: { minPower: 8, minBattery: 5 },
   sample: { all: ["rover", "navigation"], any: ["battery", "grid"], minPower: 7, minBattery: 3 },
@@ -975,7 +975,7 @@ function BuildingInspector({
   const dust = Math.round(runtime.dust);
   const upgradeLevel = runtime.upgradeLevel ?? 0;
   const connection = SYSTEM_CONNECTIONS[track.id] ?? {};
-  const downstream = Object.entries(SYSTEM_CONNECTIONS).filter(([, links]) => links.outputs?.includes(track.id)).map(([id]) => id);
+  const downstream = Object.entries(SYSTEM_CONNECTIONS).filter(([id, links]) => links.outputs?.includes(track.id) || (id === "maintenance" && track.id !== "maintenance" && links.outputs?.includes("all systems"))).map(([id]) => id);
   const connectionText = [
     ...(connection.all ?? []).map((id) => SYSTEM_LABELS[id] ?? id),
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
@@ -1694,7 +1694,6 @@ export function MissionSimulation() {
         const gridOnline = systemIsOperational("grid", dependencyContext);
         const oxygenOnline = systemIsOperational("oxygen", dependencyContext);
         const waterOnline = systemIsOperational("water", dependencyContext);
-        const co2Online = systemIsOperational("co2", dependencyContext);
         const thermalOnline = systemIsOperational("thermal", dependencyContext);
         const radiationOnline = systemIsOperational("radiation", dependencyContext);
         const maintenanceOnline = systemIsOperational("maintenance", dependencyContext);
