@@ -743,6 +743,7 @@ function IsometricMap({
   surveyedNodes,
   onSelectResource,
   roverTask,
+  roverTargetNodeId,
   speed,
 }: {
   tracks: TechnologyTrack[];
@@ -758,6 +759,7 @@ function IsometricMap({
   surveyedNodes: string[];
   onSelectResource: (node: ResourceNode) => void;
   roverTask: string;
+  roverTargetNodeId: string | null;
   speed: number;
 }) {
   return (
@@ -776,6 +778,7 @@ function IsometricMap({
       onSelect={onSelect}
       onSelectResource={onSelectResource}
       roverTask={roverTask}
+      roverTargetNodeId={roverTargetNodeId}
       simulationSpeed={speed}
     />
   );
@@ -1379,6 +1382,18 @@ export function MissionSimulation() {
   const selectedResource = selectedResourceId
     ? RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === selectedResourceId)
     : undefined;
+  const currentMissionNodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
+  const roverTaskTargetPrefix = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "].find((prefix) => roverTask.startsWith(prefix));
+  const roverTaskTarget = roverTaskTargetPrefix
+    ? currentMissionNodes.find((node) => node.label === roverTask.slice(roverTaskTargetPrefix.length))
+    : undefined;
+  const roverFieldWorkOrder = Object.values(activeOperations).find((operation) => operation.roverAssigned);
+  const roverWorkOrderHasSiteTarget = roverFieldWorkOrder?.kind === "SURVEY" || roverFieldWorkOrder?.kind === "COLLECT";
+  const roverTargetNodeId = roverFieldWorkOrder?.kind === "TRANSFER"
+    ? null
+    : roverWorkOrderHasSiteTarget
+      ? roverFieldWorkOrder?.targetId ?? null
+      : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
 
@@ -2927,6 +2942,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
           }}
           roverTask={roverTask}
+          roverTargetNodeId={roverTargetNodeId}
           speed={speed}
         />
 
