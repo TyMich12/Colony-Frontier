@@ -1122,159 +1122,175 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
     const [bx, bz] = route[(i + 1) % route.length];
     const x = THREE.MathUtils.lerp(ax, bx, f);
     const z = THREE.MathUtils.lerp(az, bz, f);
-    ref.current.position.set(x, -0.176 + Math.abs(Math.sin(time * 5 + phaseOffset)) * 0.025, z);
+    ref.current.position.set(x, -0.176 + Math.abs(Math.sin(time * 3.4 + phaseOffset)) * 0.012, z);
     ref.current.rotation.y = Math.atan2(bx - ax, bz - az);
 
-    const gait = Math.sin(time * 5.2 + phaseOffset) * 0.28;
+    // Slower, weightier EVA gait rather than a twitchy robot walk.
+    const gait = Math.sin(time * 3.2 + phaseOffset) * 0.2;
     if (leftArm.current) leftArm.current.rotation.x = gait;
     if (rightArm.current) rightArm.current.rotation.x = -gait;
-    if (leftLeg.current) leftLeg.current.rotation.x = -gait * 0.72;
-    if (rightLeg.current) rightLeg.current.rotation.x = gait * 0.72;
+    if (leftLeg.current) leftLeg.current.rotation.x = -gait * 0.8;
+    if (rightLeg.current) rightLeg.current.rotation.x = gait * 0.8;
   });
 
-  // Realistic EVA palette: neutral thermal-micrometeoroid layers, fabric patches,
-  // dark joint seals, and only subdued instrument colours.
-  const suit = mars ? "#d4c6b8" : "#e0e2db";
-  const trim = mars ? "#765f55" : "#5d696a";
+  const suit = mars ? "#d6c7b9" : "#e2e4de";
+  const fabric = mars ? "#b9a698" : "#c3c9c4";
+  const seal = "#414c50";
+  const hardware = "#7e8b8a";
   const patchColor = ["#c58a49", "#628caf", "#b66e62", "#769a7f", "#9184b8"][index % 5];
+
   return (
-    <group ref={ref} scale={1.42}>
-      {/* Separate boots, lower legs and articulated knee joints. */}
-      {[-1, 1].map((side) => (
-        <group key={side} ref={side < 0 ? leftLeg : rightLeg} position={[side * 0.105, 0.38, 0]}>
-          <mesh castShadow position={[0, -0.13, 0]}>
-            <capsuleGeometry args={[0.073, 0.22, 4, 10]} />
-            <meshStandardMaterial color={suit} roughness={0.72} />
-          </mesh>
-          <mesh position={[0, -0.12, 0.035]}>
-            <sphereGeometry args={[0.082, 12, 10]} />
-            <meshStandardMaterial color={trim} metalness={0.18} roughness={0.5} />
-          </mesh>
-          <RoundedBox args={[0.17, 0.13, 0.24]} radius={0.04} smoothness={3} position={[0, -0.28, 0.055]} castShadow>
-            <meshStandardMaterial color="#202b30" roughness={0.92} metalness={0.08} />
-          </RoundedBox>
-          <mesh position={[0, -0.346, 0.06]}>
-            <boxGeometry args={[0.145, 0.022, 0.18]} />
-            <meshStandardMaterial color="#8e9993" metalness={0.6} roughness={0.35} />
-          </mesh>
-        </group>
-      ))}
-
-      {/* Torso shell, flexible joints and a practical chest control panel. */}
-      <mesh castShadow position={[0, 0.72, 0]}>
-        <capsuleGeometry args={[0.185, 0.34, 5, 12]} />
-        <meshStandardMaterial color={suit} roughness={0.68} metalness={0.08} />
+    <group ref={ref} scale={1.32}>
+      {/* Human proportions: hip, torso, shoulders and a single helmet silhouette. */}
+      <mesh castShadow position={[0, 0.47, 0]}>
+        <sphereGeometry args={[0.205, 16, 12]} />
+        <meshStandardMaterial color={fabric} roughness={0.86} />
       </mesh>
-      <mesh position={[0, 0.47, 0.01]}>
-        <torusGeometry args={[0.16, 0.035, 8, 22]} />
-        <meshStandardMaterial color={trim} metalness={0.32} roughness={0.44} />
-      </mesh>
-      <RoundedBox args={[0.25, 0.18, 0.045]} radius={0.035} smoothness={3} position={[0, 0.76, 0.18]} castShadow>
-        <meshStandardMaterial color="#27383d" metalness={0.48} roughness={0.3} />
+      <RoundedBox args={[0.34, 0.21, 0.22]} radius={0.075} smoothness={5} position={[0, 0.48, 0.015]} castShadow>
+        <meshStandardMaterial color={suit} roughness={0.82} />
       </RoundedBox>
-      <mesh position={[0, 0.785, 0.207]}>
-        <boxGeometry args={[0.16, 0.075, 0.016]} />
-        <meshStandardMaterial color={patchColor} roughness={0.72} />
+      <mesh position={[0, 0.58, 0]}>
+        <torusGeometry args={[0.16, 0.025, 7, 20]} />
+        <meshStandardMaterial color={seal} roughness={0.7} />
       </mesh>
-      <mesh position={[0, 0.665, 0.21]}>
-        <boxGeometry args={[0.12, 0.035, 0.012]} />
-        <meshStandardMaterial color="#465255" roughness={0.66} metalness={0.16} />
-      </mesh>
-      {/* Safety harness, shoulder bars and small suit patches. */}
+
+      {/* EVA legs: shaped fabric thighs, flexible knees, calf shells and broad boots. */}
       {[-1, 1].map((side) => (
-        <group key={side}>
-          <mesh position={[side * 0.12, 0.81, 0.04]} rotation={[0, 0, -side * 0.34]}>
-            <boxGeometry args={[0.065, 0.44, 0.045]} />
-            <meshStandardMaterial color={trim} metalness={0.36} roughness={0.42} />
+        <group key={side} ref={side < 0 ? leftLeg : rightLeg} position={[side * 0.105, 0.39, 0]}>
+          <mesh castShadow position={[0, -0.12, 0]}>
+            <capsuleGeometry args={[0.085, 0.22, 5, 10]} />
+            <meshStandardMaterial color={suit} roughness={0.82} />
           </mesh>
-          <RoundedBox args={[0.14, 0.11, 0.14]} radius={0.04} smoothness={3} position={[side * 0.22, 0.86, 0]} castShadow>
-            <meshStandardMaterial color="#6d7b7a" metalness={0.38} roughness={0.44} />
+          <RoundedBox args={[0.17, 0.14, 0.18]} radius={0.055} smoothness={4} position={[0, -0.28, 0.005]} castShadow>
+            <meshStandardMaterial color={fabric} roughness={0.88} />
           </RoundedBox>
-          <mesh position={[side * 0.235, 0.865, 0.079]}>
-            <boxGeometry args={[0.09, 0.045, 0.018]} />
-            <meshStandardMaterial color={patchColor} roughness={0.76} />
+          <mesh position={[0, -0.3, 0.015]}>
+            <torusGeometry args={[0.075, 0.018, 6, 14]} />
+            <meshStandardMaterial color={seal} roughness={0.8} />
           </mesh>
-        </group>
+          <mesh castShadow position={[0, -0.4, 0.005]}>
+            <capsuleGeometry args={[0.071, 0.18, 4, 9]} />
+            <meshStandardMaterial color={suit} roughness={0.86} />
+          </mesh>
+          <RoundedBox args={[0.17, 0.105, 0.23]} radius={0.045} smoothness={4} position={[0, -0.54, 0.04]} castShadow>
+            <meshStandardMaterial color="#354045" roughness={0.95} metalness={0.03} />
+          </RoundedBox>
+          <mesh position={[0, -0.59, 0.055]}>
+            <boxGeometry args={[0.14, 0.018, 0.15]} />
+            <meshStandardMaterial color="#8c9892" roughness={0.8} />
+          </mesh>
+      </group>
       ))}
 
-      {/* Backpack with stacked life-support panels, service ports and antenna. */}
-      <group position={[0, 0.73, -0.19]}>
-        <RoundedBox args={[0.31, 0.43, 0.19]} radius={0.05} smoothness={3} castShadow>
-          <meshStandardMaterial color="#3c4b51" metalness={0.48} roughness={0.42} />
-        </RoundedBox>
-        <mesh position={[0, 0.08, -0.105]}>
-          <boxGeometry args={[0.2, 0.19, 0.025]} />
-          <meshStandardMaterial color="#6c7d80" metalness={0.5} roughness={0.4} />
+      {/* Rounded pressure suit torso, shoulder yoke, fabric pleats and chest console. */}
+      <mesh castShadow position={[0, 0.77, 0]}>
+        <capsuleGeometry args={[0.205, 0.34, 6, 14]} />
+        <meshStandardMaterial color={suit} roughness={0.82} />
+      </mesh>
+      <RoundedBox args={[0.49, 0.22, 0.29]} radius={0.095} smoothness={5} position={[0, 0.88, 0]} castShadow>
+        <meshStandardMaterial color={suit} roughness={0.83} />
+      </RoundedBox>
+      <mesh position={[0, 0.63, 0.01]}>
+        <torusGeometry args={[0.18, 0.023, 7, 22]} />
+        <meshStandardMaterial color={fabric} roughness={0.85} />
+      </mesh>
+      <RoundedBox args={[0.12, 0.045, 0.035]} radius={0.012} smoothness={3} position={[0, 0.93, 0.145]}>
+        <meshStandardMaterial color={patchColor} roughness={0.8} />
+      </RoundedBox>
+
+      {/* Cross-body restraint straps are narrow textile webbing, not metal robot plating. */}
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[side * 0.095, 0.77, 0.151]} rotation={[0, 0, -side * 0.45]}>
+          <boxGeometry args={[0.032, 0.34, 0.012]} />
+          <meshStandardMaterial color={fabric} roughness={0.92} />
         </mesh>
-        {[-0.095, 0.095].map((x) => (
-          <mesh key={x} position={[x, -0.06, -0.12]}>
-            <boxGeometry args={[0.045, 0.2, 0.025]} />
-            <meshStandardMaterial color="#d2d6cb" metalness={0.64} roughness={0.3} />
+      ))}
+      <RoundedBox args={[0.2, 0.17, 0.04]} radius={0.035} smoothness={4} position={[0, 0.79, 0.195]} castShadow>
+        <meshStandardMaterial color="#4d5b5e" roughness={0.7} metalness={0.12} />
+      </RoundedBox>
+      <RoundedBox args={[0.12, 0.065, 0.018]} radius={0.018} smoothness={3} position={[0, 0.8, 0.222]}>
+        <meshStandardMaterial color={patchColor} roughness={0.8} />
+      </RoundedBox>
+      {[-0.055, 0, 0.055].map((x, i) => (
+        <mesh key={x} position={[x, 0.725, 0.222]}>
+          <boxGeometry args={[0.025, 0.018, 0.012]} />
+          <meshStandardMaterial color={["#8aafa7", "#dbbb73", "#8aafa7"][i]} roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Arms are jointed and padded; hands have a thumb but no exposed humanoid fingers. */}
+      {[-1, 1].map((side) => (
+        <group key={side} ref={side < 0 ? leftArm : rightArm} position={[side * 0.235, 0.87, 0]}>
+          <mesh castShadow position={[side * 0.045, -0.14, 0]}>
+            <capsuleGeometry args={[0.09, 0.22, 5, 11]} />
+            <meshStandardMaterial color={suit} roughness={0.84} />
+          </mesh>
+          <RoundedBox args={[0.16, 0.13, 0.15]} radius={0.048} smoothness={4} position={[side * 0.07, -0.28, 0.005]}>
+            <meshStandardMaterial color={fabric} roughness={0.86} />
+          </RoundedBox>
+          <mesh position={[side * 0.07, -0.31, 0.005]}>
+            <torusGeometry args={[0.071, 0.018, 6, 14]} />
+            <meshStandardMaterial color={seal} roughness={0.76} />
+          </mesh>
+          <mesh castShadow position={[side * 0.09, -0.385, 0.015]}>
+            <capsuleGeometry args={[0.07, 0.12, 4, 9]} />
+            <meshStandardMaterial color={suit} roughness={0.84} />
+          </mesh>
+          <RoundedBox args={[0.125, 0.105, 0.13]} radius={0.045} smoothness={4} position={[side * 0.09, -0.47, 0.045]}>
+            <meshStandardMaterial color="#d3d5ce" roughness={0.88} />
+          </RoundedBox>
+          <mesh position={[side * 0.145, -0.49, 0.08]} rotation={[0, 0, -side * 0.5]}>
+            <capsuleGeometry args={[0.034, 0.065, 4, 8]} />
+            <meshStandardMaterial color="#d3d5ce" roughness={0.88} />
+          </mesh>
+      </group>
+      ))}
+
+      {/* Compact, load-bearing life-support backpack, hose ports and lower service pouch. */}
+      <group position={[0, 0.78, -0.205]}>
+        <RoundedBox args={[0.29, 0.4, 0.18]} radius={0.05} smoothness={4} castShadow>
+          <meshStandardMaterial color="#aab2ad" roughness={0.78} />
+        </RoundedBox>
+        <RoundedBox args={[0.23, 0.16, 0.035]} radius={0.025} smoothness={3} position={[0, 0.08, -0.101]}>
+          <meshStandardMaterial color="#6d7c7e" roughness={0.7} />
+        </RoundedBox>
+        {[-0.085, 0.085].map((x) => (
+          <mesh key={x} position={[x, -0.035, -0.105]}>
+            <boxGeometry args={[0.035, 0.19, 0.025]} />
+            <meshStandardMaterial color="#d1d7d0" roughness={0.78} />
           </mesh>
         ))}
-        <mesh position={[0, 0.27, -0.015]}>
-          <cylinderGeometry args={[0.016, 0.025, 0.23, 8]} />
-          <meshStandardMaterial color="#b7c4bc" metalness={0.74} roughness={0.3} />
+        <mesh position={[0.18, 0.04, -0.005]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.035, 0.035, 0.23, 8]} />
+          <meshStandardMaterial color="#879798" roughness={0.72} metalness={0.12} />
+        </mesh>
+        <mesh position={[0, -0.23, -0.005]}>
+          <boxGeometry args={[0.19, 0.12, 0.07]} />
+          <meshStandardMaterial color="#818e8c" roughness={0.8} />
         </mesh>
       </group>
 
-      {/* Shoulder-pivot arms, forearm seals and bulky gloves. */}
-      {[-1, 1].map((side) => (
-        <group key={side} ref={side < 0 ? leftArm : rightArm} position={[side * 0.22, 0.84, 0]}>
-          <mesh castShadow position={[side * 0.025, -0.14, 0]} rotation={[0, 0, -side * 0.08]}>
-            <capsuleGeometry args={[0.075, 0.24, 4, 10]} />
-            <meshStandardMaterial color={suit} roughness={0.68} />
-          </mesh>
-          <mesh position={[side * 0.03, -0.27, 0.015]} rotation={[0, 0, -side * 0.08]}>
-            <cylinderGeometry args={[0.077, 0.077, 0.065, 12]} />
-            <meshStandardMaterial color={trim} metalness={0.36} roughness={0.42} />
-          </mesh>
-          <RoundedBox args={[0.13, 0.12, 0.14]} radius={0.04} smoothness={3} position={[side * 0.035, -0.34, 0.035]} castShadow>
-            <meshStandardMaterial color="#d3d6cc" metalness={0.24} roughness={0.52} />
-          </RoundedBox>
-        </group>
-      ))}
-
-      {/* Helmet ring, pressure shell, dark polarized visor and headlamp. */}
-      <mesh castShadow position={[0, 1.15, 0]}>
-        <sphereGeometry args={[0.205, 20, 16]} />
-        <meshStandardMaterial color={trim} metalness={0.28} roughness={0.25} />
+      {/* A single sealed spherical helmet with a broad, dark reflective visor. No visible face or glowing eyes. */}
+      <mesh castShadow position={[0, 1.19, 0]}>
+        <sphereGeometry args={[0.19, 24, 20]} />
+        <meshStandardMaterial color={suit} roughness={0.4} metalness={0.1} />
       </mesh>
-      {/* Visible human face underneath a smoked, protective pressure visor. */}
-      <mesh position={[0, 1.15, 0.102]} scale={[0.68, 0.72, 0.28]}>
-        <sphereGeometry args={[0.15, 24, 18]} />
-        <meshStandardMaterial color={["#b98261", "#dfb18b", "#875a45", "#c99673", "#e0bd9d"][index % 5]} roughness={0.9} />
+      <mesh position={[0, 1.18, 0.112]} scale={[1.04, 0.72, 0.3]}>
+        <sphereGeometry args={[0.15, 28, 22]} />
+        <meshPhysicalMaterial color="#101f2a" transparent opacity={0.94} depthWrite={false} roughness={0.16} metalness={0.32} clearcoat={1} clearcoatRoughness={0.08} />
       </mesh>
-      {[-1, 1].map((side) => (
-        <mesh key={side} position={[side * 0.045, 1.17, 0.143]}>
-          <sphereGeometry args={[0.012, 10, 8]} />
-          <meshStandardMaterial color="#30251f" roughness={0.82} />
-        </mesh>
-      ))}
-      <mesh position={[0, 1.12, 0.147]}>
-        <sphereGeometry args={[0.016, 10, 8]} />
-        <meshStandardMaterial color="#ae7e5f" roughness={0.88} />
+      {/* A restrained curved reflection makes the visor legible at small map scale. */}
+      <mesh position={[-0.038, 1.22, 0.151]} rotation={[0, 0, -0.22]}>
+        <boxGeometry args={[0.1, 0.009, 0.004]} />
+        <meshStandardMaterial color="#6e838a" roughness={0.32} metalness={0.28} />
       </mesh>
-      <mesh position={[0, 1.085, 0.142]}>
-        <boxGeometry args={[0.04, 0.008, 0.006]} />
-        <meshStandardMaterial color="#76513f" roughness={0.9} />
+      <mesh position={[0.128, 1.19, 0.025]}>
+        <sphereGeometry args={[0.026, 10, 8]} />
+        <meshStandardMaterial color="#c5cbc4" roughness={0.5} metalness={0.18} />
       </mesh>
-      <mesh position={[0, 1.15, 0.155]} scale={[1.05, 0.72, 0.22]}>
-        <sphereGeometry args={[0.17, 24, 16]} />
-        <meshPhysicalMaterial color="#17242b" transparent opacity={0.46} depthWrite={false} roughness={0.2} metalness={0.46} clearcoat={1} clearcoatRoughness={0.12} />
-      </mesh>
-      {/* A soft, non-emissive reflection gives the visor a curved glass surface. */}
-      <mesh position={[-0.035, 1.19, 0.194]} rotation={[0, 0, -0.18]}>
-        <boxGeometry args={[0.12, 0.012, 0.006]} />
-        <meshStandardMaterial color="#7b929a" roughness={0.28} metalness={0.48} />
-      </mesh>
-      <mesh position={[0.13, 1.28, 0.02]}>
-        <sphereGeometry args={[0.03, 10, 8]} />
-        <meshStandardMaterial color="#d4d3c9" emissive="#807b5e" emissiveIntensity={0.18} metalness={0.35} roughness={0.32} />
-      </mesh>
-      <mesh position={[0, 1.35, -0.02]}>
-        <torusGeometry args={[0.145, 0.018, 8, 26]} />
-        <meshStandardMaterial color="#d5bf78" metalness={0.72} roughness={0.25} />
+      <mesh position={[0, 1.03, 0]}>
+        <boxGeometry args={[0.13, 0.1, 0.13]} />
+        <meshStandardMaterial color={suit} roughness={0.86} />
       </mesh>
     </group>
   );
