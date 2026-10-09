@@ -89,7 +89,7 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
   flush: 8, purify: 12, scrub: 8, recover: 9, dump: 7, insulate: 10,
   repoint: 8, test: 5, repair: 14, seal: 8, shield: 10, shelter: 6,
   "balance-grid": 8, prioritize: 5, calibrate: 9, experiment: 14,
-  "nav-calibrate": 7, route: 5, survey: 12, return: 8, inspect: 4,
+  "nav-calibrate": 7, route: 5, survey: 12, return: 12, inspect: 4,
   "extract-test": 10, extract: 15, process: 12, purge: 7,
   "tune-crops": 12, harvest: 9, service: 12, diagnostics: 7,
 };
@@ -2110,7 +2110,7 @@ export function MissionSimulation() {
     const navigationTier = tierLevel(pending.selected.navigation ?? "Foundation");
 
     if (action === "survey" && stage === "UNSURVEYED") {
-      const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2);
+      const duration = hasRover ? Math.max(9, 12 - roverTier * 1.0 - navigationTier * 0.35) : Math.max(17, 22 - navigationTier * 1.2);
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(hasRover ? `SURVEYING ${node.label}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
@@ -2131,7 +2131,7 @@ export function MissionSimulation() {
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
-      const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5);
+      const duration = hasRover ? Math.max(11, 14 - roverTier * 1.0) : Math.max(16, 22 - navigationTier * 1.5);
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(hasRover ? `TRANSFERRING ${node.label}` : "EVA SAMPLE RETURN");
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
@@ -2200,6 +2200,10 @@ export function MissionSimulation() {
       const repairTargetId = trackId === "maintenance"
         ? [...matchingFaults].sort((a, b) => b.severity - a.severity)[0].targetTrackId
         : trackId;
+      if (activeOperationsRef.current[repairTargetId]) {
+        setOperationResult(`REPAIR QUEUED · ${repairTargetId.toUpperCase()} already has a work order running. Finish that job before starting another repair on the same system.`);
+        return;
+      }
       if (metrics.power < 5 || metrics.battery < 2) {
         setOperationResult("REPAIR HELD · A controlled repair requires at least 5% power and 2% battery to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.");
         setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
