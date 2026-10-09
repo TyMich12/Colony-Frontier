@@ -2095,9 +2095,9 @@ export function MissionSimulation() {
     const radiationScore = clamp(100 - metrics.radiation * 3.4);
     const colonyHealth = Math.round((metrics.power + metrics.battery + metrics.oxygen + metrics.water + metrics.food + metrics.habitat + tempScore + radiationScore) / 8);
     const decisionQuality = clamp(score);
-    const researchOpportunity = pending?.selected.science !== undefined || decisions.some((decision) => decision.eventId === "science-anomaly");
+    const researchOpportunity = pending?.selected.science !== undefined || decisions.some((decision) => decision.eventId === "science-anomaly") || Object.values(sampleStages).some((stage) => stage === "ANALYSED");
     return { colonyHealth, decisionQuality, researchOpportunity, radiationScore };
-  }, [decisions, metrics, pending, score]);
+  }, [decisions, metrics, pending, sampleStages, score]);
 
   if (!pending) {
     return (
