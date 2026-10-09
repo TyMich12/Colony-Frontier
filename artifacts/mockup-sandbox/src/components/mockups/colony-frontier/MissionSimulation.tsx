@@ -815,7 +815,7 @@ function BuildingInspector({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
-              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Level {upgradeLevel}/2 · costs 8 power and 5 battery reserve · improves performance and condition.</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 8% power + 5% battery up front · takes about 18–26 seconds. Production and wear benefits begin only when installation completes.</p>
             </div>
             <button
               type="button"
@@ -1196,7 +1196,7 @@ export function MissionSimulation() {
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const powerBase = 72 + solarTier * 7.5 + solarUpgrade * 4.5 - solarDust * 0.4 - optionalCount * 2.0 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0);
         const demandPenalty = Math.max(0, 70 - powerBase);
-        const batteryDelta = (powerBase > 85 ? 0.006 : powerBase > 73 ? -0.009 : -0.042 - demandPenalty * 0.0012) + batteryTier * 0.01 + batteryUpgrade * 0.014;
+        const batteryDelta = (powerBase > 84 ? 0.008 : powerBase > 73 ? 0.002 : powerBase > 64 ? -0.012 - demandPenalty * 0.0005 : -0.024 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.014;
         const dt = 0.25 * speed;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
           const amount = dt * fault.severity;
