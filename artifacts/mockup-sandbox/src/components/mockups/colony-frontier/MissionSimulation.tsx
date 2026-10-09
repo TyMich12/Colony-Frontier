@@ -1160,7 +1160,9 @@ export function MissionSimulation() {
                 case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - 3) };
                 case "radiation-burst": return { ...current, radiation: clamp(current.radiation + 7) };
                 case "polar-shadow-cold-soak":
-                case "thermal-drift": return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -1.0 : 1.0), 16, 28), battery: clamp(current.battery - 4) };
+                  return { ...current, temperature: clamp(current.temperature - 2.5, 16, 28), battery: clamp(current.battery - 5), power: clamp(current.power - 2) };
+                case "thermal-drift":
+                  return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -2.0 : 2.0), 16, 28), battery: clamp(current.battery - 4) };
                 case "grid-overload":
                 case "core-power": return { ...current, power: clamp(current.power - 7), battery: clamp(current.battery - 4) };
                 case "agriculture-stress": return { ...current, food: clamp(current.food - 6) };
@@ -1454,11 +1456,11 @@ export function MissionSimulation() {
 
       case "polar-shadow-cold-soak":
         if (choiceId === "heat") {
-          setMetrics((current) => ({ ...current, battery: clamp(current.battery - 7), temperature: clamp(current.temperature - 0.4, 16, 28) }));
+          setMetrics((current) => ({ ...current, battery: clamp(current.battery - 7), power: clamp(current.power - 3), temperature: clamp(current.temperature + (21 - current.temperature) * 0.38, 16, 28) }));
           setScore((value) => clamp(value + 7));
           setAiMessage("Heater power was increased to protect exposed hardware during the cold-soak transition.");
         } else if (choiceId === "reroute") {
-          setMetrics((current) => ({ ...current, battery: clamp(current.battery + 2), power: clamp(current.power + 3), temperature: clamp(current.temperature - 0.8, 16, 28) }));
+          setMetrics((current) => ({ ...current, battery: clamp(current.battery - 1), power: clamp(current.power + 2), temperature: clamp(current.temperature + (21 - current.temperature) * 0.24, 16, 28) }));
           setScore((value) => clamp(value + 8));
           setAiMessage("Non-critical electrical loads were shed and thermal protection was prioritized.");
         } else {
@@ -1802,6 +1804,34 @@ export function MissionSimulation() {
       beginOperation("UPGRADE", trackId, `Installing upgrade kit · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, duration, targetLevel);
       return;
     }
+    const repairActions: Record<string, string[]> = {
+      solar: ["clean", "tune"],
+      battery: ["balance", "reserve"],
+      oxygen: ["reset", "boost"],
+      water: ["flush", "purify"],
+      co2: ["scrub", "recover"],
+      thermal: ["dump", "insulate"],
+      comms: ["repoint", "test"],
+      habitat: ["repair", "seal"],
+      radiation: ["shield", "shelter"],
+      grid: ["balance-grid", "prioritize"],
+      science: ["calibrate", "experiment"],
+      navigation: ["nav-calibrate", "route"],
+      rover: ["survey", "return", "inspect"],
+      extraction: ["extract-test", "extract"],
+      isru: ["process", "purge"],
+      agriculture: ["tune-crops", "harvest"],
+      maintenance: ["service", "diagnostics"],
+    };
+    const repairedFaultIds = Object.values(activeFaults)
+      .filter((fault) => fault.targetTrackId === trackId && (repairActions[trackId] ?? []).includes(action))
+      .map((fault) => fault.eventId);
+    if (repairedFaultIds.length > 0) {
+      const repairedSet = new Set(repairedFaultIds);
+      setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !repairedSet.has(id))));
+      setOperationResult(`FAULT CLEARED · ${trackId.toUpperCase()} intervention completed. The unresolved incident is removed from the active fault register; check system condition and reserves before resuming optional work.`);
+    }
+
     setActionBusy(true);
     window.setTimeout(() => setActionBusy(false), 1100);
     setManualActions((value) => value + 1);
@@ -2381,7 +2411,7 @@ export function MissionSimulation() {
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#c95160] bg-[#6e2634]/40 text-[#ff8088]"><AlertTriangle className="h-6 w-6" /></div>
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#ff858b]">Mission interrupted · respond now</p>
+                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#ff858b]">Critical incident · respond now</p>
                       <h1 className="mt-1 text-lg font-black uppercase tracking-[0.06em] text-white sm:text-2xl">{activeEvent.title}</h1>
                       <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#d9b4bb]">Affected asset · {(activeTargetTrackId ?? activeEvent.trackId).toUpperCase()} · {environmentLabel}</p>
                     </div>
