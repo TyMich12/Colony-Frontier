@@ -2734,7 +2734,8 @@ export function MissionSimulation() {
     const conditionBoost = (amount: number) => {
       setBuildings((current) => {
         const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE" };
-        const condition = clamp(previous.condition + amount);
+        const scaledAmount = amount >= 0 ? gain(amount) : -Math.abs(amount) / actionPerformance;
+        const condition = clamp(previous.condition + scaledAmount);
         return { ...current, [trackId]: { ...previous, condition, status: buildingStatus(condition) } };
       });
     };
@@ -2971,135 +2972,135 @@ export function MissionSimulation() {
         break;
       }
       case "clean": {
-        const recovery = pending.selected.rover ? 24 : 16;
+        const recovery = (pending.selected.rover ? 24 : 16) * actionPerformance;
         setBuildings((current) => ({
           ...current,
           solar: {
             ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }),
             dust: clamp((current.solar?.dust ?? 0) - recovery),
-            condition: clamp((current.solar?.condition ?? 100) + 1),
-            status: buildingStatus(clamp((current.solar?.condition ?? 100) + 1)),
+            condition: clamp((current.solar?.condition ?? 100) + gain(1)),
+            status: buildingStatus(clamp((current.solar?.condition ?? 100) + gain(1))),
           },
         }));
-        setMetrics((current) => ({ ...current, power: clamp(current.power + 4) }));
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(4)) }));
         setAiMessage(pending.selected.rover ? "SOLAR CLEANING COMPLETE · Dust load fell and power generation recovered. The rover is returning to the launch lane." : "SOLAR CLEANING COMPLETE · Dust load fell and power generation recovered.");
         if (pending.selected.rover) setRoverTask("RETURNING");
         break;
       }
       case "tune": {
-        setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.solar?.condition ?? 100) + 1) } }));
-        setMetrics((current) => ({ ...current, power: clamp(current.power + 3) }));
+        setBuildings((current) => ({ ...current, solar: { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: clamp((current.solar?.condition ?? 100) + gain(1)) } }));
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(3)) }));
         setAiMessage("Solar tracking solution tuned for the current illumination angle.");
         break;
       }
       case "balance":
-        setMetrics((current) => ({ ...current, battery: clamp(current.battery + 5), power: clamp(current.power + 2) }));
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery + gain(5)), power: clamp(current.power + gain(2)) }));
         setAiMessage("Battery cells balanced against the colony load. Reserve margin improved.");
         break;
       case "reserve":
-        setMetrics((current) => ({ ...current, battery: clamp(current.battery + 8), power: clamp(current.power - 2) }));
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery + gain(8)), power: clamp(current.power - cost(2)) }));
         setAiMessage("Emergency reserve mode engaged. Stored energy is protected at the expense of available load.");
         break;
       case "reset":
-        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 3), power: clamp(current.power - 2) }));
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(3)), power: clamp(current.power - cost(2)) }));
         setAiMessage("Atmospheric processing loop reset completed.");
         break;
       case "boost":
-        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 6), power: clamp(current.power - 4) }));
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(6)), power: clamp(current.power - cost(4)) }));
         conditionBoost(-1);
         setAiMessage("Oxygen output temporarily increased. The extra processing load is drawing power.");
         break;
       case "flush":
-        setMetrics((current) => ({ ...current, water: clamp(current.water + 4), power: clamp(current.power - 2) }));
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(4)), power: clamp(current.power - cost(2)) }));
         setAiMessage("Water recovery loop flushed. Differential pressure has fallen.");
         break;
       case "purify":
-        setMetrics((current) => ({ ...current, water: clamp(current.water + 6), power: clamp(current.power - 4) }));
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(6)), power: clamp(current.power - cost(4)) }));
         setAiMessage("Deep purification cycle completed. Water reserve improved at a higher energy cost.");
         break;
       case "scrub":
-        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 2), power: clamp(current.power - 1) }));
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(2)), power: clamp(current.power - cost(1)) }));
         setAiMessage("CO₂ scrubber cycle increased. Cabin atmospheric margin improved.");
         break;
       case "recover":
-        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 1), power: clamp(current.power - 1) }));
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(1)), power: clamp(current.power - cost(1)) }));
         conditionBoost(1);
         setAiMessage("Carbon-recovery stage completed and the scrubber was left in a stable state.");
         break;
       case "dump": {
         setMetrics((current) => ({
           ...current,
-          temperature: clamp(current.temperature + (21 - current.temperature) * 0.36, 16, 28),
-          power: clamp(current.power - 2),
+          temperature: clamp(current.temperature + (21 - current.temperature) * Math.min(0.8, 0.36 * actionPerformance), 16, 28),
+          power: clamp(current.power - cost(2)),
         }));
         setAiMessage("Thermal loop was opened to dump stored heat and pull the habitat back toward its target temperature.");
         break;
       }
       case "insulate":
-        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.22, 16, 28), power: clamp(current.power - 1) }));
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * Math.min(0.7, 0.22 * actionPerformance), 16, 28), power: clamp(current.power - cost(1)) }));
         conditionBoost(1);
         setAiMessage("Thermal protection mode engaged. Temperature drift has been reduced.");
         break;
       case "repoint":
         conditionBoost(1);
-        setScore((value) => clamp(value + 3));
+        setScore((value) => clamp(value + gain(3)));
         setAiMessage("High-gain antenna repointed. Communications geometry is back inside the preferred link budget.");
         break;
       case "test":
         conditionBoost(1);
-        setScore((value) => clamp(value + 2));
+        setScore((value) => clamp(value + gain(2)));
         setAiMessage("LINK TEST PASSED · Communications tracking is stable and the antenna condition check is logged.");
         break;
       case "repair": {
-        const amount = pending.selected.maintenance ? 28 : 14;
+        const amount = (pending.selected.maintenance ? 28 : 14) * actionPerformance;
         const next = clamp((buildings.habitat?.condition ?? 100) + amount);
         setBuildings((current) => ({ ...current, habitat: { ...(current.habitat ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: next, status: buildingStatus(next) } }));
-        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + 5), battery: clamp(current.battery - 2) }));
+        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + gain(5)), battery: clamp(current.battery - cost(2)) }));
         setAiMessage(pending.selected.maintenance ? "Maintenance support completed a stronger habitat seal repair." : "Basic habitat seal repair completed. Structural margin restored.");
         break;
       }
       case "seal":
-        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + 3), battery: clamp(current.battery - 1) }));
+        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + gain(3)), battery: clamp(current.battery - cost(1)) }));
         conditionBoost(3);
         setAiMessage("Pressure-isolation cycle completed. Habitat leak margin improved.");
         break;
       case "shield":
-        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - 2), battery: clamp(current.battery - 1) }));
+        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - gain(2)), battery: clamp(current.battery - cost(1)) }));
         conditionBoost(1);
         setAiMessage("Shielding inspection completed. The protected volume is better prepared for elevated radiation.");
         break;
       case "shelter":
-        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - 3), battery: clamp(current.battery - 2), power: clamp(current.power - 1) }));
+        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - gain(3)), battery: clamp(current.battery - cost(2)), power: clamp(current.power - cost(1)) }));
         setAiMessage("Shelter protocol enabled. Crew exposure risk is reduced while the protective mode is active.");
         break;
       case "balance-grid":
-        setMetrics((current) => ({ ...current, power: clamp(current.power + 3), battery: clamp(current.battery + 2) }));
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(3)), battery: clamp(current.battery + gain(2)) }));
         conditionBoost(1);
         setAiMessage("Power distribution bus balanced across active loads.");
         break;
       case "prioritize":
-        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + 1), water: clamp(current.water + 1), battery: clamp(current.battery + 3), power: clamp(current.power - 1) }));
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(1)), water: clamp(current.water + gain(1)), battery: clamp(current.battery + gain(3)), power: clamp(current.power - cost(1)) }));
         setAiMessage("Critical-load priority enabled. Life support and habitat systems now receive first access to reserve power.");
         break;
       case "calibrate":
-        setScore((value) => clamp(value + 4));
+        setScore((value) => clamp(value + gain(4)));
         conditionBoost(1);
         setAiMessage("Science instruments calibrated against the current environmental baseline.");
         break;
       case "experiment":
-        setResourceYield((value) => value + 1);
-        setScore((value) => clamp(value + 7));
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 2) }));
+        setResourceYield((value) => value + gain(1));
+        setScore((value) => clamp(value + gain(7)));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(2)) }));
         setAiMessage("Experiment completed. A field observation has been converted into a research result.");
         break;
       case "nav-calibrate":
-        setScore((value) => clamp(value + 3));
+        setScore((value) => clamp(value + gain(3)));
         conditionBoost(1);
         setAiMessage("Navigation solution recalibrated. Vehicle route confidence improved.");
         break;
       case "route":
         conditionBoost(1);
-        setScore((value) => clamp(value + 2));
+        setScore((value) => clamp(value + gain(2)));
         setAiMessage("ROUTE PLAN COMPLETE · The navigation solution was refreshed and the safest available work corridor is recorded.");
         break;
       case "survey": {
@@ -3109,7 +3110,7 @@ export function MissionSimulation() {
           setSurveyedNodes((current) => current.includes(nextNode.id) ? current : [...current, nextNode.id]);
           setSampleStages((current) => ({ ...current, [nextNode.id]: "SURVEYED" }));
           setRoverTask(`AT SITE ${nextNode.label}`);
-          setScore((value) => clamp(value + 2));
+          setScore((value) => clamp(value + gain(2)));
           setAiMessage(`SURVEY COMPLETE · ${nextNode.label} mapped and marked. The rover is at the site; select its marker to collect a sealed sample.`);
         }
         break;
@@ -3119,42 +3120,42 @@ export function MissionSimulation() {
         setAiMessage("ROVER RECALLED · It has returned to the launch lane and is ready for its next assignment.");
         break;
       case "inspect":
-        setScore((value) => clamp(value + 1));
+        setScore((value) => clamp(value + gain(1)));
         setAiMessage(`Inspection complete — ${trackId.toUpperCase()} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
         break;
       case "extract-test":
-        setResourceYield((value) => value + 4);
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 1) }));
+        setResourceYield((value) => value + gain(4));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(4)), battery: clamp(current.battery - cost(1)) }));
         conditionBoost(-1);
-        setScore((value) => clamp(value + 5));
+        setScore((value) => clamp(value + gain(5)));
         setAiMessage("Short drill test complete. A usable resource signature was confirmed at the surveyed deposit.");
         break;
       case "extract":
-        setResourceYield((value) => value + 5);
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 2) }));
-        setScore((value) => clamp(value + 7));
+        setResourceYield((value) => value + gain(5));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(2)) }));
+        setScore((value) => clamp(value + gain(7)));
         setAiMessage("Extraction sample collected. Resource yield increased, but the operation consumed colony power.");
         break;
       case "process":
-        setResourceYield((value) => value + 3);
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 1) }));
-        setScore((value) => clamp(value + 5));
+        setResourceYield((value) => value + gain(3));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
+        setScore((value) => clamp(value + gain(5)));
         setAiMessage("ISRU feed processed. Local material was converted into a useful colony stockpile.");
         break;
       case "purge":
         conditionBoost(2);
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 1) }));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(1)) }));
         setAiMessage("ISRU feed line purged. Pressure margin and process stability improved.");
         break;
       case "tune-crops":
-        setMetrics((current) => ({ ...current, food: clamp(current.food + 5), water: clamp(current.water - 2), power: clamp(current.power - 2) }));
+        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(5)), water: clamp(current.water - cost(2)), power: clamp(current.power - cost(2)) }));
         conditionBoost(1);
         setAiMessage("Controlled crop environment tuned. Food production increased with a modest water and power cost.");
         break;
       case "harvest":
-        setMetrics((current) => ({ ...current, food: clamp(current.food + 7), water: clamp(current.water - 2) }));
-        setResourceYield((value) => value + 1);
-        setScore((value) => clamp(value + 3));
+        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(7)), water: clamp(current.water - cost(2)) }));
+        setResourceYield((value) => value + gain(1));
+        setScore((value) => clamp(value + gain(3)));
         setAiMessage("Harvest cycle complete. Fresh food output has been added to the colony reserve.");
         break;
       case "service":
@@ -3162,14 +3163,14 @@ export function MissionSimulation() {
           const candidates = Object.entries(buildings).sort(([, a], [, b]) => a.condition - b.condition);
           const target = candidates[0]?.[0];
           if (target) {
-            const next = clamp(buildings[target].condition + 10);
+            const next = clamp(buildings[target].condition + gain(10));
             setBuildings((current) => ({ ...current, [target]: { ...current[target], condition: next, status: buildingStatus(next) } }));
             setAiMessage(`Maintenance service complete. ${target.toUpperCase()} received preventative service.`);
           }
         }
         break;
       case "diagnostics": {
-        setScore((value) => clamp(value + 3));
+        setScore((value) => clamp(value + gain(3)));
         const faults = Object.values(activeFaults);
         const weakest = Object.entries(buildings).sort(([, a], [, b]) => a.condition - b.condition)[0];
         setAiMessage(faults.length
