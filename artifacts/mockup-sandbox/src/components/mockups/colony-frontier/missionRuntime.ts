@@ -87,6 +87,8 @@ export type MissionRuntimeSnapshot = {
   sampleQuality?: Record<string, number>;
   /** Temporary load-shedding state, persisted across refreshes. */
   emergencyPowerMode?: boolean;
+  /** Schedule pointer keeps incident cadence correct after a refresh. */
+  eventsTriggered?: number;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
