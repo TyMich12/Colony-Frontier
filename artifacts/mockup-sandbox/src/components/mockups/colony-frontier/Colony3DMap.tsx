@@ -1238,9 +1238,28 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
         <sphereGeometry args={[0.205, 20, 16]} />
         <meshStandardMaterial color={trim} metalness={0.28} roughness={0.25} />
       </mesh>
+      {/* Visible human face underneath a smoked, protective pressure visor. */}
+      <mesh position={[0, 1.15, 0.102]} scale={[0.68, 0.72, 0.28]}>
+        <sphereGeometry args={[0.15, 24, 18]} />
+        <meshStandardMaterial color={["#b98261", "#dfb18b", "#875a45", "#c99673", "#e0bd9d"][index % 5]} roughness={0.9} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[side * 0.045, 1.17, 0.143]}>
+          <sphereGeometry args={[0.012, 10, 8]} />
+          <meshStandardMaterial color="#30251f" roughness={0.82} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.12, 0.147]}>
+        <sphereGeometry args={[0.016, 10, 8]} />
+        <meshStandardMaterial color="#ae7e5f" roughness={0.88} />
+      </mesh>
+      <mesh position={[0, 1.085, 0.142]}>
+        <boxGeometry args={[0.04, 0.008, 0.006]} />
+        <meshStandardMaterial color="#76513f" roughness={0.9} />
+      </mesh>
       <mesh position={[0, 1.15, 0.155]} scale={[1.05, 0.72, 0.22]}>
         <sphereGeometry args={[0.17, 24, 16]} />
-        <meshPhysicalMaterial color="#17242b" roughness={0.2} metalness={0.46} clearcoat={1} clearcoatRoughness={0.12} />
+        <meshPhysicalMaterial color="#17242b" transparent opacity={0.46} depthWrite={false} roughness={0.2} metalness={0.46} clearcoat={1} clearcoatRoughness={0.12} />
       </mesh>
       {/* A soft, non-emissive reflection gives the visor a curved glass surface. */}
       <mesh position={[-0.035, 1.19, 0.194]} rotation={[0, 0, -0.18]}>
