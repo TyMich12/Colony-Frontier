@@ -1006,6 +1006,9 @@ function getAiAnalysis(metrics: MissionMetrics, score: number): string {
 
 export function MissionSimulation() {
   const pending = useMemo<PendingMission | null>(() => loadPendingMission(), []);
+  // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
+  const missionStage = pending ? Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1) : 1;
+  const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
   const runtime = pending ? loadMissionRuntime(pending.missionId) : null;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
@@ -1334,8 +1337,6 @@ export function MissionSimulation() {
         const foodUpgrade = buildings.agriculture?.upgradeLevel ?? 0;
         const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
-        const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
-        const stagePressure = 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0);
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
         // Fourteen simulated days are compressed into this mission clock. Blackout missions
         // include a long low-irradiance window; Mars begins with less sunlight margin.
