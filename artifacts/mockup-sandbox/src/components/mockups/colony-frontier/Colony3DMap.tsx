@@ -922,13 +922,16 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
   const targetLabel = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "]
     .find((prefix) => task.startsWith(prefix));
   const target = targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined;
-  const isReturning = task === "RETURNING" || task === "REPAIR VERIFIED" || task === "SAMPLE DELIVERED" || task === "ANALYSIS COMPLETE";
+  const isTransferring = task.startsWith("TRANSFERRING ");
+  const isReturning = task === "RETURNING" || task === "REPAIR VERIFIED" || task === "SAMPLE DELIVERED";
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
   const isRouting = task === "REROUTING" || task === "FORCED THROUGH";
   const destination: [number, number] = target
     ? nodeWorldPosition(target)
-    : isCleaning
+    : isTransferring
+      ? POSITIONS.habitat
+      : isCleaning
       ? POSITIONS.solar
       : repairTarget && POSITIONS[repairTarget]
         ? POSITIONS[repairTarget]
@@ -937,7 +940,7 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
           : isReturning
             ? position
             : position;
-  const isMovingTask = Boolean(targetLabel && target) || isReturning || isCleaning || Boolean(repairTarget && POSITIONS[repairTarget]) || isRouting;
+  const isMovingTask = Boolean(targetLabel && target) || isTransferring || isReturning || isCleaning || Boolean(repairTarget && POSITIONS[repairTarget]) || isRouting;
   const routeRef = useRef<Array<[number, number]>>([]);
   const routeCursorRef = useRef(0);
 
@@ -955,8 +958,18 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
     if (isMovingTask && targetLabel?.startsWith("AT SITE ")) {
       add(destination);
     } else if (isMovingTask && isReturning) {
+      // If already home (e.g. after local cleaning), don't make a pointless lap.
+      if (Math.hypot(start[0] - position[0], start[1] - position[1]) > 3) {
+        add([25.6, -25.6]);
+        add(position);
+      }
+    } else if (isMovingTask && isTransferring) {
       add([25.6, -25.6]);
-      add(position);
+      add([25.6, -13]);
+      add([14, -13]);
+      add([14, -0.6]);
+      add([0, -0.6]);
+      add(destination);
     } else if (isMovingTask) {
       add([25.6, -25.6]);
       add([25.6, -13]);
@@ -975,7 +988,7 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
     }
     routeRef.current = route;
     routeCursorRef.current = Math.min(1, route.length - 1);
-  }, [task, target?.id, destination[0], destination[1], isReturning, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
+  }, [task, target?.id, destination[0], destination[1], isReturning, isTransferring, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
 
   useFrame(({ clock, delta }) => {
     if (!ref.current) return;
