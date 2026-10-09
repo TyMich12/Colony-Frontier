@@ -98,6 +98,9 @@ export type MissionRuntimeSnapshot = {
   emergencyPowerMode?: boolean;
   /** Schedule pointer keeps incident cadence correct after a refresh. */
   eventsTriggered?: number;
+  /** Most recently received Earth Mission Control report, persisted between reloads. */
+  earthReport?: string | null;
+  earthReportAtSeconds?: number;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
