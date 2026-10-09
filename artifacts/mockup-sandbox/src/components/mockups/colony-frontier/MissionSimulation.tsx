@@ -1206,8 +1206,8 @@ export function MissionSimulation() {
         const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const powerBase = 72 + solarTier * 7.5 + solarUpgrade * 4.5 - solarDust * 0.4 - optionalCount * 2.0 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0);
-        const demandPenalty = Math.max(0, 70 - powerBase);
-        const batteryDelta = (powerBase > 84 ? 0.008 : powerBase > 73 ? 0.002 : powerBase > 64 ? -0.012 - demandPenalty * 0.0005 : -0.024 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.014;
+        const demandPenalty = Math.max(0, 70 - current.power);
+        const batteryDelta = (current.power > 84 ? 0.008 : current.power > 73 ? 0.002 : current.power > 64 ? -0.012 - demandPenalty * 0.0005 : -0.024 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.014;
         const oxygenDrain = Math.max(0.0014, 0.0085 - oxygenTier * 0.0018 - co2Tier * 0.0007 - oxygenUpgrade * 0.0008);
         const waterDrain = Math.max(0.0012, 0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007);
         const dt = 0.25 * speed;
@@ -1233,8 +1233,10 @@ export function MissionSimulation() {
           return impact;
         }, { power: 0, battery: 0, oxygen: 0, water: 0, food: 0, habitat: 0, radiation: 0, temperature: 0 });
 
+        const powerRecovery = (powerBase - current.power) * 0.035 * speed;
         return {
-          power: clamp(powerBase - faultImpact.power),
+          // Electrical margin recovers over time as generation catches up with demand; faults can keep pulling it down.
+          power: clamp(current.power + powerRecovery - faultImpact.power),
           battery: clamp(current.battery + batteryDelta * speed - faultImpact.battery),
           oxygen: clamp(current.oxygen - oxygenDrain * speed - faultImpact.oxygen),
           water: clamp(current.water - waterDrain * speed - faultImpact.water),
