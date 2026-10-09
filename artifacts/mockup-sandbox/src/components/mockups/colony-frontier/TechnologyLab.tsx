@@ -21,6 +21,7 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
+import { loadGameState } from "./gameState";
 import {
   GameShell,
   ProgressBar,
@@ -57,8 +58,6 @@ const categoryIcons = {
 } as const;
 
 const tierOrder: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
-const currentXp = 0;
-const currentTokens = 0;
 
 function Metric({
   label,
@@ -77,15 +76,12 @@ function Metric({
   );
 }
 
-function UnlockCopy({ tier }: { tier: Tier }) {
+function UnlockCopy({ tier, researchTokens = 0 }: { tier: Tier; researchTokens?: number }) {
   const requirement = tierUnlockRequirements[tier];
   if (tier === "Foundation") return <span>Starting technology</span>;
   if (tier === "Research") {
-    return (
-      <span>
-        {requirement.xp.toLocaleString()} XP + research tokens
-      </span>
-    );
+    const tokens = Math.max(requirement.tokens, researchTokens);
+    return <span>{requirement.xp.toLocaleString()} XP + {tokens} Research Token{tokens === 1 ? "" : "s"}</span>;
   }
   return <span>{requirement.xp.toLocaleString()} XP</span>;
 }
@@ -148,7 +144,7 @@ function EquipmentRow({
               {equipment.name}
             </h3>
             <p className="mt-1 text-[10px] leading-5 text-[#789491]">
-              Unlock: <UnlockCopy tier={tier} />
+              Unlock: <UnlockCopy tier={tier} researchTokens={equipment.researchTokens} />
             </p>
           </div>
         </div>
@@ -174,6 +170,9 @@ function EquipmentRow({
 export function TechnologyLab() {
   const [selectedId, setSelectedId] = useState("solar");
   const [selectedTier, setSelectedTier] = useState<Tier>("Foundation");
+  const [progressionState] = useState(() => loadGameState());
+  const currentXp = progressionState.xp;
+  const currentTokens = progressionState.researchTokens;
   const selectedTrack =
     technologyTracks.find((track) => track.id === selectedId) ??
     technologyTracks[0];
@@ -195,7 +194,7 @@ export function TechnologyLab() {
         <aside className="border border-[#29434a] bg-[#0b1a21] p-4">
           <SectionLabel>Technology tracks</SectionLabel>
           <p className="mb-4 text-xs leading-5 text-[#829d99]">
-            At Mission 01, every system begins at Foundation level.
+            Loadout uses the tier you own for each system. Earn mission XP to open Frontier and Apex hardware; Research equipment also needs the token cost listed for that system.
           </p>
           <div className="space-y-1.5">
             {technologyTracks.map((track) => {
@@ -267,9 +266,10 @@ export function TechnologyLab() {
             {tierOrder.map((tier) => {
               const equipment = selectedTrack.tiers[tier];
               const requirement = tierUnlockRequirements[tier];
-              const isUnlocked =
-                currentXp >= requirement.xp &&
-                currentTokens >= requirement.tokens;
+              const requiredTokens = tier === "Research"
+                ? Math.max(requirement.tokens, equipment.researchTokens)
+                : requirement.tokens;
+              const isUnlocked = currentXp >= requirement.xp && currentTokens >= requiredTokens;
               return (
                 <EquipmentRow
                   key={tier}
@@ -286,13 +286,12 @@ export function TechnologyLab() {
 
         <aside className="space-y-4">
           <section className="border border-[#67543b] bg-[#171f23] p-5">
-            <SectionLabel>Research gate</SectionLabel>
+            <SectionLabel>Campaign progression</SectionLabel>
             <h2 className="text-lg font-semibold uppercase tracking-[0.12em] text-[#f1ebd1]">
-              Nothing auto-unlocks.
+              Earn better hardware.
             </h2>
             <p className="mt-3 text-sm leading-6 text-[#b6b19d]">
-              Mission rewards build XP and Research Tokens. You choose when to
-              invest them into a higher tier.
+              Mission rewards increase XP and Research Tokens. Eligible Frontier and Apex equipment becomes available with progress; Research hardware has an extra per-system token cost. Select the new tier on a future deployment to install its more advanced model and improved production.
             </p>
             <div className="mt-5 space-y-4 border-t border-[#514635] pt-4">
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
