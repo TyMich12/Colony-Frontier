@@ -1029,7 +1029,11 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
     if (!ref.current) return;
     const current = ref.current.position;
     const route = routeRef.current;
-    const step = Math.max(0, delta) * 8.5 * performanceMultiplier * Math.max(0, simulationSpeed);
+    // Longer trips must finish within the work-order window. A local collection manoeuvre is
+    // deliberately slower so it remains visible when the rover has already surveyed the site.
+    const localCollectionApproach = isCollecting && route.length <= 4;
+    const movementRate = localCollectionApproach ? 3.4 : 12.5;
+    const step = Math.max(0, delta) * movementRate * performanceMultiplier * Math.max(0, simulationSpeed);
     let travelled = 0;
     let dx = 0;
     let dz = 0;
