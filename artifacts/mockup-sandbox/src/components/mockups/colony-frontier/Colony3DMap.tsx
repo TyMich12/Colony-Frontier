@@ -1584,9 +1584,9 @@ function MissionGuide({ mars }: { mars: boolean }) {
       }}>
         <div style={{fontSize:9,fontWeight:900,letterSpacing:".18em",textTransform:"uppercase",color:"#efc85f"}}>MISSION CONTROL · {mars ? "MARS" : "MOON"}</div>
         <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
-          <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable and complete the objectives.
-          <br/><b style={{color:"#e8eee9"}}>2.</b> During a disaster, click the red-ringed facility. Read the situation report, then choose a response in its building panel.
-          <br/><b style={{color:"#e8eee9"}}>3.</b> Click the rover or field marker to survey resources, upgrade facilities when reserves allow, and improve your score.
+          <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable, manage supplies, and complete the mission objectives.
+          <br/><b style={{color:"#e8eee9"}}>2.</b> A disaster opens a response popup and pauses the clock. Choose there first; if a fault remains, open the red-ringed system and run its repair.
+          <br/><b style={{color:"#e8eee9"}}>3.</b> Open any system to see its work timer. Different systems can work in parallel; the rover drives to survey, sample, clean, or assigned repair sites.
         </div>
         <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
           <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
