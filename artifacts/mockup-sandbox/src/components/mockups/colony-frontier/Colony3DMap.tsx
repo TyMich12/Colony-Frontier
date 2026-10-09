@@ -922,6 +922,7 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
   const targetLabel = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "]
     .find((prefix) => task.startsWith(prefix));
   const target = targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined;
+  const isCollecting = task.startsWith("COLLECTING ");
   const isTransferring = task.startsWith("TRANSFERRING ");
   const isReturning = task === "RETURNING" || task === "REPAIR VERIFIED" || task === "SAMPLE DELIVERED";
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
@@ -955,7 +956,8 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
       if (Math.hypot(previous[0] - point[0], previous[1] - point[1]) > 0.12) route.push(point);
     };
 
-    if (isMovingTask && targetLabel?.startsWith("AT SITE ")) {
+    if (isMovingTask && (targetLabel?.startsWith("AT SITE ") || isCollecting)) {
+      // Collection takes place at the deposit; do not drive back to base and then revisit it.
       add(destination);
     } else if (isMovingTask && isReturning) {
       // If already home (e.g. after local cleaning), don't make a pointless lap.
@@ -988,13 +990,13 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
     }
     routeRef.current = route;
     routeCursorRef.current = Math.min(1, route.length - 1);
-  }, [task, target?.id, destination[0], destination[1], isReturning, isTransferring, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
+  }, [task, target?.id, destination[0], destination[1], isReturning, isTransferring, isCollecting, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
 
   useFrame(({ clock, delta }) => {
     if (!ref.current) return;
     const current = ref.current.position;
     const route = routeRef.current;
-    const step = Math.max(0, delta) * 4.5 * Math.max(0.5, simulationSpeed);
+    const step = Math.max(0, delta) * 8.5 * Math.max(0.5, simulationSpeed);
     let travelled = 0;
     let dx = 0;
     let dz = 0;
