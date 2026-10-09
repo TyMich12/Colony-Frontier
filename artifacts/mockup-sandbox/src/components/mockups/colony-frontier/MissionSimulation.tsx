@@ -1459,6 +1459,8 @@ export function MissionSimulation() {
   activeOperationsRef.current = activeOperations;
   const activeOperation = Object.values(activeOperations)[0] ?? null;
   const [operationResult, setOperationResult] = useState<string | null>(() => runtime?.operationResult ?? null);
+  const [earthReport, setEarthReport] = useState<string | null>(() => runtime?.earthReport ?? null);
+  const [earthReportAtSeconds, setEarthReportAtSeconds] = useState(runtime?.earthReportAtSeconds ?? 0);
   const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
   const activeFaultsRef = useRef(activeFaults);
   useEffect(() => { activeFaultsRef.current = activeFaults; }, [activeFaults]);
@@ -1829,6 +1831,11 @@ export function MissionSimulation() {
         const foodUpgrade = buildings.agriculture?.upgradeLevel ?? 0;
         const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
+        const gridUpgrade = buildings.grid?.upgradeLevel ?? 0;
+        const co2Upgrade = buildings.co2?.upgradeLevel ?? 0;
+        const radiationUpgrade = buildings.radiation?.upgradeLevel ?? 0;
+        const maintenanceTier = tierLevel(pending.selected.maintenance ?? "Foundation");
+        const maintenanceUpgrade = buildings.maintenance?.upgradeLevel ?? 0;
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
         // Fourteen simulated days are compressed into this mission clock. Blackout missions
         // include a long low-irradiance window; Mars begins with less sunlight margin.
@@ -1838,42 +1845,42 @@ export function MissionSimulation() {
             ? 0.82 + Math.sin(elapsed / 29) * 0.06
             : 0.96;
         const solarConditionFactor = clamp((buildings.solar?.condition ?? 100) / 100, 0, 1);
-        const solarGeneration = solarOnline ? (24 + solarTier * 7.5 + solarUpgrade * 4.5) * solarAvailability * solarConditionFactor : 0;
+        const solarGeneration = solarOnline ? (24 + solarTier * 7.5 + solarUpgrade * 2.5) * solarAvailability * solarConditionFactor : 0;
         const gridTier = tierLevel(pending.selected.grid ?? "Foundation");
         // A live grid carries generation and distributes it. Without the grid, stored energy can
         // support only a reduced local bus; without either source, colony power margin collapses.
         const powerSupply = solarOnline && gridOnline
-          ? 48 + solarGeneration + gridTier * 4
+          ? 48 + solarGeneration + gridTier * 4 + gridUpgrade * 1.25
           : batteryOnline && gridOnline
-            ? 24 + batteryTier * 2
+            ? 24 + batteryTier * 2 + batteryUpgrade * 0.6 + gridTier * 2 + gridUpgrade * 0.65
             : solarOnline && batteryOnline
-              ? 22 + solarGeneration * 0.55
+              ? 22 + solarGeneration * 0.55 + batteryTier * 0.7 + batteryUpgrade * 0.2
               : batteryOnline
-                ? 10 + batteryTier * 1.5
+                ? 10 + batteryTier * 1.5 + batteryUpgrade * 0.45
                 : 0;
         const powerBase = Math.max(0, powerSupply - solarDust * 0.4 - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
         // Stored energy can stabilise the bus during a solar outage, but it drains while discharging.
         const batteryDelta = !batteryOnline
           ? -0.035 * stagePressure
           : solarOnline && gridOnline
-            ? ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0035) * stagePressure * (emergencyPowerMode ? 0.78 : 1)
+            ? ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0009) * stagePressure * (emergencyPowerMode ? 0.78 : 1)
             : -0.018 * stagePressure * (emergencyPowerMode ? 0.78 : 1);
         const oxygenDrain = (oxygenOnline
-          ? Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0017)
+          ? Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0012 - co2Upgrade * 0.0008)
           : pending.selected.oxygen ? 0.028 : 0.036) * stagePressure * (emergencyPowerMode ? 1.02 : 1);
         const waterDrain = (waterOnline
-          ? Math.max(0.003, 0.0135 - waterTier * 0.0024 - waterUpgrade * 0.0015)
+          ? Math.max(0.003, 0.0135 - waterTier * 0.0024 - waterUpgrade * 0.0011)
           : pending.selected.water ? 0.026 : 0.034) * stagePressure;
         const agricultureTier = pending.selected.agriculture ? tierLevel(pending.selected.agriculture) : 0;
         const hasAgriculture = pending.selected.agriculture !== undefined;
         const foodDrain = (agricultureOnline
-          ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0018)
+          ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0011)
           : hasAgriculture ? 0.028 : 0.035) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
         const hasThermalControl = thermalOnline;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
         const thermalCorrection = hasThermalControl
-          ? (0.009 + (thermalTier + thermalUpgrade) * 0.0045)
+          ? (0.009 + thermalTier * 0.0045 + thermalUpgrade * 0.0021)
           : 0.0022;
         const dt = 0.25 * speed;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
@@ -1915,8 +1922,8 @@ export function MissionSimulation() {
           water: clamp(current.water - waterDrain * speed - faultImpact.water),
           food: clamp(current.food - foodDrain * speed - faultImpact.food),
           temperature: clamp(current.temperature + (thermalTarget - current.temperature) * thermalCorrection * speed * stagePressure + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
-          radiation: clamp(current.radiation + (radiationOnline ? Math.max(0.0006, 0.003 - radiationTier * 0.00065) : 0.0065) * speed + faultImpact.radiation),
-          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.0012) * speed * (maintenanceOnline ? 0.68 : 1) - faultImpact.habitat + (habitatOnline ? 0 : -0.002 * speed)),
+          radiation: clamp(current.radiation + (radiationOnline ? Math.max(0.0006, 0.003 - radiationTier * 0.00065 - radiationUpgrade * 0.0003) : 0.0065) * speed + faultImpact.radiation),
+          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.00025) * speed * (maintenanceOnline ? Math.max(0.45, 0.68 - maintenanceTier * 0.045 - maintenanceUpgrade * 0.02) : 1) - faultImpact.habitat + (habitatOnline ? 0 : -0.002 * speed)),
         };
       });
 
@@ -1977,12 +1984,14 @@ export function MissionSimulation() {
       activeOperation,
       activeOperations,
       operationResult,
+      earthReport,
+      earthReportAtSeconds,
       activeFaults,
       sampleQuality,
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
     });
-  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
+  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
