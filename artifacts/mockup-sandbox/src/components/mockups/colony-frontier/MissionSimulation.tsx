@@ -1025,21 +1025,27 @@ export function MissionSimulation() {
   const [sampleStages, setSampleStages] = useState<Record<string, SampleStage>>(() => runtime?.sampleStages ?? Object.fromEntries((runtime?.surveyedNodes ?? []).map((id) => [id, "SURVEYED" as SampleStage])));
   const [sampleQuality, setSampleQuality] = useState<Record<string, number>>(() => runtime?.sampleQuality ?? {});
   const [resourceYield, setResourceYield] = useState(runtime?.resourceYield ?? 0);
-  const [activeOperation, setActiveOperation] = useState<MissionOperation | null>(() => runtime?.activeOperation ?? null);
+  const [activeOperations, setActiveOperations] = useState<Record<string, MissionOperation>>(() => {
+    if (runtime?.activeOperations) return runtime.activeOperations;
+    return runtime?.activeOperation ? { [runtime.activeOperation.operationKey ?? runtime.activeOperation.targetId]: runtime.activeOperation } : {};
+  });
+  const activeOperationsRef = useRef(activeOperations);
+  activeOperationsRef.current = activeOperations;
+  const activeOperation = Object.values(activeOperations)[0] ?? null;
   const [operationResult, setOperationResult] = useState<string | null>(() => runtime?.operationResult ?? null);
   const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
   const activeFaultsRef = useRef(activeFaults);
   useEffect(() => { activeFaultsRef.current = activeFaults; }, [activeFaults]);
   const [emergencyPowerMode, setEmergencyPowerMode] = useState(runtime?.emergencyPowerMode ?? false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
-  const operationCompletionRef = useRef<string | null>(null);
+  const operationCompletionRef = useRef<Set<string>>(new Set());
+  const applyBuildingActionRef = useRef<(trackId: string, action: string) => void>(() => {});
   const [manualActions, setManualActions] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [results, setResults] = useState(false);
   const [missionFailed, setMissionFailed] = useState(false);
   const [missionFailureReason, setMissionFailureReason] = useState<string | null>(null);
-  const [actionBusy, setActionBusy] = useState(false);
   const eventPointerRef = useRef(
     runtime?.eventsTriggered ?? ((runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0)),
   );
@@ -1076,7 +1082,7 @@ export function MissionSimulation() {
           setSampleStages((current) => ({ ...current, [node.id]: "SURVEYED" }));
           setSurveyedNodes((current) => current.includes(node.id) ? current : [...current, node.id]);
           message = `SURVEY COMPLETE · ${node.label}. Terrain and spectral signatures are mapped. Next: collect a sealed physical sample from the marked location.`;
-          setRoverTask("SURVEY COMPLETE");
+          setRoverTask(`AT SITE ${node.label}`);
           setScore((value) => clamp(value + (pending?.selected.rover ? 5 : 3)));
         }
         break;
@@ -1086,7 +1092,7 @@ export function MissionSimulation() {
           setSampleStages((current) => ({ ...current, [node.id]: "COLLECTED" }));
           setSampleQuality((current) => ({ ...current, [node.id]: quality }));
           message = `SAMPLE SECURED · ${node.label}. Chain-of-custody label, coordinates and collection time are logged. Specimen integrity: ${Math.round(quality)}%. ${quality >= 86 ? "The sealed core has low contamination risk." : quality >= 68 ? "Some contamination / handling uncertainty remains; keep the lab result provisional." : "The sample is compromised; repeat collection if the site is important."} Next: return the sealed container to the lab without opening it.`;
-          setRoverTask("SAMPLE SECURED");
+          setRoverTask(`AT SITE ${node.label}`);
           setScore((value) => clamp(value + Math.round(2 + quality / 35)));
         }
         break;
@@ -1094,7 +1100,7 @@ export function MissionSimulation() {
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "DELIVERED" }));
           message = `CHAIN OF CUSTODY COMPLETE · ${node.label} arrived in the lab. The sample is ready for mineralogical / compositional analysis.`;
-          setRoverTask("SAMPLE DELIVERED");
+          setRoverTask(hasRover ? "RETURNING" : "SAMPLE DELIVERED");
           setScore((value) => clamp(value + 4));
         }
         break;
@@ -1118,6 +1124,12 @@ export function MissionSimulation() {
           setRoverTask("ANALYSIS COMPLETE");
         }
         break;
+      case "SYSTEM_ACTION": {
+        applyBuildingActionRef.current(operation.targetId, operation.actionId ?? "inspect");
+        const track = technologyTracks.find((item) => item.id === operation.targetId);
+        message = `ACTION COMPLETE · ${track?.category ?? operation.targetId} · ${operation.actionId ?? "inspect"}. The completed work has been applied to the colony.`;
+        break;
+      }
       case "UPGRADE": {
         const track = technologyTracks.find((item) => item.id === operation.targetId);
         const level = operation.targetLevel ?? 1;
@@ -1178,10 +1190,16 @@ export function MissionSimulation() {
 
     if (message) {
       setOperationResult(message);
-      setAiMessage(message);
+      if (operation.kind !== "SYSTEM_ACTION") setAiMessage(message);
     }
-    setActionBusy(false);
-    setActiveOperation(null);
+    operationCompletionRef.current.delete(operation.id);
+    setActiveOperations((current) => {
+      const entry = Object.entries(current).find(([, candidate]) => candidate.id === operation.id);
+      if (!entry) return current;
+      const next = { ...current };
+      delete next[entry[0]];
+      return next;
+    });
   }, [pending, sampleQuality]);
 
   useEffect(() => {
@@ -1202,25 +1220,36 @@ export function MissionSimulation() {
 
 
   useEffect(() => {
-    if (!activeOperation || results || manualPaused || activeEventId) return;
+    if (!pending || results || manualPaused || activeEventId) return;
 
+    // One stable timer advances all independent system jobs. An incident pauses every job.
     const timer = window.setInterval(() => {
-      setActiveOperation((current) => {
-        if (!current) return current;
-        const remaining = Math.max(0, current.remainingSeconds - speed);
-        if (remaining <= 0) {
-          if (operationCompletionRef.current !== current.id) {
-            operationCompletionRef.current = current.id;
-            window.setTimeout(() => finishOperation(current), 0);
+      if (Object.keys(activeOperationsRef.current).length === 0) return;
+      setActiveOperations((current) => {
+        let changed = false;
+        const next = { ...current };
+        for (const [key, operation] of Object.entries(current)) {
+          const remaining = Math.max(0, operation.remainingSeconds - 0.25 * speed);
+          if (remaining <= 0) {
+            if (!operationCompletionRef.current.has(operation.id)) {
+              operationCompletionRef.current.add(operation.id);
+              window.setTimeout(() => finishOperation({ ...operation, remainingSeconds: 0 }), 0);
+            }
+            if (operation.remainingSeconds !== 0) {
+              next[key] = { ...operation, remainingSeconds: 0 };
+              changed = true;
+            }
+          } else {
+            next[key] = { ...operation, remainingSeconds: remaining };
+            changed = true;
           }
-          return null;
         }
-        return { ...current, remainingSeconds: remaining };
+        return changed ? next : current;
       });
-    }, 1000);
+    }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeOperation, activeEventId, finishOperation, manualPaused, results, speed]);
+  }, [activeEventId, finishOperation, manualPaused, pending, results, speed]);
 
   useEffect(() => {
     if (!pending || missionFailed) return;
@@ -1231,13 +1260,12 @@ export function MissionSimulation() {
     setMissionFailed(true);
     if (!results) setResults(true);
     setActiveEventId(null);
-    setActiveOperation(null);
-    setActionBusy(false);
+    setActiveOperations({});
     setAiMessage(`MISSION ABORTED · ${reason} Preserve the remaining equipment and review the failure report before redeploying.`);
   }, [metrics, missionFailed, pending, results]);
 
   useEffect(() => {
-    if (!pending || results || manualPaused) return;
+    if (!pending || results || manualPaused || activeEventId) return;
 
     const timer = window.setInterval(() => {
       setElapsed((current) => {
@@ -1312,7 +1340,7 @@ export function MissionSimulation() {
           }, 0);
         }
 
-        if (next >= TOTAL_MISSION_SECONDS && !activeEventId && !activeOperation) {
+        if (next >= TOTAL_MISSION_SECONDS && !activeEventId && Object.keys(activeOperationsRef.current).length === 0) {
           setTimeout(() => setResults(true), 0);
         }
 
@@ -1364,7 +1392,7 @@ export function MissionSimulation() {
           : 0.0022;
         const dt = 0.25 * speed;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
-          const isBeingRepaired = activeOperation?.kind === "REPAIR" && activeOperation.targetId === fault.targetTrackId;
+          const isBeingRepaired = activeOperationsRef.current[fault.targetTrackId]?.kind === "REPAIR";
           const amount = dt * fault.severity * (isBeingRepaired ? 0.25 : 1);
           switch (fault.eventId) {
             case "solar-dust":
@@ -1413,7 +1441,7 @@ export function MissionSimulation() {
           const tier = pending.selected[trackId];
           const level = tier ? tierLevel(tier) : 0;
           const wear = (trackId === "solar" ? 0.013 : 0.0075) * stagePressure;
-          const repairingTrack = activeOperation?.kind === "REPAIR" && activeOperation.targetId === trackId;
+          const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const faultWear = Object.values(activeFaults)
             .filter((fault) => fault.targetTrackId === trackId)
             .reduce((sum, fault) => sum + 0.26 * fault.severity * dt * (repairingTrack ? 0.25 : 1), 0);
@@ -1430,7 +1458,7 @@ export function MissionSimulation() {
       const dt = 0.25 * speed;
       if (Object.keys(activeFaults).length > 0) {
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).map(([key, fault]) => {
-          const isBeingRepaired = activeOperation?.kind === "REPAIR" && activeOperation.targetId === fault.targetTrackId;
+          const isBeingRepaired = activeOperationsRef.current[fault.targetTrackId]?.kind === "REPAIR";
           const overdue = !isBeingRepaired && fault.remainingSeconds <= dt;
           return [key, {
             ...fault,
@@ -1443,7 +1471,7 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, activeFaults, activeOperation, buildings, elapsed, emergencyPowerMode, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
+  }, [activeEventId, activeFaults, activeOperations, buildings, elapsed, emergencyPowerMode, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
 
   useEffect(() => {
     if (!pending || results) return;
@@ -1462,13 +1490,14 @@ export function MissionSimulation() {
       sampleStages,
       resourceYield,
       activeOperation,
+      activeOperations,
       operationResult,
       activeFaults,
       sampleQuality,
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
     });
-  }, [activeEventId, activeFaults, activeOperation, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
+  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
@@ -1939,8 +1968,10 @@ export function MissionSimulation() {
     durationSeconds: number,
     targetLevel?: number,
     specimenQuality?: number,
+    actionId?: string,
+    operationKey = targetId,
   ) => {
-    if (!pending || activeOperation || actionBusy || activeEventId || results) return;
+    if (!pending || activeOperationsRef.current[operationKey] || activeEventId || results) return;
     const operation: MissionOperation = {
       id: `${kind.toLowerCase()}-${targetId}-${Date.now()}`,
       kind,
@@ -1948,19 +1979,20 @@ export function MissionSimulation() {
       label,
       totalSeconds: durationSeconds,
       remainingSeconds: durationSeconds,
+      operationKey,
       ...(targetLevel !== undefined ? { targetLevel } : {}),
       ...(specimenQuality !== undefined ? { sampleQuality: specimenQuality } : {}),
+      ...(actionId !== undefined ? { actionId } : {}),
     };
-    operationCompletionRef.current = null;
-    setActiveOperation(operation);
-    setActionBusy(true);
+    operationCompletionRef.current.delete(operation.id);
+    setActiveOperations((current) => ({ ...current, [operationKey]: operation }));
     setOperationResult(null);
     setManualActions((value) => value + 1);
-    setAiMessage(`${label} started. Estimated duration: ${durationSeconds} seconds at 1× simulation speed.`);
+    setAiMessage(`${label} started. Estimated duration: ${durationSeconds} simulated seconds at 1× speed. Other systems remain available while this job runs.`);
   };
 
   const handleResourceAction = (nodeId: string, action: string) => {
-    if (!pending || activeOperation || actionBusy || activeEventId || results) return;
+    if (!pending || activeEventId || results) return;
     const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
     const node = nodes.find((item) => item.id === nodeId);
     if (!node) return;
@@ -1968,6 +2000,8 @@ export function MissionSimulation() {
     const hasRover = pending.selected.rover !== undefined;
     const hasExtraction = pending.selected.extraction !== undefined;
     const hasScience = pending.selected.science !== undefined;
+    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind));
+    if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress)) return;
     const roverTier = tierLevel(pending.selected.rover ?? "Foundation");
     const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
     const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
@@ -1976,7 +2010,7 @@ export function MissionSimulation() {
     if (action === "survey" && stage === "UNSURVEYED") {
       const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2);
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration);
-      setRoverTask(hasRover ? `MAPPING ${node.label.toUpperCase()}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
+      setRoverTask(hasRover ? `SURVEYING ${node.label}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
@@ -1991,13 +2025,13 @@ export function MissionSimulation() {
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
-      setRoverTask(hasExtraction ? "DRILLING CORE" : hasRover ? "SAMPLING SITE" : "EVA SAMPLING");
+      setRoverTask(hasRover ? `COLLECTING ${node.label}` : hasExtraction ? "DRILLING CORE" : "EVA SAMPLING");
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
       const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5);
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration);
-      setRoverTask(hasRover ? "CARRYING SAMPLE" : "EVA SAMPLE RETURN");
+      setRoverTask(hasRover ? `TRANSFERRING ${node.label}` : "EVA SAMPLE RETURN");
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
       return;
     }
@@ -2030,7 +2064,7 @@ export function MissionSimulation() {
     }
   };
   const handleBuildingAction = (trackId: string, action: string) => {
-    if (!pending?.selected[trackId] || actionBusy || activeOperation || activeEventId || results) return;
+    if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
     if (action === "upgrade") {
       const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
       if ((current.upgradeLevel ?? 0) >= 2) {
@@ -2098,10 +2132,48 @@ export function MissionSimulation() {
       return;
     }
 
-    setActionBusy(true);
-    window.setTimeout(() => setActionBusy(false), 1100);
-    setManualActions((value) => value + 1);
+    const actionDurations: Record<string, number> = {
+      clean: 9, tune: 7, balance: 8, reserve: 6, reset: 7, boost: 9,
+      flush: 8, purify: 12, scrub: 8, recover: 9, dump: 7, insulate: 10,
+      repoint: 8, test: 5, repair: 14, seal: 8, shield: 10, shelter: 6,
+      "balance-grid": 8, prioritize: 5, calibrate: 9, experiment: 14,
+      "nav-calibrate": 7, route: 5, survey: 12, return: 8, inspect: 4,
+      "extract-test": 10, extract: 15, process: 12, purge: 7,
+      "tune-crops": 12, harvest: 9, service: 12, diagnostics: 7,
+    };
+    const actionLabels: Record<string, string> = {
+      clean: "Clean solar array", tune: "Tune solar tracking", balance: "Balance battery cells", reserve: "Protect battery reserve",
+      reset: "Reset oxygen loop", boost: "Boost oxygen processing", flush: "Flush water recovery", purify: "Deep-purify water",
+      scrub: "Regenerate CO₂ scrubber", recover: "Recover carbon compounds", dump: "Rebalance thermal loop", insulate: "Apply thermal protection",
+      repoint: "Repoint communications antenna", test: "Test communications link", repair: "Repair habitat seal", seal: "Run pressure check",
+      shield: "Inspect radiation shielding", shelter: "Engage shelter protocol", "balance-grid": "Balance power bus", prioritize: "Prioritise life-support loads",
+      calibrate: "Calibrate science instruments", experiment: "Run field experiment", "nav-calibrate": "Calibrate navigation", route: "Plan rover route",
+      survey: "Dispatch rover survey", return: "Recall rover", inspect: "Inspect rover", "extract-test": "Test extraction drill", extract: "Collect extraction sample",
+      process: "Process local feedstock", purge: "Purge ISRU line", "tune-crops": "Tune greenhouse controls", harvest: "Harvest crop output",
+      service: "Run maintenance service", diagnostics: "Run predictive diagnostics",
+    };
+    if (action === "survey") {
+      const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
+      const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
+      if (nextNode) setRoverTask(`SURVEYING ${nextNode.label}`);
+    } else if (action === "return") {
+      setRoverTask("RETURNING");
+    } else if (action === "clean" && pending.selected.rover) {
+      setRoverTask("CLEANING ARRAY");
+    }
+    beginOperation(
+      "SYSTEM_ACTION",
+      trackId,
+      actionLabels[action] ?? `Operate ${trackId}`,
+      actionDurations[action] ?? 6,
+      undefined,
+      undefined,
+      action,
+    );
+  };
 
+  const applyBuildingAction = (trackId: string, action: string) => {
+    if (!pending) return;
     const conditionBoost = (amount: number) => {
       setBuildings((current) => {
         const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE" };
@@ -2256,9 +2328,11 @@ export function MissionSimulation() {
         const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
         const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
         if (nextNode) {
-          setRoverTask("SURVEYING " + nextNode.label);
+          setSurveyedNodes((current) => current.includes(nextNode.id) ? current : [...current, nextNode.id]);
+          setSampleStages((current) => ({ ...current, [nextNode.id]: "SURVEYED" }));
+          setRoverTask(`AT SITE ${nextNode.label}`);
           setScore((value) => clamp(value + 2));
-          setAiMessage("Rover dispatched to " + nextNode.label + ". It is following the marked road network to the field site.");
+          setAiMessage(`SURVEY COMPLETE · ${nextNode.label} mapped and marked. The rover is at the site; select its marker to collect a sealed sample.`);
         }
         break;
       }
@@ -2325,6 +2399,7 @@ export function MissionSimulation() {
         break;
     }
   };
+  applyBuildingActionRef.current = applyBuildingAction;
 
   const askMissionAi = () => {
     const weakest = [
