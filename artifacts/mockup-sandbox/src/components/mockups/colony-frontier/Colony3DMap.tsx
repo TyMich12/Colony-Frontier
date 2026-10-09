@@ -1130,8 +1130,11 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
     if (rightLeg.current) rightLeg.current.rotation.x = gait * 0.72;
   });
 
-  const suit = ["#67c9d9", "#e4bb61", "#d47c69", "#83b97d", "#9d8bd1", "#e0e3dd", "#5c9bcc"][index % 7];
-  const trim = mars ? "#c5a08c" : "#d7d6b7";
+  // Realistic EVA palette: neutral thermal-micrometeoroid layers, fabric patches,
+  // dark joint seals, and only subdued instrument colours.
+  const suit = mars ? "#d4c6b8" : "#e0e2db";
+  const trim = mars ? "#765f55" : "#5d696a";
+  const patchColor = ["#c58a49", "#628caf", "#b66e62", "#769a7f", "#9184b8"][index % 5];
   return (
     <group ref={ref} scale={1.42}>
       {/* Separate boots, lower legs and articulated knee joints. */}
@@ -1169,14 +1172,12 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
       </RoundedBox>
       <mesh position={[0, 0.785, 0.207]}>
         <boxGeometry args={[0.16, 0.075, 0.016]} />
-        <meshStandardMaterial color={mars ? "#ffc49c" : "#66e1e8"} emissive={mars ? "#9e4b2e" : "#1c8e9b"} emissiveIntensity={0.9} />
+        <meshStandardMaterial color={patchColor} roughness={0.72} />
       </mesh>
-      {[-0.07, 0, 0.07].map((x, i) => (
-        <mesh key={x} position={[x, 0.665, 0.21]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color={["#ed625d", "#e8c867", "#6fe09b"][i]} emissive={["#b02b28", "#92702b", "#288e52"][i]} emissiveIntensity={0.6} />
-        </mesh>
-      ))}
+      <mesh position={[0, 0.665, 0.21]}>
+        <boxGeometry args={[0.12, 0.035, 0.012]} />
+        <meshStandardMaterial color="#465255" roughness={0.66} metalness={0.16} />
+      </mesh>
       {/* Safety harness, shoulder bars and small suit patches. */}
       {[-1, 1].map((side) => (
         <group key={side}>
@@ -1188,8 +1189,8 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
             <meshStandardMaterial color="#6d7b7a" metalness={0.38} roughness={0.44} />
           </RoundedBox>
           <mesh position={[side * 0.235, 0.865, 0.079]}>
-            <sphereGeometry args={[0.035, 10, 8]} />
-            <meshStandardMaterial color={side < 0 ? "#73dfb5" : "#ffd16b"} emissive={side < 0 ? "#207a60" : "#92652a"} emissiveIntensity={0.95} />
+            <boxGeometry args={[0.09, 0.045, 0.018]} />
+            <meshStandardMaterial color={patchColor} roughness={0.76} />
           </mesh>
         </group>
       ))}
@@ -1237,22 +1238,94 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
         <sphereGeometry args={[0.205, 20, 16]} />
         <meshStandardMaterial color={trim} metalness={0.28} roughness={0.25} />
       </mesh>
-      <mesh position={[0, 1.15, 0.155]} scale={[0.82, 0.64, 0.22]}>
-        <sphereGeometry args={[0.17, 20, 14]} />
-        <meshPhysicalMaterial color="#112b38" emissive="#0b2630" emissiveIntensity={0.28} roughness={0.16} metalness={0.2} clearcoat={1} />
+      <mesh position={[0, 1.15, 0.155]} scale={[1.05, 0.72, 0.22]}>
+        <sphereGeometry args={[0.17, 24, 16]} />
+        <meshPhysicalMaterial color="#17242b" roughness={0.2} metalness={0.46} clearcoat={1} clearcoatRoughness={0.12} />
       </mesh>
-      <mesh position={[0, 1.07, 0.17]}>
-        <boxGeometry args={[0.18, 0.022, 0.012]} />
-        <meshStandardMaterial color="#66e4ee" emissive="#1d8793" emissiveIntensity={1.2} />
+      {/* A soft, non-emissive reflection gives the visor a curved glass surface. */}
+      <mesh position={[-0.035, 1.19, 0.194]} rotation={[0, 0, -0.18]}>
+        <boxGeometry args={[0.12, 0.012, 0.006]} />
+        <meshStandardMaterial color="#7b929a" roughness={0.28} metalness={0.48} />
       </mesh>
       <mesh position={[0.13, 1.28, 0.02]}>
-        <sphereGeometry args={[0.036, 10, 8]} />
-        <meshStandardMaterial color="#ffe7a1" emissive="#b98734" emissiveIntensity={0.9} />
+        <sphereGeometry args={[0.03, 10, 8]} />
+        <meshStandardMaterial color="#d4d3c9" emissive="#807b5e" emissiveIntensity={0.18} metalness={0.35} roughness={0.32} />
       </mesh>
       <mesh position={[0, 1.35, -0.02]}>
         <torusGeometry args={[0.145, 0.018, 8, 26]} />
         <meshStandardMaterial color="#d5bf78" metalness={0.72} roughness={0.25} />
       </mesh>
+    </group>
+  );
+}
+
+function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolean; upgradeLevel: number }) {
+  const rank = tier === "Foundation" ? 0 : tier === "Frontier" ? 1 : tier === "Apex" ? 2 : 3;
+  if (rank === 0 && upgradeLevel === 0) return null;
+  const hue = tierColor(tier);
+  const radius = large ? 3.88 : 1.78;
+  const hardwareRadius = large ? 3.18 : 1.22;
+  const unitSize = large ? 0.36 : 0.2;
+  return (
+    <group frustumCulled={false}>
+      {/* Exterior upgrade collar: tier changes remain visually readable from map zoom. */}
+      {rank > 0 && (
+        <mesh position={[0, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={13}>
+          <ringGeometry args={[radius, radius + (rank >= 3 ? 0.12 : 0.075), 48]} />
+          <meshBasicMaterial color={hue} transparent opacity={rank >= 3 ? 0.96 : 0.78} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      {/* Frontier adds visible sensor/utility pods rather than only recolouring the skin. */}
+      {rank >= 1 && Array.from({ length: 4 }, (_, i) => {
+        const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        return (
+          <group key={i} position={[Math.cos(angle) * hardwareRadius, 0.34, Math.sin(angle) * hardwareRadius]} rotation={[0, -angle, 0]}>
+            <RoundedBox args={[unitSize, large ? 0.38 : 0.24, unitSize * 0.78]} radius={unitSize * 0.16} smoothness={3} castShadow>
+              <meshStandardMaterial color={rank >= 3 ? "#d2b56c" : rank >= 2 ? "#778d96" : "#687a7f"} metalness={rank >= 2 ? 0.54 : 0.34} roughness={0.42} />
+            </RoundedBox>
+            <mesh position={[0, large ? 0.21 : 0.14, 0.012]}>
+              <boxGeometry args={[unitSize * 0.42, unitSize * 0.22, 0.015]} />
+              <meshStandardMaterial color={hue} emissive={rank >= 2 ? hue : "#000000"} emissiveIntensity={rank >= 2 ? 0.26 : 0} roughness={0.52} />
+            </mesh>
+          </group>
+        );
+      })}
+      {/* Apex adds taller independent instrument masts; Research adds paired advanced beacons. */}
+      {rank >= 2 && [-1, 1].map((side) => (
+        <group key={side} position={[side * (large ? 2.75 : 1.06), 0.34, large ? -2.15 : -0.72]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[large ? 0.045 : 0.028, large ? 0.055 : 0.035, large ? 0.85 : 0.56, 8]} />
+            <meshStandardMaterial color="#c8d3cc" metalness={0.74} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, large ? 0.48 : 0.32, 0]}>
+            <octahedronGeometry args={[large ? 0.105 : 0.072, 0]} />
+            <meshStandardMaterial color={hue} emissive={hue} emissiveIntensity={rank >= 3 ? 0.9 : 0.36} />
+          </mesh>
+        </group>
+      ))}
+      {rank >= 3 && (
+        <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={14}>
+          <ringGeometry args={[radius + 0.18, radius + 0.24, 48]} />
+          <meshBasicMaterial color="#efd08a" transparent opacity={0.96} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      {/* In-mission retrofits retain the selected technology silhouette and add separate gold hardware. */}
+      {upgradeLevel > 0 && (
+        <mesh position={[0, 0.19, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={15}>
+          <ringGeometry args={[large ? 4.16 : 2.02, large ? 4.23 : 2.1, 48]} />
+          <meshBasicMaterial color="#e8c568" transparent opacity={0.94} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      {upgradeLevel >= 2 && (
+        <group>
+          {[-1, 1].map((side) => (
+            <mesh key={side} position={[side * (large ? 2.55 : 0.93), 0.68, large ? 0.4 : 0.18]} castShadow>
+              <boxGeometry args={[large ? 0.2 : 0.13, large ? 0.55 : 0.4, large ? 0.38 : 0.24]} />
+              <meshStandardMaterial color="#c2c9c0" metalness={0.67} roughness={0.34} />
+            </mesh>
+          ))}
+        </group>
+      )}
     </group>
   );
 }
@@ -1284,6 +1357,7 @@ function ColonyBuilding({
       <group position={[0, 0.04, 0]} frustumCulled={false}>
         <BuildingArt id={track.id} accent={tierColor(tier)} />
       </group>
+      <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       {track.id !== "habitat" && (
         <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
           <ringGeometry args={[1.42, 1.54, 40]} />
