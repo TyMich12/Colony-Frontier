@@ -431,6 +431,11 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
   return Math.max(0, 20 - tierLevel(tier) * 4.8 - Math.max(0, Math.min(2, upgradeLevel)) * 2);
 }
 
+function combinedPerformanceMultiplier(...values: number[]): number {
+  if (values.length === 0) return 1;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 const LOCAL_FALLBACK_ACTIONS = new Set([
   "fallback-solar", "fallback-battery", "fallback-grid", "fallback-habitat",
   "fallback-water", "fallback-oxygen", "fallback-co2", "fallback-thermal",
@@ -1313,6 +1318,10 @@ function ResourceInspector({
   extractionTier,
   scienceTier,
   navigationTier,
+  roverPerformance,
+  extractionPerformance,
+  sciencePerformance,
+  navigationPerformance,
   operation,
   actionBusy,
   onAction,
@@ -1329,6 +1338,10 @@ function ResourceInspector({
   extractionTier: number;
   scienceTier: number;
   navigationTier: number;
+  roverPerformance: number;
+  extractionPerformance: number;
+  sciencePerformance: number;
+  navigationPerformance: number;
   operation: MissionOperation | null;
   actionBusy: boolean;
   onAction: (action: string) => void;
@@ -1345,10 +1358,10 @@ function ResourceInspector({
   const stageIndex = flow.findIndex((item) => item.id === stage);
   const isThisOperation = Boolean(operation && operation.targetId === node.id);
   const nextAction =
-    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: Math.max(9, 12 - roverTier - navigationTier * 0.35), detail: "Needs a working rover, navigation, communications, and an operational power path." } :
-    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: hasExtraction ? Math.max(10, (hasRover ? 16 : 21) - extractionTier * 2) : Math.max(16, 24 - roverTier * 1.4), detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
-    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: Math.max(11, 14 - roverTier), detail: "The rover drives the sealed container to the habitat so chain of custody is preserved." } :
-    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Analyze in science laboratory" : "Analysis locked · laboratory required", seconds: Math.max(12, 20 - scienceTier * 2), detail: "A deployed, operational science laboratory is mandatory. There is no portable-assay bypass." } :
+    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: Math.max(5, 12 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "Needs a working rover, navigation, communications, and an operational power path." } :
+    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: Math.max(7, (hasExtraction ? 16 : 24) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance)), detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
+    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: Math.max(6, 14 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "The rover drives the sealed container to the habitat so chain of custody is preserved." } :
+    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Analyze in science laboratory" : "Analysis locked · laboratory required", seconds: Math.max(5, 20 / sciencePerformance), detail: "A deployed, operational science laboratory is mandatory. There is no portable-assay bypass." } :
     null;
   const blockers = nextAction ? getBlockers("field", nextAction.id, node.id) : [];
   const canStart = !operation && !actionBusy && blockers.length === 0;
@@ -1580,9 +1593,11 @@ export function MissionSimulation() {
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "ANALYSED" }));
           const scienceTier = tierLevel(pending?.selected.science ?? "Foundation");
+          const scienceRetrofit = buildings.science?.upgradeLevel ?? 0;
+          const sciencePerformance = systemPerformanceMultiplier(pending?.selected.science ?? "Foundation", scienceRetrofit);
           const integrity = sampleQuality[node.id] ?? 64;
-          const confidence = clamp(integrity + (pending?.selected.science ? scienceTier * 5 : -12), 42, 99);
-          const scienceBonus = pending?.selected.science ? scienceTier * 2 : 0;
+          const confidence = clamp(integrity + (pending?.selected.science ? scienceTier * 5 + scienceRetrofit * 2 : -12), 42, 99);
+          const scienceBonus = pending?.selected.science ? scienceTier * 2 + scienceRetrofit * 0.8 : 0;
           const finding = node.kind === "ICE"
             ? confidence >= 82 ? "A strong volatile / ice signature is supported by the assay; preserve a sealed aliquot for confirmation." : "The volatile signature is suggestive but not conclusive; repeat the assay before treating this as a verified ice reserve."
             : node.kind === "MINERAL"
@@ -1590,9 +1605,9 @@ export function MissionSimulation() {
               : node.kind === "SCIENCE"
                 ? confidence >= 82 ? "The reference readings are internally consistent and suitable for comparison with later observations." : "Instrument and sample uncertainty remain high; repeat calibration before using this as a reference."
                 : confidence >= 82 ? "The sample supports a consistent regolith classification and can guide a follow-up collection." : "Particle and composition evidence are not decisive; collect a better-sealed replicate for confirmation.";
-          setResourceYield((value) => value + (confidence >= 82 ? 2 : 1));
-          setScore((value) => clamp(value + Math.round(4 + confidence / 18 + scienceBonus)));
-          message = `LAB RESULT · ${node.label}. Confidence: ${Math.round(confidence)}% · specimen integrity ${Math.round(integrity)}%. ${finding} Research value: +${(confidence >= 82 ? 2 : 1) + scienceBonus} units. The result is logged with its uncertainty instead of being treated as absolute proof.`;
+          setResourceYield((value) => value + (confidence >= 82 ? 2 : 1) * sciencePerformance);
+          setScore((value) => clamp(value + Math.round((4 + confidence / 18 + scienceBonus) * sciencePerformance)));
+          message = `LAB RESULT · ${node.label}. Confidence: ${Math.round(confidence)}% · specimen integrity ${Math.round(integrity)}%. ${finding} Research value: +${((confidence >= 82 ? 2 : 1) * sciencePerformance + scienceBonus).toFixed(1)} units. The result is logged with its uncertainty instead of being treated as absolute proof.`;
           // Keep lab analysis from overwriting the rover’s independent travel state.
         }
         break;
@@ -2565,22 +2580,26 @@ export function MissionSimulation() {
     const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
     const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
     const navigationTier = tierLevel(pending.selected.navigation ?? "Foundation");
+    const roverPerformance = systemPerformanceMultiplier(pending.selected.rover ?? "Foundation", buildings.rover?.upgradeLevel ?? 0);
+    const extractionPerformance = systemPerformanceMultiplier(pending.selected.extraction ?? "Foundation", buildings.extraction?.upgradeLevel ?? 0);
+    const sciencePerformance = systemPerformanceMultiplier(pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
+    const navigationPerformance = systemPerformanceMultiplier(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0);
 
     if (action === "survey" && stage === "UNSURVEYED") {
-      const duration = hasRover ? Math.max(9, 12 - roverTier * 1.0 - navigationTier * 0.35) : Math.max(17, 22 - navigationTier * 1.2);
+      const duration = Math.max(5, 12 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`SURVEYING ${node.label}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
     if (action === "sample" && stage === "SURVEYED") {
-      const duration = hasExtraction ? Math.max(10, (hasRover ? 16 : 21) - extractionTier * 2) : hasRover ? Math.max(16, 24 - roverTier * 1.4) : 30;
+      const duration = Math.max(7, (hasExtraction ? 16 : 24) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance));
       if (metrics.power < 7 || metrics.battery < 3) {
         setOperationResult("COLLECTION HELD · Sampling requires at least 7% power and 3% battery reserve. Restore the energy margin first.");
         return;
       }
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
-      const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 : 0) + (hasRover ? 7 + roverTier * 2.5 : 0) + navigationTier * 2 - (equipmentFault ? 12 : 0), 38, 98);
+      const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 + (buildings.extraction?.upgradeLevel ?? 0) * 2 : 0) + (hasRover ? 7 + roverTier * 2.5 + (buildings.rover?.upgradeLevel ?? 0) * 0.9 : 0) + navigationTier * 2 + (buildings.navigation?.upgradeLevel ?? 0) * 0.7 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId, hasRover);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
@@ -2588,7 +2607,7 @@ export function MissionSimulation() {
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
-      const duration = hasRover ? Math.max(11, 14 - roverTier * 1.0) : Math.max(16, 22 - navigationTier * 1.5);
+      const duration = Math.max(6, 14 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`TRANSFERRING ${node.label}`);
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
@@ -2596,7 +2615,7 @@ export function MissionSimulation() {
     }
     if (action === "analyze" && stage === "DELIVERED") {
       const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
-      const duration = hasScience ? Math.max(12, 20 - scienceTier * 2) : 32;
+      const duration = Math.max(5, 20 / sciencePerformance);
       if (metrics.power < 5) {
         setOperationResult("ANALYSIS HELD · Insufficient power for the spectrometer / field assay. Restore power before analysing.");
         return;
@@ -3573,6 +3592,10 @@ export function MissionSimulation() {
             extractionTier={tierLevel(pending.selected.extraction ?? "Foundation")}
             scienceTier={tierLevel(pending.selected.science ?? "Foundation")}
             navigationTier={tierLevel(pending.selected.navigation ?? "Foundation")}
+            roverPerformance={systemPerformanceMultiplier(pending.selected.rover ?? "Foundation", buildings.rover?.upgradeLevel ?? 0)}
+            extractionPerformance={systemPerformanceMultiplier(pending.selected.extraction ?? "Foundation", buildings.extraction?.upgradeLevel ?? 0)}
+            sciencePerformance={systemPerformanceMultiplier(pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0)}
+            navigationPerformance={systemPerformanceMultiplier(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0)}
             operation={activeOperations[selectedResource.id] ?? activeOperations.rover ?? activeOperations.science ?? Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) ?? null}
             actionBusy={Boolean(activeOperations[selectedResource.id] || activeOperations.rover || activeOperations.science || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)))}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
