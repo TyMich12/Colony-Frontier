@@ -1353,6 +1353,38 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
           <meshBasicMaterial color="#e8c568" transparent opacity={0.94} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
+      {/* Field retrofits add real surface hardware as well as the gold maintenance collar. */}
+      {upgradeLevel === 1 && (
+        <group>
+          {[-1, 1].map((side) => (
+            <group key={side} position={[side * (large ? 2.35 : 0.87), 0.31, large ? -1.42 : -0.58]} rotation={[0, side * 0.32, 0]}>
+              <RoundedBox args={[large ? 0.54 : 0.28, large ? 0.29 : 0.17, large ? 0.36 : 0.2]} radius={0.045} smoothness={3} castShadow>
+                <meshStandardMaterial color="#a3b0aa" metalness={0.42} roughness={0.54} />
+              </RoundedBox>
+              <mesh position={[0, large ? 0.155 : 0.095, large ? 0.045 : 0.028]}>
+                <boxGeometry args={[large ? 0.31 : 0.15, large ? 0.035 : 0.022, 0.018]} />
+                <meshStandardMaterial color="#d8b960" emissive="#6b5120" emissiveIntensity={0.22} roughness={0.52} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      )}
+      {upgradeLevel >= 2 && rank === 0 && (
+        <group>
+          {[-1, 1].map((side) => (
+            <group key={side} position={[side * (large ? 2.78 : 1.05), 0.29, large ? 0.25 : 0.08]}>
+              <mesh castShadow>
+                <cylinderGeometry args={[large ? 0.09 : 0.055, large ? 0.11 : 0.07, large ? 0.45 : 0.3, 10]} />
+                <meshStandardMaterial color="#899995" metalness={0.48} roughness={0.4} />
+              </mesh>
+              <mesh position={[0, large ? 0.24 : 0.16, 0]}>
+                <octahedronGeometry args={[large ? 0.075 : 0.045, 0]} />
+                <meshStandardMaterial color="#d7bd72" emissive="#705324" emissiveIntensity={0.32} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      )}
       {upgradeLevel >= 2 && (
         <group>
           {[-1, 1].map((side) => (
