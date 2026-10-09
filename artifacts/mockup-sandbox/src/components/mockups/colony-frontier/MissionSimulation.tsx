@@ -182,6 +182,16 @@ function initialMetrics(selected: Record<string, Tier>): MissionMetrics {
   };
 }
 
+function getMissionFailureReason(metrics: MissionMetrics): string | null {
+  if (metrics.oxygen <= 1.5) return "Cabin oxygen reserve fell below the minimum safe operating margin.";
+  if (metrics.water <= 1) return "The usable water reserve was exhausted before recovery could be restored.";
+  if (metrics.habitat <= 1) return "Habitat integrity fell below its simulated pressure-boundary limit.";
+  if (metrics.power <= 0.5 && metrics.battery <= 0.5) return "Generation and stored power were both exhausted; life-support equipment could no longer run.";
+  if (metrics.temperature <= 16.05 || metrics.temperature >= 27.95) return "Cabin temperature passed the simulated crew-safe operating envelope.";
+  if (metrics.radiation >= 90) return "Cumulative radiation exposure passed the mission's emergency dose limit.";
+  return null;
+}
+
 function initialBuildings(selected: Record<string, Tier>): Record<string, BuildingRuntime> {
   return Object.fromEntries(
     Object.keys(selected).map((trackId) => [
@@ -1210,19 +1220,13 @@ export function MissionSimulation() {
   }, [activeOperation, activeEventId, finishOperation, manualPaused, results, speed]);
 
   useEffect(() => {
-    if (!pending || results || missionFailed) return;
-    let reason: string | null = null;
-    if (metrics.oxygen <= 1.5) reason = "Cabin oxygen reserve fell below the minimum safe operating margin.";
-    else if (metrics.water <= 1) reason = "The usable water reserve was exhausted before recovery could be restored.";
-    else if (metrics.habitat <= 1) reason = "Habitat integrity fell below its simulated pressure-boundary limit.";
-    else if (metrics.power <= 0.5 && metrics.battery <= 0.5) reason = "Generation and stored power were both exhausted; life-support equipment could no longer run.";
-    else if (metrics.temperature <= 16.05 || metrics.temperature >= 27.95) reason = "Cabin temperature passed the simulated crew-safe operating envelope.";
-    else if (metrics.radiation >= 90) reason = "Cumulative radiation exposure passed the mission's emergency dose limit.";
+    if (!pending || missionFailed) return;
+    const reason = getMissionFailureReason(metrics);
     if (!reason) return;
 
     setMissionFailureReason(reason);
     setMissionFailed(true);
-    setResults(true);
+    if (!results) setResults(true);
     setActiveEventId(null);
     setActiveOperation(null);
     setActionBusy(false);
@@ -1471,13 +1475,15 @@ export function MissionSimulation() {
 
     const finalState = loadGameState();
     const alreadyComplete = finalState.completedMissions.includes(pending.missionId);
-    const firstTime = !missionFailed && !pending.replay && !alreadyComplete;
+    const failReasonAtFinish = getMissionFailureReason(metrics);
+    const failedAtFinish = missionFailed || Boolean(failReasonAtFinish);
+    const firstTime = !failedAtFinish && !pending.replay && !alreadyComplete;
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     // Reward clean, useful science more than simply completing many low-quality collection loops.
     const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
     const researchBonusXp = firstTime ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + scienceTier * 20, 0) : 0;
-    const missionXpReward = missionFailed ? 0 : pending.rewardXp + researchBonusXp;
-    const creditedMissionSalvage = missionFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits;
+    const missionXpReward = failedAtFinish ? 0 : pending.rewardXp + researchBonusXp;
+    const creditedMissionSalvage = failedAtFinish ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits;
     const nextState = {
       ...finalState,
       credits: finalState.credits + creditedMissionSalvage,
@@ -1498,7 +1504,7 @@ export function MissionSimulation() {
     saveGameState(nextState);
     clearMissionRuntime();
     clearPendingMission();
-  }, [missionFailed, pending, results, sampleQuality, sampleStages]);
+  }, [metrics, missionFailed, pending, results, sampleQuality, sampleStages]);
 
   const handleEventChoice = (choiceId: string) => {
     if (!activeEvent || !pending || eventResponseRef.current === activeEvent.id) return;
@@ -2358,10 +2364,12 @@ export function MissionSimulation() {
   }
 
   if (results) {
+    const reportFailureReason = missionFailureReason ?? getMissionFailureReason(metrics);
+    const reportFailed = missionFailed || Boolean(reportFailureReason);
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     const researchBonusXp = pending && !pending.replay ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + tierLevel(pending.selected.science ?? "Foundation") * 20, 0) : 0;
     const checks: [string, boolean][] = [
-      ["SURVIVAL", !missionFailed],
+      ["SURVIVAL", !reportFailed],
       ["POWER STABILITY", performance.colonyHealth >= 55],
       ["LIFE SUPPORT", Math.min(metrics.oxygen, metrics.water) >= 55],
       ["CREW SAFETY", performance.radiationScore >= 55],
@@ -2374,9 +2382,9 @@ export function MissionSimulation() {
       <div className="min-h-screen bg-[#050b10] px-5 py-8 text-[#e9f0e5]">
         <div className="mx-auto max-w-6xl border border-[#3c5e59] bg-[#08151b] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
           <div className="border-b border-[#304b4b] bg-[#0d252a] px-6 py-5">
-            <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${missionFailed ? "text-[#ff858b]" : "text-[#8fc9a0]"}`}>{missionFailed ? "Mission failed · safety limit exceeded" : "Mission complete"}</p>
+            <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${reportFailed ? "text-[#ff858b]" : "text-[#8fc9a0]"}`}>{reportFailed ? "Mission failed · safety limit exceeded" : "Mission complete"}</p>
             <h1 className="mt-2 text-3xl font-semibold uppercase tracking-[0.13em] text-[#f1f4e8]">{pending.missionTitle}</h1>
-            <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-[#708b88]">{missionFailed ? (missionFailureReason ?? "Critical colony metric fell below its safe operating limit.") : "14 simulated days survived"} · {pending.replay ? "Replay operation" : "First deployment"}</p>
+            <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-[#708b88]">{reportFailed ? (reportFailureReason ?? "Critical colony metric fell below its safe operating limit.") : "14 simulated days survived"} · {pending.replay ? "Replay operation" : "First deployment"}</p>
           </div>
           <div className="grid gap-5 p-6 lg:grid-cols-[1fr_360px]">
             <section className="space-y-3">
@@ -2405,13 +2413,13 @@ export function MissionSimulation() {
               <div className="border border-[#6b5734] bg-[#1b1d18] p-5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#efb658]">Rewards</p>
                 <div className="mt-4 space-y-3">
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">{missionFailed ? "Recovery salvage" : "Credits"}</span><span className="font-mono text-[#efb658]">+{(missionFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits).toFixed((missionFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits) % 1 === 0 ? 0 : 1)}M</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{missionFailed ? "0" : (pending.rewardXp + researchBonusXp).toLocaleString()}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Research Tokens</span><span className="font-mono text-[#d4dfb7]">+{missionFailed ? "0" : pending.rewardResearchTokens}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">{reportFailed ? "Recovery salvage" : "Credits"}</span><span className="font-mono text-[#efb658]">+{(reportFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits).toFixed((reportFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits) % 1 === 0 ? 0 : 1)}M</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{reportFailed ? "0" : (pending.rewardXp + researchBonusXp).toLocaleString()}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Research Tokens</span><span className="font-mono text-[#d4dfb7]">+{reportFailed ? "0" : pending.rewardResearchTokens}</span></div>
                 </div>
               </div>
-              <a href={`/preview/CampaignMapRefresh?campaign=${pending.campaign}`} className={`flex w-full items-center justify-center gap-2 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.22em] ${missionFailed ? "border border-[#70404a] bg-[#301b22] text-[#ffb3b9]" : "bg-[#efb658] text-[#17201b]"}`}>
-                {missionFailed ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />} {missionFailed ? "Review Campaign & Redeploy" : "Continue"}
+              <a href={`/preview/CampaignMapRefresh?campaign=${pending.campaign}`} className={`flex w-full items-center justify-center gap-2 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.22em] ${reportFailed ? "border border-[#70404a] bg-[#301b22] text-[#ffb3b9]" : "bg-[#efb658] text-[#17201b]"}`}>
+                {reportFailed ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />} {reportFailed ? "Review Campaign & Redeploy" : "Continue"}
               </a>
             </aside>
           </div>
