@@ -33,23 +33,24 @@ type Props = {
 };
 
 const POSITIONS: Record<string, [number, number]> = {
+  // Wide deployment lanes: players pan across the colony instead of seeing every system as a tight cluster.
   habitat: [0, 0],
-  extraction: [-4.2, 11.0],
-  isru: [4.2, 11.0],
-  radiation: [12.5, 11.0],
-  oxygen: [-12.5, 3.3],
-  comms: [-7.0, 3.3],
-  maintenance: [7.0, 3.3],
-  water: [-12.5, 11.0],
-  co2: [-12.5, -4.5],
-  grid: [-7.0, -4.5],
-  science: [7.0, -4.5],
-  battery: [12.5, -4.5],
-  thermal: [-12.5, -12.2],
-  solar: [-4.2, -12.2],
-  agriculture: [4.2, -12.2],
-  navigation: [12.5, -12.2],
-  rover: [16.25, -14.5],
+  water: [-22, 18],
+  extraction: [-7, 18],
+  isru: [7, 18],
+  radiation: [22, 18],
+  oxygen: [-22, 5],
+  comms: [-11, 5],
+  maintenance: [11, 5],
+  co2: [-22, -7],
+  grid: [-11, -7],
+  science: [11, -7],
+  battery: [22, -7],
+  thermal: [-22, -18],
+  solar: [-7, -18],
+  agriculture: [7, -18],
+  navigation: [22, -18],
+  rover: [24, -22],
 };
 
 const BUILDING_ROTATIONS: Record<string, number> = {
@@ -71,9 +72,9 @@ const BUILDING_ROTATIONS: Record<string, number> = {
   maintenance: 0.2,
 };
 
-const ROAD_X = [-9.5, 0, 9.5];
-const ROAD_Z = [-8.35, -0.6, 7.15];
-const ROAD_EDGE = 18.4;
+const ROAD_X = [-14, 0, 14];
+const ROAD_Z = [-13, -0.6, 13];
+const ROAD_EDGE = 25.6;
 const PAD_Y = 0.12;
 
 function nodeWorldPosition(node: MissionResourceNode): [number, number] {
@@ -186,16 +187,17 @@ function Road({
 function RoadNetwork({ mars }: { mars: boolean }) {
   const roads = [
     ...ROAD_X.filter((x) => x !== 0).map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
-    // The main access lanes deliberately split around the single, enlarged habitat complex.
-    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -5.0] as [number, number], level: 0 },
+    // The central lane skirts the habitat and is interrupted around the separate landing pad.
+    { a: [0, -ROAD_EDGE] as [number, number], b: [0, -25.0] as [number, number], level: 0 },
+    { a: [0, -15.0] as [number, number], b: [0, -5.0] as [number, number], level: 0 },
     { a: [0, 5.0] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
     ...ROAD_Z.filter((z) => z !== -0.6).map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
     { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-5.0, -0.6] as [number, number], level: 1 },
     { a: [5.0, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
-    { a: [-18.4, -18.4] as [number, number], b: [18.4, -18.4] as [number, number], level: 0.5 },
-    { a: [18.4, -18.4] as [number, number], b: [18.4, 18.4] as [number, number], level: 0 },
-    { a: [18.4, 18.4] as [number, number], b: [-18.4, 18.4] as [number, number], level: 0.5 },
-    { a: [-18.4, 18.4] as [number, number], b: [-18.4, -18.4] as [number, number], level: 0 },
+    { a: [-ROAD_EDGE, -ROAD_EDGE] as [number, number], b: [ROAD_EDGE, -ROAD_EDGE] as [number, number], level: 0.5 },
+    { a: [ROAD_EDGE, -ROAD_EDGE] as [number, number], b: [ROAD_EDGE, ROAD_EDGE] as [number, number], level: 0 },
+    { a: [ROAD_EDGE, ROAD_EDGE] as [number, number], b: [-ROAD_EDGE, ROAD_EDGE] as [number, number], level: 0.5 },
+    { a: [-ROAD_EDGE, ROAD_EDGE] as [number, number], b: [-ROAD_EDGE, -ROAD_EDGE] as [number, number], level: 0 },
   ];
 
   const access = Object.entries(POSITIONS)
@@ -1094,10 +1096,10 @@ function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionRe
 
 function Crew({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number,number]>> = [
-    // Crew stays on the service lanes and skirts the raised habitat deck.
-    [[-9.5,7.15],[-9.5,11],[-9.5,7.15],[-9.5,-0.6],[-9.5,-8.35],[0,-8.35],[9.5,-8.35],[9.5,-0.6],[9.5,7.15]],
-    [[9.5,-12.2],[9.5,-8.35],[0,-8.35],[0,-18.4],[9.5,-18.4],[9.5,-12.2]],
-    [[-18.4,7.15],[-9.5,7.15],[-9.5,-0.6],[-18.4,-0.6],[-18.4,7.15]],
+    // Long service-road circuits keep the crew visually moving through a much larger settlement.
+    [[-14,13],[-14,5],[-14,-0.6],[-14,-13],[0,-13],[14,-13],[14,-0.6],[14,5],[14,13]],
+    [[14,-18],[14,-13],[25.6,-13],[25.6,-25.6],[14,-25.6],[14,-18]],
+    [[-25.6,13],[-14,13],[-14,-0.6],[-25.6,-0.6],[-25.6,13]],
   ];
   return <group>{Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}</group>;
 }
