@@ -124,19 +124,19 @@ function Foundation({ mars }: { mars: boolean }) {
   return (
     <group>
       <mesh receiveShadow position={[0, -0.205, 0]}>
-        <boxGeometry args={[44, 0.36, 44]} />
+        <boxGeometry args={[58, 0.36, 58]} />
         <meshStandardMaterial color={ground} roughness={0.98} />
       </mesh>
       <mesh receiveShadow position={[0, 0.025, 0]}>
-        <boxGeometry args={[40.8, 0.11, 40.8]} />
+        <boxGeometry args={[54, 0.11, 54]} />
         <meshStandardMaterial color={mars ? "#8d5948" : "#74726e"} roughness={0.96} />
       </mesh>
       <mesh position={[0, 0.105, 0]}>
-        <boxGeometry args={[40.3, 0.035, 40.3]} />
+        <boxGeometry args={[53, 0.035, 53]} />
         <meshStandardMaterial color={curb} roughness={0.9} metalness={0.12} />
       </mesh>
       <mesh position={[0, 0.132, 0]}>
-        <boxGeometry args={[39.4, 0.028, 39.4]} />
+        <boxGeometry args={[52, 0.028, 52]} />
         <meshStandardMaterial color={mars ? "#774b3e" : "#666765"} roughness={0.94} />
       </mesh>
     </group>
