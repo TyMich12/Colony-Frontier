@@ -106,7 +106,7 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
 };
 
 const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
-  clean: "Dust −16 points (−24 with rover) · power +4 · condition +1",
+  clean: "Dust −16 points (−24 with rover) · power +4 now · condition +1 · less dust keeps generation stronger on later ticks",
   tune: "Power +3 · condition +1", balance: "Battery +5 · power +2", reserve: "Battery +8 · power −2",
   reset: "Oxygen +3 · power −2", boost: "Oxygen +6 · power −4 · condition −1",
   flush: "Water +4 · power −2", purify: "Water +6 · power −4",
@@ -124,7 +124,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   purge: "Condition +2 · power −1", "tune-crops": "Food +5 · water −2 · power −2 · condition +1",
   harvest: "Food +7 · water −2 · yield +1 · score +3", service: "Raises the weakest system's condition by 10",
   diagnostics: "Checks live faults and reports the weakest system · score +3",
-  "fallback-solar": "Dust −7 points · power +1 · works without grid or rover",
+  "fallback-solar": "BASIC · no optional systems needed · dust −7 points · power margin +1 now; lower dust improves generation on later ticks",
   "fallback-battery": "Recover ~1% usable reserve by isolating parasitic draw · no generator required",
   "fallback-grid": "Emergency manual load shedding · power margin +1 · ECO loads enabled",
   "fallback-habitat": "Emergency seal patch · habitat integrity +1.5 · condition +3",
@@ -141,7 +141,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   "fallback-science": "Re-zero the bench instruments · condition +1, no sample consumed",
   "fallback-agriculture": "Harvest the last ready edible biomass · food +1 without a full water loop",
   "fallback-maintenance": "Manual walk-around service · condition +2 on the weakest healthy module",
-  "solar-autonomous-clean": "Rover + maintenance-assisted cleaning · greater dust removal and reduced panel wear",
+  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust −32 points · power margin +5 now · stronger ongoing generation as dust load falls",
   "battery-thermal-recondition": "Thermal conditioning plus supervised BMS balancing · larger reserve recovery",
   "oxygen-electrolyser-burst": "Electrolyse reclaimed water for extra oxygen · water and power consumed",
   "water-distillate-recovery": "Recover more condensate using waste heat · larger water gain with a power cost",
