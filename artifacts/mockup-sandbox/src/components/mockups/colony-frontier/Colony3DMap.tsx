@@ -30,6 +30,7 @@ type Props = {
   onSelect: (trackId: string) => void;
   onSelectResource: (node: MissionResourceNode) => void;
   roverTask: string;
+  roverTargetNodeId: string | null;
   simulationSpeed: number;
 };
 
@@ -916,22 +917,22 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   );
 }
 
-function Rover({ task, position, resourceNodes, onClick, selected, alerted, simulationSpeed }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; onClick: () => void; selected: boolean; alerted: boolean; simulationSpeed: number }) {
+function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected, alerted, simulationSpeed }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; targetNodeId: string | null; onClick: () => void; selected: boolean; alerted: boolean; simulationSpeed: number }) {
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
   const targetLabel = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "]
     .find((prefix) => task.startsWith(prefix));
-  const target = targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined;
+  const target = (targetNodeId ? resourceNodes.find((node) => node.id === targetNodeId) : undefined) ?? (targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined);
   const isCollecting = task.startsWith("COLLECTING ");
   const isTransferring = task.startsWith("TRANSFERRING ");
   const isReturning = task === "RETURNING" || task === "REPAIR VERIFIED" || task === "SAMPLE DELIVERED";
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
   const isRouting = task === "REROUTING" || task === "FORCED THROUGH";
-  const destination: [number, number] = target
-    ? nodeWorldPosition(target)
-    : isTransferring
-      ? POSITIONS.habitat
+  const destination: [number, number] = isTransferring
+    ? POSITIONS.habitat
+    : target
+      ? nodeWorldPosition(target)
       : isCleaning
       ? POSITIONS.solar
       : repairTarget && POSITIONS[repairTarget]
@@ -990,7 +991,7 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
     }
     routeRef.current = route;
     routeCursorRef.current = Math.min(1, route.length - 1);
-  }, [task, target?.id, destination[0], destination[1], isReturning, isTransferring, isCollecting, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
+  }, [task, targetNodeId, target?.id, destination[0], destination[1], isReturning, isTransferring, isCollecting, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
 
   useFrame(({ clock, delta }) => {
     if (!ref.current) return;
@@ -1132,7 +1133,6 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted, simu
         <meshStandardMaterial color="#4b6264" metalness={0.4} roughness={0.48} />
       </mesh>
       <SelectionRing selected={selected} alerted={alerted} radius={1.34} height={-0.32} />
-      {task !== "STANDBY" && <Billboard position={[0, 1.35, 0]} follow><Text frustumCulled={false} fontSize={0.26} color="#fff0a8" outlineWidth={0.03} outlineColor="#1c1815" anchorX="center">{task}</Text></Billboard>}
     </group>
   );
 }
@@ -1635,7 +1635,7 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
         <Crew mars={mars} />
