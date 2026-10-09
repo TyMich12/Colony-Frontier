@@ -84,6 +84,37 @@ const categoryIcons = {
   Maintenance: Wrench,
 } as const;
 
+const SYSTEM_ACTION_SECONDS: Record<string, number> = {
+  clean: 9, tune: 7, balance: 8, reserve: 6, reset: 7, boost: 9,
+  flush: 8, purify: 12, scrub: 8, recover: 9, dump: 7, insulate: 10,
+  repoint: 8, test: 5, repair: 14, seal: 8, shield: 10, shelter: 6,
+  "balance-grid": 8, prioritize: 5, calibrate: 9, experiment: 14,
+  "nav-calibrate": 7, route: 5, survey: 12, return: 8, inspect: 4,
+  "extract-test": 10, extract: 15, process: 12, purge: 7,
+  "tune-crops": 12, harvest: 9, service: 12, diagnostics: 7,
+};
+
+const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
+  clean: "Dust −16 points (−24 with rover) · power +4 · condition +1",
+  tune: "Power +3 · condition +1", balance: "Battery +5 · power +2", reserve: "Battery +8 · power −2",
+  reset: "Oxygen +3 · power −2", boost: "Oxygen +6 · power −4 · condition −1",
+  flush: "Water +4 · power −2", purify: "Water +6 · power −4",
+  scrub: "Oxygen +2 · power −1", recover: "Oxygen +1 · power −1 · condition +1",
+  dump: "Moves temperature 36% toward 21°C · power −2", insulate: "Moves temperature 22% toward 21°C · power −1 · condition +1",
+  repoint: "Condition +1 · score +3", test: "Link check · condition +1 · score +2",
+  repair: "Habitat condition +14 (+28 with Maintenance) · integrity +5 · battery −2", seal: "Habitat condition +3 · integrity +3 · battery −1",
+  shield: "Radiation index −2 · battery −1 · condition +1", shelter: "Radiation index −3 · battery −2 · power −1",
+  "balance-grid": "Power +3 · battery +2 · condition +1", prioritize: "Oxygen +1 · water +1 · battery +3 · power −1",
+  calibrate: "Condition +1 · score +4", experiment: "Research yield +1 · score +7 · power −2",
+  "nav-calibrate": "Navigation condition +1 · score +3", route: "Navigation condition +1 · score +2",
+  survey: "Maps next site · unlocks sealed-sample collection", return: "Rover returns to launch lane",
+  inspect: "Reports condition · score +1", "extract-test": "Yield +4 · power −4 · battery −1 · condition −1 · score +5",
+  extract: "Yield +5 · power −5 · battery −2 · score +7", process: "Yield +3 · power −5 · battery −1 · score +5",
+  purge: "Condition +2 · power −1", "tune-crops": "Food +5 · water −2 · power −2 · condition +1",
+  harvest: "Food +7 · water −2 · yield +1 · score +3", service: "Raises the weakest system's condition by 10",
+  diagnostics: "Checks the live fault register · score +3",
+};
+
 type MissionEvent = {
   id: string;
   trackId: string;
@@ -649,6 +680,7 @@ function BuildingInspector({
   onClose,
   hasMaintenance,
   actionBusy,
+  operation,
   activeEvent,
   eventChoices,
   onEventChoice,
@@ -662,6 +694,7 @@ function BuildingInspector({
   onClose: () => void;
   hasMaintenance: boolean;
   actionBusy: boolean;
+  operation: MissionOperation | null;
   activeEvent: MissionEvent | null;
   eventChoices: EventChoice[];
   onEventChoice: (choiceId: string) => void;
@@ -744,7 +777,7 @@ function BuildingInspector({
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
   const upgradeLevel = runtime.upgradeLevel ?? 0;
-  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5;
+  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5 && !operation;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -780,6 +813,25 @@ function BuildingInspector({
             )}
           </div>
         </div>
+
+        {operation && (
+          <section className="mx-4 mt-4 rounded-2xl border border-[#5c9e87] bg-gradient-to-r from-[#12392f] to-[#10262c] p-4 shadow-[0_0_28px_rgba(79,210,158,0.10)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2 text-[#a9f2c8]">
+                <Activity className="h-4 w-4 shrink-0 animate-pulse" />
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em]">Work in progress</p>
+                  <p className="mt-0.5 truncate text-[10px] font-bold text-white">{operation.label}</p>
+                </div>
+              </div>
+              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{Math.ceil(operation.remainingSeconds)}s</span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#233f3e]">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#31ce9b] to-[#f1d16a] transition-[width]" style={{ width: `${clamp(100 * (1 - operation.remainingSeconds / operation.totalSeconds))}%` }} />
+            </div>
+            <p className="mt-2 text-[9px] leading-4 text-[#a1c8bb]">This system is busy until its final check completes. Other colony systems can work in parallel.</p>
+          </section>
+        )}
 
         {activeEvent && eventChoices.length > 0 && (
           <section className="border-b border-[#733943] bg-[#21151b] p-4">
@@ -817,15 +869,19 @@ function BuildingInspector({
               key={action.id}
               type="button"
               onClick={() => onAction(action.id)}
-              disabled={actionBusy}
+              disabled={actionBusy || Boolean(operation)}
               className="group min-w-0 rounded-2xl border border-[#35505a] bg-[#14262d] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f2cd64] hover:bg-[#1b343d] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-start gap-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#0a1519] text-[10px] font-black text-[#f4cf65]">{index + 1}</span>
-                <span className="text-[10px] font-black uppercase tracking-[0.05em] text-white">{action.label}</span>
-              </span>
-              <span className="mt-2 block text-[9px] leading-4 text-[#8da2a7]">{action.detail}</span>
-            </button>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-[0.05em] text-white">{action.label}</span>
+                    <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">~{SYSTEM_ACTION_SECONDS[action.id] ?? 6}s</span>
+                  </span>
+                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}</span>
+                </span>
+              </span></button>
           ))}
         </div>
         <div className="mx-4 mb-4 rounded-2xl border border-[#40575b] bg-[#101f24] p-3">
@@ -837,7 +893,7 @@ function BuildingInspector({
             <button
               type="button"
               onClick={() => onAction("upgrade")}
-              disabled={actionBusy || !canUpgrade}
+              disabled={actionBusy || Boolean(operation) || !canUpgrade}
               className="shrink-0 rounded-xl border border-[#8b7445] bg-[#d9b555] px-3 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-[#1b211d] transition hover:bg-[#f0cd70] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {upgradeLevel >= 2 ? "MAX LEVEL" : "UPGRADE"}
@@ -848,7 +904,7 @@ function BuildingInspector({
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
-          <span className={`text-[9px] font-bold uppercase tracking-[0.16em] ${actionBusy ? "text-[#f0c85f]" : "text-[#70858a]"}`}>{actionBusy ? "OPERATION IN PROGRESS" : runtime.status}</span>
+          <span className={`text-[9px] font-bold uppercase tracking-[0.16em] ${actionBusy ? "text-[#f0c85f]" : "text-[#70858a]"}`}>{operation ? "WORK IN PROGRESS" : runtime.status}</span>
           <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#7e9398]">Tap another facility to switch</span>
         </div>
       </div>
@@ -987,7 +1043,7 @@ function ResourceInspector({
           )}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#263f3e] pt-3 text-[9px]">
             <span className="text-[#7e9a92]">Rover: {hasRover ? "available" : "not deployed"} · Drill: {hasExtraction ? "available" : "field sampler only"} · Science lab: {hasScience ? "available" : "portable assay"}</span>
-            {actionBusy && <span className="font-bold uppercase tracking-[0.12em] text-[#e9c65e]">Operation running</span>}
+            {operation && <span className="font-bold uppercase tracking-[0.12em] text-[#a9f2c8]">Working · {Math.ceil(operation.remainingSeconds)}s</span>}
           </div>
         </div>
       </div>
@@ -2132,15 +2188,7 @@ export function MissionSimulation() {
       return;
     }
 
-    const actionDurations: Record<string, number> = {
-      clean: 9, tune: 7, balance: 8, reserve: 6, reset: 7, boost: 9,
-      flush: 8, purify: 12, scrub: 8, recover: 9, dump: 7, insulate: 10,
-      repoint: 8, test: 5, repair: 14, seal: 8, shield: 10, shelter: 6,
-      "balance-grid": 8, prioritize: 5, calibrate: 9, experiment: 14,
-      "nav-calibrate": 7, route: 5, survey: 12, return: 8, inspect: 4,
-      "extract-test": 10, extract: 15, process: 12, purge: 7,
-      "tune-crops": 12, harvest: 9, service: 12, diagnostics: 7,
-    };
+    const actionDurations = SYSTEM_ACTION_SECONDS;
     const actionLabels: Record<string, string> = {
       clean: "Clean solar array", tune: "Tune solar tracking", balance: "Balance battery cells", reserve: "Protect battery reserve",
       reset: "Reset oxygen loop", boost: "Boost oxygen processing", flush: "Flush water recovery", purify: "Deep-purify water",
@@ -2270,8 +2318,9 @@ export function MissionSimulation() {
         setAiMessage("High-gain antenna repointed. Communications geometry is back inside the preferred link budget.");
         break;
       case "test":
+        conditionBoost(1);
         setScore((value) => clamp(value + 2));
-        setAiMessage("Communications link test passed. The relay is tracking the current Earth-facing solution.");
+        setAiMessage("LINK TEST PASSED · Communications tracking is stable and the antenna condition check is logged.");
         break;
       case "repair": {
         const amount = pending.selected.maintenance ? 28 : 14;
@@ -2321,8 +2370,9 @@ export function MissionSimulation() {
         setAiMessage("Navigation solution recalibrated. Vehicle route confidence improved.");
         break;
       case "route":
+        conditionBoost(1);
         setScore((value) => clamp(value + 2));
-        setAiMessage("Colony route planner recalculated the safest travel corridors around the current work sites.");
+        setAiMessage("ROUTE PLAN COMPLETE · The navigation solution was refreshed and the safest available work corridor is recorded.");
         break;
       case "survey": {
         const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
