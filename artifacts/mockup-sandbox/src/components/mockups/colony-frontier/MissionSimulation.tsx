@@ -1052,10 +1052,12 @@ export function MissionSimulation() {
         break;
       case "COLLECT":
         if (node) {
+          const quality = clamp(operation.sampleQuality ?? 68, 35, 99);
           setSampleStages((current) => ({ ...current, [node.id]: "COLLECTED" }));
-          message = `SAMPLE SECURED · ${node.label}. The core is bagged and labelled with site coordinates and collection time. Next: transfer it to the analysis bench.`;
+          setSampleQuality((current) => ({ ...current, [node.id]: quality }));
+          message = `SAMPLE SECURED · ${node.label}. Chain-of-custody label, coordinates and collection time are logged. Specimen integrity: ${Math.round(quality)}%. ${quality >= 86 ? "The sealed core has low contamination risk." : quality >= 68 ? "Some contamination / handling uncertainty remains; keep the lab result provisional." : "The sample is compromised; repeat collection if the site is important."} Next: return the sealed container to the lab without opening it.`;
           setRoverTask("SAMPLE SECURED");
-          setScore((value) => clamp(value + 4));
+          setScore((value) => clamp(value + Math.round(2 + quality / 35)));
         }
         break;
       case "TRANSFER":
@@ -1069,10 +1071,20 @@ export function MissionSimulation() {
       case "ANALYZE":
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "ANALYSED" }));
-          setResourceYield((value) => value + 1);
-          const scienceBonus = pending?.selected.science ? tierLevel(pending.selected.science) * 2 : 0;
-          setScore((value) => clamp(value + 9 + scienceBonus));
-          message = `ANALYSIS COMPLETE · ${node.label}. The lab recorded a usable field result. Research value: +${1 + scienceBonus} units. Your mission report now includes the result.`;
+          const scienceTier = tierLevel(pending?.selected.science ?? "Foundation");
+          const integrity = sampleQuality[node.id] ?? 64;
+          const confidence = clamp(integrity + (pending?.selected.science ? scienceTier * 5 : -12), 42, 99);
+          const scienceBonus = pending?.selected.science ? scienceTier * 2 : 0;
+          const finding = node.kind === "ICE"
+            ? confidence >= 82 ? "A strong volatile / ice signature is supported by the assay; preserve a sealed aliquot for confirmation." : "The volatile signature is suggestive but not conclusive; repeat the assay before treating this as a verified ice reserve."
+            : node.kind === "MINERAL"
+              ? confidence >= 82 ? "The spectral response supports a mineral-bearing deposit; follow-up measurements can refine the composition." : "The spectrum is mixed; the deposit remains a candidate rather than a confirmed resource."
+              : node.kind === "SCIENCE"
+                ? confidence >= 82 ? "The reference readings are internally consistent and suitable for comparison with later observations." : "Instrument and sample uncertainty remain high; repeat calibration before using this as a reference."
+                : confidence >= 82 ? "The sample supports a consistent regolith classification and can guide a follow-up collection." : "Particle and composition evidence are not decisive; collect a better-sealed replicate for confirmation.";
+          setResourceYield((value) => value + (confidence >= 82 ? 2 : 1));
+          setScore((value) => clamp(value + Math.round(4 + confidence / 18 + scienceBonus)));
+          message = `LAB RESULT · ${node.label}. Confidence: ${Math.round(confidence)}% · specimen integrity ${Math.round(integrity)}%. ${finding} Research value: +${(confidence >= 82 ? 2 : 1) + scienceBonus} units. The result is logged with its uncertainty instead of being treated as absolute proof.`;
           setRoverTask("ANALYSIS COMPLETE");
         }
         break;
@@ -1086,7 +1098,47 @@ export function MissionSimulation() {
           return { ...current, [operation.targetId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
         });
         setScore((value) => clamp(value + 4));
-        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} now has field-upgrade level ${level}/2. The new hardware kit is online and its output / wear model has improved.`;
+        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} now has field-upgrade level ${level}/2. The new hardware is visible on the module, and its output / wear model has improved.`;
+        break;
+      }
+      case "REPAIR": {
+        const repairTarget = operation.targetId;
+        const faults = Object.values(activeFaults).filter((fault) => fault.targetTrackId === repairTarget);
+        setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
+        setBuildings((current) => {
+          const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
+          const condition = clamp(previous.condition + 12);
+          return { ...current, [repairTarget]: { ...previous, condition, status: buildingStatus(condition) } };
+        });
+        setMetrics((current) => {
+          let next = { ...current, power: clamp(current.power + 2), battery: clamp(current.battery + 2) };
+          for (const fault of faults) {
+            switch (fault.eventId) {
+              case "solar-dust":
+              case "regional-dust-front":
+                next = { ...next, power: clamp(next.power + 4), battery: clamp(next.battery + 2) };
+                setBuildings((buildingsNow) => ({ ...buildingsNow, solar: { ...(buildingsNow.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((buildingsNow.solar?.dust ?? 0) - 8) } }));
+                break;
+              case "battery-thermal": next = { ...next, battery: clamp(next.battery + 7) }; break;
+              case "oxygen-filter":
+              case "co2-scrubber-loading": next = { ...next, oxygen: clamp(next.oxygen + 6) }; break;
+              case "water-filter": next = { ...next, water: clamp(next.water + 6) }; break;
+              case "habitat-pressure":
+              case "micrometeoroid-impact": next = { ...next, habitat: clamp(next.habitat + 6) }; break;
+              case "radiation-burst": next = { ...next, radiation: clamp(next.radiation - 4) }; break;
+              case "polar-shadow-cold-soak":
+              case "thermal-drift": next = { ...next, temperature: clamp(next.temperature + (21 - next.temperature) * 0.35, 16, 28) }; break;
+              case "grid-overload":
+              case "core-power": next = { ...next, power: clamp(next.power + 5), battery: clamp(next.battery + 3) }; break;
+              case "agriculture-stress": next = { ...next, food: clamp(next.food + 5), water: clamp(next.water - 1) }; break;
+              default: break;
+            }
+          }
+          return next;
+        });
+        setScore((value) => clamp(value + 6));
+        message = `REPAIR VERIFIED · ${technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget} passed its post-maintenance check. The live fault has been removed, the module condition has improved, and affected reserves are recovering. ${faults.length} fault(s) cleared.`;
+        setRoverTask("REPAIR VERIFIED");
         break;
       }
     }
@@ -1097,7 +1149,7 @@ export function MissionSimulation() {
     }
     setActionBusy(false);
     setActiveOperation(null);
-  }, [pending]);
+  }, [activeFaults, pending, sampleQuality]);
 
   useEffect(() => {
     if (!storedEventIsInvalid) return;
@@ -1834,6 +1886,7 @@ export function MissionSimulation() {
     label: string,
     durationSeconds: number,
     targetLevel?: number,
+    specimenQuality?: number,
   ) => {
     if (!pending || activeOperation || actionBusy || activeEventId || results) return;
     const operation: MissionOperation = {
@@ -1844,6 +1897,7 @@ export function MissionSimulation() {
       totalSeconds: durationSeconds,
       remainingSeconds: durationSeconds,
       ...(targetLevel !== undefined ? { targetLevel } : {}),
+      ...(specimenQuality !== undefined ? { sampleQuality: specimenQuality } : {}),
     };
     operationCompletionRef.current = null;
     setActiveOperation(operation);
@@ -1880,7 +1934,9 @@ export function MissionSimulation() {
         setOperationResult("COLLECTION HELD · Sampling requires at least 7% power and 3% battery reserve. Restore the energy margin first.");
         return;
       }
-      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, duration);
+      const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 : 0) + (hasRover ? 7 + roverTier * 2.5 : 0) + navigationTier * 2 - (activeFaults[nodeId]?.severity ? 12 : 0), 38, 98);
+      const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
+      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
       setRoverTask(hasExtraction ? "DRILLING CORE" : hasRover ? "SAMPLING SITE" : "EVA SAMPLING");
       return;
