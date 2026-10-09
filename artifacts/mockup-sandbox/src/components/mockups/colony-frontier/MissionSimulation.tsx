@@ -961,6 +961,10 @@ function BuildingInspector({
   power,
   battery,
   getBlockers,
+  selected,
+  earthReport,
+  earthReportAtSeconds,
+  elapsedSeconds,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -977,6 +981,10 @@ function BuildingInspector({
   power: number;
   battery: number;
   getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
+  selected: Record<string, Tier>;
+  earthReport: string | null;
+  earthReportAtSeconds: number;
+  elapsedSeconds: number;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1140,6 +1148,28 @@ function BuildingInspector({
           <p className="mt-1 text-[9px] leading-4 text-[#6fa294]">Feeds: {downstream.length ? downstream.map((id) => SYSTEM_LABELS[id] ?? id).join(" · ") : "No direct downstream consumer"}</p>
         </section>
 
+        {track.id === "navigation" && (
+          <section className="mx-4 mt-3 rounded-xl border border-[#435b73] bg-gradient-to-br from-[#101d2c] to-[#111b22] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#8dc8e8]">Earth Mission Control</p>
+              <span className="rounded-full border border-[#456c81] bg-[#162b3d] px-2 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#a5d9f0]">{earthReport ? "REPORT RECEIVED" : "AWAITING UPLINK"}</span>
+            </div>
+            <div className="mt-2 flex items-start gap-2">
+              <Radio className="mt-0.5 h-4 w-4 shrink-0 text-[#76bddf]" />
+              <p className="text-[9px] leading-4 text-[#a8c0d0]">
+                {earthReport ? `Last report received at mission T+${Math.round(earthReportAtSeconds)}s.` : "Request a report for power, life support, faults, field science and the recommended next action."}
+                {" "}Queue estimate: <span className="font-bold text-[#f0cf69]">{earthReportDelaySeconds(tier, upgradeLevel) === 0 ? "INSTANT · local cache" : `${earthReportDelaySeconds(tier, upgradeLevel)} simulated seconds`}</span>.
+              </p>
+            </div>
+            <p className="mt-2 text-[8px] leading-4 text-[#6f95aa]">This is a compressed Earth processing / command queue, not adjustable light-speed. Navigation tiers shorten the queue; Research with 2/2 retrofits caches guidance locally for instant delivery.</p>
+            {earthReport && (
+              <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-[#2c4a5d] bg-[#07131f] p-3">
+                <pre className="whitespace-pre-wrap font-mono text-[9px] leading-4 text-[#d1e3ee]">{earthReport}</pre>
+              </div>
+            )}
+          </section>
+        )}
+
         {operation && (
           <section className="mx-4 mt-4 rounded-2xl border border-[#5c9e87] bg-gradient-to-r from-[#12392f] to-[#10262c] p-4 shadow-[0_0_28px_rgba(79,210,158,0.10)]">
             <div className="flex items-center justify-between gap-3">
@@ -1219,6 +1249,8 @@ function BuildingInspector({
           {actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
             const locked = blockers.length > 0;
+            const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[action.id] ?? 6);
+            const actionMultiplier = systemPerformanceMultiplier(tier, upgradeLevel);
             return (
             <button
               key={action.id}
@@ -1232,9 +1264,9 @@ function BuildingInspector({
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center justify-between gap-1.5">
                     <span className="text-[10px] font-black uppercase tracking-[0.05em] text-white">{action.label}</span>
-                    <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">~{SYSTEM_ACTION_SECONDS[action.id] ?? 6}s</span>
+                    <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
-                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}</span>
+                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`} · navigation performance ×${actionMultiplier.toFixed(2)}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail} · module output ×${actionMultiplier.toFixed(2)}`}</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">LOCKED · {blockers.join(" · ")}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
                 </span>
               </span>
@@ -2501,6 +2533,10 @@ export function MissionSimulation() {
     };
     operationCompletionRef.current.delete(operation.id);
     setActiveOperations((current) => ({ ...current, [operationKey]: operation }));
+    if (durationSeconds <= 0) {
+      operationCompletionRef.current.add(operation.id);
+      window.setTimeout(() => finishOperation({ ...operation, remainingSeconds: 0 }), 0);
+    }
     setOperationResult(null);
     setManualActions((value) => value + 1);
     setAiMessage(`${label} started. Estimated duration: ${durationSeconds} simulated seconds at 1× speed. Other systems remain available while this job runs.`);
@@ -2665,7 +2701,7 @@ export function MissionSimulation() {
       calibrate: "Calibrate science instruments", experiment: "Run field experiment", "nav-calibrate": "Calibrate navigation", route: "Plan rover route",
       survey: "Dispatch rover survey", return: "Recall rover", inspect: "Inspect rover", "extract-test": "Test extraction drill", extract: "Collect extraction sample",
       process: "Process local feedstock", purge: "Purge ISRU line", "tune-crops": "Tune greenhouse controls", harvest: "Harvest crop output",
-      service: "Run maintenance service", diagnostics: "Run predictive diagnostics",
+      service: "Run maintenance service", diagnostics: "Run predictive diagnostics", "request-earth-report": "Request Earth Mission Control report",
     };
     if (action === "survey") {
       const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
@@ -2680,7 +2716,7 @@ export function MissionSimulation() {
       "SYSTEM_ACTION",
       trackId,
       actionLabels[action] ?? `Operate ${trackId}`,
-      actionDurations[action] ?? 6,
+      action === "request-earth-report" ? earthReportDelaySeconds(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0) : (actionDurations[action] ?? 6),
       undefined,
       undefined,
       action,
@@ -3337,6 +3373,10 @@ export function MissionSimulation() {
             power={metrics.power}
             battery={metrics.battery}
             getBlockers={checkActionPrerequisites}
+            selected={pending.selected}
+            earthReport={earthReport}
+            earthReportAtSeconds={earthReportAtSeconds}
+            elapsedSeconds={elapsed}
           />
         )}
 
