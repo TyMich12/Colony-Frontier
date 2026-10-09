@@ -1708,7 +1708,7 @@ export function MissionSimulation() {
     }
   };
   const handleBuildingAction = (trackId: string, action: string) => {
-    if (!pending?.selected[trackId] || actionBusy) return;
+    if (!pending?.selected[trackId] || actionBusy || activeOperation || activeEventId || results) return;
     if (action === "upgrade") {
       const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
       if ((current.upgradeLevel ?? 0) >= 2) {
@@ -1716,9 +1716,15 @@ export function MissionSimulation() {
         return;
       }
       if (metrics.power < 8 || metrics.battery < 5) {
-        setAiMessage("Upgrade unavailable: reserve at least 8 power and 5 battery before modifying this module.");
+        setAiMessage("Retrofit unavailable: reserve at least 8% power and 5% battery before isolating this system.");
         return;
       }
+      const targetLevel = (current.upgradeLevel ?? 0) + 1;
+      const equipmentTier = tierLevel(pending.selected[trackId]);
+      const duration = 18 + equipmentTier * 2 + (current.upgradeLevel ?? 0) * 3;
+      setMetrics((value) => ({ ...value, power: clamp(value.power - 8), battery: clamp(value.battery - 5) }));
+      beginOperation("UPGRADE", trackId, `Installing upgrade kit · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, duration, targetLevel);
+      return;
     }
     setActionBusy(true);
     window.setTimeout(() => setActionBusy(false), 1100);
