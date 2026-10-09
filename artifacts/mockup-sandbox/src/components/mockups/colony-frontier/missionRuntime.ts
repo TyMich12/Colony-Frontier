@@ -43,7 +43,7 @@ export type MissionDecision = {
 
 export type SampleStage = "UNSURVEYED" | "SURVEYED" | "COLLECTED" | "DELIVERED" | "ANALYSED";
 
-export type MissionOperationKind = "SURVEY" | "COLLECT" | "TRANSFER" | "ANALYZE" | "UPGRADE" | "REPAIR";
+export type MissionOperationKind = "SURVEY" | "COLLECT" | "TRANSFER" | "ANALYZE" | "UPGRADE" | "REPAIR" | "SYSTEM_ACTION";
 
 export type MissionOperation = {
   id: string;
@@ -53,6 +53,10 @@ export type MissionOperation = {
   totalSeconds: number;
   remainingSeconds: number;
   targetLevel?: number;
+  /** ID of a normal system action that should apply its effects when the timer completes. */
+  actionId?: string;
+  /** Key identifying the system occupied by this job; targetId may identify a field site instead. */
+  operationKey?: string;
   /** Sample integrity score captured when a sealed sample is collected. */
   sampleQuality?: number;
 };
@@ -80,7 +84,10 @@ export type MissionRuntimeSnapshot = {
   surveyedNodes?: string[];
   sampleStages?: Record<string, SampleStage>;
   resourceYield?: number;
+  /** Legacy single-operation slot; read only to recover saves made before parallel jobs existed. */
   activeOperation?: MissionOperation | null;
+  /** Multiple jobs can run at once, with at most one operation per occupied system. */
+  activeOperations?: Record<string, MissionOperation>;
   operationResult?: string | null;
   activeFaults?: Record<string, ActiveFault>;
   /** Quality is frozen at collection so later lab analysis uses the actual specimen. */
