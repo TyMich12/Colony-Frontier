@@ -1482,8 +1482,12 @@ export function MissionSimulation() {
     // Reward clean, useful science more than simply completing many low-quality collection loops.
     const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
     const researchBonusXp = firstTime ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + scienceTier * 20, 0) : 0;
-    const missionXpReward = failedAtFinish ? 0 : pending.rewardXp + researchBonusXp;
-    const creditedMissionSalvage = failedAtFinish ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits;
+    // Unrepaired faults are carried into mission closeout and reduce payout, even if the colony survived.
+    const unresolvedFaultPenalty = Math.min(0.45, Object.keys(activeFaults).length * 0.1);
+    const missionXpReward = failedAtFinish ? 0 : Math.round((pending.rewardXp + researchBonusXp) * (1 - unresolvedFaultPenalty));
+    const creditedMissionSalvage = failedAtFinish
+      ? Math.round(pending.rewardCredits * 0.15 * 10) / 10
+      : Math.round(pending.rewardCredits * (1 - unresolvedFaultPenalty) * 10) / 10;
     const nextState = {
       ...finalState,
       credits: finalState.credits + creditedMissionSalvage,
@@ -1494,7 +1498,7 @@ export function MissionSimulation() {
         ? {
             missionId: pending.missionId,
             title: pending.missionTitle,
-            credits: pending.rewardCredits,
+            credits: creditedMissionSalvage,
             xp: missionXpReward,
             researchTokens: pending.rewardResearchTokens,
           }
@@ -1504,7 +1508,7 @@ export function MissionSimulation() {
     saveGameState(nextState);
     clearMissionRuntime();
     clearPendingMission();
-  }, [metrics, missionFailed, pending, results, sampleQuality, sampleStages]);
+  }, [activeFaults, metrics, missionFailed, pending, results, sampleQuality, sampleStages]);
 
   const handleEventChoice = (choiceId: string) => {
     if (!activeEvent || !pending || eventResponseRef.current === activeEvent.id) return;
@@ -2368,11 +2372,15 @@ export function MissionSimulation() {
     const reportFailed = missionFailed || Boolean(reportFailureReason);
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     const researchBonusXp = pending && !pending.replay ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + tierLevel(pending.selected.science ?? "Foundation") * 20, 0) : 0;
+    const unresolvedFaultPenalty = Math.min(0.45, Object.keys(activeFaults).length * 0.1);
+    const reportCredits = reportFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : Math.round(pending.rewardCredits * (1 - unresolvedFaultPenalty) * 10) / 10;
+    const reportXp = reportFailed ? 0 : Math.round((pending.rewardXp + researchBonusXp) * (1 - unresolvedFaultPenalty));
     const checks: [string, boolean][] = [
       ["SURVIVAL", !reportFailed],
       ["POWER STABILITY", performance.colonyHealth >= 55],
       ["LIFE SUPPORT", Math.min(metrics.oxygen, metrics.water) >= 55],
       ["CREW SAFETY", performance.radiationScore >= 55],
+      ["FAULT REGISTER CLEAR", Object.keys(activeFaults).length === 0],
       ["HABITAT INTEGRITY", metrics.habitat >= 75],
       ["RESOURCE MANAGEMENT", Math.min(metrics.food, metrics.water) >= 55],
       ["RESEARCH OPPORTUNITY", performance.researchOpportunity],
@@ -2413,9 +2421,10 @@ export function MissionSimulation() {
               <div className="border border-[#6b5734] bg-[#1b1d18] p-5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#efb658]">Rewards</p>
                 <div className="mt-4 space-y-3">
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">{reportFailed ? "Recovery salvage" : "Credits"}</span><span className="font-mono text-[#efb658]">+{(reportFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits).toFixed((reportFailed ? Math.round(pending.rewardCredits * 0.15 * 10) / 10 : pending.rewardCredits) % 1 === 0 ? 0 : 1)}M</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{reportFailed ? "0" : (pending.rewardXp + researchBonusXp).toLocaleString()}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">{reportFailed ? "Recovery salvage" : "Credits"}</span><span className="font-mono text-[#efb658]">+{reportCredits.toFixed(reportCredits % 1 === 0 ? 0 : 1)}M</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{reportXp.toLocaleString()}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Research Tokens</span><span className="font-mono text-[#d4dfb7]">+{reportFailed ? "0" : pending.rewardResearchTokens}</span></div>
+                  {!reportFailed && unresolvedFaultPenalty > 0 && <p className="mt-3 text-[9px] leading-4 text-[#e5bc76]">{Object.keys(activeFaults).length} unresolved fault(s) reduced the payout by {Math.round(unresolvedFaultPenalty * 100)}%. Repair and verify every affected system next time to preserve mission rewards.</p>}
                 </div>
               </div>
               <a href={`/preview/CampaignMapRefresh?campaign=${pending.campaign}`} className={`flex w-full items-center justify-center gap-2 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.22em] ${reportFailed ? "border border-[#70404a] bg-[#301b22] text-[#ffb3b9]" : "bg-[#efb658] text-[#17201b]"}`}>
