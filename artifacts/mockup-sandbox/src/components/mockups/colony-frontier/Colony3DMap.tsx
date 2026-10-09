@@ -1064,7 +1064,7 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
       if (Math.hypot(dx, dz) > 0.01 && travelled > 0.0001) ref.current.rotation.y = Math.atan2(dx, dz);
     }
     // If an old save or interrupted route leaves no waypoints, still drive toward the live target.
-    if (isMovingTask && routeCursorRef.current >= route.length && Math.hypot(destination[0] - current.x, destination[1] - current.z) > 0.7) {
+    if (isMovingTask && (route.length <= 1 || routeCursorRef.current >= route.length) && Math.hypot(destination[0] - current.x, destination[1] - current.z) > 0.7) {
       const directDx = destination[0] - current.x;
       const directDz = destination[1] - current.z;
       const directDistance = Math.hypot(directDx, directDz);
