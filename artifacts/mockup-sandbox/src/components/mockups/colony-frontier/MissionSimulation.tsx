@@ -556,6 +556,7 @@ function IsometricMap({
   surveyedNodes,
   onSelectResource,
   roverTask,
+  speed,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
@@ -570,6 +571,7 @@ function IsometricMap({
   surveyedNodes: string[];
   onSelectResource: (node: ResourceNode) => void;
   roverTask: string;
+  speed: number;
 }) {
   return (
     <Colony3DMap
@@ -587,6 +589,7 @@ function IsometricMap({
       onSelect={onSelect}
       onSelectResource={onSelectResource}
       roverTask={roverTask}
+      simulationSpeed={speed}
     />
   );
 }
@@ -2177,7 +2180,7 @@ export function MissionSimulation() {
       const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
       const duration = Math.max(16, 27 + highestSeverity * 7 + missionStage * 1.4 - repairTier * 2 - (pending.selected.maintenance ? 5 : 0));
       setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 2) }));
-      setRoverTask("ISOLATING FAULT");
+      setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
         "REPAIR",
         repairTargetId,
@@ -2255,7 +2258,8 @@ export function MissionSimulation() {
           },
         }));
         setMetrics((current) => ({ ...current, power: clamp(current.power + 4) }));
-        setAiMessage(pending.selected.rover ? "Solar array cleaned by a rover-assisted operation. Generation margin recovered." : "Solar array cleaned. Generation margin recovered.");
+        setAiMessage(pending.selected.rover ? "SOLAR CLEANING COMPLETE · Dust load fell and power generation recovered. The rover is returning to the launch lane." : "SOLAR CLEANING COMPLETE · Dust load fell and power generation recovered.");
+        if (pending.selected.rover) setRoverTask("RETURNING");
         break;
       }
       case "tune": {
@@ -2586,6 +2590,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
           }}
           roverTask={roverTask}
+          speed={speed}
         />
 
         {!activeEvent && !dashboardOpen && (
