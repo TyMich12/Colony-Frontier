@@ -917,7 +917,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   );
 }
 
-function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected, alerted, simulationSpeed, performanceMultiplier }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; targetNodeId: string | null; onClick: () => void; selected: boolean; alerted: boolean; simulationSpeed: number; performanceMultiplier: number }) {
+function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected, alerted, performanceMultiplier }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; targetNodeId: string | null; onClick: () => void; selected: boolean; alerted: boolean; performanceMultiplier: number }) {
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
   const drillRef = useRef<THREE.Group>(null);
@@ -1582,7 +1582,7 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} simulationSpeed={props.simulationSpeed} performanceMultiplier={roverPerformanceMultiplier} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} performanceMultiplier={roverPerformanceMultiplier} onClick={() => props.onSelect("rover")} />
           </>
         )}
         <Crew mars={mars} />
