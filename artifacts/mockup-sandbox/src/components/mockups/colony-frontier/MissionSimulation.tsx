@@ -1537,7 +1537,7 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, activeFaults, activeOperations, buildings, elapsed, emergencyPowerMode, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
+  }, [activeEventId, activeFaults, buildings, elapsed, emergencyPowerMode, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
 
   useEffect(() => {
     if (!pending || results) return;
