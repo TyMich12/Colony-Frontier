@@ -526,7 +526,7 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
   return Math.max(0, 20 - tierLevel(tier) * 4.8 - Math.max(0, Math.min(2, upgradeLevel)) * 2);
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number): { label: string; value: string } {
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, condition = 100, dust = 0): { label: string; value: string } {
   const performance = systemPerformanceMultiplier(tier, upgradeLevel);
   const outputs: Record<string, { label: string; base: number; unit: string; digits?: number }> = {
     solar: { label: "Array energy delivered", base: 220, unit: "kJ / 10 sim s", digits: 0 },
@@ -549,7 +549,9 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
     power: { label: "Managed power margin", base: 8, unit: "kW", digits: 2 },
   };
   const output = outputs[systemId] ?? { label: "Nominal system throughput", base: 1, unit: "units / day", digits: 2 };
-  const value = systemId === "navigation" ? output.base / performance : output.base * performance;
+  const healthFactor = Math.max(0.25, condition / 100);
+  let value = systemId === "navigation" ? output.base / performance / healthFactor : output.base * performance * healthFactor;
+  if (systemId === "solar") value *= Math.max(0.15, 1 - Math.max(0, Math.min(100, dust)) / 100 * 0.85);
   return { label: output.label, value: value.toFixed(output.digits ?? 2) + " " + output.unit };
 }
 
@@ -1286,8 +1288,8 @@ function BuildingInspector({
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
             <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
             <div className="mt-1 flex items-baseline justify-between gap-3">
-              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel).label}</span>
-              <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel).value}</span>
+              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust).label}</span>
+              <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust).value}</span>
             </div>
             <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes this rated output. A higher technology tier is a larger improvement than both retrofit steps combined.</p>
           </div>
@@ -3687,7 +3689,7 @@ export function MissionSimulation() {
                     { label: "Food reserve", value: metrics.food, display: (metrics.food / 100 * 42).toFixed(1) + " kg food", inverse: false },
                     { label: "Hull integrity", value: metrics.habitat, display: Math.round(metrics.habitat) + "% integrity", inverse: false },
                     { label: "Temperature", value: clamp(100 - Math.abs(metrics.temperature - 21) * 12), display: `${metrics.temperature.toFixed(1)}°C`, inverse: false },
-                    { label: "Radiation dose rate", value: clamp(metrics.radiation * 3.33), display: (metrics.radiation / 100 * 0.8).toFixed(2) + " mSv/h", inverse: true },
+                    { label: "Radiation dose rate", value: clamp(metrics.radiation * 3.33), display: (metrics.radiation / 100 * 0.06).toFixed(3) + " mSv/h", inverse: true },
                   ].map((metric) => (
                     <div key={metric.label} className="rounded-xl border border-[#253d42] bg-[#102025] p-3">
                       <div className="flex items-start justify-between gap-2">
