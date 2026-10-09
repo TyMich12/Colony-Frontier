@@ -977,6 +977,7 @@ function BuildingInspector({
     ...(connection.all ?? []).map((id) => SYSTEM_LABELS[id] ?? id),
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
+  const connectionBlockers = getBlockers(track.id, "link-check");
   const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0;
 
   return (
@@ -1017,7 +1018,7 @@ function BuildingInspector({
         <section className="mx-4 mt-3 rounded-xl border border-[#2d4d53] bg-[#0d2025] p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#8dc9b6]">System connections</p>
-            <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${connectionText.length && connectionText.every((label) => getBlockers(track.id, "inspect").length === 0) ? "bg-[#173d32] text-[#8ce3b0]" : "bg-[#253438] text-[#9ab0ae]"}`}>Live dependency graph</span>
+            <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${connectionBlockers.length ? "bg-[#40242a] text-[#ffadb5]" : "bg-[#173d32] text-[#8ce3b0]"}`}>{connectionBlockers.length ? "LINKS OFFLINE" : "LINKS ONLINE"}</span>
           </div>
           <p className="mt-1.5 text-[9px] leading-4 text-[#a5c0c1]">{connectionText.length ? `Requires: ${connectionText.join(" · ")}` : "Upstream source system — produces or anchors a core colony resource."}</p>
           <p className="mt-1 text-[9px] leading-4 text-[#6fa294]">Feeds: {downstream.length ? downstream.map((id) => SYSTEM_LABELS[id] ?? id).join(" · ") : "No direct downstream consumer"}</p>
@@ -3198,6 +3199,7 @@ export function MissionSimulation() {
             onEventChoice={handleEventChoice}
             power={metrics.power}
             battery={metrics.battery}
+            getBlockers={checkActionPrerequisites}
           />
         )}
 
