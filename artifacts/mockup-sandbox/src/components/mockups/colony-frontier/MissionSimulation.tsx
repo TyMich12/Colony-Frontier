@@ -154,8 +154,8 @@ const SYSTEM_LABELS: Record<string, string> = {
  */
 const SYSTEM_CONNECTIONS: Record<string, { all?: string[]; any?: string[]; outputs?: string[] }> = {
   solar: { outputs: ["grid", "battery"] },
-  battery: { all: ["solar"], outputs: ["grid", "oxygen", "water", "thermal", "comms", "radiation", "rover"] },
-  grid: { all: ["solar"], outputs: ["water", "co2", "oxygen", "thermal", "comms", "navigation", "science", "maintenance"] },
+  battery: { outputs: ["grid", "oxygen", "water", "thermal", "comms", "radiation", "rover"] },
+  grid: { any: ["solar", "battery"], outputs: ["water", "co2", "oxygen", "thermal", "comms", "navigation", "science", "maintenance"] },
   habitat: { outputs: ["water", "co2", "oxygen", "thermal", "radiation", "agriculture", "maintenance"] },
   water: { all: ["habitat"], any: ["grid", "battery"], outputs: ["oxygen", "agriculture", "extraction", "isru"] },
   co2: { all: ["habitat"], any: ["grid", "battery"], outputs: ["oxygen", "agriculture"] },
@@ -290,7 +290,7 @@ function getActionBlockers(
     const ownFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
     if (ownFault && !isRepair) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
     if (!ownFault && !isRepair && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
-    if (!ownFault && !isRepair && actionId !== "diagnostics" && actionId !== "service" && actionId !== "upgrade") collectSystemBlockers(systemId, context, blockers);
+    if (!ownFault && !isRepair && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
   }
 
   const rule = ACTION_REQUIREMENTS[actionId] ?? {};
@@ -1664,6 +1664,26 @@ export function MissionSimulation() {
       });
 
       setMetrics((current) => {
+        const dependencyContext: ActionRequirementContext = {
+          selected: pending.selected,
+          buildings,
+          activeFaults: activeFaultsRef.current,
+          metrics: current,
+          surveyedNodes,
+          sampleStages,
+          resourceYield,
+        };
+        const solarOnline = systemIsOperational("solar", dependencyContext);
+        const batteryOnline = systemIsOperational("battery", dependencyContext);
+        const gridOnline = systemIsOperational("grid", dependencyContext);
+        const oxygenOnline = systemIsOperational("oxygen", dependencyContext);
+        const waterOnline = systemIsOperational("water", dependencyContext);
+        const co2Online = systemIsOperational("co2", dependencyContext);
+        const thermalOnline = systemIsOperational("thermal", dependencyContext);
+        const radiationOnline = systemIsOperational("radiation", dependencyContext);
+        const maintenanceOnline = systemIsOperational("maintenance", dependencyContext);
+        const agricultureOnline = systemIsOperational("agriculture", dependencyContext);
+        const habitatOnline = systemIsOperational("habitat", dependencyContext);
         const solarTier = tierLevel(pending.selected.solar ?? "Foundation");
         const batteryTier = tierLevel(pending.selected.battery ?? "Foundation");
         const oxygenTier = tierLevel(pending.selected.oxygen ?? "Foundation");
@@ -1689,18 +1709,39 @@ export function MissionSimulation() {
           : pending.campaign === "mars"
             ? 0.82 + Math.sin(elapsed / 29) * 0.06
             : 0.96;
-        const solarGeneration = (24 + solarTier * 7.5 + solarUpgrade * 4.5) * solarAvailability;
-        const powerBase = 48 + solarGeneration - solarDust * 0.4 - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0) + (emergencyPowerMode ? 9 : 0);
-        // Better batteries reduce loss; they cannot create charge when generation is below demand.
-        const batteryDelta = ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0035) * stagePressure * (emergencyPowerMode ? 0.78 : 1);
-        const oxygenDrain = Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0017) * stagePressure * (emergencyPowerMode ? 1.02 : 1);
-        const waterDrain = Math.max(0.003, 0.0135 - waterTier * 0.0024 - waterUpgrade * 0.0015) * stagePressure;
+        const solarConditionFactor = clamp((buildings.solar?.condition ?? 100) / 100, 0, 1);
+        const solarGeneration = solarOnline ? (24 + solarTier * 7.5 + solarUpgrade * 4.5) * solarAvailability * solarConditionFactor : 0;
+        const gridTier = tierLevel(pending.selected.grid ?? "Foundation");
+        // A live grid carries generation and distributes it. Without the grid, stored energy can
+        // support only a reduced local bus; without either source, colony power margin collapses.
+        const powerSupply = solarOnline && gridOnline
+          ? 48 + solarGeneration + gridTier * 4
+          : batteryOnline && gridOnline
+            ? 24 + batteryTier * 2
+            : solarOnline && batteryOnline
+              ? 22 + solarGeneration * 0.55
+              : batteryOnline
+                ? 10 + batteryTier * 1.5
+                : 0;
+        const powerBase = Math.max(0, powerSupply - solarDust * 0.4 - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
+        // Stored energy can stabilise the bus during a solar outage, but it drains while discharging.
+        const batteryDelta = !batteryOnline
+          ? -0.035 * stagePressure
+          : solarOnline && gridOnline
+            ? ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0035) * stagePressure * (emergencyPowerMode ? 0.78 : 1)
+            : -0.018 * stagePressure * (emergencyPowerMode ? 0.78 : 1);
+        const oxygenDrain = (oxygenOnline
+          ? Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0017)
+          : pending.selected.oxygen ? 0.028 : 0.036) * stagePressure * (emergencyPowerMode ? 1.02 : 1);
+        const waterDrain = (waterOnline
+          ? Math.max(0.003, 0.0135 - waterTier * 0.0024 - waterUpgrade * 0.0015)
+          : pending.selected.water ? 0.026 : 0.034) * stagePressure;
         const agricultureTier = pending.selected.agriculture ? tierLevel(pending.selected.agriculture) : 0;
         const hasAgriculture = pending.selected.agriculture !== undefined;
-        const foodDrain = (hasAgriculture
+        const foodDrain = (agricultureOnline
           ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0018)
-          : 0.022) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
-        const hasThermalControl = pending.selected.thermal !== undefined;
+          : hasAgriculture ? 0.028 : 0.035) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
+        const hasThermalControl = thermalOnline;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
         const thermalCorrection = hasThermalControl
@@ -1746,8 +1787,8 @@ export function MissionSimulation() {
           water: clamp(current.water - waterDrain * speed - faultImpact.water),
           food: clamp(current.food - foodDrain * speed - faultImpact.food),
           temperature: clamp(current.temperature + (thermalTarget - current.temperature) * thermalCorrection * speed * stagePressure + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
-          radiation: clamp(current.radiation + Math.max(0.0006, 0.003 - radiationTier * 0.00065) * speed + faultImpact.radiation),
-          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.0012) * speed - faultImpact.habitat),
+          radiation: clamp(current.radiation + (radiationOnline ? Math.max(0.0006, 0.003 - radiationTier * 0.00065) : 0.0065) * speed + faultImpact.radiation),
+          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.0012) * speed * (maintenanceOnline ? 0.68 : 1) - faultImpact.habitat + (habitatOnline ? 0 : -0.002 * speed)),
         };
       });
 
