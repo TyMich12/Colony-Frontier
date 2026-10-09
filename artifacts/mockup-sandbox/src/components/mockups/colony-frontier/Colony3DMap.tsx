@@ -944,6 +944,12 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
             ? position
             : position;
   const isMovingTask = Boolean(targetLabel && target) || isTransferring || isReturning || isCleaning || Boolean(repairTarget && POSITIONS[repairTarget]) || isRouting;
+  useEffect(() => {
+    if (!ref.current || ref.current.userData.roverPositionInitialized) return;
+    ref.current.position.set(position[0], PAD_Y + 0.47, position[1]);
+    ref.current.userData.roverPositionInitialized = true;
+  }, [position[0], position[1]]);
+
   // Move visually using frame delta, independent of the mission-time speed setting.
   useFrame(({ clock, delta }) => {
     if (!ref.current) return;
