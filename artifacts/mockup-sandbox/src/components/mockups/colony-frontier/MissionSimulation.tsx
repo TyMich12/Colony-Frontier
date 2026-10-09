@@ -2158,6 +2158,7 @@ export function MissionSimulation() {
           roverTask={roverTask}
         />
 
+        {!activeEvent && (
         <div className="pointer-events-none absolute left-3 bottom-3 z-20 w-[min(86vw,390px)]">
           <div className="rounded-2xl border border-[#3d555b] bg-[#0b1519]/[0.90] px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm">
             <div className="flex items-start gap-2.5">
@@ -2172,6 +2173,8 @@ export function MissionSimulation() {
           </div>
         </div>
 
+        )}
+        {!activeEvent && (
         <div className="pointer-events-auto absolute right-3 bottom-3 z-20 flex items-center gap-1.5">
           <button
             type="button"
@@ -2195,6 +2198,8 @@ export function MissionSimulation() {
           ))}
         </div>
 
+        )}
+        {!activeEvent && (
         <MissionTaskRibbon
           pending={pending}
           elapsed={elapsed}
@@ -2203,6 +2208,139 @@ export function MissionSimulation() {
           activeEvent={activeEvent}
           roverTask={roverTask}
         />
+
+        )}
+
+        {!activeEvent && (
+          <>
+            <button
+              type="button"
+              onClick={() => setDashboardOpen((open) => !open)}
+              className="pointer-events-auto absolute right-3 top-3 z-40 flex items-center gap-2 rounded-xl border border-[#526c68] bg-[#0a171c]/[0.94] px-3 py-2.5 text-left shadow-[0_8px_28px_rgba(0,0,0,0.42)] backdrop-blur-md transition hover:border-[#e8c568]"
+              aria-expanded={dashboardOpen}
+              aria-label={dashboardOpen ? "Close systems dashboard" : "Open systems dashboard"}
+            >
+              <Gauge className="h-4 w-4 text-[#eac568]" />
+              <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white">Systems</span>
+              <span className="font-mono text-[10px] text-[#a8ddb8]">{Math.round(performance.colonyHealth)}%</span>
+              {Object.keys(activeFaults).length > 0 && <span className="rounded-full bg-[#d74d59] px-1.5 py-0.5 text-[8px] font-black text-white">{Object.keys(activeFaults).length}!</span>}
+              <span className="text-xs text-[#8eaaa4]">{dashboardOpen ? "−" : "+"}</span>
+            </button>
+
+            {dashboardOpen && (
+              <aside className="pointer-events-auto absolute right-3 top-[58px] z-40 max-h-[76vh] w-[min(94vw,390px)] overflow-y-auto rounded-2xl border border-[#405b5e] bg-[#081419]/[0.97] shadow-[0_22px_62px_rgba(0,0,0,0.65)] backdrop-blur-xl">
+                <div className="sticky top-0 z-10 border-b border-[#30484c] bg-[#102329]/[0.98] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#e8c568]">Telemetry / live board</p>
+                      <h2 className="mt-1 text-sm font-black uppercase tracking-[0.1em] text-white">Colony systems</h2>
+                    </div>
+                    <button type="button" onClick={() => setDashboardOpen(false)} className="rounded-lg border border-[#425a5d] px-2.5 py-1.5 text-xs text-[#b4c4c2]" aria-label="Close systems dashboard">×</button>
+                  </div>
+                  <p className="mt-2 text-[9px] leading-4 text-[#87a29f]">Healthy systems still need monitoring. Warning colours show loss of margin, not simply whether a disaster has fired.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 p-3">
+                  {[
+                    { label: "Power margin", value: metrics.power, display: `${Math.round(metrics.power)}%`, inverse: false },
+                    { label: "Battery reserve", value: metrics.battery, display: `${Math.round(metrics.battery)}%`, inverse: false },
+                    { label: "O₂ / life support", value: metrics.oxygen, display: `${Math.round(metrics.oxygen)}%`, inverse: false },
+                    { label: "Water reserve", value: metrics.water, display: `${Math.round(metrics.water)}%`, inverse: false },
+                    { label: "Food reserve", value: metrics.food, display: `${Math.round(metrics.food)}%`, inverse: false },
+                    { label: "Habitat integrity", value: metrics.habitat, display: `${Math.round(metrics.habitat)}%`, inverse: false },
+                    { label: "Temperature", value: clamp(100 - Math.abs(metrics.temperature - 21) * 12), display: `${metrics.temperature.toFixed(1)}°C`, inverse: false },
+                    { label: "Radiation dose index", value: clamp(metrics.radiation * 3.33), display: metrics.radiation.toFixed(1), inverse: true },
+                  ].map((metric) => (
+                    <div key={metric.label} className="rounded-xl border border-[#253d42] bg-[#102025] p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#8da8a4]">{metric.label}</p>
+                        <p className="shrink-0 font-mono text-sm font-bold" style={{ color: resourceColor(metric.value, metric.inverse) }}>{metric.display}</p>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#26383d]">
+                        <div className="h-full rounded-full transition-[width]" style={{ width: `${clamp(metric.value)}%`, background: resourceColor(metric.value, metric.inverse) }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="px-3 pb-3">
+                  <div className="flex items-center justify-between gap-2 px-1 pb-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#b5c8c1]">Deployed equipment</p>
+                    <span className="text-[8px] uppercase tracking-[0.1em] text-[#718e8b]">{selectedTracks.length} systems</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {selectedTracks.map((track) => {
+                      const state = buildings[track.id] ?? { condition: 100, dust: 0, status: "ONLINE" };
+                      const fault = Object.values(activeFaults).find((item) => item.targetTrackId === track.id);
+                      return (
+                        <button key={track.id} type="button" onClick={() => { setSelectedResourceId(null); setSelectedBuildingId(track.id); setDashboardOpen(false); }} className="w-full rounded-xl border border-[#263d42] bg-[#0d1b20] p-2.5 text-left transition hover:border-[#b9a15d]">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="min-w-0 text-[9px] font-black uppercase tracking-[0.08em] text-[#e4ece4]">{track.category} <span className="font-normal text-[#75918d]">· {pending.selected[track.id]}</span></span>
+                            <span className="shrink-0 font-mono text-[10px] font-bold" style={{ color: resourceColor(state.condition) }}>{Math.round(state.condition)}%</span>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#25363a]"><div className="h-full rounded-full" style={{ width: `${clamp(state.condition)}%`, background: resourceColor(state.condition) }} /></div>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <span className="text-[8px] uppercase tracking-[0.1em]" style={{ color: resourceColor(state.condition) }}>{fault ? "FAULT ACTIVE" : state.status}</span>
+                            {track.id === "solar" && <span className="text-[8px] text-[#d7be72]">Dust {Math.round(state.dust)}%</span>}
+                            {(state.upgradeLevel ?? 0) > 0 && <span className="text-[8px] text-[#e8c568]">Retrofit L{state.upgradeLevel}/2</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {activeOperation && (
+                  <div className="border-t border-[#30484c] bg-[#11242a] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#e8c568]">Work in progress</p>
+                      <span className="font-mono text-[10px] text-white">{Math.ceil(activeOperation.remainingSeconds)}s</span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-[#d8e5df]">{activeOperation.label}</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#2b3d40]"><div className="h-full bg-[#dfbb58]" style={{ width: `${clamp(100 * (1 - activeOperation.remainingSeconds / activeOperation.totalSeconds))}%` }} /></div>
+                    {manualPaused && <p className="mt-2 text-[8px] text-[#e9ca7c]">Mission paused · operation clock paused</p>}
+                  </div>
+                )}
+
+                <div className="border-t border-[#30484c] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#b5c8c1]">Active fault register</p>
+                    <span className={`text-[8px] font-black uppercase tracking-[0.1em] ${Object.keys(activeFaults).length ? "text-[#ff8187]" : "text-[#84d4a2]"}`}>{Object.keys(activeFaults).length ? `${Object.keys(activeFaults).length} unresolved` : "No ongoing faults"}</span>
+                  </div>
+                  {Object.keys(activeFaults).length === 0 ? (
+                    <p className="mt-2 text-[9px] leading-4 text-[#76928f]">Ignored incidents will appear here and continue to affect the relevant system until the fault clears.</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {Object.values(activeFaults).map((fault) => (
+                        <div key={fault.eventId} className="rounded-xl border border-[#713b44] bg-[#26161d] p-2.5">
+                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{Math.ceil(fault.remainingSeconds)}s</span></div>
+                          <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#d59097]">Degrading {fault.targetTrackId.toUpperCase()} · severity {fault.severity.toFixed(1)}×</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </aside>
+            )}
+
+            {operationResult && (
+              <div className="pointer-events-auto absolute left-1/2 top-1/2 z-40 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[#5d8a6b] bg-[#0b1c1c]/[0.98] p-4 shadow-[0_18px_58px_rgba(0,0,0,0.68)]">
+                <div className="flex items-start gap-3">
+                  <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#85d9a2]" />
+                  <div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#91ddb0]">Operation report</p><p className="mt-1 text-[11px] leading-5 text-[#d7e6de]">{operationResult}</p></div>
+                  <button type="button" onClick={() => setOperationResult(null)} className="rounded-lg border border-[#3d6052] px-2 py-1 text-xs text-[#c3d7cb]" aria-label="Dismiss operation report">×</button>
+                </div>
+              </div>
+            )}
+
+            {activeOperation && (
+              <div className="pointer-events-none absolute bottom-[96px] left-1/2 z-30 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-[#526e71] bg-[#0b171c]/[0.94] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+                <div className="flex items-center justify-between gap-3"><p className="truncate text-[9px] font-black uppercase tracking-[0.14em] text-[#e9c86b]">{activeOperation.label}</p><span className="font-mono text-[11px] text-white">{Math.ceil(activeOperation.remainingSeconds)}s</span></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#283b40]"><div className="h-full rounded-full bg-[#e1bb58] transition-[width]" style={{ width: `${clamp(100 * (1 - activeOperation.remainingSeconds / activeOperation.totalSeconds))}%` }} /></div>
+              </div>
+            )}
+          </>
+        )}
 
         {selectedResource && !activeEvent && (
           <ResourceInspector
@@ -2218,7 +2356,7 @@ export function MissionSimulation() {
           />
         )}
 
-        {selectedTrack && selectedTier && !selectedResource && (!activeEvent || selectedBuildingId === activeTargetTrackId) && (
+        {!activeEvent && selectedTrack && selectedTier && !selectedResource && (
           <BuildingInspector
             track={selectedTrack}
             tier={selectedTier}
@@ -2236,38 +2374,95 @@ export function MissionSimulation() {
         )}
 
         {activeEvent && (
-          <div className="pointer-events-none absolute right-3 top-3 z-40 flex justify-end px-0">
-            <div className="pointer-events-auto max-h-[55vh] w-[min(92vw,400px)] overflow-y-auto rounded-2xl border-2 border-[#ff5367] bg-[#120f16]/[0.96] shadow-[0_14px_40px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center justify-between gap-3 bg-[#2a1620] px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff7180]">⚠ DISASTER · {activeEvent.title}</p>
-                  <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#e5bd64]">Situation report · {activeTargetTrackId}</p>
-                </div>
-                <span className="shrink-0 rounded-full border border-[#ff5367]/50 px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-[#ffb39d]">{activeTargetTrackId}</span>
-              </div>
-              <div className="space-y-3 p-3">
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#ff9aa3]">What is happening</p>
-                  <p className="mt-1 text-[10px] leading-4 text-[#e4d6da]">{activeEvent.subtitle}</p>
-                  <p className="mt-1 text-[10px] leading-4 text-[#bfaeb5]">{activeEvent.summary}</p>
-                </div>
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#f1cd75]">Possible responses</p>
-                  <div className="mt-1.5 space-y-2">
-                    {getEventChoices(activeEvent, pending.selected).map((choice, index) => (
-                      <div key={choice.id} className="border-l-2 border-[#76505b] pl-2.5">
-                        <p className="text-[9px] font-bold text-white">{index + 1}. {choice.label}</p>
-                        <p className="mt-0.5 text-[8px] leading-3.5 text-[#bca9b3]">{choice.detail}</p>
-                      </div>
-                    ))}
+          <div className="absolute inset-0 z-[80] grid place-items-center bg-[#05080c]/[0.80] p-3 backdrop-blur-sm sm:p-5">
+            <section className="pointer-events-auto max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-[26px] border-2 border-[#d95363] bg-[#0b1118]/[0.99] shadow-[0_25px_100px_rgba(0,0,0,0.8)]">
+              <header className="sticky top-0 z-10 border-b border-[#733842] bg-gradient-to-r from-[#421c27] via-[#25161e] to-[#15141c] px-5 py-4 sm:px-7">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#c95160] bg-[#6e2634]/40 text-[#ff8088]"><AlertTriangle className="h-6 w-6" /></div>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#ff858b]">Mission interrupted · respond now</p>
+                      <h1 className="mt-1 text-lg font-black uppercase tracking-[0.06em] text-white sm:text-2xl">{activeEvent.title}</h1>
+                      <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#d9b4bb]">Affected asset · {(activeTargetTrackId ?? activeEvent.trackId).toUpperCase()} · {environmentLabel}</p>
+                    </div>
                   </div>
+                  <span className="rounded-full border border-[#ee6e78] bg-[#721f2c]/50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#ffc1c2]">Live fault · 1 active</span>
                 </div>
-                <div className="rounded-xl border border-[#78424b] bg-[#281820] px-2.5 py-2">
-                  <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#ffb0b7]">Your next step</p>
-                  <p className="mt-1 text-[9px] leading-4 text-[#e1c6cb]">Click the red-ringed building. Its information panel will give you the response options. No response is chosen for you.</p>
+                <p className="mt-4 max-w-3xl text-[11px] leading-5 text-[#e4d9df]">{activeEvent.subtitle} {activeEvent.summary}</p>
+                <div className="mt-3 rounded-xl border border-[#7a3543] bg-[#29151d] px-3 py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#ffb6bc]">This is not a cosmetic warning</p>
+                  <p className="mt-1 text-[10px] leading-4 text-[#dcbac1]">The mission clock and life-support simulation keep running while you decide. Non-essential controls are disabled here. A poor response leaves a fault that continues degrading its system after this panel closes.</p>
                 </div>
+              </header>
+
+              <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-4">
+                  <section className="rounded-2xl border border-[#33484f] bg-[#101e25] p-4">
+                    <div className="flex items-center gap-2 text-[#e8c568]"><Activity className="h-4 w-4" /><p className="text-[9px] font-black uppercase tracking-[0.18em]">Current telemetry</p></div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {[
+                        { label: "Target condition", value: Math.round(buildings[activeTargetTrackId ?? activeEvent.trackId]?.condition ?? 100), display: `${Math.round(buildings[activeTargetTrackId ?? activeEvent.trackId]?.condition ?? 100)}%` },
+                        { label: "Power margin", value: metrics.power, display: `${Math.round(metrics.power)}%` },
+                        { label: "Battery reserve", value: metrics.battery, display: `${Math.round(metrics.battery)}%` },
+                        { label: "Life support", value: Math.min(metrics.oxygen, metrics.water), display: `${Math.round(Math.min(metrics.oxygen, metrics.water))}%` },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-xl border border-[#2d4248] bg-[#0b171d] p-3">
+                          <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#8fa7ab]">{item.label}</p>
+                          <p className="mt-1 font-mono text-lg font-bold" style={{ color: resourceColor(item.value) }}>{item.display}</p>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#273a40]"><div className="h-full rounded-full" style={{ width: `${clamp(item.value)}%`, background: resourceColor(item.value) }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {activeOperation && (
+                    <section className="rounded-2xl border border-[#8a7141] bg-[#2a2518] p-4">
+                      <div className="flex items-center gap-2 text-[#f1cf77]"><Clock className="h-4 w-4" /><p className="text-[9px] font-black uppercase tracking-[0.16em]">Operation suspended by incident</p></div>
+                      <p className="mt-2 text-[11px] font-bold text-white">{activeOperation.label}</p>
+                      <p className="mt-1 text-[10px] text-[#cdbb8e]">{Math.ceil(activeOperation.remainingSeconds)} seconds remain. Work resumes after this response is chosen.</p>
+                    </section>
+                  )}
+
+                  <section className="rounded-2xl border border-[#33484f] bg-[#101e25] p-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#b6c8c4]">Operational consequence</p>
+                    <p className="mt-2 text-[10px] leading-5 text-[#93aaa9]">Use the readings to choose between restoring the system, protecting the rest of the colony, or accepting an operational limitation. No choice is free: power, reserve, time or hardware life may be affected.</p>
+                    {Object.keys(activeFaults).length > 0 && <p className="mt-3 rounded-lg border border-[#7d3b45] bg-[#2b171e] px-3 py-2 text-[9px] text-[#ffb3b6]">{Object.keys(activeFaults).length} unresolved fault(s) are already degrading the colony.</p>}
+                  </section>
+                </div>
+
+                <section>
+                  <div className="mb-3 flex items-end justify-between gap-3">
+                    <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#ff868e]">Response console</p><h2 className="mt-1 text-base font-black uppercase tracking-[0.07em] text-white">Choose your action</h2></div>
+                    <span className="text-[8px] uppercase tracking-[0.12em] text-[#80989a]">Decision recorded</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {getEventChoices(activeEvent, pending.selected).map((choice, index) => {
+                      const unsafe = ["ignore", "continue", "defer", "force", "push", "hold", "maintain"].includes(choice.id);
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          onClick={() => handleEventChoice(choice.id)}
+                          className={`w-full rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${unsafe ? "border-[#6a4148] bg-[#21191f] hover:border-[#db727c] hover:bg-[#2d1b23]" : "border-[#385c55] bg-[#142922] hover:border-[#e9c568] hover:bg-[#1d382d]"}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[10px] font-black ${unsafe ? "bg-[#6a2d3a] text-[#ffc4c3]" : "bg-[#d9b654] text-[#1b2119]"}`}>{index + 1}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] font-black uppercase tracking-[0.04em] text-white">{choice.label}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.1em] ${unsafe ? "bg-[#652c37] text-[#ffb1b5]" : "bg-[#224538] text-[#9ce0b4]"}`}>{unsafe ? "Ongoing risk" : "Mitigation"}</span>
+                              </span>
+                              <span className="mt-1.5 block text-[10px] leading-5 text-[#acbfc0]">{choice.detail}</span>
+                              {unsafe && <span className="mt-2 block text-[9px] font-bold text-[#ff9ba4]">Choosing this leaves a persistent fault that continues draining the affected system.</span>}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
               </div>
-            </div>
+            </section>
           </div>
         )}
       </main>
