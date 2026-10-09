@@ -106,7 +106,7 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
 };
 
 const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
-  clean: "Dust −16 points (−24 with rover) · power +4 now · condition +1 · extra power recovery of about +2.2 (+3.4 with rover) per 10 simulated seconds while below supply target",
+  clean: "Dust layer reduced by 16 percentage points (24 with rover) · recover up to 220 kJ per 10 simulated seconds while the array is under target",
   tune: "Power +3 · condition +1", balance: "Battery +5 · power +2", reserve: "Battery +8 · power −2",
   reset: "Oxygen +3 · power −2", boost: "Oxygen +6 · power −4 · condition −1",
   flush: "Water +4 · power −2", purify: "Water +6 · power −4",
@@ -124,7 +124,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   purge: "Condition +2 · power −1", "tune-crops": "Food +5 · water −2 · power −2 · condition +1",
   harvest: "Food +7 · water −2 · yield +1 · score +3", service: "Raises the weakest system's condition by 10",
   diagnostics: "Checks live faults and reports the weakest system · score +3",
-  "fallback-solar": "BASIC · no optional systems needed · dust −7 points · power margin +1 now; about +1 extra power recovery per 10 simulated seconds while below supply target",
+  "fallback-solar": "BASIC · no optional systems needed · dust −7 percentage points · recover up to 70 kJ per 10 simulated seconds while the array is under target",
   "fallback-battery": "Recover ~1% usable reserve by isolating parasitic draw · no generator required",
   "fallback-grid": "Emergency manual load shedding · power margin +1 · ECO loads enabled",
   "fallback-habitat": "Emergency seal patch · habitat integrity +1.5 · condition +3",
@@ -141,7 +141,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   "fallback-science": "Re-zero the bench instruments · condition +1, no sample consumed",
   "fallback-agriculture": "Harvest the last ready edible biomass · food +1 without a full water loop",
   "fallback-maintenance": "Manual walk-around service · condition +2 on the weakest healthy module",
-  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust −32 points · power margin +5 now · about +4.5 extra power recovery per 10 simulated seconds while below supply target",
+  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust −32 percentage points · recover up to 450 kJ per 10 simulated seconds while the array is under target",
   "battery-thermal-recondition": "Thermal conditioning plus supervised BMS balancing · larger reserve recovery",
   "oxygen-electrolyser-burst": "Electrolyse reclaimed water for extra oxygen · water and power consumed",
   "water-distillate-recovery": "Recover more condensate using waste heat · larger water gain with a power cost",
@@ -1400,8 +1400,7 @@ function BuildingInspector({
                 : "";
             const variant = decodeActionVariant(track.id, action.id);
             const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[variant?.baseActionId ?? action.id] ?? 6);
-            const actionMultiplier = operationPerformanceMultiplier(track.id, selected, { [track.id]: runtime }, variant?.supportSystems ?? []);
-            return (
+                      return (
             <button
               key={action.id}
               type="button"
@@ -1419,7 +1418,7 @@ function BuildingInspector({
                     </span>
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
-                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`} · navigation performance ×${actionMultiplier.toFixed(2)}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail} · module output ×${actionMultiplier.toFixed(2)}`}</span>
+                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Basic fix available · no optional systems" : "Specialist prerequisites satisfied"}</span>}
                 </span>
               </span>
@@ -3632,14 +3631,14 @@ export function MissionSimulation() {
 
                 <div className="grid grid-cols-2 gap-2 p-3">
                   {[
-                    { label: "Power margin", value: metrics.power, display: `${Math.round(metrics.power)}%`, inverse: false },
-                    { label: "Battery reserve", value: metrics.battery, display: `${Math.round(metrics.battery)}%`, inverse: false },
-                    { label: "O₂ / life support", value: metrics.oxygen, display: `${Math.round(metrics.oxygen)}%`, inverse: false },
-                    { label: "Water reserve", value: metrics.water, display: `${Math.round(metrics.water)}%`, inverse: false },
-                    { label: "Food reserve", value: metrics.food, display: `${Math.round(metrics.food)}%`, inverse: false },
-                    { label: "Habitat integrity", value: metrics.habitat, display: `${Math.round(metrics.habitat)}%`, inverse: false },
+                    { label: "Available electrical power", value: metrics.power, display: (metrics.power / 100 * 12).toFixed(1) + " kW", inverse: false },
+                    { label: "Stored energy", value: metrics.battery, display: (metrics.battery / 100 * 48).toFixed(1) + " kWh", inverse: false },
+                    { label: "O₂ reserve", value: metrics.oxygen, display: (metrics.oxygen / 100 * 24).toFixed(1) + " kg O₂", inverse: false },
+                    { label: "Water reserve", value: metrics.water, display: Math.round(metrics.water / 100 * 180) + " L", inverse: false },
+                    { label: "Food reserve", value: metrics.food, display: (metrics.food / 100 * 42).toFixed(1) + " kg food", inverse: false },
+                    { label: "Hull integrity", value: metrics.habitat, display: Math.round(metrics.habitat) + "% integrity", inverse: false },
                     { label: "Temperature", value: clamp(100 - Math.abs(metrics.temperature - 21) * 12), display: `${metrics.temperature.toFixed(1)}°C`, inverse: false },
-                    { label: "Radiation dose index", value: clamp(metrics.radiation * 3.33), display: metrics.radiation.toFixed(1), inverse: true },
+                    { label: "Radiation dose rate", value: clamp(metrics.radiation * 3.33), display: (metrics.radiation / 100 * 0.8).toFixed(2) + " mSv/h", inverse: true },
                   ].map((metric) => (
                     <div key={metric.label} className="rounded-xl border border-[#253d42] bg-[#102025] p-3">
                       <div className="flex items-start justify-between gap-2">
