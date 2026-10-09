@@ -444,6 +444,35 @@ const LOCAL_FALLBACK_ACTIONS = new Set([
   "fallback-maintenance",
 ]);
 
+function fallbackEmergencyOverride(
+  actionId: string,
+  systemId: string,
+  metrics: MissionMetrics,
+  hasActiveFault: boolean,
+): boolean {
+  if (hasActiveFault) return true;
+  switch (actionId) {
+    case "fallback-solar": return metrics.power < 32 || metrics.battery < 18;
+    case "fallback-battery": return metrics.battery < 25 || metrics.power < 28;
+    case "fallback-grid": return metrics.power < 30 || metrics.battery < 22;
+    case "fallback-habitat": return metrics.habitat < 40;
+    case "fallback-water": return metrics.water < 30;
+    case "fallback-oxygen":
+    case "fallback-co2": return metrics.oxygen < 30;
+    case "fallback-thermal": return Math.abs(metrics.temperature - 21) > 3.5;
+    case "fallback-radiation": return metrics.radiation > 35;
+    case "fallback-comms": return metrics.power < 25;
+    case "fallback-navigation": return metrics.power < 25 || metrics.battery < 25;
+    case "fallback-rover": return metrics.battery < 25;
+    case "fallback-extraction": return metrics.power < 25 || metrics.battery < 20;
+    case "fallback-isru":
+    case "fallback-science": return metrics.power < 25;
+    case "fallback-agriculture": return metrics.food < 30 || metrics.water < 20;
+    case "fallback-maintenance": return metrics.habitat < 40 || metrics.power < 25;
+    default: return false;
+  }
+}
+
 function clamp(value: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -965,6 +994,7 @@ function BuildingInspector({
   onEventChoice,
   power,
   battery,
+  metrics,
   getBlockers,
   selected,
   earthReport,
@@ -986,6 +1016,7 @@ function BuildingInspector({
   onEventChoice: (choiceId: string) => void;
   power: number;
   battery: number;
+  metrics: MissionMetrics;
   getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
   selected: Record<string, Tier>;
   earthReport: string | null;
@@ -1255,7 +1286,8 @@ function BuildingInspector({
         <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
           {actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
-            const fallbackRemaining = action.id.startsWith("fallback-")
+            const emergencyOverride = action.id.startsWith("fallback-") && fallbackEmergencyOverride(action.id, track.id, metrics, Boolean(activeFault));
+            const fallbackRemaining = action.id.startsWith("fallback-") && !emergencyOverride
               ? Math.max(0, (fallbackReadyAt[`${track.id}:${action.id}`] ?? 0) - elapsedSeconds)
               : 0;
             const locked = blockers.length > 0 || fallbackRemaining > 0;
@@ -1282,7 +1314,7 @@ function BuildingInspector({
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`} · navigation performance ×${actionMultiplier.toFixed(2)}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail} · module output ×${actionMultiplier.toFixed(2)}`}</span>
-                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
+                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {fallbackRemaining > 0 ? lockMessage : lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
                 </span>
               </span>
             </button>
@@ -2657,8 +2689,10 @@ export function MissionSimulation() {
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
     const fallbackKey = `${trackId}:${action}`;
+    const hasOwnActiveFault = Object.values(activeFaults).some((fault) => fault.targetTrackId === trackId);
+    const emergencyOverride = action.startsWith("fallback-") && fallbackEmergencyOverride(action, trackId, metrics, hasOwnActiveFault);
     const fallbackRemaining = (fallbackReadyAt[fallbackKey] ?? 0) - elapsed;
-    if (action.startsWith("fallback-") && fallbackRemaining > 0) {
+    if (action.startsWith("fallback-") && fallbackRemaining > 0 && !emergencyOverride) {
       setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${Math.ceil(fallbackRemaining)} simulated seconds.`);
       return;
     }
@@ -3645,6 +3679,7 @@ export function MissionSimulation() {
             onEventChoice={handleEventChoice}
             power={metrics.power}
             battery={metrics.battery}
+            metrics={metrics}
             getBlockers={checkActionPrerequisites}
             selected={pending.selected}
             earthReport={earthReport}
