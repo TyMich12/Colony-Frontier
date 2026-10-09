@@ -1283,6 +1283,13 @@ function BuildingInspector({
           </section>
         )}
 
+        <section className="mx-4 mt-4 rounded-xl border border-[#304d53] bg-[#0c1b20] p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md border border-[#3f8767] bg-[#15392b] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#a7efc1]">Basic fix</span>
+            <span className="text-[9px] font-bold text-[#d8e7de]">No optional support systems required</span>
+          </div>
+          <p className="mt-1.5 text-[9px] leading-4 text-[#91aaa8]">Every facility has a small fallback intervention. Specialist methods unlock when their required systems are deployed, connected, and healthy.</p>
+        </section>
         <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
           {actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
@@ -1311,10 +1318,13 @@ function BuildingInspector({
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center justify-between gap-1.5">
                     <span className="text-[10px] font-black uppercase tracking-[0.05em] text-white">{action.label}</span>
+                    <span className={action.id.startsWith("fallback-") ? "mt-1 inline-flex rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] border border-[#477e65] bg-[#173426] text-[#9ce3b2]" : "mt-1 inline-flex rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] border border-[#526d88] bg-[#192c3e] text-[#9ed1f1]"}>
+                      {action.id.startsWith("fallback-") ? "Basic · no optional systems" : "Specialist method"}
+                    </span>
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`} · navigation performance ×${actionMultiplier.toFixed(2)}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail} · module output ×${actionMultiplier.toFixed(2)}`}</span>
-                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {fallbackRemaining > 0 ? lockMessage : lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
+                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Basic fix available · no optional systems" : "Specialist prerequisites satisfied"}</span>}
                 </span>
               </span>
             </button>
