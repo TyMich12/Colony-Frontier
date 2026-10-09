@@ -838,49 +838,123 @@ function BuildingInspector({
 }
 
 function ResourceInspector({
-  node, surveyed, hasRover, hasExtraction, onAction, onClose,
+  node,
+  stage,
+  hasRover,
+  hasExtraction,
+  hasScience,
+  operation,
+  actionBusy,
+  onAction,
+  onClose,
 }: {
   node: ResourceNode;
-  surveyed: boolean;
+  stage: SampleStage;
   hasRover: boolean;
   hasExtraction: boolean;
+  hasScience: boolean;
+  operation: MissionOperation | null;
+  actionBusy: boolean;
   onAction: (action: string) => void;
   onClose: () => void;
 }) {
+  const flow: { id: SampleStage; title: string; detail: string }[] = [
+    { id: "UNSURVEYED", title: "1 · Survey & classify", detail: "Map the site, estimate terrain hazards, and record a baseline spectral signature." },
+    { id: "SURVEYED", title: "2 · Collect & seal", detail: "Use a core tool or field sampler. Record coordinates and seal the sample to avoid contamination." },
+    { id: "COLLECTED", title: "3 · Return the sample", detail: "Transport the labelled container to the habitat lab and preserve chain of custody." },
+    { id: "DELIVERED", title: "4 · Analyse in the lab", detail: "Run mineral / ice-composition tests and record evidence, not just a visual guess." },
+    { id: "ANALYSED", title: "5 · File the result", detail: "The analysis is stored in the mission record and contributes to research value." },
+  ];
+  const stageIndex = flow.findIndex((item) => item.id === stage);
+  const isThisOperation = Boolean(operation && operation.targetId === node.id);
+  const canStart = !operation && !actionBusy;
+  const nextAction =
+    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Start rover survey" : "Start remote survey", seconds: hasRover ? 12 : 22, detail: hasRover ? "Rover mapping + close-range instrument readings." : "Orbital / fixed-sensor scan; slower and lower confidence." } :
+    stage === "SURVEYED" ? { id: "sample", label: hasExtraction ? "Collect core sample" : "Collect field sample", seconds: hasExtraction ? (hasRover ? 16 : 21) : (hasRover ? 24 : 30), detail: hasExtraction ? "Drill / sampler consumes energy; sealed core retained for analysis." : "Crew EVA sampler is slower and increases exposure." } :
+    stage === "COLLECTED" ? { id: "transfer", label: hasRover ? "Return sample to lab" : "Carry sample to lab", seconds: hasRover ? 12 : 22, detail: hasRover ? "Rover transports the sealed sample along the site route." : "Crew transfer takes longer and adds EVA exposure." } :
+    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Run lab analysis" : "Run portable assay", seconds: hasScience ? 20 : 32, detail: hasScience ? "Spectrometry with the selected science system." : "Portable assay is slower and produces a lower-confidence result." } :
+    null;
+  const progress = isThisOperation && operation ? Math.round(100 * (1 - operation.remainingSeconds / operation.totalSeconds)) : 0;
+
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
-      <div className="pointer-events-auto w-[min(94vw,470px)] overflow-hidden rounded-[26px] border border-[#6b7e68] bg-[#101a16]/[0.97] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
-        <div className="flex items-start gap-3 border-b border-[#334b3b] bg-gradient-to-r from-[#183025] to-[#13221b] px-5 py-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#49664d] bg-[#0a1510]">
-            <CircleDot className="h-6 w-6 text-[#f0cf69]" />
+      <div className="pointer-events-auto max-h-[82vh] w-[min(94vw,540px)] overflow-y-auto rounded-[26px] border border-[#526e62] bg-[#0b1718]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.68)] backdrop-blur-md">
+        <div className="flex items-start gap-3 border-b border-[#304d46] bg-gradient-to-r from-[#1a332e] to-[#102126] px-5 py-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#527467] bg-[#0a1517]">
+            <FlaskConical className="h-6 w-6 text-[#f0cf69]" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#86b88d]">{node.kind} DEPOSIT · {surveyed ? "SURVEYED" : "UNSURVEYED"}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#86bba3]">{node.kind} DEPOSIT · FIELD OPERATIONS</p>
             <h2 className="mt-1 text-lg font-black uppercase tracking-[0.06em] text-white">{node.label}</h2>
-            <p className="mt-1 text-[11px] leading-4 text-[#9eb2a4]">{node.description}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#a7bdb4]">{node.description}</p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#43584b] bg-[#0c1711] text-xl text-[#9bb0a0] hover:border-[#f0cf69] hover:text-white" aria-label="Close resource panel">×</button>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#43584b] bg-[#0c1717] text-xl text-[#9bb0a0] hover:border-[#f0cf69] hover:text-white" aria-label="Close resource panel">×</button>
         </div>
-        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
-          <button type="button" onClick={() => onAction("survey")} className="rounded-2xl border border-[#3b654b] bg-[#173326] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f0cf69]">
-            <span className="block text-[10px] font-black uppercase tracking-[0.05em] text-white">{surveyed ? "Resurvey" : "Survey"}</span>
-            <span className="mt-2 block text-[9px] leading-4 text-[#91ad99]">{hasRover ? "Dispatch rover." : "Use local sensors."}</span>
-          </button>
-          <button type="button" disabled={!surveyed} onClick={() => onAction("sample")} className="rounded-2xl border border-[#3b654b] bg-[#173326] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f0cf69] disabled:cursor-not-allowed disabled:opacity-35">
-            <span className="block text-[10px] font-black uppercase tracking-[0.05em] text-white">Collect sample</span>
-            <span className="mt-2 block text-[9px] leading-4 text-[#91ad99]">Turn field data into research.</span>
-          </button>
-          {hasExtraction && surveyed && (
-            <button type="button" onClick={() => onAction("extract")} className="rounded-2xl border border-[#725e35] bg-[#302715] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#f0cf69] sm:col-span-1">
-              <span className="block text-[10px] font-black uppercase tracking-[0.05em] text-[#ffeab2]">Test extraction</span>
-              <span className="mt-2 block text-[9px] leading-4 text-[#b8a27d]">Spend power for a resource yield.</span>
+
+        <div className="space-y-2 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#a9bbb3]">Sample chain of custody</p>
+              <p className="mt-1 text-[10px] text-[#6f918b]">Each phase takes time; the next step unlocks only when the previous step finishes.</p>
+            </div>
+            <span className="shrink-0 rounded-full border border-[#547b68] bg-[#16372d] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#a7e1bc]">{stage === "ANALYSED" ? "COMPLETE" : `STEP ${Math.max(1, stageIndex + 1)} / 5`}</span>
+          </div>
+
+          {flow.map((item, index) => {
+            const done = index < stageIndex;
+            const current = item.id === stage;
+            return (
+              <div key={item.id} className={`flex gap-3 rounded-xl border p-3 ${done ? "border-[#315d4a] bg-[#122820]" : current ? "border-[#a18645] bg-[#272619]" : "border-[#243b3e] bg-[#101e21] opacity-65"}`}>
+                <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-black ${done ? "bg-[#7cc99a] text-[#0c2117]" : current ? "bg-[#e4bd59] text-[#201f16]" : "bg-[#26383b] text-[#78938d]"}`}>{done ? "✓" : index + 1}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.07em] text-white">{item.title}</p>
+                    <span className={`text-[8px] font-bold uppercase tracking-[0.1em] ${done ? "text-[#80d4a1]" : current ? "text-[#f0cf69]" : "text-[#637e7c]"}`}>{done ? "Complete" : current ? "Ready" : "Awaiting previous step"}</span>
+                  </div>
+                  <p className="mt-1 text-[9px] leading-4 text-[#93aaa4]">{item.detail}</p>
+                </div>
+              </div>
+            );
+          })}
+
+          {isThisOperation && operation && (
+            <div className="rounded-2xl border border-[#647d85] bg-[#13252c] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[#f0cf69]"><Clock className="h-4 w-4" /><p className="text-[10px] font-black uppercase tracking-[0.1em]">{operation.label}</p></div>
+                <p className="shrink-0 font-mono text-sm text-white">{Math.ceil(operation.remainingSeconds)}s</p>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#263b41]"><div className="h-full rounded-full bg-[#e5bf5d] transition-[width]" style={{ width: `${progress}%` }} /></div>
+              <p className="mt-2 text-[9px] leading-4 text-[#96b2b5]">The simulation continues while this operation runs. A serious incident can interrupt the work and pause this timer until the crew responds.</p>
+            </div>
+          )}
+
+          {nextAction && !isThisOperation && (
+            <button type="button" disabled={!canStart} onClick={() => onAction(nextAction.id)} className="w-full rounded-2xl border border-[#8b7445] bg-[#dfb956] p-4 text-left text-[#172018] transition hover:bg-[#f0cf70] disabled:cursor-not-allowed disabled:opacity-40">
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-black uppercase tracking-[0.08em]">{nextAction.label}</span>
+                <span className="shrink-0 rounded-full border border-[#554821]/40 bg-[#f7dc8d] px-2.5 py-1 font-mono text-[10px] font-bold">~{nextAction.seconds}s</span>
+              </span>
+              <span className="mt-1.5 block text-[10px] leading-4 text-[#3e4c37]">{nextAction.detail}</span>
+              <span className="mt-2 flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.15em]"><Clock className="h-3 w-3" /> Start operation</span>
             </button>
           )}
+
+          {stage === "ANALYSED" && (
+            <div className="rounded-2xl border border-[#315d4a] bg-[#122820] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8fe0ad]">Sample analysed and logged</p>
+              <p className="mt-1 text-[10px] leading-4 text-[#b7cec0]">Field data is stored in the mission record. Analyse other sites to build a broader resource map.</p>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#263f3e] pt-3 text-[9px]">
+            <span className="text-[#7e9a92]">Rover: {hasRover ? "available" : "not deployed"} · Drill: {hasExtraction ? "available" : "field sampler only"} · Science lab: {hasScience ? "available" : "portable assay"}</span>
+            {actionBusy && <span className="font-bold uppercase tracking-[0.12em] text-[#e9c65e]">Operation running</span>}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 function getAiAnalysis(metrics: MissionMetrics, score: number): string {
   if (metrics.battery < 45) return "Your largest weakness was battery management during low-solar periods. Stored energy was used more aggressively than necessary.";
   if (metrics.water < 55) return "Your largest weakness was water recovery. The colony remained stable, but the recycling loop lost reserve that could have been protected earlier.";
