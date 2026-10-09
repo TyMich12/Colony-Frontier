@@ -1776,18 +1776,53 @@ export function MissionSimulation() {
         setAiMessage("Mission AI recorded the decision and will include it in the final analysis.");
     }
 
-    // A deliberate "carry on / ignore / defer" choice creates a live fault, not just a one-off penalty.
+    // "Carry on" is a risk decision, not a free dismissal. Safe responses clear the live
+    // incident fault, while unsafe choices shorten the cascade window and worsen the plant.
     const unsafeChoices = new Set(["ignore", "continue", "defer", "force", "push", "hold", "maintain"]);
     if (unsafeChoices.has(choiceId)) {
       const targetTrackId = activeTargetTrackId ?? activeEvent.trackId;
       const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
-      const severity = 1 + Math.min(0.9, (missionStage - 1) * 0.08 + eventPointerRef.current * 0.04);
-      const remainingSeconds = 48 + Math.min(30, missionStage * 3);
+      const severity = 1.5 + Math.min(1.7, (missionStage - 1) * 0.12 + eventPointerRef.current * 0.075) + (pending.campaign === "mars" ? 0.15 : 0);
+      const remainingSeconds = Math.max(14, 29 - missionStage * 0.8 - eventPointerRef.current * 1.1);
       setActiveFaults((current) => ({
         ...current,
         [activeEvent.id]: { eventId: activeEvent.id, targetTrackId, title: activeEvent.title, remainingSeconds, severity },
       }));
-      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. It will continue degrading ${targetTrackId.toUpperCase()} for about ${Math.round(remainingSeconds)} simulated seconds unless the remaining fault is repaired.`);
+      const cascadeHit = Math.min(6.5, 2.4 + missionStage * 0.28 + eventPointerRef.current * 0.25);
+      setBuildings((current) => {
+        const previous = current[targetTrackId];
+        if (!previous) return current;
+        const condition = clamp(previous.condition - 2.5 - missionStage * 0.18);
+        return { ...current, [targetTrackId]: { ...previous, condition, status: buildingStatus(condition) } };
+      });
+      setMetrics((current) => {
+        switch (activeEvent.id) {
+          case "solar-dust":
+          case "regional-dust-front": return { ...current, power: clamp(current.power - cascadeHit), battery: clamp(current.battery - cascadeHit * 0.6) };
+          case "battery-thermal": return { ...current, battery: clamp(current.battery - cascadeHit), power: clamp(current.power - cascadeHit * 0.35) };
+          case "oxygen-filter":
+          case "co2-scrubber-loading": return { ...current, oxygen: clamp(current.oxygen - cascadeHit) };
+          case "water-filter": return { ...current, water: clamp(current.water - cascadeHit) };
+          case "habitat-pressure":
+          case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - cascadeHit) };
+          case "radiation-burst": return { ...current, radiation: clamp(current.radiation + cascadeHit) };
+          case "polar-shadow-cold-soak":
+          case "thermal-drift": return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -1 : 1) * cascadeHit * 0.3, 16, 28), battery: clamp(current.battery - cascadeHit * 0.6) };
+          case "grid-overload":
+          case "core-power": return { ...current, power: clamp(current.power - cascadeHit), battery: clamp(current.battery - cascadeHit * 0.7) };
+          case "agriculture-stress": return { ...current, food: clamp(current.food - cascadeHit), water: clamp(current.water - cascadeHit * 0.4) };
+          default: return { ...current, power: clamp(current.power - cascadeHit * 0.45), battery: clamp(current.battery - cascadeHit * 0.35) };
+        }
+      });
+      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. ${targetTrackId.toUpperCase()} is now cascading at ${severity.toFixed(1)}× severity. The response window is ${Math.ceil(remainingSeconds)} seconds; inspect that facility and run a timed repair before the fault spreads further.`);
+      setOperationResult(`FAULT NOT ISOLATED · You chose to continue. ${targetTrackId.toUpperCase()} has taken additional damage and will keep degrading other colony reserves. The fault register now contains this incident until a repair operation finishes.`);
+    } else {
+      setActiveFaults((current) => {
+        const next = { ...current };
+        delete next[activeEvent.id];
+        return next;
+      });
+      setAiMessage(`INCIDENT STABILIZED · ${activeEvent.title}. The immediate cascade has been stopped. The equipment still took damage, so inspect its condition and reserves before resuming high-load operations.`);
     }
 
     setActiveEventId(null);
