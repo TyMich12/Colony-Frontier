@@ -1016,6 +1016,14 @@ function ResourceInspector({
             </div>
           )}
 
+          {operation && !isThisOperation && (
+            <div className="rounded-2xl border border-[#8a7141] bg-[#282519] p-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#f0cf69]">System currently assigned</p>
+              <p className="mt-1 text-[10px] font-bold text-white">{operation.label}</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#c7b98f]">This job is using the relevant field asset or laboratory. Open its target marker / system to see the countdown before assigning another task.</p>
+            </div>
+          )}
+
           {isThisOperation && operation && (
             <div className="rounded-2xl border border-[#647d85] bg-[#13252c] p-4">
               <div className="flex items-center justify-between gap-3">
@@ -2059,8 +2067,8 @@ export function MissionSimulation() {
     const hasRover = pending.selected.rover !== undefined;
     const hasExtraction = pending.selected.extraction !== undefined;
     const hasScience = pending.selected.science !== undefined;
-    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind));
-    if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress)) return;
+    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"));
+    if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress) || (hasScience && activeOperationsRef.current.science)) return;
     const roverTier = tierLevel(pending.selected.rover ?? "Foundation");
     const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
     const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
@@ -2068,7 +2076,7 @@ export function MissionSimulation() {
 
     if (action === "survey" && stage === "UNSURVEYED") {
       const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2);
-      beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration);
+      beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId);
       setRoverTask(hasRover ? `SURVEYING ${node.label}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
@@ -2082,14 +2090,14 @@ export function MissionSimulation() {
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
       const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 : 0) + (hasRover ? 7 + roverTier * 2.5 : 0) + navigationTier * 2 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
-      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality);
+      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
       setRoverTask(hasRover ? `COLLECTING ${node.label}` : hasExtraction ? "DRILLING CORE" : "EVA SAMPLING");
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
       const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5);
-      beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration);
+      beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId);
       setRoverTask(hasRover ? `TRANSFERRING ${node.label}` : "EVA SAMPLE RETURN");
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
       return;
@@ -2101,7 +2109,7 @@ export function MissionSimulation() {
         setOperationResult("ANALYSIS HELD · Insufficient power for the spectrometer / field assay. Restore power before analysing.");
         return;
       }
-      beginOperation("ANALYZE", nodeId, `Analysing sample · ${node.label}`, duration);
+      beginOperation("ANALYZE", nodeId, `Analysing sample · ${node.label}`, duration, undefined, undefined, undefined, hasScience ? "science" : nodeId);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasScience ? 3 : 5)) }));
       setRoverTask(hasScience ? "LAB ANALYSIS" : "PORTABLE ASSAY");
       return;
@@ -2124,6 +2132,13 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
+    const roverOnFieldJob = Object.values(activeOperationsRef.current).some((operation) =>
+      ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"),
+    );
+    if (roverOnFieldJob && (action === "survey" || action === "return" || (action === "clean" && pending.selected.rover))) {
+      setOperationResult("ROVER UNAVAILABLE · The rover is already committed to field work. Finish that job or return it to base before dispatching it elsewhere.");
+      return;
+    }
     if (action === "upgrade") {
       const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
       if ((current.upgradeLevel ?? 0) >= 2) {
@@ -2391,8 +2406,8 @@ export function MissionSimulation() {
         break;
       }
       case "return":
-        setRoverTask("RETURNING");
-        setAiMessage("Rover recall issued. It is returning along the colony road network to the launch lane.");
+        setRoverTask("STANDBY");
+        setAiMessage("ROVER RECALLED · It has returned to the launch lane and is ready for its next assignment.");
         break;
       case "inspect":
         setScore((value) => clamp(value + 1));
@@ -2838,8 +2853,8 @@ export function MissionSimulation() {
             extractionTier={tierLevel(pending.selected.extraction ?? "Foundation")}
             scienceTier={tierLevel(pending.selected.science ?? "Foundation")}
             navigationTier={tierLevel(pending.selected.navigation ?? "Foundation")}
-            operation={activeOperations[selectedResource.id] ?? Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) ?? null}
-            actionBusy={Boolean(activeOperations[selectedResource.id] || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) || activeOperations.science)}
+            operation={activeOperations[selectedResource.id] ?? activeOperations.rover ?? activeOperations.science ?? Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) ?? null}
+            actionBusy={Boolean(activeOperations[selectedResource.id] || activeOperations.rover || activeOperations.science || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)))}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
             onClose={() => setSelectedResourceId(null)}
           />
