@@ -1278,7 +1278,7 @@ export function MissionSimulation() {
         });
         setScore((value) => clamp(value + 6));
         message = `REPAIR VERIFIED · ${technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget} passed its post-maintenance check. The live fault has been removed, the module condition has improved, and affected reserves are recovering. ${faults.length} fault(s) cleared.`;
-        setRoverTask("REPAIR VERIFIED");
+        if (operation.roverAssigned) setRoverTask("REPAIR VERIFIED");
         break;
       }
     }
@@ -1295,6 +1295,12 @@ export function MissionSimulation() {
       return next;
     });
   }, [pending, sampleQuality]);
+
+  useEffect(() => {
+    if (!operationResult) return;
+    const timeout = window.setTimeout(() => setOperationResult(null), 6500);
+    return () => window.clearTimeout(timeout);
+  }, [operationResult]);
 
   useEffect(() => {
     if (!storedEventIsInvalid) return;
@@ -2064,6 +2070,7 @@ export function MissionSimulation() {
     specimenQuality?: number,
     actionId?: string,
     operationKey = targetId,
+    roverAssigned = false,
   ) => {
     if (!pending || activeOperationsRef.current[operationKey] || activeEventId || results) return;
     const operation: MissionOperation = {
@@ -2074,6 +2081,7 @@ export function MissionSimulation() {
       totalSeconds: durationSeconds,
       remainingSeconds: durationSeconds,
       operationKey,
+      ...(roverAssigned ? { roverAssigned: true } : {}),
       ...(targetLevel !== undefined ? { targetLevel } : {}),
       ...(specimenQuality !== undefined ? { sampleQuality: specimenQuality } : {}),
       ...(actionId !== undefined ? { actionId } : {}),
@@ -2094,7 +2102,7 @@ export function MissionSimulation() {
     const hasRover = pending.selected.rover !== undefined;
     const hasExtraction = pending.selected.extraction !== undefined;
     const hasScience = pending.selected.science !== undefined;
-    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"));
+    const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"));
     if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress) || (hasScience && activeOperationsRef.current.science)) return;
     const roverTier = tierLevel(pending.selected.rover ?? "Foundation");
     const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
@@ -2103,7 +2111,7 @@ export function MissionSimulation() {
 
     if (action === "survey" && stage === "UNSURVEYED") {
       const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2);
-      beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId);
+      beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(hasRover ? `SURVEYING ${node.label}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
@@ -2117,14 +2125,14 @@ export function MissionSimulation() {
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
       const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 : 0) + (hasRover ? 7 + roverTier * 2.5 : 0) + navigationTier * 2 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
-      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId);
+      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId, hasRover);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
       setRoverTask(hasRover ? `COLLECTING ${node.label}` : hasExtraction ? "DRILLING CORE" : "EVA SAMPLING");
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
       const duration = hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5);
-      beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId);
+      beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(hasRover ? `TRANSFERRING ${node.label}` : "EVA SAMPLE RETURN");
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
       return;
@@ -2138,7 +2146,6 @@ export function MissionSimulation() {
       }
       beginOperation("ANALYZE", nodeId, `Analysing sample · ${node.label}`, duration, undefined, undefined, undefined, hasScience ? "science" : nodeId);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasScience ? 3 : 5)) }));
-      setRoverTask(hasScience ? "LAB ANALYSIS" : "PORTABLE ASSAY");
       return;
     }
   };
@@ -2159,10 +2166,10 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
-    const roverOnFieldJob = Object.values(activeOperationsRef.current).some((operation) =>
-      ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"),
+    const roverOnFieldJob = pending.selected.rover !== undefined && Object.values(activeOperationsRef.current).some((operation) =>
+      operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover"),
     );
-    if (roverOnFieldJob && (action === "survey" || action === "return" || (action === "clean" && pending.selected.rover))) {
+    if (roverOnFieldJob && (trackId === "rover" || action === "survey" || action === "return" || (action === "clean" && pending.selected.rover))) {
       setOperationResult("ROVER UNAVAILABLE · The rover is already committed to field work. Finish that job or return it to base before dispatching it elsewhere.");
       return;
     }
@@ -2203,12 +2210,18 @@ export function MissionSimulation() {
       const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
       const duration = Math.max(16, 27 + highestSeverity * 7 + missionStage * 1.4 - repairTier * 2 - (pending.selected.maintenance ? 5 : 0));
       setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 2) }));
-      setRoverTask(`REPAIRING ${repairTargetId}`);
+      const roverCanAssist = pending.selected.rover !== undefined && !roverOnFieldJob;
+      if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
         "REPAIR",
         repairTargetId,
         `Isolate, repair & verify · ${technologyTracks.find((track) => track.id === repairTargetId)?.category ?? repairTargetId}`,
         duration,
+        undefined,
+        undefined,
+        undefined,
+        repairTargetId,
+        roverCanAssist,
       );
       setAiMessage(`REPAIR STARTED · ${repairTargetId.toUpperCase()}. Isolation is in progress; ${Math.ceil(duration)} seconds are required for repair and a return-to-service check. Other systems continue running until the test passes.`);
       return;
@@ -2243,6 +2256,8 @@ export function MissionSimulation() {
       undefined,
       undefined,
       action,
+      trackId,
+      (trackId === "rover" && pending.selected.rover !== undefined) || (trackId === "solar" && action === "clean" && pending.selected.rover !== undefined),
     );
   };
 
@@ -2467,10 +2482,17 @@ export function MissionSimulation() {
           }
         }
         break;
-      case "diagnostics":
+      case "diagnostics": {
         setScore((value) => clamp(value + 3));
-        setAiMessage("Predictive diagnostic sweep complete. No immediate critical failure is present.");
+        const faults = Object.values(activeFaults);
+        const weakest = Object.entries(buildings).sort(([, a], [, b]) => a.condition - b.condition)[0];
+        setAiMessage(faults.length
+          ? `DIAGNOSTICS COMPLETE · ${faults.length} unresolved fault(s): ${faults.map((fault) => `${fault.targetTrackId.toUpperCase()} / ${fault.title}`).join("; ")}. Open an affected system and use Isolate · repair · verify.`
+          : weakest
+            ? `DIAGNOSTICS COMPLETE · No unresolved incidents. The weakest equipment is ${weakest[0].toUpperCase()} at ${Math.round(weakest[1].condition)}% condition; schedule preventative service before another emergency.`
+            : "DIAGNOSTICS COMPLETE · No unresolved incidents detected.");
         break;
+      }
       default:
         setAiMessage(`Inspection complete — ${trackId.toUpperCase()} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
         break;
