@@ -130,6 +130,7 @@ type EventChoice = {
   detail: string;
 };
 
+
 type ResourceNode = {
   id: string;
   label: string;
@@ -138,6 +139,192 @@ type ResourceNode = {
   y: number;
   description: string;
 };
+
+const SYSTEM_LABELS: Record<string, string> = {
+  solar: "Solar array", battery: "Battery bank", grid: "Power grid", habitat: "Habitat",
+  water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
+  radiation: "Radiation shielding", comms: "Communications relay", navigation: "Navigation",
+  rover: "Rover", extraction: "Extraction drill", isru: "ISRU processor",
+  science: "Science laboratory", agriculture: "Agriculture", maintenance: "Maintenance bay",
+};
+
+/**
+ * Directed engineering graph. "all" are mandatory upstream connections; "any" describes
+ * an alternate, redundant connection. Actions and live production both consult this graph.
+ */
+const SYSTEM_CONNECTIONS: Record<string, { all?: string[]; any?: string[]; outputs?: string[] }> = {
+  solar: { outputs: ["grid", "battery"] },
+  battery: { all: ["solar"], outputs: ["grid", "oxygen", "water", "thermal", "comms", "radiation", "rover"] },
+  grid: { all: ["solar"], outputs: ["water", "co2", "oxygen", "thermal", "comms", "navigation", "science", "maintenance"] },
+  habitat: { outputs: ["water", "co2", "oxygen", "thermal", "radiation", "agriculture", "maintenance"] },
+  water: { all: ["habitat"], any: ["grid", "battery"], outputs: ["oxygen", "agriculture", "extraction", "isru"] },
+  co2: { all: ["habitat"], any: ["grid", "battery"], outputs: ["oxygen", "agriculture"] },
+  oxygen: { all: ["water", "co2", "habitat"], any: ["grid", "battery"], outputs: ["agriculture"] },
+  thermal: { all: ["habitat"], any: ["grid", "battery"], outputs: ["science", "agriculture"] },
+  radiation: { all: ["habitat"], any: ["battery", "grid"], outputs: ["habitat"] },
+  comms: { any: ["grid", "battery"], outputs: ["navigation", "rover", "science", "maintenance"] },
+  navigation: { all: ["comms"], any: ["grid", "battery"], outputs: ["rover", "extraction", "science"] },
+  rover: { all: ["navigation", "comms"], any: ["battery", "grid"], outputs: ["extraction", "isru"] },
+  extraction: { all: ["rover", "navigation", "water"], any: ["grid", "battery"], outputs: ["isru"] },
+  isru: { all: ["extraction", "water"], any: ["grid", "battery"], outputs: ["agriculture"] },
+  science: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], outputs: [] },
+  agriculture: { all: ["water", "co2", "oxygen", "thermal", "isru"], any: ["grid", "battery"], outputs: [] },
+  maintenance: { all: ["comms", "grid"], any: ["battery"], outputs: ["all systems"] },
+};
+
+type ActionRequirementRule = {
+  all?: string[];
+  any?: string[];
+  anyGroups?: string[][];
+  minPower?: number;
+  minBattery?: number;
+  surveyedSite?: boolean;
+  analysedSample?: boolean;
+  extractedFeed?: boolean;
+};
+
+const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
+  clean: { any: ["rover", "maintenance"], anyGroups: [["grid", "battery"]], minPower: 2 },
+  tune: { all: ["navigation", "comms"], any: ["grid", "battery"], minPower: 3 },
+  balance: { all: ["grid", "solar"], minPower: 2 },
+  reserve: { all: ["grid"], minPower: 2 },
+  reset: { all: ["water", "co2", "habitat"], any: ["grid", "battery"], minPower: 3 },
+  boost: { all: ["water", "co2", "habitat"], any: ["grid", "battery"], minPower: 5 },
+  flush: { all: ["habitat", "oxygen", "co2"], any: ["grid", "battery"], minPower: 3 },
+  purify: { all: ["habitat", "oxygen", "co2"], any: ["grid", "battery"], minPower: 5 },
+  scrub: { all: ["habitat", "oxygen"], any: ["grid", "battery"], minPower: 2 },
+  recover: { all: ["habitat", "oxygen"], any: ["grid", "battery"], minPower: 2 },
+  dump: { all: ["habitat"], any: ["grid", "battery"], minPower: 2 },
+  insulate: { all: ["habitat"], any: ["grid", "battery"], minPower: 2 },
+  repoint: { all: ["navigation"], any: ["grid", "battery"], minPower: 2 },
+  test: { all: ["navigation"], any: ["grid", "battery"], minPower: 2 },
+  repair: { all: ["maintenance", "thermal"], any: ["grid", "battery"], minPower: 3, minBattery: 2 },
+  seal: { all: ["maintenance", "thermal"], any: ["grid", "battery"], minPower: 3, minBattery: 1 },
+  shield: { all: ["habitat", "maintenance"], any: ["battery", "grid"], minPower: 2, minBattery: 1 },
+  shelter: { all: ["habitat"], any: ["battery", "grid"], minPower: 2, minBattery: 2 },
+  "balance-grid": { all: ["solar", "battery"], minPower: 3 },
+  prioritize: { all: ["oxygen", "water", "battery"], minPower: 2 },
+  calibrate: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], minPower: 2 },
+  experiment: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], minPower: 3, analysedSample: true },
+  "nav-calibrate": { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
+  route: { all: ["rover", "comms"], any: ["grid", "battery"], minPower: 2 },
+  survey: { all: ["rover", "navigation", "comms"], any: ["grid", "battery"], minPower: 2 },
+  return: { all: ["navigation"], any: ["battery", "grid"], minPower: 1 },
+  inspect: {},
+  "extract-test": { all: ["rover", "navigation", "water"], any: ["grid", "battery"], minPower: 5, minBattery: 2, surveyedSite: true },
+  extract: { all: ["rover", "navigation", "water"], any: ["grid", "battery"], minPower: 7, minBattery: 3, surveyedSite: true },
+  process: { all: ["extraction", "water"], any: ["grid", "battery"], minPower: 5, minBattery: 2, extractedFeed: true },
+  purge: { all: ["extraction", "water"], any: ["grid", "battery"], minPower: 2 },
+  "tune-crops": { all: ["water", "co2", "oxygen", "thermal", "isru", "habitat"], any: ["grid", "battery"], minPower: 4 },
+  harvest: { all: ["water", "co2", "oxygen", "thermal", "isru", "habitat"], any: ["grid", "battery"], minPower: 2 },
+  service: { all: ["comms", "grid"], any: ["battery"], minPower: 2 },
+  diagnostics: { all: ["comms", "grid"], any: ["battery"], minPower: 2 },
+  "repair-active": { minPower: 5, minBattery: 2 },
+  upgrade: { minPower: 8, minBattery: 5 },
+  sample: { all: ["rover", "navigation"], any: ["battery", "grid"], minPower: 7, minBattery: 3 },
+  transfer: { all: ["rover", "habitat"], any: ["battery", "grid"], minPower: 2 },
+  analyze: { all: ["science", "habitat"], any: ["grid", "battery"], minPower: 5 },
+};
+
+type ActionRequirementContext = {
+  selected: Record<string, Tier>;
+  buildings: Record<string, BuildingRuntime>;
+  activeFaults: Record<string, ActiveFault>;
+  metrics: MissionMetrics;
+  surveyedNodes: string[];
+  sampleStages: Record<string, SampleStage>;
+  resourceYield: number;
+};
+
+function systemIsOperational(systemId: string, context: ActionRequirementContext, visiting = new Set<string>()): boolean {
+  if (!context.selected[systemId] || Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId)) return false;
+  if ((context.buildings[systemId]?.condition ?? 100) < 25) return false;
+  if (visiting.has(systemId)) return false;
+  const nextVisiting = new Set(visiting);
+  nextVisiting.add(systemId);
+  const links = SYSTEM_CONNECTIONS[systemId];
+  if (!links) return true;
+  if ((links.all ?? []).some((dependency) => !systemIsOperational(dependency, context, nextVisiting))) return false;
+  if (links.any?.length && !links.any.some((dependency) => systemIsOperational(dependency, context, nextVisiting))) return false;
+  return true;
+}
+
+function collectSystemBlockers(systemId: string, context: ActionRequirementContext, blockers: string[], visiting = new Set<string>()): void {
+  if (visiting.has(systemId)) return;
+  if (!context.selected[systemId]) {
+    blockers.push(`Install ${SYSTEM_LABELS[systemId] ?? systemId} first`);
+    return;
+  }
+  const activeFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
+  if (activeFault) {
+    blockers.push(`Repair ${SYSTEM_LABELS[systemId] ?? systemId} first`);
+    return;
+  }
+  if ((context.buildings[systemId]?.condition ?? 100) < 25) {
+    blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
+    return;
+  }
+  const nextVisiting = new Set(visiting);
+  nextVisiting.add(systemId);
+  const links = SYSTEM_CONNECTIONS[systemId];
+  if (!links) return;
+  for (const dependency of links.all ?? []) collectSystemBlockers(dependency, context, blockers, nextVisiting);
+  if (links.any?.length && !links.any.some((dependency) => systemIsOperational(dependency, context))) {
+    blockers.push(`Needs one working link: ${links.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" or ")}`);
+  }
+}
+
+function getActionBlockers(
+  systemId: string,
+  actionId: string,
+  context: ActionRequirementContext,
+  node?: ResourceNode,
+): string[] {
+  if (actionId === "inspect") return [];
+  const blockers: string[] = [];
+  const isRepair = actionId === "repair-active";
+  const stage = node ? context.sampleStages[node.id] ?? (context.surveyedNodes.includes(node.id) ? "SURVEYED" : "UNSURVEYED") : undefined;
+
+  if (systemId !== "field") {
+    if (!context.selected[systemId]) blockers.push(`Install ${SYSTEM_LABELS[systemId] ?? systemId} first`);
+    const ownFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
+    if (ownFault && !isRepair) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
+    if (!ownFault && !isRepair && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
+    if (!ownFault && !isRepair && actionId !== "diagnostics" && actionId !== "service" && actionId !== "upgrade") collectSystemBlockers(systemId, context, blockers);
+  }
+
+  const rule = ACTION_REQUIREMENTS[actionId] ?? {};
+  for (const required of rule.all ?? []) collectSystemBlockers(required, context, blockers);
+  for (const group of [rule.any ?? [], ...(rule.anyGroups ?? [])]) {
+    if (group.length && !group.some((systemId) => systemIsOperational(systemId, context))) {
+      blockers.push(`Needs one working link: ${group.map((systemId) => SYSTEM_LABELS[systemId] ?? systemId).join(" or ")}`);
+    }
+  }
+
+  if (rule.surveyedSite && context.surveyedNodes.length === 0 && !Object.values(context.sampleStages).some((value) => value !== "UNSURVEYED")) {
+    blockers.push("Survey a field site before extraction");
+  }
+  if (rule.analysedSample && !Object.values(context.sampleStages).some((value) => value === "ANALYSED")) {
+    blockers.push("Analyse at least one specimen in the science lab first");
+  }
+  if (rule.extractedFeed && context.resourceYield <= 0) {
+    blockers.push("Run the extraction drill on a surveyed site before processing feed");
+  }
+  if (actionId === "repair-active" && !Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId)) {
+    blockers.push("There is no active fault on this system to repair");
+  }
+  if (actionId === "sample" && node) {
+    if (stage !== "SURVEYED") blockers.push("Survey this site before collecting a specimen");
+    if ((node.kind === "ICE" || node.kind === "MINERAL")) collectSystemBlockers("extraction", context, blockers);
+  }
+  if (actionId === "transfer" && node && stage !== "COLLECTED") blockers.push("Secure a specimen at this site before returning it");
+  if (actionId === "analyze" && node && stage !== "DELIVERED") blockers.push("Return the sealed specimen to the habitat laboratory first");
+
+  if (rule.minPower !== undefined && context.metrics.power < rule.minPower) blockers.push(`Power must be at least ${rule.minPower}%`);
+  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Battery reserve must be at least ${rule.minBattery}%`);
+  return [...new Set(blockers)];
+}
+
 
 const EVENT_DEFS: MissionEvent[] = [
   { id: "solar-dust", trackId: "solar", title: "Dust deposition on solar array", subtitle: "Surface dust is reducing usable solar input.", summary: "On the Moon, electrostatically active regolith can adhere to exposed hardware; on Mars, airborne dust can reduce solar input. Array output is falling." },
