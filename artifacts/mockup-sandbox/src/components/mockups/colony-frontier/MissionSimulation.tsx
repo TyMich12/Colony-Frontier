@@ -1297,10 +1297,14 @@ export function MissionSimulation() {
     const finalState = loadGameState();
     const alreadyComplete = finalState.completedMissions.includes(pending.missionId);
     const firstTime = !pending.replay && !alreadyComplete;
+    const analysedSamples = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
+    // Field science earns extra XP only on the first clear; replay farming is intentionally limited.
+    const researchBonusXp = firstTime ? analysedSamples * 120 : 0;
+    const missionXpReward = pending.rewardXp + researchBonusXp;
     const nextState = {
       ...finalState,
       credits: finalState.credits + pending.rewardCredits,
-      xp: finalState.xp + pending.rewardXp,
+      xp: finalState.xp + missionXpReward,
       researchTokens: finalState.researchTokens + (firstTime ? pending.rewardResearchTokens : 0),
       completedMissions: firstTime ? Array.from(new Set([...finalState.completedMissions, pending.missionId])) : finalState.completedMissions,
       lastMissionReward: firstTime
@@ -1308,7 +1312,7 @@ export function MissionSimulation() {
             missionId: pending.missionId,
             title: pending.missionTitle,
             credits: pending.rewardCredits,
-            xp: pending.rewardXp,
+            xp: missionXpReward,
             researchTokens: pending.rewardResearchTokens,
           }
         : undefined,
@@ -2109,6 +2113,8 @@ export function MissionSimulation() {
   }
 
   if (results) {
+    const analysedSamples = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
+    const researchBonusXp = pending && !pending.replay ? analysedSamples * 120 : 0;
     const checks: [string, boolean][] = [
       ["SURVIVAL", true],
       ["POWER STABILITY", performance.colonyHealth >= 55],
@@ -2155,7 +2161,7 @@ export function MissionSimulation() {
                 <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#efb658]">Rewards</p>
                 <div className="mt-4 space-y-3">
                   <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Credits</span><span className="font-mono text-[#efb658]">+{pending.rewardCredits.toFixed(pending.rewardCredits % 1 === 0 ? 0 : 1)}M</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{pending.rewardXp.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">XP</span><span className="font-mono text-[#b4d0b6]">+{(pending.rewardXp + researchBonusXp).toLocaleString()}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-[#9baaa3]">Research Tokens</span><span className="font-mono text-[#d4dfb7]">+{pending.rewardResearchTokens}</span></div>
                 </div>
               </div>
