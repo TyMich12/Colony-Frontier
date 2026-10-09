@@ -2727,6 +2727,10 @@ export function MissionSimulation() {
 
   const applyBuildingAction = (trackId: string, action: string) => {
     if (!pending) return;
+    const upgradeLevel = buildings[trackId]?.upgradeLevel ?? 0;
+    const actionPerformance = systemPerformanceMultiplier(pending.selected[trackId] ?? "Foundation", upgradeLevel);
+    const gain = (amount: number) => amount * actionPerformance;
+    const cost = (amount: number) => amount / actionPerformance;
     const conditionBoost = (amount: number) => {
       setBuildings((current) => {
         const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE" };
@@ -2746,6 +2750,224 @@ export function MissionSimulation() {
         });
         setScore((value) => clamp(value + 4));
         setAiMessage(`${trackId.toUpperCase()} upgraded to module level ${Math.min(2, (buildings[trackId]?.upgradeLevel ?? 0) + 1)}. Ongoing performance and equipment wear have improved.`);
+        break;
+      }
+      case "fallback-solar": {
+        const dustReduction = gain(7);
+        setBuildings((current) => {
+          const previous = current.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
+          const condition = clamp(previous.condition + gain(0.5));
+          return { ...current, solar: { ...previous, dust: clamp(previous.dust - dustReduction), condition, status: buildingStatus(condition) } };
+        });
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(1)) }));
+        setAiMessage(`MANUAL ARRAY BRUSH · Removed ${dustReduction.toFixed(1)} dust points and recovered a small amount of generation. A rover/maintenance cleaning pass is more effective.`);
+        break;
+      }
+      case "fallback-battery":
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery + gain(1)), power: clamp(current.power + gain(0.4)) }));
+        setAiMessage("LOCAL BATTERY-MANAGEMENT RESET · Parasitic draw reduced and a small amount of usable reserve recovered. This cannot replace a grid or charger.");
+        break;
+      case "fallback-grid":
+        setEmergencyPowerMode(true);
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(1)) }));
+        setAiMessage("MANUAL LOAD SHED · Non-critical loads have been isolated at local breakers. The power margin rises slightly, but this does not generate electricity.");
+        break;
+      case "fallback-habitat":
+        conditionBoost(3);
+        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + gain(1.5)) }));
+        setAiMessage("EMERGENCY SEAL PATCH · A small manual patch restored limited pressure margin. A maintenance/thermal-cured composite repair is stronger.");
+        break;
+      case "fallback-water":
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(1)) }));
+        setAiMessage("GRAVITY-FED CONDENSATE RECOVERY · A small amount of water recovered without running the powered purification loop.");
+        break;
+      case "fallback-oxygen":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(1)) }));
+        setAiMessage("CONTINGENCY OXYGEN RELEASE · A small quantity from the local emergency buffer has been added. It is finite; restore normal oxygen processing.");
+        break;
+      case "fallback-co2":
+        conditionBoost(1);
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(0.8)) }));
+        setAiMessage("PASSIVE SORBENT CARTRIDGE SWAP · Basic CO₂ removal restored without the full powered recovery chain.");
+        break;
+      case "fallback-thermal":
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.12 * actionPerformance, 16, 28) }));
+        conditionBoost(0.5);
+        setAiMessage("PASSIVE THERMAL SHUTTERS · Insulation reduces temperature drift without drawing heater power; it cannot actively control temperature.");
+        break;
+      case "fallback-radiation":
+        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - gain(0.5)) }));
+        setAiMessage("SHELTER LOCKDOWN · Crew moved behind the habitat's passive shielding, reducing near-term exposure slightly.");
+        break;
+      case "fallback-comms":
+        conditionBoost(1);
+        setAiMessage("LOCAL LOW-RATE BEACON RESET · Short-range communications restored. High-rate Earth reports still need a working relay path.");
+        break;
+      case "fallback-navigation":
+        conditionBoost(1);
+        setScore((value) => clamp(value + gain(1)));
+        setAiMessage("INERTIAL SENSOR RE-ZERO · Dead-reckoning baseline refreshed. Position uncertainty will still grow without external fixes.");
+        break;
+      case "fallback-rover":
+        conditionBoost(2);
+        setAiMessage("LOCAL WHEEL-ENCODER CHECK · Drive controller cleared and wheel telemetry checked. Remote path planning still needs navigation and comms.");
+        break;
+      case "fallback-extraction":
+        conditionBoost(1);
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(0.5)) }));
+        setAiMessage("DRILL TORQUE LATCH RELEASED · The actuator is unloaded safely. No resource was extracted.");
+        break;
+      case "fallback-isru":
+        conditionBoost(1);
+        setAiMessage("PROCESS LINE ISOLATED · Local valves closed and the pressure path stabilised. No feedstock was processed.");
+        break;
+      case "fallback-science":
+        conditionBoost(1);
+        setScore((value) => clamp(value + gain(1)));
+        setAiMessage("BENCH REFERENCE CHECK · A local instrument reference was restored. No specimen was analysed or consumed.");
+        break;
+      case "fallback-agriculture":
+        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(1)) }));
+        setAiMessage("EMERGENCY BIOMASS RECOVERY · A small reserve of already-mature edible biomass was collected. This does not replace active crop production.");
+        break;
+      case "fallback-maintenance": {
+        const candidates = Object.entries(buildings)
+          .filter(([id]) => pending.selected[id] && !Object.values(activeFaults).some((fault) => fault.targetTrackId === id))
+          .sort(([,a],[,b]) => a.condition - b.condition);
+        const target = candidates[0]?.[0];
+        if (target) setBuildings((current) => {
+          const previous = current[target];
+          const condition = clamp(previous.condition + gain(2));
+          return { ...current, [target]: { ...previous, condition, status: buildingStatus(condition) } };
+        });
+        setAiMessage(target ? `MANUAL WALK-AROUND · Minor field service improved ${target.toUpperCase()} without needing the powered maintenance bay.` : "MANUAL WALK-AROUND · No healthy deployed module is available for minor service.");
+        break;
+      }
+      case "solar-autonomous-clean": {
+        const dustReduction = gain(32);
+        setBuildings((current) => {
+          const previous = current.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
+          const condition = clamp(previous.condition + gain(2));
+          return { ...current, solar: { ...previous, dust: clamp(previous.dust - dustReduction), condition, status: buildingStatus(condition) } };
+        });
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(5)) }));
+        if (pending.selected.rover) setRoverTask("RETURNING");
+        setAiMessage(`AUTONOMOUS ARRAY SERVICE · ${dustReduction.toFixed(1)} dust points removed, array condition checked, and generation margin restored.`);
+        break;
+      }
+      case "battery-thermal-recondition":
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery + gain(10)), power: clamp(current.power + gain(2)) }));
+        conditionBoost(3);
+        setAiMessage("THERMAL BMS RECONDITIONING · Cells were brought back into their preferred operating band and actively balanced. This improves usable reserve, not the battery's stored energy limit.");
+        break;
+      case "oxygen-electrolyser-burst":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(5)), water: clamp(current.water - cost(3)), power: clamp(current.power - cost(4)) }));
+        conditionBoost(1);
+        setAiMessage("RECLAIMED-WATER ELECTROLYSIS · Oxygen production increased using water and electrical input; this is a conversion process, not free oxygen.");
+        break;
+      case "water-distillate-recovery":
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(6)), power: clamp(current.power - cost(3)) }));
+        conditionBoost(1);
+        setAiMessage("WASTE-HEAT DISTILLATION · More condensate was recovered by using available thermal energy, with a smaller net electric cost than an all-electric cycle.");
+        break;
+      case "co2-crop-loop":
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(3)), food: clamp(current.food + gain(2)), power: clamp(current.power - cost(3)) }));
+        setAiMessage("GREENHOUSE CARBON EXCHANGE · Captured CO₂ was routed into the controlled crop loop. Crop metabolism and lighting remain dependent on water, oxygen and power.");
+        break;
+      case "thermal-waste-heat-recovery":
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * Math.min(0.75, 0.45 * actionPerformance), 16, 28), battery: clamp(current.battery + gain(1)), power: clamp(current.power - cost(1)) }));
+        conditionBoost(1);
+        setAiMessage("WASTE-HEAT RECOVERY · Recoverable thermal energy was redirected to the habitat, reducing temperature drift with a small control load.");
+        break;
+      case "comms-priority-window":
+        conditionBoost(2);
+        setScore((value) => clamp(value + gain(3)));
+        setAiMessage("PRIORITY UPLINK WINDOW RESERVED · Navigation timing and grid scheduling improve link availability for a high-rate Earth report; they do not change radio propagation speed.");
+        break;
+      case "habitat-composite-patch":
+        conditionBoost(20);
+        setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + gain(8)) }));
+        setResourceYield((value) => Math.max(0, value - 1));
+        setMetrics((current) => ({ ...current, battery: clamp(current.battery - cost(3)) }));
+        setAiMessage("THERMALLY CURED COMPOSITE PATCH · Processed local material was used for a higher-strength structural repair. One unit of prepared feedstock was consumed.");
+        break;
+      case "radiation-regolith-berm":
+        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - gain(5)), power: clamp(current.power - cost(2)) }));
+        setResourceYield((value) => Math.max(0, value - 1));
+        conditionBoost(1);
+        setAiMessage("REGOLITH SHIELDING BERM · Local shielding mass was placed around the habitat. This reduces exposure, but it is not a substitute for a dedicated storm shelter.");
+        break;
+      case "grid-black-start":
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(8)), battery: clamp(current.battery - cost(5)) }));
+        conditionBoost(2);
+        setAiMessage("POWER-BUS BLACK START · A controlled restart restored part of the bus using battery energy and available solar input; battery reserves were consumed in the process.");
+        break;
+      case "science-fusion":
+        setResourceYield((value) => value + gain(4));
+        setScore((value) => clamp(value + gain(10)));
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(2)) }));
+        setAiMessage("MULTI-MODAL SCIENCE FUSION · The analysed specimen and verified process telemetry were combined into a higher-value research result.");
+        break;
+      case "request-earth-report": {
+        const openFaults = Object.values(activeFaults);
+        const weakest = [
+          {label:"POWER MARGIN", value:metrics.power, unit:"%"},
+          {label:"BATTERY RESERVE", value:metrics.battery, unit:"%"},
+          {label:"OXYGEN RESERVE", value:metrics.oxygen, unit:"%"},
+          {label:"WATER RESERVE", value:metrics.water, unit:"%"},
+          {label:"FOOD RESERVE", value:metrics.food, unit:"%"},
+          {label:"HABITAT INTEGRITY", value:metrics.habitat, unit:"%"},
+        ].sort((a,b)=>a.value-b.value)[0];
+        const analysedCount = Object.values(sampleStages).filter((stage)=>stage==="ANALYSED").length;
+        const report = [
+          "EARTH MISSION CONTROL // OUTPOST OPERATIONS REPORT",
+          `MISSION: ${pending.missionTitle} · ${pending.campaign.toUpperCase()} · T+${Math.round(elapsed)} simulated seconds`,
+          `RESOURCE TELEMETRY: power ${Math.round(metrics.power)}% | battery ${Math.round(metrics.battery)}% | O₂ ${Math.round(metrics.oxygen)}% | water ${Math.round(metrics.water)}% | food ${Math.round(metrics.food)}% | habitat ${Math.round(metrics.habitat)}%`,
+          `FIELD SCIENCE: ${surveyedNodes.length} site(s) mapped · ${analysedCount} specimen(s) analysed · ${resourceYield.toFixed(1)} resource / feedstock units logged`,
+          `FAULT REGISTER: ${openFaults.length ? openFaults.map((fault)=>`${fault.targetTrackId.toUpperCase()} — ${fault.title}`).join("; ") : "no unresolved faults at report generation"}`,
+          `RECOMMENDED PRIORITY: ${openFaults.length ? "Repair " + openFaults[0].targetTrackId.toUpperCase() + " and verify the affected system before high-load work." : "Prioritise " + weakest.label + " at " + Math.round(weakest.value) + weakest.unit + " and avoid non-essential power draw."}`,
+          "OPERATIONS NOTE: This is a compressed mission-control processing queue. Real signal propagation is determined by Earth–surface distance; the high-tier local cache can display a previously computed recommendation instantly.",
+        ].join("\n");
+        setEarthReport(report);
+        setEarthReportAtSeconds(elapsed);
+        setScore((value) => clamp(value + gain(1)));
+        setAiMessage("EARTH REPORT RECEIVED · Live resource telemetry and an actionable operations recommendation have been added to the Navigation system.");
+        break;
+      }
+      case "extraction-waterjet":
+        setResourceYield((value) => value + gain(8));
+        setMetrics((current) => ({ ...current, water: clamp(current.water - cost(4)), power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(3)) }));
+        conditionBoost(-1);
+        setAiMessage("WATER-ASSISTED CORE DRILLING · Drilling yielded more feedstock but consumed water and substantial electrical energy.");
+        break;
+      case "isru-oxygen-feed":
+        setResourceYield((value) => value + gain(4));
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(3)), power: clamp(current.power - cost(3)) }));
+        conditionBoost(1);
+        setAiMessage("OXYGEN-BEARING FEED PROCESSING · Verified regolith feed was processed into useful oxygen-bearing products; the output depends on composition and processing efficiency.");
+        break;
+      case "agriculture-closed-loop":
+        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(10)), water: clamp(current.water - cost(3)), power: clamp(current.power - cost(4)) }));
+        conditionBoost(1);
+        setAiMessage("CLOSED-LOOP CROP CYCLE · Water, CO₂, oxygen, thermal control and habitat services supported a larger harvest at a meaningful energy cost.");
+        break;
+      case "maintenance-overhaul": {
+        const targets = Object.entries(buildings)
+          .filter(([id]) => pending.selected[id] && id !== "maintenance" && !Object.values(activeFaults).some((fault) => fault.targetTrackId === id))
+          .sort(([,a],[,b]) => a.condition-b.condition)
+          .slice(0,3);
+        setBuildings((current) => {
+          const next = { ...current };
+          for (const [id] of targets) {
+            const previous = next[id];
+            if (!previous) continue;
+            const condition = clamp(previous.condition + gain(6));
+            next[id] = { ...previous, condition, status: buildingStatus(condition) };
+          }
+          return next;
+        });
+        setMetrics((current) => ({ ...current, power: clamp(current.power - cost(3)), battery: clamp(current.battery - cost(2)) }));
+        setAiMessage(`TELEMETRY-GUIDED OVERHAUL · ${targets.length} healthy module(s) received preventative maintenance. Live faults still require their own isolation and verification.`);
         break;
       }
       case "clean": {
