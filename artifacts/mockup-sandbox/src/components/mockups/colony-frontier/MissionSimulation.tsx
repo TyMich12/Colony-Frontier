@@ -2588,6 +2588,32 @@ export function MissionSimulation() {
           roverTask={roverTask}
         />
 
+        {!activeEvent && !dashboardOpen && (
+          <div className="pointer-events-none absolute right-3 top-[58px] z-20 w-[min(68vw,390px)]">
+            <div className="overflow-hidden rounded-2xl border border-[#41696a] bg-[#08171b]/[0.94] p-2 shadow-[0_10px_34px_rgba(0,0,0,0.48)] backdrop-blur-xl">
+              <div className="mb-2 flex items-center justify-between px-1">
+                <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
+                <span className="font-mono text-[9px] font-black text-[#f0cf69]">{Math.round(performance.colonyHealth)}% HEALTH</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                {[
+                  { label: "POWER", value: metrics.power, icon: <Zap className="h-3 w-3" /> },
+                  { label: "BATTERY", value: metrics.battery, icon: <BatteryCharging className="h-3 w-3" /> },
+                  { label: "O₂", value: metrics.oxygen, icon: <Wind className="h-3 w-3" /> },
+                  { label: "WATER", value: metrics.water, icon: <Droplets className="h-3 w-3" /> },
+                ].map((metric) => (
+                  <div key={metric.label} className={`rounded-xl border p-2 transition-colors ${metric.value < 28 ? "animate-pulse border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
+                    <div className="flex items-center justify-between gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.08em]">{metric.label}</span></div>
+                    <div className="mt-1 font-mono text-sm font-black" style={{ color: resourceColor(metric.value) }}>{Math.round(metric.value)}%</div>
+                    <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#20373a]"><div className="h-full rounded-full transition-[width]" style={{ width: `${clamp(metric.value)}%`, background: resourceColor(metric.value) }} /></div>
+                  </div>
+                ))}
+              </div>
+              {Object.values(activeOperations).length > 0 && <p className="mt-2 text-right text-[7px] font-black uppercase tracking-[0.1em] text-[#92e7b7]">{Object.values(activeOperations).length} work order(s) · open system to view timer</p>}
+            </div>
+          </div>
+        )}
+
         {!activeEvent && (
         <div className="pointer-events-none absolute left-3 bottom-3 z-20 w-[min(86vw,390px)]">
           <div className="rounded-2xl border border-[#3d555b] bg-[#0b1519]/[0.90] px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm">
@@ -2662,6 +2688,7 @@ export function MissionSimulation() {
               <Gauge className="h-4 w-4 text-[#eac568]" />
               <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white">Systems</span>
               <span className="font-mono text-[10px] text-[#a8ddb8]">{Math.round(performance.colonyHealth)}%</span>
+              {Object.values(activeOperations).length > 0 && <span className="rounded-full bg-[#1f775a] px-1.5 py-0.5 text-[8px] font-black text-[#d4ffe5] animate-pulse">{Object.values(activeOperations).length} WORK</span>}
               {Object.keys(activeFaults).length > 0 && <span className="rounded-full bg-[#d74d59] px-1.5 py-0.5 text-[8px] font-black text-white">{Object.keys(activeFaults).length}!</span>}
               <span className="text-xs text-[#8eaaa4]">{dashboardOpen ? "−" : "+"}</span>
             </button>
@@ -2729,15 +2756,26 @@ export function MissionSimulation() {
                   </div>
                 </div>
 
-                {activeOperation && (
+                {Object.values(activeOperations).length > 0 && (
                   <div className="border-t border-[#30484c] bg-[#11242a] p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#e8c568]">Work in progress</p>
-                      <span className="font-mono text-[10px] text-white">{Math.ceil(activeOperation.remainingSeconds)}s</span>
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#a9f2c8]">Active work orders</p>
+                      <span className="rounded-full bg-[#1e5944] px-2 py-1 text-[8px] font-black text-[#b7ffd1]">{Object.values(activeOperations).length} RUNNING</span>
                     </div>
-                    <p className="mt-1 text-[10px] text-[#d8e5df]">{activeOperation.label}</p>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#2b3d40]"><div className="h-full bg-[#dfbb58]" style={{ width: `${clamp(100 * (1 - activeOperation.remainingSeconds / activeOperation.totalSeconds))}%` }} /></div>
-                    {manualPaused && <p className="mt-2 text-[8px] text-[#e9ca7c]">Mission paused · operation clock paused</p>}
+                    <div className="mt-2 space-y-1.5">
+                      {Object.values(activeOperations).map((job) => (
+                        <button key={job.id} type="button" onClick={() => {
+                          const fieldNode = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === job.targetId);
+                          setSelectedResourceId(fieldNode?.id ?? null);
+                          setSelectedBuildingId(fieldNode ? null : job.targetId);
+                          setDashboardOpen(false);
+                        }} className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#2a5a4a] bg-[#0c211d] px-2.5 py-2 text-left hover:border-[#76dda8]">
+                          <span className="min-w-0 truncate text-[9px] font-bold text-[#e2f4e9]">{job.label}</span>
+                          <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-[#93e8b6]">Open system →</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[8px] leading-4 text-[#88aaa0]">Countdowns appear inside each system panel, not over the map.</p>
                   </div>
                 )}
 
@@ -2779,12 +2817,7 @@ export function MissionSimulation() {
               </div>
             )}
 
-            {activeOperation && (
-              <div className="pointer-events-none absolute bottom-[96px] left-1/2 z-30 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-[#526e71] bg-[#0b171c]/[0.94] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-sm">
-                <div className="flex items-center justify-between gap-3"><p className="truncate text-[9px] font-black uppercase tracking-[0.14em] text-[#e9c86b]">{activeOperation.label}</p><span className="font-mono text-[11px] text-white">{Math.ceil(activeOperation.remainingSeconds)}s</span></div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#283b40]"><div className="h-full rounded-full bg-[#e1bb58] transition-[width]" style={{ width: `${clamp(100 * (1 - activeOperation.remainingSeconds / activeOperation.totalSeconds))}%` }} /></div>
-              </div>
-            )}
+
           </>
         )}
 
@@ -2800,8 +2833,8 @@ export function MissionSimulation() {
             extractionTier={tierLevel(pending.selected.extraction ?? "Foundation")}
             scienceTier={tierLevel(pending.selected.science ?? "Foundation")}
             navigationTier={tierLevel(pending.selected.navigation ?? "Foundation")}
-            operation={activeOperation}
-            actionBusy={actionBusy}
+            operation={activeOperations[selectedResource.id] ?? Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) ?? null}
+            actionBusy={Boolean(activeOperations[selectedResource.id] || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) || activeOperations.science)}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
             onClose={() => setSelectedResourceId(null)}
           />
@@ -2815,7 +2848,8 @@ export function MissionSimulation() {
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => setSelectedBuildingId(null)}
             hasMaintenance={pending.selected.maintenance !== undefined}
-            actionBusy={actionBusy}
+            operation={activeOperations[selectedTrack.id] ?? null}
+            actionBusy={Boolean(activeOperations[selectedTrack.id])}
             activeEvent={activeEvent && selectedBuildingId === activeTargetTrackId ? activeEvent : null}
             eventChoices={activeEvent && selectedBuildingId === activeTargetTrackId ? getEventChoices(activeEvent, pending.selected) : []}
             onEventChoice={handleEventChoice}
@@ -2842,7 +2876,7 @@ export function MissionSimulation() {
                 <p className="mt-4 max-w-3xl text-[11px] leading-5 text-[#e4d9df]">{activeEvent.subtitle} {activeEvent.summary}</p>
                 <div className="mt-3 rounded-xl border border-[#7a3543] bg-[#29151d] px-3 py-2.5">
                   <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#ffb6bc]">This is not a cosmetic warning</p>
-                  <p className="mt-1 text-[10px] leading-4 text-[#dcbac1]">The mission clock and life-support simulation keep running while you decide. Non-essential controls are disabled here. A poor response leaves a fault that continues degrading its system after this panel closes.</p>
+                  <p className="mt-1 text-[10px] leading-4 text-[#f0c8cb]">The mission clock, resource simulation and all work timers are PAUSED while you decide. A poor response leaves a persistent fault that will keep degrading its system after you resume.</p>
                 </div>
               </header>
 
@@ -2866,11 +2900,10 @@ export function MissionSimulation() {
                     </div>
                   </section>
 
-                  {activeOperation && (
+                  {Object.values(activeOperations).length > 0 && (
                     <section className="rounded-2xl border border-[#8a7141] bg-[#2a2518] p-4">
-                      <div className="flex items-center gap-2 text-[#f1cf77]"><Clock className="h-4 w-4" /><p className="text-[9px] font-black uppercase tracking-[0.16em]">Operation suspended by incident</p></div>
-                      <p className="mt-2 text-[11px] font-bold text-white">{activeOperation.label}</p>
-                      <p className="mt-1 text-[10px] text-[#cdbb8e]">{Math.ceil(activeOperation.remainingSeconds)} seconds remain. Work resumes after this response is chosen.</p>
+                      <div className="flex items-center gap-2 text-[#f1cf77]"><Pause className="h-4 w-4" /><p className="text-[9px] font-black uppercase tracking-[0.16em]">Work orders safely paused</p></div>
+                      <p className="mt-2 text-[10px] leading-4 text-[#f2e3bf]">{Object.values(activeOperations).length} system job(s) are paused while this decision is open. Their countdowns resume once you choose a response; open each system to inspect its timer.</p>
                     </section>
                   )}
 
