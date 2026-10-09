@@ -920,6 +920,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
 function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected, alerted, simulationSpeed }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; targetNodeId: string | null; onClick: () => void; selected: boolean; alerted: boolean; simulationSpeed: number }) {
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
+  const drillRef = useRef<THREE.Group>(null);
   const targetLabel = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "]
     .find((prefix) => task.startsWith(prefix));
   const target = (targetNodeId ? resourceNodes.find((node) => node.id === targetNodeId) : undefined) ?? (targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined);
@@ -957,8 +958,32 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
       if (Math.hypot(previous[0] - point[0], previous[1] - point[1]) > 0.12) route.push(point);
     };
 
-    if (isMovingTask && (targetLabel?.startsWith("AT SITE ") || isCollecting)) {
-      // Collection takes place at the deposit; do not drive back to base and then revisit it.
+    if (isMovingTask && isCollecting && target) {
+      const distanceToSample = Math.hypot(start[0] - destination[0], start[1] - destination[1]);
+      if (distanceToSample < 1.8) {
+        // A small positioning manoeuvre keeps collection visibly active even when the rover
+        // arrived during the earlier survey stage.
+        add([destination[0] + 3.2, destination[1] + 1.6]);
+        add([destination[0] + 1.2, destination[1] + 0.6]);
+        add(destination);
+      } else {
+        // On a resumed/older save, approach the selected site using the service corridors.
+        add([25.6, -25.6]);
+        add([25.6, -13]);
+        add([14, -13]);
+        if (destination[0] < -14) {
+          add([0, -13]);
+          add([-14, -13]);
+          add([-14, destination[1]]);
+        } else if (destination[0] > 14) {
+          add([destination[0], -13]);
+        } else {
+          add([0, -13]);
+          add([destination[0], -13]);
+        }
+        add(destination);
+      }
+    } else if (isMovingTask && targetLabel?.startsWith("AT SITE ")) {
       add(destination);
     } else if (isMovingTask && isReturning) {
       // If already home (e.g. after local cleaning), don't make a pointless lap.
@@ -1029,6 +1054,9 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
     }
     current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * 5.5) * (travelled > 0 ? 0.014 : 0.004);
     if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
+    if (drillRef.current) {
+      drillRef.current.position.y = isCollecting ? 0.14 + (Math.sin(clock.getElapsedTime() * 15) + 1) * 0.035 : 0.14;
+    }
   });
   const wheelZ = [-0.55, 0, 0.55];
   return (
@@ -1114,7 +1142,7 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
           <meshStandardMaterial color="#fff0a6" emissive="#ffca63" emissiveIntensity={1.15} />
         </mesh>
       ))}
-      <group position={[0.48, 0.14, 0.53]} rotation={[0.1, 0, -0.22]}>
+      <group ref={drillRef} position={[0.48, 0.14, 0.53]} rotation={[0.1, 0, -0.22]}>
         <mesh position={[0, 0.15, 0.18]} rotation={[0.55, 0, 0]}>
           <cylinderGeometry args={[0.045, 0.055, 0.4, 9]} />
           <meshStandardMaterial color="#aeb8b1" metalness={0.7} roughness={0.3} />
