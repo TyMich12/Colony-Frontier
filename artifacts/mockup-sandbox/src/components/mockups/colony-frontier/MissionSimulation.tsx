@@ -349,7 +349,7 @@ function getActionBlockers(
     if (!context.selected[systemId]) blockers.push(`Install ${SYSTEM_LABELS[systemId] ?? systemId} first`);
     const ownFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
     if (ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId)) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
-    if (!ownFault && !isRepair && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
+    if (!ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
     if (!ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
   }
 
@@ -970,6 +970,7 @@ function BuildingInspector({
   earthReport,
   earthReportAtSeconds,
   elapsedSeconds,
+  fallbackReadyAt,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -990,6 +991,7 @@ function BuildingInspector({
   earthReport: string | null;
   earthReportAtSeconds: number;
   elapsedSeconds: number;
+  fallbackReadyAt: Record<string, number>;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1253,7 +1255,15 @@ function BuildingInspector({
         <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
           {actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
-            const locked = blockers.length > 0;
+            const fallbackRemaining = action.id.startsWith("fallback-")
+              ? Math.max(0, (fallbackReadyAt[`${track.id}:${action.id}`] ?? 0) - elapsedSeconds)
+              : 0;
+            const locked = blockers.length > 0 || fallbackRemaining > 0;
+            const lockMessage = blockers.length > 0
+              ? blockers.join(" · ")
+              : fallbackRemaining > 0
+                ? `Emergency backup recharge · ${Math.ceil(fallbackRemaining)} simulated seconds`
+                : "";
             const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[action.id] ?? 6);
             const actionMultiplier = systemPerformanceMultiplier(selected[track.id] ?? tier, upgradeLevel);
             return (
@@ -1272,7 +1282,7 @@ function BuildingInspector({
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`} · navigation performance ×${actionMultiplier.toFixed(2)}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail} · module output ×${actionMultiplier.toFixed(2)}`}</span>
-                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">LOCKED · {blockers.join(" · ")}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
+                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
                 </span>
               </span>
             </button>
@@ -3640,6 +3650,7 @@ export function MissionSimulation() {
             earthReport={earthReport}
             earthReportAtSeconds={earthReportAtSeconds}
             elapsedSeconds={elapsed}
+            fallbackReadyAt={fallbackReadyAt}
           />
         )}
 
