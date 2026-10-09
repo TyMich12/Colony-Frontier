@@ -1004,6 +1004,7 @@ export function MissionSimulation() {
   const eventPointerRef = useRef(
     (runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0),
   );
+  const eventResponseRef = useRef<string | null>(null);
   const completionSavedRef = useRef(false);
 
   const selectedTracks = pending ? selectedTrackData(pending.selected) : [];
@@ -1137,9 +1138,11 @@ export function MissionSimulation() {
           const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
           eventPointerRef.current += 1;
           setTimeout(() => {
+            eventResponseRef.current = null;
             setActiveEventId(event.id);
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
+            setOperationResult(null);
             setAiMessage(`CRITICAL INCIDENT: ${event.title}. The affected system has taken an immediate hit. Life support and other systems continue to evolve until you respond.`);
 
             const targetId = event.trackId === "power"
@@ -1340,7 +1343,9 @@ export function MissionSimulation() {
   }, [pending, results]);
 
   const handleEventChoice = (choiceId: string) => {
-    if (!activeEvent || !pending) return;
+    if (!activeEvent || !pending || eventResponseRef.current === activeEvent.id) return;
+    // Prevent double-clicks from resolving one incident twice while React updates the overlay.
+    eventResponseRef.current = activeEvent.id;
 
     const choice = getEventChoices(activeEvent, pending.selected).find((item) => item.id === choiceId);
     setDecisions((current) => [...current, { eventId: activeEvent.id, choiceId, label: choice?.label ?? choiceId }]);
