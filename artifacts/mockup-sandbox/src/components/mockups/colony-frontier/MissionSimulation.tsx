@@ -203,17 +203,17 @@ const SYSTEM_CONNECTIONS: Record<string, { all?: string[]; any?: string[]; outpu
   habitat: { outputs: ["water", "co2", "oxygen", "thermal", "radiation", "agriculture", "maintenance"] },
   water: { all: ["habitat"], any: ["grid", "battery"], outputs: ["oxygen", "agriculture", "extraction", "isru"] },
   co2: { all: ["habitat"], any: ["grid", "battery"], outputs: ["oxygen", "agriculture"] },
-  oxygen: { all: ["water", "co2", "habitat"], any: ["grid", "battery"], outputs: ["agriculture"] },
+  oxygen: { all: ["water", "habitat"], any: ["grid", "battery"], outputs: ["agriculture", "co2"] },
   thermal: { all: ["habitat"], any: ["grid", "battery"], outputs: ["science", "agriculture"] },
   radiation: { all: ["habitat"], any: ["battery", "grid"], outputs: ["habitat"] },
   comms: { any: ["grid", "battery"], outputs: ["navigation", "rover", "science", "maintenance"] },
-  navigation: { all: ["comms"], any: ["grid", "battery"], outputs: ["rover", "extraction", "science"] },
-  rover: { all: ["navigation", "comms"], any: ["battery", "grid"], outputs: ["extraction", "isru"] },
-  extraction: { all: ["rover", "navigation", "water"], any: ["grid", "battery"], outputs: ["isru"] },
-  isru: { all: ["extraction", "water"], any: ["grid", "battery"], outputs: ["agriculture"] },
-  science: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], outputs: [] },
-  agriculture: { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], outputs: [] },
-  maintenance: { all: ["comms"], any: ["grid", "battery"], outputs: ["all systems"] },
+  navigation: { any: ["grid", "battery"], outputs: ["rover", "extraction", "science", "comms"] },
+  rover: { any: ["battery", "grid"], outputs: ["extraction", "isru"] },
+  extraction: { any: ["grid", "battery"], outputs: ["isru", "radiation"] },
+  isru: { all: ["extraction"], any: ["grid", "battery"], outputs: ["agriculture", "habitat"] },
+  science: { any: ["grid", "battery"], outputs: [] },
+  agriculture: { all: ["water", "habitat"], any: ["grid", "battery"], outputs: ["co2", "oxygen"] },
+  maintenance: { any: ["grid", "battery"], outputs: ["all systems"] },
 };
 
 type ActionRequirementRule = {
@@ -227,41 +227,124 @@ type ActionRequirementRule = {
   extractedFeed?: boolean;
 };
 
+type ActionVariantProfile = {
+  actionId: string;
+  label: string;
+  helpers: [string, string, string];
+};
+
+// Each primary operation has all eight helper combinations: none, each helper alone, each pair,
+// and all three. These are actual support-system variants, not cosmetic button changes.
+const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
+  solar: { actionId: "clean", label: "Solar-array cleaning", helpers: ["rover", "maintenance", "navigation"] },
+  battery: { actionId: "balance", label: "Battery-cell balancing", helpers: ["solar", "grid", "thermal"] },
+  grid: { actionId: "balance-grid", label: "Power-bus balancing", helpers: ["solar", "battery", "maintenance"] },
+  habitat: { actionId: "repair", label: "Habitat seal repair", helpers: ["maintenance", "thermal", "isru"] },
+  water: { actionId: "flush", label: "Water-recovery flush", helpers: ["thermal", "co2", "maintenance"] },
+  oxygen: { actionId: "reset", label: "Oxygen-loop reset", helpers: ["water", "co2", "thermal"] },
+  co2: { actionId: "scrub", label: "CO₂ sorbent regeneration", helpers: ["habitat", "oxygen", "agriculture"] },
+  thermal: { actionId: "dump", label: "Thermal-loop correction", helpers: ["habitat", "grid", "battery"] },
+  comms: { actionId: "repoint", label: "High-gain antenna realignment", helpers: ["navigation", "maintenance", "grid"] },
+  radiation: { actionId: "shelter", label: "Radiation shelter protocol", helpers: ["habitat", "thermal", "battery"] },
+  science: { actionId: "calibrate", label: "Science-instrument calibration", helpers: ["navigation", "comms", "thermal"] },
+  navigation: { actionId: "nav-calibrate", label: "Navigation calibration", helpers: ["comms", "maintenance", "grid"] },
+  rover: { actionId: "survey", label: "Rover field survey", helpers: ["navigation", "comms", "grid"] },
+  extraction: { actionId: "extract-test", label: "Core-drill test run", helpers: ["rover", "navigation", "water"] },
+  isru: { actionId: "process", label: "ISRU feedstock processing", helpers: ["water", "thermal", "science"] },
+  agriculture: { actionId: "tune-crops", label: "Controlled-crop tuning", helpers: ["water", "co2", "thermal"] },
+  maintenance: { actionId: "service", label: "Preventative system service", helpers: ["comms", "navigation", "grid"] },
+};
+
+const SUPPORT_SHORT_LABELS: Record<string, string> = {
+  solar: "Solar", battery: "Battery", grid: "Power grid", habitat: "Habitat",
+  water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
+  radiation: "Shielding", comms: "Comms relay", navigation: "Navigation", rover: "Rover",
+  extraction: "Core drill", isru: "ISRU processor", science: "Science lab",
+  agriculture: "Greenhouse", maintenance: "Maintenance bay",
+};
+
+type DecodedActionVariant = { baseActionId: string; mask: number; supportSystems: string[] };
+
+function decodeActionVariant(systemId: string, actionId: string): DecodedActionVariant | null {
+  const profile = ACTION_VARIANT_PROFILES[systemId];
+  const match = /^variant:([^:]+):([0-7])$/.exec(actionId);
+  if (!profile || !match || match[1] !== profile.actionId) return null;
+  const mask = Number(match[2]);
+  return {
+    baseActionId: profile.actionId,
+    mask,
+    supportSystems: profile.helpers.filter((_, bit) => (mask & (1 << bit)) !== 0),
+  };
+}
+
+function buildSystemActionChoices(systemId: string, actions: EventChoice[]): EventChoice[] {
+  const profile = ACTION_VARIANT_PROFILES[systemId];
+  if (!profile) return actions;
+  const generated: EventChoice[] = Array.from({ length: 8 }, (_, mask) => {
+    const supportSystems = profile.helpers.filter((_, bit) => (mask & (1 << bit)) !== 0);
+    const supportLabels = supportSystems.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id);
+    return {
+      id: `variant:${profile.actionId}:${mask}`,
+      label: supportLabels.length ? `${profile.label} · ${supportLabels.join(" + ")}` : `${profile.label} · Standard procedure`,
+      detail: supportLabels.length
+        ? `Integrated method using ${supportLabels.join(", ")}. Every listed system must be installed, connected, online, and above 25% condition. Each helper improves efficiency; helper technology tier improves the integration further.`
+        : `Baseline procedure using this system's own controls. No optional support systems are needed beyond essential power and safety links.`,
+    };
+  });
+  return actions.flatMap((action) => action.id === profile.actionId ? generated : [action]);
+}
+
+function operationPerformanceMultiplier(
+  systemId: string,
+  selected: Record<string, Tier>,
+  buildings: Record<string, BuildingRuntime>,
+  supportSystems: string[] = [],
+): number {
+  const primary = systemPerformanceMultiplier(selected[systemId] ?? "Foundation", buildings[systemId]?.upgradeLevel ?? 0);
+  // A helper adds 4% base integration and 4% of its own tier/retrofit improvement.
+  // A tier jump (+18%) remains larger than both same-system retrofits (+10%).
+  const supportFactor = 1 + supportSystems.reduce((sum, helperId) => {
+    const helper = systemPerformanceMultiplier(selected[helperId] ?? "Foundation", buildings[helperId]?.upgradeLevel ?? 0);
+    return sum + 0.04 + (helper - 1) * 0.04;
+  }, 0);
+  return primary * supportFactor;
+}
+
 const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
-  clean: { any: ["rover", "maintenance"], anyGroups: [["grid", "battery"]], minPower: 2 },
+  clean: { minPower: 2 },
   tune: { all: ["navigation", "comms"], any: ["grid", "battery"], minPower: 3 },
-  balance: { all: ["grid", "solar"], minPower: 2 },
+  balance: { minPower: 2 },
   reserve: { all: ["grid"], minPower: 2 },
-  reset: { all: ["water", "co2", "habitat"], any: ["grid", "battery"], minPower: 3 },
+  reset: { minPower: 3 },
   boost: { all: ["water", "co2", "habitat"], any: ["grid", "battery"], minPower: 5 },
-  flush: { all: ["habitat", "oxygen", "co2"], any: ["grid", "battery"], minPower: 3 },
+  flush: { minPower: 3 },
   purify: { all: ["habitat", "oxygen", "co2"], any: ["grid", "battery"], minPower: 5 },
-  scrub: { all: ["habitat", "oxygen"], any: ["grid", "battery"], minPower: 2 },
+  scrub: { minPower: 2 },
   recover: { all: ["habitat", "oxygen"], any: ["grid", "battery"], minPower: 2 },
-  dump: { all: ["habitat"], any: ["grid", "battery"], minPower: 2 },
+  dump: { minPower: 2 },
   insulate: { all: ["habitat"], any: ["grid", "battery"], minPower: 2 },
-  repoint: { all: ["navigation"], any: ["grid", "battery"], minPower: 2 },
+  repoint: { minPower: 2 },
   test: { all: ["navigation"], any: ["grid", "battery"], minPower: 2 },
-  repair: { all: ["maintenance", "thermal"], any: ["grid", "battery"], minPower: 3, minBattery: 2 },
-  seal: { all: ["maintenance", "thermal"], any: ["grid", "battery"], minPower: 3, minBattery: 1 },
+  repair: { minPower: 2, minBattery: 1 },
+  seal: { minPower: 2, minBattery: 1 },
   shield: { all: ["habitat", "maintenance"], any: ["battery", "grid"], minPower: 2, minBattery: 1 },
-  shelter: { all: ["habitat"], any: ["battery", "grid"], minPower: 2, minBattery: 2 },
-  "balance-grid": { all: ["solar", "battery"], minPower: 3 },
+  shelter: { minPower: 2, minBattery: 2 },
+  "balance-grid": { minPower: 3 },
   prioritize: { all: ["oxygen", "water", "battery"], minPower: 2 },
-  calibrate: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], minPower: 2 },
+  calibrate: { minPower: 2 },
   experiment: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], minPower: 3, analysedSample: true },
-  "nav-calibrate": { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
+  "nav-calibrate": { minPower: 2 },
   route: { all: ["rover", "comms"], any: ["grid", "battery"], minPower: 2 },
-  survey: { all: ["rover", "navigation", "comms"], any: ["grid", "battery"], minPower: 2 },
+  survey: { minPower: 2 },
   return: { all: ["navigation"], any: ["battery", "grid"], minPower: 1 },
   inspect: {},
-  "extract-test": { all: ["rover", "navigation", "water"], any: ["grid", "battery"], minPower: 5, minBattery: 2, surveyedSite: true },
+  "extract-test": { minPower: 5, minBattery: 2, surveyedSite: true },
   extract: { all: ["rover", "navigation", "water"], any: ["grid", "battery"], minPower: 7, minBattery: 3, surveyedSite: true },
-  process: { all: ["extraction", "water"], any: ["grid", "battery"], minPower: 5, minBattery: 2, extractedFeed: true },
+  process: { minPower: 5, minBattery: 2, extractedFeed: true },
   purge: { all: ["extraction", "water"], any: ["grid", "battery"], minPower: 2 },
-  "tune-crops": { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], minPower: 4 },
+  "tune-crops": { minPower: 4 },
   harvest: { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], minPower: 2 },
-  service: { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
+  service: { minPower: 2 },
   diagnostics: { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
   "request-earth-report": { all: ["comms"], any: ["grid", "battery"], minPower: 1 },
   "solar-autonomous-clean": { all: ["rover", "maintenance", "navigation"], any: ["grid", "battery"], minPower: 2 },
@@ -340,6 +423,12 @@ function getActionBlockers(
   context: ActionRequirementContext,
   node?: ResourceNode,
 ): string[] {
+  const variant = decodeActionVariant(systemId, actionId);
+  if (variant) {
+    const blockers = getActionBlockers(systemId, variant.baseActionId, context, node);
+    for (const helperId of variant.supportSystems) collectSystemBlockers(helperId, context, blockers);
+    return [...new Set(blockers)];
+  }
   if (actionId === "inspect") return [];
   const blockers: string[] = [];
   const isRepair = actionId === "repair-active";
