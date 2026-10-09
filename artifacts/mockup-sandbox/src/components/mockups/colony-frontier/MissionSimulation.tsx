@@ -2020,13 +2020,35 @@ export function MissionSimulation() {
       agriculture: ["tune-crops", "harvest"],
       maintenance: ["service", "diagnostics"],
     };
-    const repairedFaultIds = Object.values(activeFaults)
-      .filter((fault) => fault.targetTrackId === trackId && (repairActions[trackId] ?? []).includes(action))
-      .map((fault) => fault.eventId);
-    if (repairedFaultIds.length > 0) {
-      const repairedSet = new Set(repairedFaultIds);
-      setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !repairedSet.has(id))));
-      setOperationResult(`FAULT CLEARED · ${trackId.toUpperCase()} intervention completed. The unresolved incident is removed from the active fault register; check system condition and reserves before resuming optional work.`);
+    const matchingFaults = Object.values(activeFaults).filter((fault) =>
+      (fault.targetTrackId === trackId && (repairActions[trackId] ?? []).includes(action)) ||
+      (trackId === "maintenance" && (action === "service" || action === "diagnostics")),
+    );
+    if (matchingFaults.length > 0) {
+      // A repair is a timed operation. The fault stays live and keeps degrading reserves
+      // until isolation, repair, and the post-repair check are complete.
+      const repairTargetId = trackId === "maintenance"
+        ? [...matchingFaults].sort((a, b) => b.severity - a.severity)[0].targetTrackId
+        : trackId;
+      if (metrics.power < 5 || metrics.battery < 2) {
+        setOperationResult("REPAIR HELD · A controlled repair requires at least 5% power and 2% battery to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.");
+        setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
+        return;
+      }
+      const repairTier = tierLevel(pending.selected.maintenance ?? pending.selected[repairTargetId] ?? "Foundation");
+      const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
+      const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
+      const duration = Math.max(16, 27 + highestSeverity * 7 + missionStage * 1.4 - repairTier * 2 - (pending.selected.maintenance ? 5 : 0));
+      setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 2) }));
+      setRoverTask("ISOLATING FAULT");
+      beginOperation(
+        "REPAIR",
+        repairTargetId,
+        `Isolate, repair & verify · ${technologyTracks.find((track) => track.id === repairTargetId)?.category ?? repairTargetId}`,
+        duration,
+      );
+      setAiMessage(`REPAIR STARTED · ${repairTargetId.toUpperCase()}. Isolation is in progress; ${Math.ceil(duration)} seconds are required for repair and a return-to-service check. Other systems continue running until the test passes.`);
+      return;
     }
 
     setActionBusy(true);
@@ -2414,6 +2436,15 @@ export function MissionSimulation() {
           >
             {manualPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
           </button>
+          <button
+            type="button"
+            onClick={() => { setEmergencyPowerMode((value) => !value); setAiMessage(!emergencyPowerMode ? "ECO POWER ON · Non-critical load is being shed. Generation margin improves, but battery efficiency and agriculture support are reduced until normal mode is restored." : "ECO POWER OFF · Normal loads restored. Check generation and reserve before continuing high-power work."); }}
+            className={`rounded-xl border px-2.5 py-2 text-[8px] font-black tracking-[0.08em] shadow-[0_8px_25px_rgba(0,0,0,0.38)] backdrop-blur-sm ${emergencyPowerMode ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519]/[0.92] text-[#aab8b9] hover:border-[#f0ca63]"}`}
+            aria-pressed={emergencyPowerMode}
+            title="Shed non-critical loads to protect power margin; agriculture and battery charging take a hit."
+          >
+            {emergencyPowerMode ? "ECO ON" : "ECO MODE"}
+          </button>
           {[1, 2, 4].map((value) => (
             <button
               key={value}
@@ -2541,10 +2572,17 @@ export function MissionSimulation() {
                   ) : (
                     <div className="mt-2 space-y-2">
                       {Object.values(activeFaults).map((fault) => (
-                        <div key={fault.eventId} className="rounded-xl border border-[#713b44] bg-[#26161d] p-2.5">
+                        <button
+                          key={fault.eventId}
+                          type="button"
+                          onClick={() => { setSelectedResourceId(null); setSelectedBuildingId(fault.targetTrackId); setDashboardOpen(false); }}
+                          className="w-full rounded-xl border border-[#713b44] bg-[#26161d] p-2.5 text-left transition hover:border-[#e7c567] hover:bg-[#302027]"
+                          title={`Open ${fault.targetTrackId} to inspect repair options`}
+                        >
                           <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{fault.remainingSeconds > 0 ? `${Math.ceil(fault.remainingSeconds)}s` : "OVERDUE"}</span></div>
                           <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#d59097]">Degrading {fault.targetTrackId.toUpperCase()} · severity {fault.severity.toFixed(1)}×</p>
-                        </div>
+                          <p className="mt-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#e8c568]">Inspect system → start timed repair</p>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -2619,7 +2657,7 @@ export function MissionSimulation() {
                       <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#d9b4bb]">Affected asset · {(activeTargetTrackId ?? activeEvent.trackId).toUpperCase()} · {environmentLabel}</p>
                     </div>
                   </div>
-                  <span className="rounded-full border border-[#ee6e78] bg-[#721f2c]/50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#ffc1c2]">Live fault · 1 active</span>
+                  <span className="rounded-full border border-[#ee6e78] bg-[#721f2c]/50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#ffc1c2]">Live fault · {Object.keys(activeFaults).length} active</span>
                 </div>
                 <p className="mt-4 max-w-3xl text-[11px] leading-5 text-[#e4d9df]">{activeEvent.subtitle} {activeEvent.summary}</p>
                 <div className="mt-3 rounded-xl border border-[#7a3543] bg-[#29151d] px-3 py-2.5">
