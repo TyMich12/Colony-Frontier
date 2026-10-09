@@ -2191,8 +2191,7 @@ export function MissionSimulation() {
       return;
     }
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
-      (fault.targetTrackId === trackId && action === "repair-active") ||
-      (trackId === "maintenance" && (action === "service" || action === "diagnostics")),
+      fault.targetTrackId === trackId && action === "repair-active",
     );
     if (matchingFaults.length > 0) {
       // A repair is a timed operation. The fault stays live and keeps degrading reserves
