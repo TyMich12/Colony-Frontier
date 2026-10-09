@@ -1485,6 +1485,8 @@ export function MissionSimulation() {
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
+  const buildingsRef = useRef(buildings);
+  buildingsRef.current = buildings;
   const [activeEventId, setActiveEventId] = useState<string | null>(runtime?.activeEventId ?? null);
   const [resolvedEventIds, setResolvedEventIds] = useState<string[]>(runtime?.resolvedEventIds ?? []);
   const [decisions, setDecisions] = useState<MissionDecision[]>(runtime?.decisions ?? []);
@@ -1506,6 +1508,7 @@ export function MissionSimulation() {
   const [operationResult, setOperationResult] = useState<string | null>(() => runtime?.operationResult ?? null);
   const [earthReport, setEarthReport] = useState<string | null>(() => runtime?.earthReport ?? null);
   const [earthReportAtSeconds, setEarthReportAtSeconds] = useState(runtime?.earthReportAtSeconds ?? 0);
+  const [fallbackReadyAt, setFallbackReadyAt] = useState<Record<string, number>>(() => runtime?.fallbackReadyAt ?? {});
   const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
   const activeFaultsRef = useRef(activeFaults);
   useEffect(() => { activeFaultsRef.current = activeFaults; }, [activeFaults]);
@@ -1593,7 +1596,7 @@ export function MissionSimulation() {
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "ANALYSED" }));
           const scienceTier = tierLevel(pending?.selected.science ?? "Foundation");
-          const scienceRetrofit = buildings.science?.upgradeLevel ?? 0;
+          const scienceRetrofit = buildingsRef.current.science?.upgradeLevel ?? 0;
           const sciencePerformance = systemPerformanceMultiplier(pending?.selected.science ?? "Foundation", scienceRetrofit);
           const integrity = sampleQuality[node.id] ?? 64;
           const confidence = clamp(integrity + (pending?.selected.science ? scienceTier * 5 + scienceRetrofit * 2 : -12), 42, 99);
@@ -1636,7 +1639,7 @@ export function MissionSimulation() {
       case "REPAIR": {
         const repairTarget = operation.targetId;
         const faults = Object.values(activeFaultsRef.current).filter((fault) => fault.targetTrackId === repairTarget);
-        const repairMultiplier = systemPerformanceMultiplier(pending?.selected[repairTarget], buildings[repairTarget]?.upgradeLevel ?? 0);
+        const repairMultiplier = systemPerformanceMultiplier(pending?.selected[repairTarget], buildingsRef.current[repairTarget]?.upgradeLevel ?? 0);
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
         setBuildings((current) => {
           const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
@@ -1988,9 +1991,9 @@ export function MissionSimulation() {
             .reduce((sum, fault) => sum + 0.26 * fault.severity * dt * (repairingTrack ? 0.25 : 1), 0);
           next[trackId] = {
             ...state,
-            condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.002) * speed - faultWear),
-            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.002) * speed - faultWear)),
-            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.004) * speed * stagePressure) : state.dust,
+            condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.0009) * speed - faultWear),
+            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.0009) * speed - faultWear)),
+            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.0018) * speed * stagePressure) : state.dust,
           };
         }
         return next;
@@ -2035,12 +2038,13 @@ export function MissionSimulation() {
       operationResult,
       earthReport,
       earthReportAtSeconds,
+      fallbackReadyAt,
       activeFaults,
       sampleQuality,
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
     });
-  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
+  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
@@ -2642,6 +2646,12 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
+    const fallbackKey = `${trackId}:${action}`;
+    const fallbackRemaining = (fallbackReadyAt[fallbackKey] ?? 0) - elapsed;
+    if (action.startsWith("fallback-") && fallbackRemaining > 0) {
+      setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${Math.ceil(fallbackRemaining)} simulated seconds.`);
+      return;
+    }
     const blockers = checkActionPrerequisites(trackId, action);
     if (blockers.length > 0) {
       setOperationResult(`ACTION LOCKED · ${blockers.join(" · ")}.`);
@@ -2733,6 +2743,9 @@ export function MissionSimulation() {
     } else if (action === "clean" && pending.selected.rover) {
       setRoverTask("CLEANING ARRAY");
     }
+    if (action.startsWith("fallback-")) {
+      setFallbackReadyAt((current) => ({ ...current, [fallbackKey]: elapsed + 70 }));
+    }
     beginOperation(
       "SYSTEM_ACTION",
       trackId,
@@ -2786,8 +2799,9 @@ export function MissionSimulation() {
         break;
       }
       case "fallback-battery":
-        setMetrics((current) => ({ ...current, battery: clamp(current.battery + gain(1)), power: clamp(current.power + gain(0.4)) }));
-        setAiMessage("LOCAL BATTERY-MANAGEMENT RESET · Parasitic draw reduced and a small amount of usable reserve recovered. This cannot replace a grid or charger.");
+        setEmergencyPowerMode(true);
+        setMetrics((current) => ({ ...current, power: clamp(current.power + gain(1)) }));
+        setAiMessage("LOCAL BATTERY-MANAGEMENT RESET · Parasitic loads are shed and emergency power mode is enabled. This protects stored charge; it does not create battery energy.");
         break;
       case "fallback-grid":
         setEmergencyPowerMode(true);
@@ -2818,8 +2832,9 @@ export function MissionSimulation() {
         setAiMessage("PASSIVE THERMAL SHUTTERS · Insulation reduces temperature drift without drawing heater power; it cannot actively control temperature.");
         break;
       case "fallback-radiation":
-        setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - gain(0.5)) }));
-        setAiMessage("SHELTER LOCKDOWN · Crew moved behind the habitat's passive shielding, reducing near-term exposure slightly.");
+        setEmergencyPowerMode(true);
+        conditionBoost(0.25);
+        setAiMessage("SHELTER LOCKDOWN · Crew moved behind passive habitat shielding. This reduces future exposure rate; the already accumulated dose index is not erased.");
         break;
       case "fallback-comms":
         conditionBoost(1);
