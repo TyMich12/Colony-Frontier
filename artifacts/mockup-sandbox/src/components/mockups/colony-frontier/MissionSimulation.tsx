@@ -1049,52 +1049,49 @@ export function MissionSimulation() {
       setElapsed((current) => {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed);
 
-        while (eventPointerRef.current < EVENT_TIMES.length && next >= EVENT_TIMES[eventPointerRef.current]) {
-          if (!activeEventId) {
-            const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
-            eventPointerRef.current += 1;
-            setTimeout(() => {
-              setActiveEventId(event.id);
-              setSelectedBuildingId(null);
-              setSelectedResourceId(null);
-              setAiMessage(`CRITICAL INCIDENT: ${event.title}. The affected system has taken an immediate hit. Life support and other systems continue to evolve until you respond.`);
+        if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= EVENT_TIMES[eventPointerRef.current]) {
+          const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventPointerRef.current, metrics);
+          eventPointerRef.current += 1;
+          setTimeout(() => {
+            setActiveEventId(event.id);
+            setSelectedBuildingId(null);
+            setSelectedResourceId(null);
+            setAiMessage(`CRITICAL INCIDENT: ${event.title}. The affected system has taken an immediate hit. Life support and other systems continue to evolve until you respond.`);
 
-              const targetId = event.trackId === "power"
-                ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
-                : event.trackId;
-              setBuildings((current) => {
-                const previous = current[targetId];
-                if (!previous) return current;
-                const damage = 3 + Math.min(5, eventPointerRef.current * 0.4);
-                const condition = clamp(previous.condition - damage);
-                const next = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
-                if (event.id === "solar-dust" || event.id === "regional-dust-front") {
-                  next.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 12) };
-                }
-                return next;
-              });
-              setMetrics((current) => {
-                switch (event.id) {
-                  case "solar-dust":
-                  case "regional-dust-front": return { ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 3) };
-                  case "battery-thermal": return { ...current, battery: clamp(current.battery - 7), power: clamp(current.power - 2) };
-                  case "oxygen-filter":
-                  case "co2-scrubber-loading": return { ...current, oxygen: clamp(current.oxygen - 6) };
-                  case "water-filter": return { ...current, water: clamp(current.water - 6) };
-                  case "habitat-pressure": return { ...current, habitat: clamp(current.habitat - 5) };
-                  case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - 3) };
-                  case "radiation-burst": return { ...current, radiation: clamp(current.radiation + 7) };
-                  case "polar-shadow-cold-soak":
-                  case "thermal-drift": return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -1.0 : 1.0), 16, 28), battery: clamp(current.battery - 4) };
-                  case "grid-overload":
-                  case "core-power": return { ...current, power: clamp(current.power - 7), battery: clamp(current.battery - 4) };
-                  case "agriculture-stress": return { ...current, food: clamp(current.food - 6) };
-                  default: return current;
-                }
-              });
-            }, 0);
-            break;
-          }
+            const targetId = event.trackId === "power"
+              ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
+              : event.trackId;
+            setBuildings((current) => {
+              const previous = current[targetId];
+              if (!previous) return current;
+              const damage = 3 + Math.min(5, eventPointerRef.current * 0.4);
+              const condition = clamp(previous.condition - damage);
+              const nextBuildings = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
+              if (event.id === "solar-dust" || event.id === "regional-dust-front") {
+                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 12) };
+              }
+              return nextBuildings;
+            });
+            setMetrics((current) => {
+              switch (event.id) {
+                case "solar-dust":
+                case "regional-dust-front": return { ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 3) };
+                case "battery-thermal": return { ...current, battery: clamp(current.battery - 7), power: clamp(current.power - 2) };
+                case "oxygen-filter":
+                case "co2-scrubber-loading": return { ...current, oxygen: clamp(current.oxygen - 6) };
+                case "water-filter": return { ...current, water: clamp(current.water - 6) };
+                case "habitat-pressure": return { ...current, habitat: clamp(current.habitat - 5) };
+                case "micrometeoroid-impact": return { ...current, habitat: clamp(current.habitat - 3) };
+                case "radiation-burst": return { ...current, radiation: clamp(current.radiation + 7) };
+                case "polar-shadow-cold-soak":
+                case "thermal-drift": return { ...current, temperature: clamp(current.temperature + (current.temperature < 21 ? -1.0 : 1.0), 16, 28), battery: clamp(current.battery - 4) };
+                case "grid-overload":
+                case "core-power": return { ...current, power: clamp(current.power - 7), battery: clamp(current.battery - 4) };
+                case "agriculture-stress": return { ...current, food: clamp(current.food - 6) };
+                default: return current;
+              }
+            });
+          }, 0);
         }
 
         if (next >= TOTAL_MISSION_SECONDS) {
@@ -1119,19 +1116,41 @@ export function MissionSimulation() {
         const foodUpgrade = buildings.agriculture?.upgradeLevel ?? 0;
         const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
-        const powerBase = 74 + solarTier * 7 + solarUpgrade * 4 - solarDust * 0.34 - optionalCount * 1.8 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 3 : 0);
-        const demandPenalty = Math.max(0, 68 - powerBase);
-        const batteryDelta = (powerBase > 84 ? 0.006 : powerBase > 72 ? -0.008 : -0.045 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.012;
+        const powerBase = 72 + solarTier * 7.5 + solarUpgrade * 4.5 - solarDust * 0.4 - optionalCount * 2.0 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0);
+        const demandPenalty = Math.max(0, 70 - powerBase);
+        const batteryDelta = (powerBase > 85 ? 0.006 : powerBase > 73 ? -0.009 : -0.042 - demandPenalty * 0.0012) + batteryTier * 0.01 + batteryUpgrade * 0.014;
+        const dt = 0.25 * speed;
+        const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
+          const amount = dt * fault.severity;
+          switch (fault.eventId) {
+            case "solar-dust":
+            case "regional-dust-front": impact.power += 0.1 * amount; break;
+            case "battery-thermal": impact.battery += 0.095 * amount; impact.power += 0.035 * amount; break;
+            case "oxygen-filter":
+            case "co2-scrubber-loading": impact.oxygen += 0.085 * amount; break;
+            case "water-filter": impact.water += 0.075 * amount; break;
+            case "habitat-pressure":
+            case "micrometeoroid-impact": impact.habitat += 0.08 * amount; break;
+            case "radiation-burst": impact.radiation += 0.12 * amount; break;
+            case "polar-shadow-cold-soak":
+            case "thermal-drift": impact.temperature += 0.055 * amount; impact.battery += 0.035 * amount; break;
+            case "grid-overload":
+            case "core-power": impact.power += 0.09 * amount; impact.battery += 0.04 * amount; break;
+            case "agriculture-stress": impact.food += 0.08 * amount; break;
+            default: break;
+          }
+          return impact;
+        }, { power: 0, battery: 0, oxygen: 0, water: 0, food: 0, habitat: 0, radiation: 0, temperature: 0 });
 
         return {
-          power: clamp(powerBase),
-          battery: clamp(current.battery + batteryDelta * speed),
-          oxygen: clamp(current.oxygen - (0.0085 - oxygenTier * 0.0018 - oxygenUpgrade * 0.0008) * speed),
-          water: clamp(current.water - (0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007) * speed),
-          food: clamp(current.food - Math.max(0.0014, 0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0019 : 0) - foodUpgrade * 0.0011) * speed),
-          temperature: clamp(current.temperature + (21 - current.temperature) * (0.009 + (thermalTier + thermalUpgrade) * 0.0045) * speed, 16, 28),
-          radiation: clamp(current.radiation + 0.003 * speed),
-          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatUpgrade * 0.0012) * speed),
+          power: clamp(powerBase - faultImpact.power),
+          battery: clamp(current.battery + batteryDelta * speed - faultImpact.battery),
+          oxygen: clamp(current.oxygen - (0.0085 - oxygenTier * 0.0018 - oxygenUpgrade * 0.0008) * speed - faultImpact.oxygen),
+          water: clamp(current.water - (0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007) * speed - faultImpact.water),
+          food: clamp(current.food - Math.max(0.0014, 0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0019 : 0) - foodUpgrade * 0.0011) * speed - faultImpact.food),
+          temperature: clamp(current.temperature + (21 - current.temperature) * (0.009 + (thermalTier + thermalUpgrade) * 0.0045) * speed + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
+          radiation: clamp(current.radiation + 0.003 * speed + faultImpact.radiation),
+          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatUpgrade * 0.0012) * speed - faultImpact.habitat),
         };
       });
 
@@ -1141,10 +1160,13 @@ export function MissionSimulation() {
           const tier = pending.selected[trackId];
           const level = tier ? tierLevel(tier) : 0;
           const wear = trackId === "solar" ? 0.013 : 0.0075;
+          const faultWear = Object.values(activeFaults)
+            .filter((fault) => fault.targetTrackId === trackId)
+            .reduce((sum, fault) => sum + 0.12 * fault.severity * 0.25 * speed, 0);
           next[trackId] = {
             ...state,
-            condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.00025 - (state.upgradeLevel ?? 0) * 0.0003) * speed),
-            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.00025 - (state.upgradeLevel ?? 0) * 0.0003) * speed)),
+            condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.002) * speed - faultWear),
+            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.002) * speed - faultWear)),
             dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.004) * speed) : state.dust,
           };
         }
@@ -1580,35 +1602,94 @@ export function MissionSimulation() {
         setAiMessage("Mission AI recorded the decision and will include it in the final analysis.");
     }
 
+    // A deliberate "carry on / ignore / defer" choice creates a live fault, not just a one-off penalty.
+    const unsafeChoices = new Set(["ignore", "continue", "defer", "force", "push", "hold", "maintain"]);
+    if (unsafeChoices.has(choiceId)) {
+      const targetTrackId = activeTargetTrackId ?? activeEvent.trackId;
+      const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
+      const severity = 1 + Math.min(0.9, (missionStage - 1) * 0.08 + eventPointerRef.current * 0.04);
+      const remainingSeconds = 48 + Math.min(30, missionStage * 3);
+      setActiveFaults((current) => ({
+        ...current,
+        [activeEvent.id]: { eventId: activeEvent.id, targetTrackId, title: activeEvent.title, remainingSeconds, severity },
+      }));
+      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. It will continue degrading ${targetTrackId.toUpperCase()} for about ${Math.round(remainingSeconds)} simulated seconds unless the remaining fault is repaired.`);
+    }
+
     setActiveEventId(null);
   };
 
+  const beginOperation = (
+    kind: MissionOperation["kind"],
+    targetId: string,
+    label: string,
+    durationSeconds: number,
+    targetLevel?: number,
+  ) => {
+    if (!pending || activeOperation || actionBusy || activeEventId || results) return;
+    const operation: MissionOperation = {
+      id: `${kind.toLowerCase()}-${targetId}-${Date.now()}`,
+      kind,
+      targetId,
+      label,
+      totalSeconds: durationSeconds,
+      remainingSeconds: durationSeconds,
+      ...(targetLevel !== undefined ? { targetLevel } : {}),
+    };
+    operationCompletionRef.current = null;
+    setActiveOperation(operation);
+    setActionBusy(true);
+    setOperationResult(null);
+    setManualActions((value) => value + 1);
+    setAiMessage(`${label} started. Estimated duration: ${durationSeconds} seconds at 1× simulation speed.`);
+  };
+
   const handleResourceAction = (nodeId: string, action: string) => {
-    const nodes = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"];
+    if (!pending || activeOperation || actionBusy || activeEventId || results) return;
+    const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
     const node = nodes.find((item) => item.id === nodeId);
     if (!node) return;
+    const stage = sampleStages[nodeId] ?? (surveyedNodes.includes(nodeId) ? "SURVEYED" : "UNSURVEYED");
+    const hasRover = pending.selected.rover !== undefined;
+    const hasExtraction = pending.selected.extraction !== undefined;
+    const hasScience = pending.selected.science !== undefined;
 
-    if (action === "survey") {
-      setSurveyedNodes((current) => current.includes(nodeId) ? current : [...current, nodeId]);
-      setManualActions((value) => value + 1);
-      setScore((value) => clamp(value + (pending?.selected.rover ? 4 : 2)));
-      setRoverTask(pending?.selected.rover ? "SURVEYING " + node.label : "REMOTE TERRAIN SCAN");
-      setAiMessage(pending?.selected.rover ? "Rover dispatched to " + node.label + ". Terrain geometry and resource signatures are being mapped." : "Local sensors scanned " + node.label + ". A rover would provide higher-resolution terrain data.");
+    if (action === "survey" && stage === "UNSURVEYED") {
+      const duration = hasRover ? 12 : 22;
+      beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration);
+      setRoverTask(hasRover ? `MAPPING ${node.label.toUpperCase()}` : `REMOTE SCAN ${node.label.toUpperCase()}`);
+      setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
-    if (action === "sample" && surveyedNodes.includes(nodeId)) {
-      setResourceYield((value) => value + 1);
-      setManualActions((value) => value + 1);
-      setScore((value) => clamp(value + 5));
-      setAiMessage("Sample secured from " + node.label + ". The mission now has a physical field result.");
+    if (action === "sample" && stage === "SURVEYED") {
+      const duration = hasExtraction ? (hasRover ? 16 : 21) : (hasRover ? 24 : 30);
+      if (metrics.power < 7 || metrics.battery < 3) {
+        setOperationResult("COLLECTION HELD · Sampling requires at least 7% power and 3% battery reserve. Restore the energy margin first.");
+        return;
+      }
+      beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, duration);
+      setMetrics((current) => ({ ...current, power: clamp(current.power - (hasExtraction ? 5 : 3)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
+      setRoverTask(hasExtraction ? "DRILLING CORE" : hasRover ? "SAMPLING SITE" : "EVA SAMPLING");
       return;
     }
-    if (action === "extract" && surveyedNodes.includes(nodeId)) {
-      setResourceYield((value) => value + 5);
-      setManualActions((value) => value + 1);
-      setMetrics((current) => ({ ...current, power: clamp(current.power - 5), battery: clamp(current.battery - 2) }));
-      setScore((value) => clamp(value + 7));
-      setAiMessage("Extraction test complete at " + node.label + ". Resource yield increased, but the operation consumed real colony power.");
+    if (action === "transfer" && stage === "COLLECTED") {
+      const duration = hasRover ? 12 : 22;
+      beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration);
+      setRoverTask(hasRover ? "CARRYING SAMPLE" : "EVA SAMPLE RETURN");
+      if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
+      return;
+    }
+    if (action === "analyze" && stage === "DELIVERED") {
+      const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
+      const duration = hasScience ? Math.max(12, 20 - scienceTier * 2) : 32;
+      if (metrics.power < 5) {
+        setOperationResult("ANALYSIS HELD · Insufficient power for the spectrometer / field assay. Restore power before analysing.");
+        return;
+      }
+      beginOperation("ANALYZE", nodeId, `Analysing sample · ${node.label}`, duration);
+      setMetrics((current) => ({ ...current, power: clamp(current.power - (hasScience ? 3 : 5)) }));
+      setRoverTask(hasScience ? "LAB ANALYSIS" : "PORTABLE ASSAY");
+      return;
     }
   };
   const runQuickCommand = (command: "survey" | "service" | "clean") => {
