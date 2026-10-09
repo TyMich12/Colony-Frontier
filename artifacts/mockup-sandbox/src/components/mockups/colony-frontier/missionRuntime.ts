@@ -57,6 +57,8 @@ export type MissionOperation = {
   actionId?: string;
   /** Key identifying the system occupied by this job; targetId may identify a field site instead. */
   operationKey?: string;
+  /** True when this work order currently requires the physical rover; prevents conflicting dispatches. */
+  roverAssigned?: boolean;
   /** Sample integrity score captured when a sealed sample is collected. */
   sampleQuality?: number;
 };
