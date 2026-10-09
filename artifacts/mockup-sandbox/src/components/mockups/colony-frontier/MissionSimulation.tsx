@@ -1002,6 +1002,8 @@ export function MissionSimulation() {
   const [activeOperation, setActiveOperation] = useState<MissionOperation | null>(() => runtime?.activeOperation ?? null);
   const [operationResult, setOperationResult] = useState<string | null>(() => runtime?.operationResult ?? null);
   const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
+  const activeFaultsRef = useRef(activeFaults);
+  useEffect(() => { activeFaultsRef.current = activeFaults; }, [activeFaults]);
   const [emergencyPowerMode, setEmergencyPowerMode] = useState(runtime?.emergencyPowerMode ?? false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const operationCompletionRef = useRef<string | null>(null);
@@ -1103,12 +1105,16 @@ export function MissionSimulation() {
       }
       case "REPAIR": {
         const repairTarget = operation.targetId;
-        const faults = Object.values(activeFaults).filter((fault) => fault.targetTrackId === repairTarget);
+        const faults = Object.values(activeFaultsRef.current).filter((fault) => fault.targetTrackId === repairTarget);
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
         setBuildings((current) => {
           const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
           const condition = clamp(previous.condition + 12);
-          return { ...current, [repairTarget]: { ...previous, condition, status: buildingStatus(condition) } };
+          const repaired = { ...current, [repairTarget]: { ...previous, condition, status: buildingStatus(condition) } };
+          if (faults.some((fault) => fault.eventId === "solar-dust" || fault.eventId === "regional-dust-front")) {
+            repaired.solar = { ...(repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((repaired.solar?.dust ?? 0) - 8) };
+          }
+          return repaired;
         });
         setMetrics((current) => {
           let next = { ...current, power: clamp(current.power + 2), battery: clamp(current.battery + 2) };
@@ -1117,7 +1123,6 @@ export function MissionSimulation() {
               case "solar-dust":
               case "regional-dust-front":
                 next = { ...next, power: clamp(next.power + 4), battery: clamp(next.battery + 2) };
-                setBuildings((buildingsNow) => ({ ...buildingsNow, solar: { ...(buildingsNow.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((buildingsNow.solar?.dust ?? 0) - 8) } }));
                 break;
               case "battery-thermal": next = { ...next, battery: clamp(next.battery + 7) }; break;
               case "oxygen-filter":
@@ -1149,7 +1154,7 @@ export function MissionSimulation() {
     }
     setActionBusy(false);
     setActiveOperation(null);
-  }, [activeFaults, pending, sampleQuality]);
+  }, [pending, sampleQuality]);
 
   useEffect(() => {
     if (!storedEventIsInvalid) return;
@@ -1934,7 +1939,8 @@ export function MissionSimulation() {
         setOperationResult("COLLECTION HELD · Sampling requires at least 7% power and 3% battery reserve. Restore the energy margin first.");
         return;
       }
-      const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 : 0) + (hasRover ? 7 + roverTier * 2.5 : 0) + navigationTier * 2 - (activeFaults[nodeId]?.severity ? 12 : 0), 38, 98);
+      const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
+      const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 : 0) + (hasRover ? 7 + roverTier * 2.5 : 0) + navigationTier * 2 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
