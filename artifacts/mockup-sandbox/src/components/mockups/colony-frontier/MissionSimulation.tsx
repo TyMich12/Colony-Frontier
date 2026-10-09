@@ -1238,29 +1238,59 @@ export function MissionSimulation() {
         const foodUpgrade = buildings.agriculture?.upgradeLevel ?? 0;
         const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
-        const powerBase = 72 + solarTier * 7.5 + solarUpgrade * 4.5 - solarDust * 0.4 - optionalCount * 2.0 + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0);
-        const demandPenalty = Math.max(0, 70 - current.power);
-        const batteryDelta = (current.power > 84 ? 0.008 : current.power > 73 ? 0.002 : current.power > 64 ? -0.012 - demandPenalty * 0.0005 : -0.024 - demandPenalty * 0.001) + batteryTier * 0.009 + batteryUpgrade * 0.014;
-        const oxygenDrain = Math.max(0.0014, 0.0085 - oxygenTier * 0.0018 - co2Tier * 0.0007 - oxygenUpgrade * 0.0008);
-        const waterDrain = Math.max(0.0012, 0.0075 - waterTier * 0.0016 - waterUpgrade * 0.0007);
+        const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
+        const stagePressure = 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0);
+        const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
+        // Fourteen simulated days are compressed into this mission clock. Blackout missions
+        // include a long low-irradiance window; Mars begins with less sunlight margin.
+        const solarAvailability = blackoutMission
+          ? (elapsed < 55 ? 0.42 : elapsed < 285 ? 0.14 : 0.28)
+          : pending.campaign === "mars"
+            ? 0.82 + Math.sin(elapsed / 29) * 0.06
+            : 0.96;
+        const solarGeneration = (24 + solarTier * 7.5 + solarUpgrade * 4.5) * solarAvailability;
+        const powerBase = 48 + solarGeneration - solarDust * 0.4 - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (pending.selected.grid ? tierLevel(pending.selected.grid) * 4 : 0) + (emergencyPowerMode ? 9 : 0);
+        // Better batteries reduce loss; they cannot create charge when generation is below demand.
+        const batteryDelta = ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0035) * stagePressure * (emergencyPowerMode ? 0.78 : 1);
+        const oxygenDrain = Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0017) * stagePressure * (emergencyPowerMode ? 1.02 : 1);
+        const waterDrain = Math.max(0.003, 0.0135 - waterTier * 0.0024 - waterUpgrade * 0.0015) * stagePressure;
+        const agricultureTier = pending.selected.agriculture ? tierLevel(pending.selected.agriculture) : 0;
+        const hasAgriculture = pending.selected.agriculture !== undefined;
+        const foodDrain = (hasAgriculture
+          ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0018)
+          : 0.022) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
+        const hasThermalControl = pending.selected.thermal !== undefined;
+        const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
+        const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
+        const thermalCorrection = hasThermalControl
+          ? (0.009 + (thermalTier + thermalUpgrade) * 0.0045)
+          : 0.0022;
         const dt = 0.25 * speed;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
-          const amount = dt * fault.severity;
+          const isBeingRepaired = activeOperation?.kind === "REPAIR" && activeOperation.targetId === fault.targetTrackId;
+          const amount = dt * fault.severity * (isBeingRepaired ? 0.25 : 1);
           switch (fault.eventId) {
             case "solar-dust":
-            case "regional-dust-front": impact.power += 0.1 * amount; break;
-            case "battery-thermal": impact.battery += 0.095 * amount; impact.power += 0.035 * amount; break;
-            case "oxygen-filter":
-            case "co2-scrubber-loading": impact.oxygen += 0.085 * amount; break;
-            case "water-filter": impact.water += 0.075 * amount; break;
-            case "habitat-pressure":
-            case "micrometeoroid-impact": impact.habitat += 0.08 * amount; break;
-            case "radiation-burst": impact.radiation += 0.12 * amount; break;
+            case "regional-dust-front": impact.power += 0.34 * amount; impact.battery += 0.08 * amount; break;
+            case "battery-thermal": impact.battery += 0.31 * amount; impact.power += 0.16 * amount; break;
+            case "oxygen-filter": impact.oxygen += 0.28 * amount; impact.habitat += 0.04 * amount; break;
+            case "co2-scrubber-loading": impact.oxygen += 0.25 * amount; impact.habitat += 0.08 * amount; break;
+            case "water-filter": impact.water += 0.26 * amount; break;
+            case "habitat-pressure": impact.habitat += 0.3 * amount; impact.oxygen += 0.05 * amount; impact.water += 0.04 * amount; break;
+            case "micrometeoroid-impact": impact.habitat += 0.24 * amount; impact.power += 0.12 * amount; break;
+            case "radiation-burst": impact.radiation += 0.28 * amount; break;
             case "polar-shadow-cold-soak":
-            case "thermal-drift": impact.temperature += 0.055 * amount; impact.battery += 0.035 * amount; break;
+            case "thermal-drift": impact.temperature += 0.21 * amount; impact.battery += 0.12 * amount; break;
             case "grid-overload":
-            case "core-power": impact.power += 0.09 * amount; impact.battery += 0.04 * amount; break;
-            case "agriculture-stress": impact.food += 0.08 * amount; break;
+            case "core-power": impact.power += 0.3 * amount; impact.battery += 0.17 * amount; break;
+            case "agriculture-stress": impact.food += 0.26 * amount; impact.water += 0.05 * amount; break;
+            case "comms-drift":
+            case "mars-comm-relay-loss": impact.power += 0.1 * amount; break;
+            case "rover-wheel": impact.battery += 0.1 * amount; break;
+            case "extraction-lock": impact.power += 0.2 * amount; impact.battery += 0.07 * amount; break;
+            case "isru-pressure": impact.power += 0.2 * amount; impact.battery += 0.13 * amount; break;
+            case "science-anomaly":
+            case "maintenance-alert": impact.power += 0.07 * amount; break;
             default: break;
           }
           return impact;
@@ -1273,8 +1303,8 @@ export function MissionSimulation() {
           battery: clamp(current.battery + batteryDelta * speed - faultImpact.battery),
           oxygen: clamp(current.oxygen - oxygenDrain * speed - faultImpact.oxygen),
           water: clamp(current.water - waterDrain * speed - faultImpact.water),
-          food: clamp(current.food - Math.max(0.0014, 0.0065 - (pending.selected.agriculture ? tierLevel(pending.selected.agriculture) * 0.0019 : 0) - foodUpgrade * 0.0011) * speed - faultImpact.food),
-          temperature: clamp(current.temperature + (21 - current.temperature) * (0.009 + (thermalTier + thermalUpgrade) * 0.0045) * speed + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
+          food: clamp(current.food - foodDrain * speed - faultImpact.food),
+          temperature: clamp(current.temperature + (thermalTarget - current.temperature) * thermalCorrection * speed * stagePressure + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
           radiation: clamp(current.radiation + Math.max(0.0006, 0.003 - radiationTier * 0.00065) * speed + faultImpact.radiation),
           habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.0012) * speed - faultImpact.habitat),
         };
@@ -1285,15 +1315,16 @@ export function MissionSimulation() {
         for (const [trackId, state] of Object.entries(next)) {
           const tier = pending.selected[trackId];
           const level = tier ? tierLevel(tier) : 0;
-          const wear = trackId === "solar" ? 0.013 : 0.0075;
+          const wear = (trackId === "solar" ? 0.013 : 0.0075) * stagePressure;
+          const repairingTrack = activeOperation?.kind === "REPAIR" && activeOperation.targetId === trackId;
           const faultWear = Object.values(activeFaults)
             .filter((fault) => fault.targetTrackId === trackId)
-            .reduce((sum, fault) => sum + 0.12 * fault.severity * 0.25 * speed, 0);
+            .reduce((sum, fault) => sum + 0.26 * fault.severity * dt * (repairingTrack ? 0.25 : 1), 0);
           next[trackId] = {
             ...state,
             condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.002) * speed - faultWear),
             status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.002) * speed - faultWear)),
-            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.004) * speed) : state.dust,
+            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.004) * speed * stagePressure) : state.dust,
           };
         }
         return next;
@@ -1302,19 +1333,20 @@ export function MissionSimulation() {
       const dt = 0.25 * speed;
       if (Object.keys(activeFaults).length > 0) {
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).map(([key, fault]) => {
-          const overdue = fault.remainingSeconds <= dt;
+          const isBeingRepaired = activeOperation?.kind === "REPAIR" && activeOperation.targetId === fault.targetTrackId;
+          const overdue = !isBeingRepaired && fault.remainingSeconds <= dt;
           return [key, {
             ...fault,
-            remainingSeconds: Math.max(0, fault.remainingSeconds - dt),
-            // After the response window expires, the fault cascades until a real repair action clears it.
-            severity: overdue ? Math.min(3, fault.severity + 0.025 * dt) : fault.severity,
+            remainingSeconds: isBeingRepaired ? fault.remainingSeconds : Math.max(0, fault.remainingSeconds - dt),
+            // Overdue faults cascade faster; a live repair isolates most propagation until completion.
+            severity: overdue ? Math.min(4, fault.severity + 0.06 * stagePressure * dt) : fault.severity,
           }];
         })) as Record<string, ActiveFault>);
       }
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, activeFaults, buildings, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
+  }, [activeEventId, activeFaults, activeOperation, buildings, elapsed, emergencyPowerMode, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
 
   useEffect(() => {
     if (!pending || results) return;
