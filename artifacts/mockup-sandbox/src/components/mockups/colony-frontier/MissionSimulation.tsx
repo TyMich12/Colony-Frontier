@@ -547,24 +547,26 @@ function MissionTaskRibbon({
   pending,
   elapsed,
   resolvedEvents,
-  surveyedNodes,
+  sampleStages,
   activeEvent,
   roverTask,
 }: {
   pending: PendingMission;
   elapsed: number;
   resolvedEvents: string[];
-  surveyedNodes: string[];
+  sampleStages: Record<string, SampleStage>;
   activeEvent: MissionEvent | null;
   roverTask: string;
 }) {
   const day = Math.min(14, Math.floor(elapsed / 30) + 1);
   const eventGoal = EVENT_TIMES.length;
-  const surveyDone = surveyedNodes.length > 0;
+  const surveyedCount = Object.values(sampleStages).filter((stage) => stage !== "UNSURVEYED").length;
+  const analysedCount = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
   const taskRows = [
     { label: "SURVIVE", value: `DAY ${day.toString().padStart(2, "0")} / 14`, done: elapsed >= TOTAL_MISSION_SECONDS },
-    { label: "RESPOND TO EVENTS", value: `${resolvedEvents.length} / ${eventGoal}`, done: resolvedEvents.length >= eventGoal },
-    { label: "SURVEY A FIELD SITE", value: surveyDone ? "COMPLETE" : "1 REQUIRED", done: surveyDone },
+    { label: "RESOLVE INCIDENTS", value: `${resolvedEvents.length} / ${eventGoal}`, done: resolvedEvents.length >= eventGoal },
+    { label: "FIELD RESEARCH", value: `${analysedCount} ANALYSED`, done: analysedCount > 0 },
+    { label: "SITES MAPPED", value: `${surveyedCount} / ${Math.max(1, RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"].length)}`, done: surveyedCount > 0 },
   ];
   return (
     <div className="pointer-events-none absolute left-3 top-3 z-30 w-[min(88vw,270px)]">
@@ -2197,7 +2199,7 @@ export function MissionSimulation() {
           pending={pending}
           elapsed={elapsed}
           resolvedEvents={resolvedEventIds}
-          surveyedNodes={surveyedNodes}
+          sampleStages={sampleStages}
           activeEvent={activeEvent}
           roverTask={roverTask}
         />
@@ -2205,9 +2207,12 @@ export function MissionSimulation() {
         {selectedResource && !activeEvent && (
           <ResourceInspector
             node={selectedResource}
-            surveyed={surveyedNodes.includes(selectedResource.id)}
+            stage={sampleStages[selectedResource.id] ?? (surveyedNodes.includes(selectedResource.id) ? "SURVEYED" : "UNSURVEYED")}
             hasRover={pending.selected.rover !== undefined}
-            hasExtraction={pending.selected.extraction !== undefined || pending.selected.isru !== undefined}
+            hasExtraction={pending.selected.extraction !== undefined}
+            hasScience={pending.selected.science !== undefined}
+            operation={activeOperation}
+            actionBusy={actionBusy}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
             onClose={() => setSelectedResourceId(null)}
           />
