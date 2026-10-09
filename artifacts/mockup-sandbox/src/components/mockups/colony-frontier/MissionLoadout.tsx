@@ -113,13 +113,19 @@ function technologyKey(trackId: string, tier: Tier) {
 function isTierUnlocked(
   track: TechnologyTrack,
   tier: Tier,
-  unlockedTechnologies: string[],
+  gameState: ReturnType<typeof loadGameState>,
 ) {
-  if (tier === "Foundation") {
-    return true;
-  }
+  if (tier === "Foundation") return true;
 
-  return unlockedTechnologies.includes(technologyKey(track.id, tier));
+  const requirement = tierUnlockRequirements[tier];
+  const requiredTokens = tier === "Research"
+    ? Math.max(requirement.tokens, track.tiers[tier].researchTokens)
+    : requirement.tokens;
+
+  // Mission rewards organically open later hardware tiers. The Technology Lab
+  // can explicitly unlock them too; a player's tier is never silently upgraded.
+  return gameState.unlockedTechnologies.includes(technologyKey(track.id, tier))
+    || (gameState.xp >= requirement.xp && gameState.researchTokens >= requiredTokens);
 }
 
 function deploymentCost(
@@ -139,7 +145,7 @@ function getTierStatus(
   availableCredits: number,
   availableMass: number,
 ) {
-  if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
+  if (!isTierUnlocked(track, tier, gameState)) {
     return "locked";
   }
 
@@ -423,7 +429,7 @@ function getAutomaticTier(
   for (let index = tierOrder.length - 1; index >= 0; index -= 1) {
     const tier = tierOrder[index];
 
-    if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
+    if (!isTierUnlocked(track, tier, gameState)) {
       continue;
     }
 
@@ -586,7 +592,7 @@ export function MissionLoadout() {
       return;
     }
 
-    if (!isTierUnlocked(track, tier, gameState.unlockedTechnologies)) {
+    if (!isTierUnlocked(track, tier, gameState)) {
       setNotice(
         `${track.category} / ${tier} is not unlocked. Upgrade this technology in the Technology Lab first.`,
       );
