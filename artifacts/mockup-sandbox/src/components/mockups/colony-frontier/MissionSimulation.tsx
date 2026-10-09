@@ -684,6 +684,7 @@ function BuildingInspector({
   hasMaintenance,
   actionBusy,
   operation,
+  activeFault,
   activeEvent,
   eventChoices,
   onEventChoice,
@@ -698,6 +699,7 @@ function BuildingInspector({
   hasMaintenance: boolean;
   actionBusy: boolean;
   operation: MissionOperation | null;
+  activeFault: ActiveFault | null;
   activeEvent: MissionEvent | null;
   eventChoices: EventChoice[];
   onEventChoice: (choiceId: string) => void;
@@ -833,6 +835,32 @@ function BuildingInspector({
               <div className="h-full rounded-full bg-gradient-to-r from-[#31ce9b] to-[#f1d16a] transition-[width]" style={{ width: `${clamp(100 * (1 - operation.remainingSeconds / operation.totalSeconds))}%` }} />
             </div>
             <p className="mt-2 text-[9px] leading-4 text-[#a1c8bb]">This system is busy until its final check completes. Other colony systems can work in parallel.</p>
+          </section>
+        )}
+
+        {activeFault && (
+          <section className="mx-4 mt-4 rounded-2xl border border-[#a84c58] bg-gradient-to-r from-[#321a22] to-[#211a25] p-4 shadow-[0_0_28px_rgba(232,74,99,0.12)]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#a54d5b] bg-[#5a2531] text-[#ff8992]"><AlertTriangle className="h-5 w-5" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff9aa2]">Unresolved equipment fault</p>
+                <h3 className="mt-1 text-[11px] font-black uppercase text-white">{activeFault.title}</h3>
+                <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)}× · {activeFault.remainingSeconds > 0 ? `${Math.ceil(activeFault.remainingSeconds)}s before the next escalation` : "escalation window expired"}. This fault remains until repair and verification finish.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAction("repair-active")}
+              disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2}
+              className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-[#d16e72] bg-[#7b303c] px-3.5 py-3 text-left transition hover:border-[#ffd07a] hover:bg-[#8b3744] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span>
+                <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-white">Isolate · repair · verify</span>
+                <span className="mt-1 block text-[9px] leading-4 text-[#f0c8cc]">Power −4 · battery −2 · condition +12, plus recovery specific to this fault</span>
+              </span>
+              <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
+            </button>
+            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least 5% power and 2% battery reserve.</p>}
           </section>
         )}
 
@@ -2155,27 +2183,8 @@ export function MissionSimulation() {
       beginOperation("UPGRADE", trackId, `Installing upgrade kit · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, duration, targetLevel);
       return;
     }
-    const repairActions: Record<string, string[]> = {
-      solar: ["clean", "tune"],
-      battery: ["balance", "reserve"],
-      oxygen: ["reset", "boost"],
-      water: ["flush", "purify"],
-      co2: ["scrub", "recover"],
-      thermal: ["dump", "insulate"],
-      comms: ["repoint", "test"],
-      habitat: ["repair", "seal"],
-      radiation: ["shield", "shelter"],
-      grid: ["balance-grid", "prioritize"],
-      science: ["calibrate", "experiment"],
-      navigation: ["nav-calibrate", "route"],
-      rover: ["survey", "return", "inspect"],
-      extraction: ["extract-test", "extract"],
-      isru: ["process", "purge"],
-      agriculture: ["tune-crops", "harvest"],
-      maintenance: ["service", "diagnostics"],
-    };
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
-      (fault.targetTrackId === trackId && (repairActions[trackId] ?? []).includes(action)) ||
+      (fault.targetTrackId === trackId && action === "repair-active") ||
       (trackId === "maintenance" && (action === "service" || action === "diagnostics")),
     );
     if (matchingFaults.length > 0) {
@@ -2868,6 +2877,7 @@ export function MissionSimulation() {
             onClose={() => setSelectedBuildingId(null)}
             hasMaintenance={pending.selected.maintenance !== undefined}
             operation={activeOperations[selectedTrack.id] ?? null}
+            activeFault={Object.values(activeFaults).find((fault) => fault.targetTrackId === selectedTrack.id) ?? null}
             actionBusy={Boolean(activeOperations[selectedTrack.id])}
             activeEvent={activeEvent && selectedBuildingId === activeTargetTrackId ? activeEvent : null}
             eventChoices={activeEvent && selectedBuildingId === activeTargetTrackId ? getEventChoices(activeEvent, pending.selected) : []}
