@@ -2942,7 +2942,7 @@ export function MissionSimulation() {
           }}
           roverTask={roverTask}
           roverTargetNodeId={roverTargetNodeId}
-          speed={speed}
+          speed={manualPaused || activeEvent ? 0 : speed}
         />
 
         {!activeEvent && !dashboardOpen && (
