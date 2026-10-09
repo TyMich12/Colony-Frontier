@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Billboard, Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -30,6 +30,7 @@ type Props = {
   onSelect: (trackId: string) => void;
   onSelectResource: (node: MissionResourceNode) => void;
   roverTask: string;
+  simulationSpeed: number;
 };
 
 const POSITIONS: Record<string, [number, number]> = {
@@ -915,19 +916,103 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   );
 }
 
-function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; onClick: () => void; selected: boolean; alerted: boolean }) {
+function Rover({ task, position, resourceNodes, onClick, selected, alerted, simulationSpeed }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; onClick: () => void; selected: boolean; alerted: boolean; simulationSpeed: number }) {
   const ref = useRef<THREE.Group>(null);
-  const targetLabel = task.startsWith("SURVEYING ") ? task.slice("SURVEYING ".length) : "";
-  const target = resourceNodes.find((node) => node.label === targetLabel);
-  const destination = target ? nodeWorldPosition(target) : position;
-  useFrame(({ clock }) => {
+  const wheelRefs = useRef<Array<THREE.Group | null>>([]);
+  const targetLabel = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "]
+    .find((prefix) => task.startsWith(prefix));
+  const target = targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined;
+  const isReturning = task === "RETURNING" || task === "REPAIR VERIFIED" || task === "SAMPLE DELIVERED" || task === "ANALYSIS COMPLETE";
+  const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
+  const isCleaning = task === "CLEANING ARRAY";
+  const isRouting = task === "REROUTING" || task === "FORCED THROUGH";
+  const destination: [number, number] = target
+    ? nodeWorldPosition(target)
+    : isCleaning
+      ? POSITIONS.solar
+      : repairTarget && POSITIONS[repairTarget]
+        ? POSITIONS[repairTarget]
+        : isRouting && resourceNodes[0]
+          ? nodeWorldPosition(resourceNodes[0])
+          : isReturning
+            ? position
+            : position;
+  const isMovingTask = Boolean(targetLabel && target) || isReturning || isCleaning || Boolean(repairTarget && POSITIONS[repairTarget]) || isRouting;
+  const routeRef = useRef<Array<[number, number]>>([]);
+  const routeCursorRef = useRef(0);
+
+  // Build a one-way route over the colony's service corridors. Each waypoint is consumed once,
+  // replacing the previous back-and-forth oscillation between base and the target.
+  useEffect(() => {
     if (!ref.current) return;
-    const active = !!target && task.startsWith("SURVEYING ");
-    const phase = active ? (Math.sin(clock.getElapsedTime() * 0.24) + 1) / 2 : 0;
-    const x = THREE.MathUtils.lerp(position[0], destination[0], phase);
-    const z = THREE.MathUtils.lerp(position[1], destination[1], phase);
-    ref.current.position.set(x, terrainHeight(x, z) + 0.47, z);
-    ref.current.position.y += Math.sin(clock.getElapsedTime() * 2) * 0.008;
+    const start: [number, number] = [ref.current.position.x, ref.current.position.z];
+    const route: Array<[number, number]> = [start];
+    const add = (point: [number, number]) => {
+      const previous = route[route.length - 1];
+      if (Math.hypot(previous[0] - point[0], previous[1] - point[1]) > 0.12) route.push(point);
+    };
+
+    if (isMovingTask && targetLabel?.startsWith("AT SITE ")) {
+      add(destination);
+    } else if (isMovingTask && isReturning) {
+      add([25.6, -25.6]);
+      add(position);
+    } else if (isMovingTask) {
+      add([25.6, -25.6]);
+      add([25.6, -13]);
+      add([14, -13]);
+      if (destination[0] < -14) {
+        add([0, -13]);
+        add([-14, -13]);
+        add([-14, destination[1]]);
+      } else if (destination[0] > 14) {
+        add([destination[0], -13]);
+      } else {
+        add([0, -13]);
+        add([destination[0], -13]);
+      }
+      add(destination);
+    }
+    routeRef.current = route;
+    routeCursorRef.current = Math.min(1, route.length - 1);
+  }, [task, target?.id, destination[0], destination[1], isReturning, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
+
+  useFrame(({ clock, delta }) => {
+    if (!ref.current) return;
+    const current = ref.current.position;
+    const route = routeRef.current;
+    const step = Math.max(0, delta) * 4.5 * Math.max(0.5, simulationSpeed);
+    let travelled = 0;
+    let dx = 0;
+    let dz = 0;
+    if (isMovingTask && route.length > 1) {
+      let remainingStep = step;
+      while (remainingStep > 0 && routeCursorRef.current < route.length) {
+        const point = route[routeCursorRef.current];
+        dx = point[0] - current.x;
+        dz = point[1] - current.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 0.16) {
+          current.x = point[0];
+          current.z = point[1];
+          routeCursorRef.current += 1;
+          continue;
+        }
+        const move = Math.min(distance, remainingStep);
+        current.x += (dx / distance) * move;
+        current.z += (dz / distance) * move;
+        travelled += move;
+        remainingStep -= move;
+        if (move >= distance - 0.001) {
+          current.x = point[0];
+          current.z = point[1];
+          routeCursorRef.current += 1;
+        }
+      }
+      if (Math.hypot(dx, dz) > 0.01 && travelled > 0.0001) ref.current.rotation.y = Math.atan2(dx, dz);
+    }
+    current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * 5.5) * (travelled > 0 ? 0.014 : 0.004);
+    if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
   });
   const wheelZ = [-0.55, 0, 0.55];
   return (
@@ -948,8 +1033,8 @@ function Rover({ task, position, resourceNodes, onClick, selected, alerted }: { 
             <boxGeometry args={[0.09, 0.07, 1.36]} />
             <meshStandardMaterial color="#515b5d" metalness={0.58} roughness={0.36} />
           </mesh>
-          {wheelZ.map((z) => (
-            <group key={z} position={[side * 0.82, -0.16, z]}>
+          {wheelZ.map((z, wheelIndex) => (
+            <group key={z} ref={(el) => { wheelRefs.current[(side === -1 ? 0 : 3) + wheelIndex] = el; }} position={[side * 0.82, -0.16, z]}>
               <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.235, 0.235, 0.19, 20]} />
                 <meshStandardMaterial color="#1e2528" roughness={0.96} metalness={0.04} />
@@ -1535,7 +1620,7 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
         <Crew mars={mars} />
