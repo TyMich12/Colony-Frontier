@@ -2541,7 +2541,7 @@ export function MissionSimulation() {
                     </div>
                     <button type="button" onClick={() => setDashboardOpen(false)} className="rounded-lg border border-[#425a5d] px-2.5 py-1.5 text-xs text-[#b4c4c2]" aria-label="Close systems dashboard">×</button>
                   </div>
-                  <p className="mt-2 text-[9px] leading-4 text-[#87a29f]">Healthy systems still need monitoring. Warning colours show loss of margin, not simply whether a disaster has fired.</p>
+                  <p className="mt-2 text-[9px] leading-4 text-[#87a29f]">{emergencyPowerMode ? "ECO POWER ACTIVE · non-critical loads are shed. Power margin improves, but food production / battery charging are less efficient." : "Healthy systems still need monitoring. Warning colours show loss of margin, not simply whether a disaster has fired."}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 p-3">
