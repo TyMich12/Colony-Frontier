@@ -92,6 +92,17 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
   "nav-calibrate": 7, route: 5, survey: 12, return: 12, inspect: 4,
   "extract-test": 10, extract: 15, process: 12, purge: 7,
   "tune-crops": 12, harvest: 9, service: 12, diagnostics: 7,
+  "fallback-solar": 7, "fallback-battery": 5, "fallback-grid": 4, "fallback-habitat": 6,
+  "fallback-water": 7, "fallback-oxygen": 5, "fallback-co2": 6, "fallback-thermal": 6,
+  "fallback-radiation": 5, "fallback-comms": 5, "fallback-navigation": 5, "fallback-rover": 5,
+  "fallback-extraction": 6, "fallback-isru": 6, "fallback-science": 6, "fallback-agriculture": 5,
+  "fallback-maintenance": 8,
+  "solar-autonomous-clean": 12, "battery-thermal-recondition": 14, "oxygen-electrolyser-burst": 13,
+  "water-distillate-recovery": 12, "co2-crop-loop": 12, "thermal-waste-heat-recovery": 12,
+  "comms-priority-window": 9, "habitat-composite-patch": 16, "radiation-regolith-berm": 15,
+  "grid-black-start": 13, "science-fusion": 16, "request-earth-report": 20,
+  "extraction-waterjet": 18, "isru-oxygen-feed": 16, "agriculture-closed-loop": 16,
+  "maintenance-overhaul": 18,
 };
 
 const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
@@ -112,7 +123,40 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   extract: "Yield +5 · power −5 · battery −2 · score +7", process: "Yield +3 · power −5 · battery −1 · score +5",
   purge: "Condition +2 · power −1", "tune-crops": "Food +5 · water −2 · power −2 · condition +1",
   harvest: "Food +7 · water −2 · yield +1 · score +3", service: "Raises the weakest system's condition by 10",
-  diagnostics: "Checks the live fault register · score +3",
+  diagnostics: "Checks live faults and reports the weakest system · score +3",
+  "fallback-solar": "Dust −7 points · power +1 · works without grid or rover",
+  "fallback-battery": "Recover ~1% usable reserve by isolating parasitic draw · no generator required",
+  "fallback-grid": "Emergency manual load shedding · power margin +1 · ECO loads enabled",
+  "fallback-habitat": "Emergency seal patch · habitat integrity +1.5 · condition +3",
+  "fallback-water": "Gravity-fed condensate recovery · water +1 · no powered purifier required",
+  "fallback-oxygen": "Release a small amount from the built-in emergency oxygen buffer · oxygen +1",
+  "fallback-co2": "Swap passive sorbent cartridge · condition +1 · oxygen margin +0.8",
+  "fallback-thermal": "Close passive insulation shutters · gently damp temperature drift without a heater load",
+  "fallback-radiation": "Move crew behind passive shielding · exposure index −0.5",
+  "fallback-comms": "Reset the local low-rate beacon · condition +1",
+  "fallback-navigation": "Re-zero inertial sensors for dead-reckoning · condition +1",
+  "fallback-rover": "Inspect wheel encoders and clear a local drive fault · condition +2",
+  "fallback-extraction": "Unload the drill torque latch · condition +1 without extracting material",
+  "fallback-isru": "Isolate and purge the process line · condition +1, no feedstock required",
+  "fallback-science": "Re-zero the bench instruments · condition +1, no sample consumed",
+  "fallback-agriculture": "Harvest the last ready edible biomass · food +1 without a full water loop",
+  "fallback-maintenance": "Manual walk-around service · condition +2 on the weakest healthy module",
+  "solar-autonomous-clean": "Rover + maintenance-assisted cleaning · greater dust removal and reduced panel wear",
+  "battery-thermal-recondition": "Thermal conditioning plus supervised BMS balancing · larger reserve recovery",
+  "oxygen-electrolyser-burst": "Electrolyse reclaimed water for extra oxygen · water and power consumed",
+  "water-distillate-recovery": "Recover more condensate using waste heat · larger water gain with a power cost",
+  "co2-crop-loop": "Route scrubbed CO₂ into a compatible greenhouse loop · oxygen margin and crop support improve",
+  "thermal-waste-heat-recovery": "Recover waste heat from the power system · temperature stabilises with less net energy loss",
+  "comms-priority-window": "Reserve a high-gain uplink window using navigation timing",
+  "habitat-composite-patch": "Use processed structural composite and thermal-controlled curing · stronger seal repair",
+  "radiation-regolith-berm": "Use excavated regolith to thicken local shielding · lower exposure index",
+  "grid-black-start": "Black-start the bus from a charged battery and stable solar input · strong power recovery",
+  "science-fusion": "Fuse analysed specimen data with navigation and thermal telemetry · high research yield",
+  "request-earth-report": "Earth Mission Control report · up to 20 simulated seconds; Research navigation with 2/2 caches locally for instant delivery",
+  "extraction-waterjet": "Water-assisted drilling with rover alignment · higher yield, but water and energy costs",
+  "isru-oxygen-feed": "Process verified drill feedstock into useful oxygen-bearing products",
+  "agriculture-closed-loop": "Close the water / CO₂ / thermal loop for a larger food gain at meaningful energy cost",
+  "maintenance-overhaul": "Preventative multi-module service using telemetry and an available work crew",
 };
 
 type MissionEvent = {
@@ -219,6 +263,22 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
   harvest: { all: ["water", "co2", "oxygen", "thermal", "habitat"], any: ["grid", "battery"], minPower: 2 },
   service: { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
   diagnostics: { all: ["comms"], any: ["grid", "battery"], minPower: 2 },
+  "request-earth-report": { all: ["comms"], any: ["grid", "battery"], minPower: 1 },
+  "solar-autonomous-clean": { all: ["rover", "maintenance", "navigation"], any: ["grid", "battery"], minPower: 2 },
+  "battery-thermal-recondition": { all: ["thermal", "maintenance", "grid"], minPower: 3, minBattery: 2 },
+  "oxygen-electrolyser-burst": { all: ["water", "grid", "thermal", "habitat"], minPower: 6, minBattery: 1 },
+  "water-distillate-recovery": { all: ["thermal", "habitat", "grid"], minPower: 4 },
+  "co2-crop-loop": { all: ["agriculture", "oxygen", "water"], any: ["grid", "battery"], minPower: 2 },
+  "thermal-waste-heat-recovery": { all: ["grid", "battery", "habitat"], minPower: 2 },
+  "comms-priority-window": { all: ["navigation", "grid"], minPower: 2 },
+  "habitat-composite-patch": { all: ["maintenance", "thermal", "isru"], any: ["grid", "battery"], minPower: 3, minBattery: 2 },
+  "radiation-regolith-berm": { all: ["habitat", "extraction", "isru"], minPower: 2 },
+  "grid-black-start": { all: ["solar", "battery", "maintenance"], minPower: 2, minBattery: 3 },
+  "science-fusion": { all: ["navigation", "comms", "thermal", "isru"], any: ["grid", "battery"], minPower: 3, analysedSample: true, extractedFeed: true },
+  "extraction-waterjet": { all: ["rover", "navigation", "water", "maintenance"], any: ["grid", "battery"], minPower: 7, minBattery: 3, surveyedSite: true },
+  "isru-oxygen-feed": { all: ["extraction", "water", "oxygen", "grid"], minPower: 4, extractedFeed: true },
+  "agriculture-closed-loop": { all: ["water", "co2", "oxygen", "thermal", "habitat", "science"], any: ["grid", "battery"], minPower: 4 },
+  "maintenance-overhaul": { all: ["comms", "navigation", "grid"], minPower: 3, minBattery: 2 },
   "repair-active": { minPower: 5, minBattery: 2 },
   upgrade: { minPower: 8, minBattery: 5 },
   sample: { all: ["rover", "navigation"], any: ["battery", "grid"], minPower: 7, minBattery: 3 },
@@ -290,7 +350,7 @@ function getActionBlockers(
     const ownFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
     if (ownFault && !isRepair) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
     if (!ownFault && !isRepair && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
-    if (!ownFault && !isRepair && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
+    if (!ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
   }
 
   const rule = ACTION_REQUIREMENTS[actionId] ?? {};
@@ -358,6 +418,26 @@ function tierLevel(tier: Tier): number {
   if (!isTier(tier)) return 0;
   return tier === "Foundation" ? 0 : tier === "Frontier" ? 1 : tier === "Apex" ? 2 : 3;
 }
+
+// Tier jumps always beat two field retrofits: +18% per technology tier versus +5% per retrofit.
+function systemPerformanceMultiplier(tier: Tier | undefined, upgradeLevel: number): number {
+  return 1 + tierLevel(tier ?? "Foundation") * 0.18 + Math.max(0, Math.min(2, upgradeLevel)) * 0.05;
+}
+
+// This is a compressed command/processing queue, not the speed-of-light radio delay.
+// At Research 2/2, local predictive caching can provide the report without waiting for Earth.
+function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
+  if (tier === "Research" && upgradeLevel >= 2) return 0;
+  return Math.max(0, 20 - tierLevel(tier) * 4.8 - Math.max(0, Math.min(2, upgradeLevel)) * 2);
+}
+
+const LOCAL_FALLBACK_ACTIONS = new Set([
+  "fallback-solar", "fallback-battery", "fallback-grid", "fallback-habitat",
+  "fallback-water", "fallback-oxygen", "fallback-co2", "fallback-thermal",
+  "fallback-radiation", "fallback-comms", "fallback-navigation", "fallback-rover",
+  "fallback-extraction", "fallback-isru", "fallback-science", "fallback-agriculture",
+  "fallback-maintenance",
+]);
 
 function clamp(value: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, value));
