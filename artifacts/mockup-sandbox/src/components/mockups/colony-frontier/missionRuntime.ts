@@ -59,6 +59,8 @@ export type MissionOperation = {
   operationKey?: string;
   /** True when this work order currently requires the physical rover; prevents conflicting dispatches. */
   roverAssigned?: boolean;
+  /** Optional deployed systems integrated into this operation. */
+  supportSystems?: string[];
   /** Sample integrity score captured when a sealed sample is collected. */
   sampleQuality?: number;
 };
