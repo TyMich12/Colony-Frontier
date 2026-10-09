@@ -1434,7 +1434,7 @@ function BuildingInspector({
             </button>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3>
+        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
           {actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
             const emergencyOverride = action.id.startsWith("fallback-") && fallbackEmergencyOverride(action.id, track.id, metrics, Boolean(activeFault));
