@@ -951,6 +951,13 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
   // replacing the previous back-and-forth oscillation between base and the target.
   useEffect(() => {
     if (!ref.current) return;
+    // React Three Fiber otherwise reapplies the JSX position prop on re-renders, snapping a
+    // frame-driven rover back to its launch point. Set the initial position once, then let the
+    // route controller own X/Z for the remainder of the mission.
+    if (!ref.current.userData.roverPositionInitialized) {
+      ref.current.position.set(position[0], PAD_Y + 0.47, position[1]);
+      ref.current.userData.roverPositionInitialized = true;
+    }
     const start: [number, number] = [ref.current.position.x, ref.current.position.z];
     const route: Array<[number, number]> = [start];
     const add = (point: [number, number]) => {
@@ -1060,7 +1067,7 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
   });
   const wheelZ = [-0.55, 0, 0.55];
   return (
-    <group ref={ref} position={[position[0], PAD_Y + 0.47, position[1]]} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+    <group ref={ref} onClick={(e) => { e.stopPropagation(); onClick(); }}>
       <mesh castShadow position={[0, 0.01, 0]}>
         <RoundedBox args={[1.72, 0.28, 1.12]} radius={0.12} smoothness={4}>
           <meshStandardMaterial color="#b99a5d" roughness={0.64} metalness={0.3} />
