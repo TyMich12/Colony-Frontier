@@ -348,7 +348,7 @@ function getActionBlockers(
   if (systemId !== "field") {
     if (!context.selected[systemId]) blockers.push(`Install ${SYSTEM_LABELS[systemId] ?? systemId} first`);
     const ownFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
-    if (ownFault && !isRepair) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
+    if (ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId)) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
     if (!ownFault && !isRepair && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
     if (!ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
   }
@@ -1157,7 +1157,7 @@ function BuildingInspector({
             <div className="mt-2 flex items-start gap-2">
               <Radio className="mt-0.5 h-4 w-4 shrink-0 text-[#76bddf]" />
               <p className="text-[9px] leading-4 text-[#a8c0d0]">
-                {earthReport ? `Last report received at mission T+${Math.round(earthReportAtSeconds)}s.` : "Request a report for power, life support, faults, field science and the recommended next action."}
+                {earthReport ? `Last report received at mission T+${Math.round(earthReportAtSeconds)}s.` : `Mission T+${Math.round(elapsedSeconds)}s: request a report for power, life support, faults, field science and the recommended next action.`}
                 {" "}Queue estimate: <span className="font-bold text-[#f0cf69]">{earthReportDelaySeconds(tier, upgradeLevel) === 0 ? "INSTANT · local cache" : `${earthReportDelaySeconds(tier, upgradeLevel)} simulated seconds`}</span>.
               </p>
             </div>
@@ -1250,7 +1250,7 @@ function BuildingInspector({
             const blockers = getBlockers(track.id, action.id);
             const locked = blockers.length > 0;
             const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[action.id] ?? 6);
-            const actionMultiplier = systemPerformanceMultiplier(tier, upgradeLevel);
+            const actionMultiplier = systemPerformanceMultiplier(selected[track.id] ?? tier, upgradeLevel);
             return (
             <button
               key={action.id}
@@ -1609,8 +1609,9 @@ export function MissionSimulation() {
         const level = operation.targetLevel ?? 1;
         setBuildings((current) => {
           const previous = current[operation.targetId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          const upgradeLevel = Math.max(previous.upgradeLevel ?? 0, level);
-          const condition = clamp(previous.condition + 5);
+          const previousLevel = previous.upgradeLevel ?? 0;
+          const upgradeLevel = Math.max(previousLevel, level);
+          const condition = clamp(previous.condition + 5 * systemPerformanceMultiplier(pending?.selected[operation.targetId], previousLevel));
           return { ...current, [operation.targetId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
         });
         setScore((value) => clamp(value + 4));
@@ -1620,10 +1621,11 @@ export function MissionSimulation() {
       case "REPAIR": {
         const repairTarget = operation.targetId;
         const faults = Object.values(activeFaultsRef.current).filter((fault) => fault.targetTrackId === repairTarget);
+        const repairMultiplier = systemPerformanceMultiplier(pending?.selected[repairTarget], buildings[repairTarget]?.upgradeLevel ?? 0);
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
         setBuildings((current) => {
           const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          const condition = clamp(previous.condition + 12);
+          const condition = clamp(previous.condition + 12 * repairMultiplier);
           const repaired = { ...current, [repairTarget]: { ...previous, condition, status: buildingStatus(condition) } };
           if (faults.some((fault) => fault.eventId === "solar-dust" || fault.eventId === "regional-dust-front")) {
             repaired.solar = { ...(repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((repaired.solar?.dust ?? 0) - 8) };
@@ -1631,25 +1633,25 @@ export function MissionSimulation() {
           return repaired;
         });
         setMetrics((current) => {
-          let next = { ...current, power: clamp(current.power + 2), battery: clamp(current.battery + 2) };
+          let next = { ...current, power: clamp(current.power + 2 * repairMultiplier), battery: clamp(current.battery + 2 * repairMultiplier) };
           for (const fault of faults) {
             switch (fault.eventId) {
               case "solar-dust":
               case "regional-dust-front":
-                next = { ...next, power: clamp(next.power + 4), battery: clamp(next.battery + 2) };
+                next = { ...next, power: clamp(next.power + 4 * repairMultiplier), battery: clamp(next.battery + 2 * repairMultiplier) };
                 break;
-              case "battery-thermal": next = { ...next, battery: clamp(next.battery + 7) }; break;
+              case "battery-thermal": next = { ...next, battery: clamp(next.battery + 7 * repairMultiplier) }; break;
               case "oxygen-filter":
-              case "co2-scrubber-loading": next = { ...next, oxygen: clamp(next.oxygen + 6) }; break;
-              case "water-filter": next = { ...next, water: clamp(next.water + 6) }; break;
+              case "co2-scrubber-loading": next = { ...next, oxygen: clamp(next.oxygen + 6 * repairMultiplier) }; break;
+              case "water-filter": next = { ...next, water: clamp(next.water + 6 * repairMultiplier) }; break;
               case "habitat-pressure":
-              case "micrometeoroid-impact": next = { ...next, habitat: clamp(next.habitat + 6) }; break;
-              case "radiation-burst": next = { ...next, radiation: clamp(next.radiation - 4) }; break;
+              case "micrometeoroid-impact": next = { ...next, habitat: clamp(next.habitat + 6 * repairMultiplier) }; break;
+              case "radiation-burst": next = { ...next, radiation: clamp(next.radiation - 4 * repairMultiplier) }; break;
               case "polar-shadow-cold-soak":
-              case "thermal-drift": next = { ...next, temperature: clamp(next.temperature + (21 - next.temperature) * 0.35, 16, 28) }; break;
+              case "thermal-drift": next = { ...next, temperature: clamp(next.temperature + (21 - next.temperature) * Math.min(0.7, 0.35 * repairMultiplier), 16, 28) }; break;
               case "grid-overload":
-              case "core-power": next = { ...next, power: clamp(next.power + 5), battery: clamp(next.battery + 3) }; break;
-              case "agriculture-stress": next = { ...next, food: clamp(next.food + 5), water: clamp(next.water - 1) }; break;
+              case "core-power": next = { ...next, power: clamp(next.power + 5 * repairMultiplier), battery: clamp(next.battery + 3 * repairMultiplier) }; break;
+              case "agriculture-stress": next = { ...next, food: clamp(next.food + 5 * repairMultiplier), water: clamp(next.water - 1 / repairMultiplier) }; break;
               default: break;
             }
           }
