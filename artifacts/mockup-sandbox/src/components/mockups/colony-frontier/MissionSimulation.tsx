@@ -1233,7 +1233,7 @@ export function MissionSimulation() {
           return impact;
         }, { power: 0, battery: 0, oxygen: 0, water: 0, food: 0, habitat: 0, radiation: 0, temperature: 0 });
 
-        const powerRecovery = (powerBase - current.power) * 0.035 * speed;
+        const powerRecovery = (powerBase - current.power) * 0.035 * dt;
         return {
           // Electrical margin recovers over time as generation catches up with demand; faults can keep pulling it down.
           power: clamp(current.power + powerRecovery - faultImpact.power),
