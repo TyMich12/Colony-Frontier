@@ -1120,8 +1120,10 @@ function BuildingInspector({
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">LOCKED · {blockers.join(" · ")}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">Prerequisites satisfied</span>}
                 </span>
-              </span></button>
-          ))}
+              </span>
+            </button>
+            );
+          })}
         </div>
         <div className="mx-4 mb-4 rounded-2xl border border-[#40575b] bg-[#101f24] p-3">
           <div className="flex items-center justify-between gap-3">
@@ -1166,6 +1168,7 @@ function ResourceInspector({
   actionBusy,
   onAction,
   onClose,
+  getBlockers,
 }: {
   node: ResourceNode;
   stage: SampleStage;
@@ -1181,6 +1184,7 @@ function ResourceInspector({
   actionBusy: boolean;
   onAction: (action: string) => void;
   onClose: () => void;
+  getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
 }) {
   const flow: { id: SampleStage; title: string; detail: string }[] = [
     { id: "UNSURVEYED", title: "1 · Survey & classify", detail: "Map the site, estimate terrain hazards, and record a baseline spectral signature." },
@@ -1191,13 +1195,14 @@ function ResourceInspector({
   ];
   const stageIndex = flow.findIndex((item) => item.id === stage);
   const isThisOperation = Boolean(operation && operation.targetId === node.id);
-  const canStart = !operation && !actionBusy;
   const nextAction =
-    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Start rover survey" : "Start remote survey", seconds: hasRover ? Math.max(7, 12 - roverTier * 1.5 - navigationTier * 0.5) : Math.max(17, 22 - navigationTier * 1.2), detail: hasRover ? "Rover mapping + close-range instrument readings." : "Orbital / fixed-sensor scan; slower and lower confidence." } :
-    stage === "SURVEYED" ? { id: "sample", label: hasExtraction ? "Collect core sample" : "Collect field sample", seconds: hasExtraction ? Math.max(10, (hasRover ? 16 : 21) - extractionTier * 2) : hasRover ? Math.max(16, 24 - roverTier * 1.4) : 30, detail: hasExtraction ? "Drill / sampler consumes energy; sealed core retained for analysis." : "Crew EVA sampler is slower and increases exposure." } :
-    stage === "COLLECTED" ? { id: "transfer", label: hasRover ? "Return sample to lab" : "Carry sample to lab", seconds: hasRover ? Math.max(7, 12 - roverTier * 1.5) : Math.max(16, 22 - navigationTier * 1.5), detail: hasRover ? "Rover transports the sealed sample along the site route." : "Crew transfer takes longer and adds EVA exposure." } :
-    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Run lab analysis" : "Run portable assay", seconds: hasScience ? Math.max(12, 20 - scienceTier * 2) : 32, detail: hasScience ? "Spectrometry with the selected science system." : "Portable assay is slower and produces a lower-confidence result." } :
+    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: Math.max(9, 12 - roverTier - navigationTier * 0.35), detail: "Needs a working rover, navigation, communications, and an operational power path." } :
+    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: hasExtraction ? Math.max(10, (hasRover ? 16 : 21) - extractionTier * 2) : Math.max(16, 24 - roverTier * 1.4), detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
+    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: Math.max(11, 14 - roverTier), detail: "The rover drives the sealed container to the habitat so chain of custody is preserved." } :
+    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Analyze in science laboratory" : "Analysis locked · laboratory required", seconds: Math.max(12, 20 - scienceTier * 2), detail: "A deployed, operational science laboratory is mandatory. There is no portable-assay bypass." } :
     null;
+  const blockers = nextAction ? getBlockers("field", nextAction.id, node.id) : [];
+  const canStart = !operation && !actionBusy && blockers.length === 0;
   const progress = isThisOperation && operation ? Math.round(100 * (1 - operation.remainingSeconds / operation.totalSeconds)) : 0;
 
   return (
@@ -1278,7 +1283,8 @@ function ResourceInspector({
                 <span className="shrink-0 rounded-full border border-[#554821]/40 bg-[#f7dc8d] px-2.5 py-1 font-mono text-[10px] font-bold">~{nextAction.seconds}s</span>
               </span>
               <span className="mt-1.5 block text-[10px] leading-4 text-[#3e4c37]">{nextAction.detail}</span>
-              <span className="mt-2 flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.15em]"><Clock className="h-3 w-3" /> Start operation</span>
+              {blockers.length > 0 && <span className="mt-2 block rounded-lg border border-[#92515a]/50 bg-[#6d2d37]/10 px-2.5 py-2 text-[9px] font-bold leading-4 text-[#7e2c33]">LOCKED · {blockers.join(" · ")}</span>}
+              <span className="mt-2 flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.15em]"><Clock className="h-3 w-3" /> {blockers.length ? "Resolve prerequisites first" : "Start operation"}</span>
             </button>
           )}
 
@@ -1289,7 +1295,7 @@ function ResourceInspector({
             </div>
           )}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#263f3e] pt-3 text-[9px]">
-            <span className="text-[#7e9a92]">Rover: {hasRover ? "available" : "not deployed"} · Drill: {hasExtraction ? "available" : "field sampler only"} · Science lab: {hasScience ? "available" : "portable assay"}</span>
+            <span className="text-[#7e9a92]">Rover: {hasRover ? "deployed" : "missing"} · Core drill: {hasExtraction ? "deployed" : "required for ICE/MINERAL"} · Science lab: {hasScience ? "deployed" : "required for analysis"}</span>
             {operation && <span className="font-bold uppercase tracking-[0.12em] text-[#a9f2c8]">Working · {Math.ceil(operation.remainingSeconds)}s</span>}
           </div>
         </div>
@@ -3131,6 +3137,7 @@ export function MissionSimulation() {
             actionBusy={Boolean(activeOperations[selectedResource.id] || activeOperations.rover || activeOperations.science || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)))}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
             onClose={() => setSelectedResourceId(null)}
+            getBlockers={checkActionPrerequisites}
           />
         )}
 
