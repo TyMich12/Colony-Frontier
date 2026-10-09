@@ -944,143 +944,31 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
             ? position
             : position;
   const isMovingTask = Boolean(targetLabel && target) || isTransferring || isReturning || isCleaning || Boolean(repairTarget && POSITIONS[repairTarget]) || isRouting;
-  const routeRef = useRef<Array<[number, number]>>([]);
-  const routeCursorRef = useRef(0);
-
-  // Build a one-way route over the colony's service corridors. Each waypoint is consumed once,
-  // replacing the previous back-and-forth oscillation between base and the target.
-  useEffect(() => {
-    if (!ref.current) return;
-    // React Three Fiber otherwise reapplies the JSX position prop on re-renders, snapping a
-    // frame-driven rover back to its launch point. Set the initial position once, then let the
-    // route controller own X/Z for the remainder of the mission.
-    if (!ref.current.userData.roverPositionInitialized) {
-      ref.current.position.set(position[0], PAD_Y + 0.47, position[1]);
-      ref.current.userData.roverPositionInitialized = true;
-    }
-    const start: [number, number] = [ref.current.position.x, ref.current.position.z];
-    const route: Array<[number, number]> = [start];
-    const add = (point: [number, number]) => {
-      const previous = route[route.length - 1];
-      if (Math.hypot(previous[0] - point[0], previous[1] - point[1]) > 0.12) route.push(point);
-    };
-
-    if (isMovingTask && isCollecting && target) {
-      const distanceToSample = Math.hypot(start[0] - destination[0], start[1] - destination[1]);
-      if (distanceToSample < 1.8) {
-        // A small positioning manoeuvre keeps collection visibly active even when the rover
-        // arrived during the earlier survey stage.
-        add([destination[0] + 3.2, destination[1] + 1.6]);
-        add([destination[0] + 1.2, destination[1] + 0.6]);
-        add(destination);
-      } else {
-        // On a resumed/older save, approach the selected site using the service corridors.
-        add([25.6, -25.6]);
-        add([25.6, -13]);
-        add([14, -13]);
-        if (destination[0] < -14) {
-          add([0, -13]);
-          add([-14, -13]);
-          add([-14, destination[1]]);
-        } else if (destination[0] > 14) {
-          add([destination[0], -13]);
-        } else {
-          add([0, -13]);
-          add([destination[0], -13]);
-        }
-        add(destination);
-      }
-    } else if (isMovingTask && targetLabel?.startsWith("AT SITE ")) {
-      add(destination);
-    } else if (isMovingTask && isReturning) {
-      // If already home (e.g. after local cleaning), don't make a pointless lap.
-      if (Math.hypot(start[0] - position[0], start[1] - position[1]) > 3) {
-        add([25.6, -25.6]);
-        add(position);
-      }
-    } else if (isMovingTask && isTransferring) {
-      add([25.6, -25.6]);
-      add([25.6, -13]);
-      add([14, -13]);
-      add([14, -0.6]);
-      add([0, -0.6]);
-      add(destination);
-    } else if (isMovingTask) {
-      add([25.6, -25.6]);
-      add([25.6, -13]);
-      add([14, -13]);
-      if (destination[0] < -14) {
-        add([0, -13]);
-        add([-14, -13]);
-        add([-14, destination[1]]);
-      } else if (destination[0] > 14) {
-        add([destination[0], -13]);
-      } else {
-        add([0, -13]);
-        add([destination[0], -13]);
-      }
-      add(destination);
-    }
-    routeRef.current = route;
-    routeCursorRef.current = Math.min(1, route.length - 1);
-  }, [task, targetNodeId, target?.id, destination[0], destination[1], isReturning, isTransferring, isCollecting, isCleaning, repairTarget, isRouting, isMovingTask, targetLabel, position[0], position[1]]);
-
+  // Move visually using frame delta, independent of the mission-time speed setting.
   useFrame(({ clock, delta }) => {
     if (!ref.current) return;
     const current = ref.current.position;
-    const route = routeRef.current;
-    // Longer trips must finish within the work-order window. A local collection manoeuvre is
-    // deliberately slower so it remains visible when the rover has already surveyed the site.
-    const localCollectionApproach = isCollecting && route.length <= 4;
-    const movementRate = localCollectionApproach ? 3.4 : 12.5;
-    const step = Math.max(0, delta) * movementRate * performanceMultiplier * Math.max(0, simulationSpeed);
     let travelled = 0;
-    let dx = 0;
-    let dz = 0;
-    if (isMovingTask && route.length > 1) {
-      let remainingStep = step;
-      while (remainingStep > 0 && routeCursorRef.current < route.length) {
-        const point = route[routeCursorRef.current];
-        dx = point[0] - current.x;
-        dz = point[1] - current.z;
-        const distance = Math.hypot(dx, dz);
-        if (distance < 0.16) {
-          current.x = point[0];
-          current.z = point[1];
-          routeCursorRef.current += 1;
-          continue;
+    const returningToLaunch = isReturning && Math.hypot(destination[0] - position[0], destination[1] - position[1]) < 0.1;
+    if (isMovingTask && !returningToLaunch) {
+      const dx = destination[0] - current.x;
+      const dz = destination[1] - current.z;
+      const distance = Math.hypot(dx, dz);
+      const arriveRadius = isCollecting ? 0.42 : 0.22;
+      if (distance > arriveRadius) {
+        const movementRate = isCollecting ? 5.8 : isTransferring ? 8.5 : 10.5;
+        const move = Math.min(Math.max(0, delta) * movementRate * Math.max(0.85, performanceMultiplier), distance - arriveRadius);
+        if (move > 0) {
+          current.x += dx / distance * move;
+          current.z += dz / distance * move;
+          travelled = move;
+          ref.current.rotation.y = Math.atan2(dx, dz);
         }
-        const move = Math.min(distance, remainingStep);
-        current.x += (dx / distance) * move;
-        current.z += (dz / distance) * move;
-        travelled += move;
-        remainingStep -= move;
-        if (move >= distance - 0.001) {
-          current.x = point[0];
-          current.z = point[1];
-          routeCursorRef.current += 1;
-        }
-      }
-      if (Math.hypot(dx, dz) > 0.01 && travelled > 0.0001) ref.current.rotation.y = Math.atan2(dx, dz);
-    }
-    // If an old save or interrupted route leaves no waypoints, still drive toward the live target.
-    if (isMovingTask && (route.length <= 1 || routeCursorRef.current >= route.length) && Math.hypot(destination[0] - current.x, destination[1] - current.z) > 0.7) {
-      const directDx = destination[0] - current.x;
-      const directDz = destination[1] - current.z;
-      const directDistance = Math.hypot(directDx, directDz);
-      const directMove = Math.min(directDistance, Math.max(0, delta) * 9 * performanceMultiplier * Math.max(0, simulationSpeed));
-      if (directDistance > 0.001 && directMove > 0) {
-        current.x += directDx / directDistance * directMove;
-        current.z += directDz / directDistance * directMove;
-        travelled += directMove;
-        ref.current.rotation.y = Math.atan2(directDx, directDz);
       }
     }
     current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * 5.5) * (travelled > 0 ? 0.014 : 0.004);
     if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
-    if (drillRef.current) {
-      drillRef.current.position.y = isCollecting ? 0.14 + (Math.sin(clock.getElapsedTime() * 15) + 1) * 0.035 : 0.14;
-    }
+    if (drillRef.current) drillRef.current.position.y = isCollecting ? 0.14 + (Math.sin(clock.getElapsedTime() * 15) + 1) * 0.035 : 0.14;
   });
   const wheelZ = [-0.55, 0, 0.55];
   return (
@@ -1592,19 +1480,21 @@ function ColonyBuilding({
         </mesh>
       )}
       <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.24 : 2.05} height={0.12} />
-      <Billboard
-        position={[0, track.id === "habitat" ? 5.0 : track.id === "extraction" ? 4.35 : 3.35, 0]}
-        follow
-        frustumCulled={false}
-      >
-        <mesh position={[0, -0.04, -0.045]} renderOrder={12}>
-          <planeGeometry args={[Math.max(2.35, Math.min(5.4, track.category.length * 0.19 + 0.7)), alerted ? 0.96 : 0.76]} />
-          <meshBasicMaterial color="#071117" transparent opacity={0.78} depthWrite={false} toneMapped={false} />
-        </mesh>
-        <Text frustumCulled={false} position={[0, 0.16, 0]} fontSize={track.id === "habitat" ? 0.48 : 0.36} color={selected ? "#fff0a2" : "#f0f5ef"} outlineWidth={0.035} outlineColor="#11191d" anchorX="center" anchorY="middle">{track.category.toUpperCase()}</Text>
-        <Text frustumCulled={false} position={[0, -0.16, 0]} fontSize={0.2} color={tierColor(tier)} outlineWidth={0.025} outlineColor="#11191d" anchorX="center" anchorY="middle">{tier.toUpperCase()}</Text>
-        {alerted && <Text frustumCulled={false} position={[0, -0.43, 0]} fontSize={0.24} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center" anchorY="middle">EVENT · RESPOND</Text>}
-      </Billboard>
+      {track.id !== "rover" && (
+  <Billboard
+          position={[0, track.id === "habitat" ? 5.0 : track.id === "extraction" ? 4.35 : 3.35, 0]}
+          follow
+          frustumCulled={false}
+        >
+          <mesh position={[0, -0.04, -0.045]} renderOrder={12}>
+            <planeGeometry args={[Math.max(2.35, Math.min(5.4, track.category.length * 0.19 + 0.7)), alerted ? 0.96 : 0.76]} />
+            <meshBasicMaterial color="#071117" transparent opacity={0.78} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <Text frustumCulled={false} position={[0, 0.16, 0]} fontSize={track.id === "habitat" ? 0.48 : 0.36} color={selected ? "#fff0a2" : "#f0f5ef"} outlineWidth={0.035} outlineColor="#11191d" anchorX="center" anchorY="middle">{track.category.toUpperCase()}</Text>
+          <Text frustumCulled={false} position={[0, -0.16, 0]} fontSize={0.2} color={tierColor(tier)} outlineWidth={0.025} outlineColor="#11191d" anchorX="center" anchorY="middle">{tier.toUpperCase()}</Text>
+          {alerted && <Text frustumCulled={false} position={[0, -0.43, 0]} fontSize={0.24} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center" anchorY="middle">EVENT · RESPOND</Text>}
+        </Billboard>
+)}
     </group>
   );
 }
