@@ -1029,7 +1029,7 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
     if (!ref.current) return;
     const current = ref.current.position;
     const route = routeRef.current;
-    const step = Math.max(0, delta) * 5.5 * performanceMultiplier * Math.max(0, simulationSpeed);
+    const step = Math.max(0, delta) * 8.5 * performanceMultiplier * Math.max(0, simulationSpeed);
     let travelled = 0;
     let dx = 0;
     let dz = 0;
