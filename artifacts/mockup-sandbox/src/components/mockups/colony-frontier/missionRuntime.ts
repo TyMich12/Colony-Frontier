@@ -101,6 +101,8 @@ export type MissionRuntimeSnapshot = {
   /** Most recently received Earth Mission Control report, persisted between reloads. */
   earthReport?: string | null;
   earthReportAtSeconds?: number;
+  /** Simulated mission time when each low-tech emergency fallback can be used again. */
+  fallbackReadyAt?: Record<string, number>;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
