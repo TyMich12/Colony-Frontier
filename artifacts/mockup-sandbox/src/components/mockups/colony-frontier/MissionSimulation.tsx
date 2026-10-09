@@ -849,6 +849,7 @@ function BuildingInspector({
 function ResourceInspector({
   node,
   stage,
+  sampleQuality,
   hasRover,
   hasExtraction,
   hasScience,
@@ -863,6 +864,7 @@ function ResourceInspector({
 }: {
   node: ResourceNode;
   stage: SampleStage;
+  sampleQuality?: number;
   hasRover: boolean;
   hasExtraction: boolean;
   hasScience: boolean;
@@ -933,6 +935,17 @@ function ResourceInspector({
               </div>
             );
           })}
+
+          {stage !== "UNSURVEYED" && stage !== "SURVEYED" && sampleQuality !== undefined && (
+            <div className="rounded-xl border border-[#344f50] bg-[#101f23] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#9ab5ae]">Specimen integrity</p>
+                <span className="font-mono text-sm font-bold" style={{ color: sampleQuality >= 86 ? "#83d9a0" : sampleQuality >= 68 ? "#e7c568" : "#ff918b" }}>{Math.round(sampleQuality)}%</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#263b40]"><div className="h-full transition-[width]" style={{ width: `${clamp(sampleQuality)}%`, background: sampleQuality >= 86 ? "#83d9a0" : sampleQuality >= 68 ? "#e7c568" : "#ff918b" }} /></div>
+              <p className="mt-2 text-[9px] leading-4 text-[#92aaa8]">{sampleQuality >= 86 ? "Good chain-of-custody: contamination risk is low, though composition still needs verification." : sampleQuality >= 68 ? "Moderate uncertainty: handling contamination or mixed material may limit interpretation." : "Compromised specimen: findings should remain provisional; consider collecting a better-sealed replicate."}</p>
+            </div>
+          )}
 
           {isThisOperation && operation && (
             <div className="rounded-2xl border border-[#647d85] bg-[#13252c] p-4">
@@ -1437,10 +1450,10 @@ export function MissionSimulation() {
     const finalState = loadGameState();
     const alreadyComplete = finalState.completedMissions.includes(pending.missionId);
     const firstTime = !pending.replay && !alreadyComplete;
-    const analysedSamples = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
-    // Field science earns extra XP only on the first clear; replay farming is intentionally limited.
+    const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
+    // Reward clean, useful science more than simply completing many low-quality collection loops.
     const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
-    const researchBonusXp = firstTime ? analysedSamples * (120 + scienceTier * 20) : 0;
+    const researchBonusXp = firstTime ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + scienceTier * 20, 0) : 0;
     const missionXpReward = pending.rewardXp + researchBonusXp;
     const nextState = {
       ...finalState,
@@ -1462,7 +1475,7 @@ export function MissionSimulation() {
     saveGameState(nextState);
     clearMissionRuntime();
     clearPendingMission();
-  }, [pending, results]);
+  }, [pending, results, sampleQuality, sampleStages]);
 
   const handleEventChoice = (choiceId: string) => {
     if (!activeEvent || !pending || eventResponseRef.current === activeEvent.id) return;
@@ -2322,8 +2335,8 @@ export function MissionSimulation() {
   }
 
   if (results) {
-    const analysedSamples = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
-    const researchBonusXp = pending && !pending.replay ? analysedSamples * (120 + tierLevel(pending.selected.science ?? "Foundation") * 20) : 0;
+    const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
+    const researchBonusXp = pending && !pending.replay ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + tierLevel(pending.selected.science ?? "Foundation") * 20, 0) : 0;
     const checks: [string, boolean][] = [
       ["SURVIVAL", true],
       ["POWER STABILITY", performance.colonyHealth >= 55],
@@ -2613,6 +2626,7 @@ export function MissionSimulation() {
           <ResourceInspector
             node={selectedResource}
             stage={sampleStages[selectedResource.id] ?? (surveyedNodes.includes(selectedResource.id) ? "SURVEYED" : "UNSURVEYED")}
+            sampleQuality={sampleQuality[selectedResource.id]}
             hasRover={pending.selected.rover !== undefined}
             hasExtraction={pending.selected.extraction !== undefined}
             hasScience={pending.selected.science !== undefined}
