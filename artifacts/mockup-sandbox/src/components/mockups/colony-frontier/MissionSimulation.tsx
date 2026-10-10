@@ -49,6 +49,16 @@ import {
   type SampleStage,
 } from "./missionRuntime";
 import { Colony3DMap } from "./Colony3DMap";
+import { dustRemainingFraction } from "./solar-surface/state";
+import {
+  getSystemOutput,
+  getRetrofitConfig,
+  REPAIR_SUPPORT_PROFILES as BALANCED_REPAIR_SUPPORT_PROFILES,
+  getRepairOption,
+  getRepairOptionForAction,
+  getSolarEnvironment,
+  getSolarActualOutputKW,
+} from "./disasterSystems";
 
 const TOTAL_MISSION_SECONDS = 14 * 30;
 const EVENT_TIMES = [42, 88, 135, 183, 232, 282, 332, 382];
@@ -273,25 +283,7 @@ const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
 };
 
 // Standalone repairs are always available. Optional integrations never require essential Solar or Habitat as support.
-const REPAIR_SUPPORT_PROFILES: Record<string, [string, string, string]> = {
-  solar: ["maintenance", "rover", "navigation"],
-  battery: ["thermal", "grid", "maintenance"],
-  grid: ["battery", "maintenance", "comms"],
-  habitat: ["maintenance", "thermal", "isru"],
-  water: ["thermal", "co2", "maintenance"],
-  oxygen: ["water", "co2", "thermal"],
-  co2: ["oxygen", "agriculture", "maintenance"],
-  thermal: ["grid", "battery", "maintenance"],
-  comms: ["navigation", "maintenance", "grid"],
-  radiation: ["thermal", "battery", "maintenance"],
-  science: ["navigation", "comms", "thermal"],
-  navigation: ["comms", "maintenance", "grid"],
-  rover: ["navigation", "comms", "maintenance"],
-  extraction: ["rover", "navigation", "maintenance"],
-  isru: ["water", "thermal", "science"],
-  agriculture: ["water", "co2", "thermal"],
-  maintenance: ["comms", "navigation", "grid"],
-};
+const REPAIR_SUPPORT_PROFILES = BALANCED_REPAIR_SUPPORT_PROFILES;
 
 const REPAIR_METHOD_NAMES: Record<string, string> = {
   solar: "Robotic dry-brush array recovery",
@@ -428,8 +420,8 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
   "isru-oxygen-feed": { all: ["extraction", "water", "oxygen", "grid"], minPower: 4, extractedFeed: true },
   "agriculture-closed-loop": { all: ["water", "co2", "oxygen", "thermal", "habitat", "science"], any: ["grid", "battery"], minPower: 4 },
   "maintenance-overhaul": { all: ["comms", "navigation", "grid"], minPower: 3, minBattery: 2 },
-  "repair-active": { minPower: 5, minBattery: 2 },
-  upgrade: { minPower: 8, minBattery: 5 },
+  "repair-active": {},
+  upgrade: {},
   sample: { all: ["rover", "navigation"], any: ["battery", "grid"], minPower: 7, minBattery: 3 },
   transfer: { all: ["rover", "navigation", "habitat"], any: ["battery", "grid"], minPower: 2, minBattery: 1 },
   analyze: { all: ["science", "habitat"], any: ["grid", "battery"], minPower: 5 },
@@ -629,45 +621,11 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
   return Math.max(0, 20 - tierLevel(tier) * 4.8 - Math.max(0, Math.min(2, upgradeLevel)) * 2);
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, condition = 100, dust = 0): { label: string; value: string } {
-  const performance = systemPerformanceMultiplier(tier, upgradeLevel);
-  const outputs: Record<string, { label: string; base: number; unit: string; digits?: number }> = {
-    solar: { label: "Array energy delivered at nominal sunlight", base: 28.8, unit: "kJ / 10 sim s", digits: 1 },
-    battery: { label: "Usable stored energy", base: 12, unit: "kWh", digits: 1 },
-    oxygen: { label: "Oxygen production", base: 0.84, unit: "kg O₂ / crew-day", digits: 2 },
-    water: { label: "Water recovery", base: 96, unit: "L / day", digits: 1 },
-    co2: { label: "CO₂ removal capacity", base: 3.6, unit: "kg / crew-day", digits: 2 },
-    thermal: { label: "Thermal control capacity", base: 4.5, unit: "kW thermal", digits: 2 },
-    comms: { label: "Data-link throughput", base: 2.4, unit: "Mbit/s", digits: 2 },
-    habitat: { label: "Pressure-regulation tolerance", base: 2.0, unit: "kPa band (lower is better)", digits: 2 },
-    radiation: { label: "Shelter residual dose rate", base: 0.18, unit: "mSv / day (lower is better)", digits: 3 },
-    grid: { label: "Power distribution capacity", base: 8, unit: "kW", digits: 2 },
-    science: { label: "Sample analyses", base: 3, unit: "samples / day", digits: 1 },
-    navigation: { label: "Position uncertainty", base: 1.5, unit: "m (lower is better)", digits: 2 },
-    rover: { label: "Cruise speed", base: 0.4, unit: "m/s", digits: 2 },
-    extraction: { label: "Core recovery rate", base: 1.5, unit: "kg / h", digits: 2 },
-    isru: { label: "O₂ from local feedstock", base: 0.7, unit: "kg / day", digits: 2 },
-    agriculture: { label: "Edible biomass yield", base: 0.8, unit: "kg / day", digits: 2 },
-    maintenance: { label: "Repair throughput", base: 1.2, unit: "work units / h", digits: 2 },
-    power: { label: "Managed power margin", base: 8, unit: "kW", digits: 2 },
-  };
-  const output = outputs[systemId] ?? { label: "Nominal system throughput", base: 1, unit: "units / day", digits: 2 };
-  const healthFactor = Math.max(0.25, condition / 100);
-  const limitedUpgrade = Math.max(0, Math.min(2, upgradeLevel));
-  let value: number;
-  if (systemId === "solar") {
-    // 1 normalized generation point is 0.12 kW; over 10 simulated seconds that is 1.2 kJ.
-    // This matches the actual solar-generation equation rather than inventing a larger display rate.
-    const generationPoints = 24 + tierLevel(tier) * 7.5 + limitedUpgrade * 2.5;
-    const solarHealth = Math.max(0, Math.min(1, condition / 100));
-    const dustFactor = Math.max(0.15, 1 - Math.max(0, Math.min(100, dust)) / 100 * 0.85);
-    value = generationPoints * 1.2 * solarHealth * dustFactor;
-  } else if (systemId === "navigation" || systemId === "radiation" || systemId === "habitat") {
-    value = output.base / performance / healthFactor;
-  } else {
-    value = output.base * performance * healthFactor;
-  }
-  return { label: output.label, value: value.toFixed(output.digits ?? 2) + " " + output.unit };
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, _dust = 0): { label: string; value: string } {
+  // Display the explicit engineering rating. Condition, dust, Sun angle, temperature and faults
+  // are shown separately and affect actual operating output, not the rating itself.
+  const output = getSystemOutput(systemId, tier, upgradeLevel);
+  return { label: output.label, value: output.value };
 }
 
 function combinedPerformanceMultiplier(...values: number[]): number {
@@ -800,7 +758,10 @@ function initialBuildings(selected: Record<string, Tier>): Record<string, Buildi
   return Object.fromEntries(
     Object.keys(selected).map((trackId) => [
       trackId,
-      { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 },
+      {
+        condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0,
+        ...(trackId === "solar" ? { alignmentErrorDegrees: 5, solarStringLossPct: 0 } : {}),
+      },
     ]),
   );
 }
