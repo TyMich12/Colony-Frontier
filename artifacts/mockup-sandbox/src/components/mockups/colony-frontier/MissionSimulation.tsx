@@ -2272,18 +2272,7 @@ export function MissionSimulation() {
         const waterOnline = systemIsOperational("water", dependencyContext);
         const thermalOnline = systemIsOperational("thermal", dependencyContext);
         const radiationOnline = systemIsOperational("radiation", dependencyContext);
-        const maintenanceOnline = systemIsOperational("maintenance", dependencyContext);
         const agricultureOnline = systemIsOperational("agriculture", dependencyContext);
-        const habitatOnline = systemIsOperational("habitat", dependencyContext);
-        const solarTier = tierLevel(pending.selected.solar ?? "Foundation");
-        const batteryTier = tierLevel(pending.selected.battery ?? "Foundation");
-        const oxygenTier = tierLevel(pending.selected.oxygen ?? "Foundation");
-        const co2Tier = tierLevel(pending.selected.co2 ?? "Foundation");
-        const waterTier = tierLevel(pending.selected.water ?? "Foundation");
-        const thermalTier = tierLevel(pending.selected.thermal ?? "Foundation");
-        const radiationTier = tierLevel(pending.selected.radiation ?? "Foundation");
-        const habitatTier = tierLevel(pending.selected.habitat ?? "Foundation");
-        const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
         const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
         const missionFraction = clamp(elapsed / TOTAL_MISSION_SECONDS, 0, 1);
         const missionDay = Math.min(14, Math.max(0, elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
@@ -2457,7 +2446,7 @@ export function MissionSimulation() {
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
     });
-  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
+  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes, partsInventoryKg]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
