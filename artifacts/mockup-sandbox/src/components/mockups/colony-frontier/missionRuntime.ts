@@ -31,8 +31,10 @@ export type BuildingRuntime = {
   condition: number;
   dust: number;
   status: string;
-  /** Temporary in-mission module upgrades (0–2), independent of unlocked technology tier. */
+  /** Workbook retrofit progress (0/2 to 2/2); does not repair damage or alter condition. */
   upgradeLevel?: number;
+  /** Absolute readings or diagnosed fault states produced by the selected workbook repair. */
+  repairMetrics?: Record<string, number>;
 };
 
 export type MissionDecision = {
@@ -105,6 +107,8 @@ export type MissionRuntimeSnapshot = {
   earthReportAtSeconds?: number;
   /** Simulated mission time when each low-tech emergency fallback can be used again. */
   fallbackReadyAt?: Record<string, number>;
+  /** Available on-site repair / retrofit material; consumed on installation, never added to launch mass. */
+  partsInventoryKg?: number;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
