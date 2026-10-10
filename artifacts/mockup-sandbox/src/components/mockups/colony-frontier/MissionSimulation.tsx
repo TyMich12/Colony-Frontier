@@ -2002,7 +2002,8 @@ export function MissionSimulation() {
       case "REPAIR": {
         const repairTarget = operation.targetId;
         const faults = Object.values(activeFaultsRef.current).filter((fault) => fault.targetTrackId === repairTarget);
-        const repairMultiplier = systemPerformanceMultiplier(pending?.selected[repairTarget], buildingsRef.current[repairTarget]?.upgradeLevel ?? 0);
+        const repairSupportSystems = decodeRepairVariant(repairTarget, operation.actionId ?? "") ?? [];
+        const repairMultiplier = operationPerformanceMultiplier(repairTarget, pending?.selected ?? {}, buildingsRef.current, repairSupportSystems);
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
         setBuildings((current) => {
           const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
@@ -3075,7 +3076,7 @@ export function MissionSimulation() {
       const supportSystems = repairVariantHelpers ?? [];
       const repairPerformance = operationPerformanceMultiplier(repairTargetId, pending.selected, buildings, supportSystems);
       const duration = Math.max(12, Math.round((27 + highestSeverity * 7 + missionStage * 1.4 - (pending.selected.maintenance ? 5 : 0)) / repairPerformance));
-      setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 2) }));
+      setMetrics((current) => ({ ...current, power: clamp(current.power - 4 / repairPerformance), battery: clamp(current.battery - 2 / repairPerformance) }));
       const roverCanAssist = pending.selected.rover !== undefined && supportSystems.includes("rover") && !roverOnFieldJob;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
@@ -3085,7 +3086,7 @@ export function MissionSimulation() {
         duration,
         undefined,
         undefined,
-        undefined,
+        action,
         repairTargetId,
         roverCanAssist,
       );
