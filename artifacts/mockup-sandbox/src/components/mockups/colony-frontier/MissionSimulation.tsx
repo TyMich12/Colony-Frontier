@@ -1375,6 +1375,7 @@ function BuildingInspector({
     ],
   };
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
+  const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
   const [repairCategory, setRepairCategory] = useState<"Standalone Options" | "Enhanced Options" | "Dual-System Options" | "Fully Integrated">("Standalone Options");
   const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
   const repairOptions = Array.from({ length: 8 }, (_, mask) =>
@@ -1657,7 +1658,7 @@ function BuildingInspector({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
-              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 0.96 kW available-power margin + 0.60 kWh stored energy at Foundation 0/2 upfront · takes about 18–26 seconds. Output and wear benefits begin only when installation completes.</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">In-situ retrofit {upgradeLevel}/2 · {nextRetrofit ? nextRetrofit.powerCost + " power-reserve points + " + nextRetrofit.batteryCost + " battery-reserve points" : "maximum installed level"} · {nextRetrofit ? nextRetrofit.durationSeconds + " simulated seconds" : "fully upgraded"}. Installed using on-site inventory and crew time; no added launch mass.</p>
             </div>
             <button
               type="button"
@@ -1669,7 +1670,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || (nextRetrofit ? "Requires " + nextRetrofit.powerCost + " power-reserve points and " + nextRetrofit.batteryCost + " battery-reserve points." : "Maximum retrofit level reached.")}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -2011,7 +2012,7 @@ export function MissionSimulation() {
           const previous = current[operation.targetId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
           const previousLevel = previous.upgradeLevel ?? 0;
           const upgradeLevel = Math.max(previousLevel, level);
-          const condition = clamp(previous.condition + 5 * systemPerformanceMultiplier(pending?.selected[operation.targetId], previousLevel));
+          const condition = clamp(previous.condition + 3);
           return { ...current, [operation.targetId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
         });
         setScore((value) => clamp(value + 4));
@@ -3087,18 +3088,17 @@ export function MissionSimulation() {
     if (baseActionId === "upgrade") {
       const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
       if ((current.upgradeLevel ?? 0) >= 2) {
-        setAiMessage(`${trackId.toUpperCase()} has reached its maximum module upgrade level.`);
-        return;
-      }
-      if (metrics.power < 8 || metrics.battery < 5) {
-        setAiMessage(`Retrofit unavailable: reserve at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, ratedBatteryCapacityKWh(pending.selected, buildings))} before isolating this system.`);
+        setAiMessage(trackId.toUpperCase() + " has reached its maximum in-situ retrofit level.");
         return;
       }
       const targetLevel = (current.upgradeLevel ?? 0) + 1;
-      const equipmentTier = tierLevel(pending.selected[trackId]);
-      const duration = 18 + equipmentTier * 2 + (current.upgradeLevel ?? 0) * 3;
-      setMetrics((value) => ({ ...value, power: clamp(value.power - 8), battery: clamp(value.battery - 5) }));
-      beginOperation("UPGRADE", trackId, `Installing upgrade kit · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, duration, targetLevel);
+      const retrofit = getRetrofitConfig(trackId, targetLevel);
+      if (metrics.power < retrofit.powerCost || metrics.battery < retrofit.batteryCost) {
+        setOperationResult("RETROFIT HELD · Requires " + retrofit.powerCost + " power-reserve points and " + retrofit.batteryCost + " battery-reserve points. No launch mass is added; installation uses on-site labour and inventory.");
+        return;
+      }
+      setMetrics((value) => ({ ...value, power: clamp(value.power - retrofit.powerCost), battery: clamp(value.battery - retrofit.batteryCost) }));
+      beginOperation("UPGRADE", trackId, "In-situ retrofit · " + (technologyTracks.find((track) => track.id === trackId)?.category ?? trackId) + " · no launch mass added", retrofit.durationSeconds, targetLevel);
       return;
     }
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
@@ -3114,17 +3114,23 @@ export function MissionSimulation() {
         setOperationResult(`REPAIR QUEUED · ${repairTargetId.toUpperCase()} already has a work order running. Finish that job before starting another repair on the same system.`);
         return;
       }
-      if (metrics.power < 5 || metrics.battery < 2) {
-        setOperationResult(`REPAIR HELD · A controlled repair requires at least ${physicalThreshold("power", 5)} and ${physicalThreshold("battery", 2, ratedBatteryCapacityKWh(pending.selected, buildings))} to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.`);
-        setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
+      const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
+      const repairPlan = getRepairOptionForAction(
+        repairTargetId,
+        pending.selected[repairTargetId] ?? "Foundation",
+        buildings[repairTargetId]?.upgradeLevel ?? 0,
+        action,
+        highestSeverity,
+      ) ?? getRepairOption(repairTargetId, pending.selected[repairTargetId] ?? "Foundation", buildings[repairTargetId]?.upgradeLevel ?? 0, 0, highestSeverity);
+      const supportSystems = repairPlan.helpers;
+      if (metrics.power < repairPlan.powerCost || metrics.battery < repairPlan.batteryCost) {
+        setOperationResult("REPAIR HELD · " + repairPlan.name + " needs " + repairPlan.powerCost + " power-reserve points and " + repairPlan.batteryCost + " battery-reserve points. Restore reserves or choose a lower-cost method.");
+        setAiMessage("Repair held: this method's specific energy requirement is not met.");
         return;
       }
-      const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
-      const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
-      const supportSystems = repairVariantHelpers ?? [];
-      const repairPerformance = operationPerformanceMultiplier(repairTargetId, pending.selected, buildings, supportSystems);
-      const duration = Math.max(12, Math.round((27 + highestSeverity * 7 + missionStage * 1.4 - (pending.selected.maintenance ? 5 : 0)) / repairPerformance));
-      setMetrics((current) => ({ ...current, power: clamp(current.power - 4 / repairPerformance), battery: clamp(current.battery - 2 / repairPerformance) }));
+      const duration = repairPlan.durationSeconds;
+      // Energy is charged once, when the work order starts. Completion applies the repair outcome only.
+      setMetrics((current) => ({ ...current, power: clamp(current.power - repairPlan.powerCost), battery: clamp(current.battery - repairPlan.batteryCost) }));
       const roverCanAssist = pending.selected.rover !== undefined && supportSystems.includes("rover") && !roverOnFieldJob;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
@@ -3138,7 +3144,7 @@ export function MissionSimulation() {
         repairTargetId,
         roverCanAssist,
       );
-      setAiMessage(`REPAIR STARTED · ${repairTargetId.toUpperCase()}. ${supportSystems.length ? `Integrated support: ${supportSystems.join(" + ")}. ` : "Standalone procedure; no optional support systems required. " }Isolation, repair and return-to-service verification need ${Math.ceil(duration)} seconds.`);
+      setAiMessage("REPAIR STARTED · " + repairTargetId.toUpperCase() + " · " + repairPlan.name + ". " + (supportSystems.length ? "Support: " + supportSystems.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id).join(" + ") + ". " : "Standalone procedure; no optional systems required. ") + "Cost: " + repairPlan.powerCost + " power reserve points and " + repairPlan.batteryCost + " battery reserve points. Completion in " + Math.ceil(duration) + " simulated seconds.");
       return;
     }
 
@@ -3212,15 +3218,15 @@ export function MissionSimulation() {
 
     switch (baseActionId) {
       case "upgrade": {
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 8), battery: clamp(current.battery - 5) }));
+        // Legacy action path: installation energy is charged once in handleBuildingAction.
         setBuildings((current) => {
           const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
           const upgradeLevel = Math.min(2, (previous.upgradeLevel ?? 0) + 1);
-          const condition = clamp(previous.condition + 8);
+          const condition = clamp(previous.condition + 3);
           return { ...current, [trackId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
         });
         setScore((value) => clamp(value + 4));
-        setAiMessage(`${trackId.toUpperCase()} upgraded to module level ${Math.min(2, (buildings[trackId]?.upgradeLevel ?? 0) + 1)}. Ongoing performance and equipment wear have improved.`);
+        setAiMessage(trackId.toUpperCase() + " received an in-situ retrofit. No launch mass was added.");
         break;
       }
       case "fallback-solar": {
