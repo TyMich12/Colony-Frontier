@@ -440,6 +440,7 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
 
 type ActionRequirementContext = {
   selected: Record<string, Tier>;
+  partsInventoryKg?: number;
   buildings: Record<string, BuildingRuntime>;
   activeFaults: Record<string, ActiveFault>;
   metrics: MissionMetrics;
@@ -517,10 +518,12 @@ function getActionBlockers(
   context: ActionRequirementContext,
   node?: ResourceNode,
 ): string[] {
-  const repairHelpers = decodeRepairVariant(systemId, actionId);
-  if (repairHelpers) {
+  if (actionId.startsWith("repair:")) {
+    const option = getRepairOption(systemId, actionId.slice("repair:".length));
+    if (!option) return ["Unknown repair procedure in workbook data"];
     const blockers = getActionBlockers(systemId, "repair-active", context, node);
-    for (const helperId of repairHelpers) collectRepairSupportBlockers(helperId, context, blockers);
+    for (const helperId of option.requiredSystems) collectRepairSupportBlockers(helperId, context, blockers);
+    if ((context.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG) < option.partsMassKg) blockers.push(`Requires ${option.partsMassKg.toFixed(2)} kg repair parts; ${(context.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG).toFixed(2)} kg available`);
     return [...new Set(blockers)];
   }
   const variant = decodeActionVariant(systemId, actionId);
@@ -1410,13 +1413,10 @@ function BuildingInspector({
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
   const [showRepairMethods, setShowRepairMethods] = useState(false);
+  const [repairCategory, setRepairCategory] = useState<"Standalone" | "Enhanced" | "Dual" | "Integrated">("Standalone");
+  const repairOptions = getRepairOptions(track.id);
+  const standaloneOption = repairOptions.find((option) => option.category === "Standalone");
   const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
-  const repairHelpers = REPAIR_SUPPORT_PROFILES[track.id] ?? ["maintenance", "navigation", "grid"];
-  const repairOptions = Array.from({ length: 8 }, (_, mask) => ({
-    id: `repair-variant:${track.id}:${mask}`,
-    mask,
-    helpers: repairHelpers.filter((_, bit) => (mask & (1 << bit)) !== 0),
-  })).filter((option) => option.mask !== 0);
   const actions = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return !variant || variant.mask === 0 || showIntegratedMethods; });
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
@@ -1554,20 +1554,56 @@ function BuildingInspector({
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "7 METHODS +"}</span>
             </button>
-            {showRepairMethods && <div className="mt-2 grid gap-1.5">
-              {repairOptions.map((option) => {
-                const labels = option.helpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id);
-                const blockers = getBlockers(track.id, option.id);
-                const duration = Math.max(12, Math.round((27 + activeFault.severity * 7) / operationPerformanceMultiplier(track.id, selected, { [track.id]: runtime }, option.helpers)));
-                return <button key={option.id} type="button" onClick={() => onAction(option.id)} disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2 || blockers.length > 0} className="flex items-center justify-between gap-2 rounded-lg border border-[#354f59] bg-[#0d1c22] px-3 py-2 text-left hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-40">
-                  <span className="min-w-0">
-                    <span className="block text-[9px] font-bold text-[#e1eeee]">{REPAIR_METHOD_NAMES[track.id] ?? "Integrated repair"} · {labels.join(" + ")}</span>
-                    <span className="mt-0.5 block text-[8px] leading-3 text-[#91aaa9]">{blockers.length ? blockers.join(" · ") : "All support systems online"}</span>
+                        <button
+              type="button"
+              onClick={() => { if (standaloneOption) onAction(`repair:${standaloneOption.id}`); }}
+              disabled={actionBusy || Boolean(operation) || !standaloneOption || getBlockers(track.id, `repair:${standaloneOption?.id ?? ""}`).length > 0}
+              className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-[#d16e72] bg-[#7b303c] px-3.5 py-3 text-left transition hover:border-[#ffd07a] hover:bg-[#8b3744] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span>
+                <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-white">Standalone isolate · repair · verify</span>
+                <span className="mt-1 block text-[9px] leading-4 text-[#f0c8cc]">{standaloneOption?.name ?? "Standalone repair"} · no optional support system required.</span>
+              </span>
+              <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
+            </button>
+            <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
+              <span>
+                <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Repair procedure catalogue</span>
+                <span className="mt-0.5 block text-[8px] text-[#8faeae]">Exact workbook effect, duration, energy, parts and support requirements.</span>
+              </span>
+              <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
+            </button>
+            {showRepairMethods && <div className="mt-2 grid gap-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => (
+                  <button key={category} type="button" onClick={() => setRepairCategory(category)} className={`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] ${repairCategory === category ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519] text-[#aab8b9]"}`}>
+                    {category}
+                  </button>
+                ))}
+              </div>
+              {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
+                const blockers = getBlockers(track.id, `repair:${option.id}`);
+                const tierIndex = effectiveRepairTierIndex(tier, option.requiredSystems, selected);
+                const outcome = getRepairEffectValue(option, tierIndex);
+                const secondary = option.secondary && typeof option.secondary.values[tierIndex] === "number" ? option.secondary.values[tierIndex] : null;
+                const tertiary = option.tertiary && typeof option.tertiary.values[tierIndex] === "number" ? option.tertiary.values[tierIndex] : null;
+                const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
+                return <button key={option.id} type="button" onClick={() => onAction(`repair:${option.id}`)} disabled={actionBusy || Boolean(operation) || blockers.length > 0} className="rounded-xl border border-[#354f59] bg-[#0d1c22] px-3 py-3 text-left hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-40">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-[9px] font-black text-[#e1eeee]">{option.name}</span>
+                    <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">{option.durationsMinutes[tierIndex]} min</span>
                   </span>
-                  <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">~{duration}s</span>
+                  <span className="mt-1 block text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</span>
+                  <span className="mt-2 block text-[8px] font-bold text-[#c4d9d6]">Support: {supportLabels}</span>
+                  <span className="mt-1 block text-[8px] text-[#a8c4c0]">Result: {option.metric} → {formatRating(outcome)} {option.unit}{option.secondary && secondary !== null ? ` · ${option.secondary.metric}: ${formatRating(secondary)} ${option.secondary.unit}` : ""}{option.tertiary && tertiary !== null ? ` · ${option.tertiary.metric}: ${formatRating(tertiary)} ${option.tertiary.unit}` : ""}</span>
+                  <span className="mt-1 block text-[8px] text-[#d8c18a]">Cost: {option.energyKWh} kWh · {option.partsMassKg} kg · {option.kit}</span>
+                  <span className="mt-1 block text-[8px] leading-3 text-[#8fa7ab]">{option.tradeoff} {blockers.length ? `· LOCKED: ${blockers.join(" · ")}` : ""}</span>
                 </button>;
               })}
             </div>}
+            </div>}
+          </section>
+        )}            </div>}
           </section>
         )}
 
@@ -1880,6 +1916,7 @@ export function MissionSimulation() {
   const [sampleStages, setSampleStages] = useState<Record<string, SampleStage>>(() => runtime?.sampleStages ?? Object.fromEntries((runtime?.surveyedNodes ?? []).map((id) => [id, "SURVEYED" as SampleStage])));
   const [sampleQuality, setSampleQuality] = useState<Record<string, number>>(() => runtime?.sampleQuality ?? {});
   const [resourceYield, setResourceYield] = useState(runtime?.resourceYield ?? 0);
+  const [partsInventoryKg, setPartsInventoryKg] = useState(runtime?.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG);
   const [activeOperations, setActiveOperations] = useState<Record<string, MissionOperation>>(() => {
     if (runtime?.activeOperations) return runtime.activeOperations;
     return runtime?.activeOperation ? { [runtime.activeOperation.operationKey ?? runtime.activeOperation.targetId]: runtime.activeOperation } : {};
@@ -2429,6 +2466,7 @@ export function MissionSimulation() {
       earthReportAtSeconds,
       fallbackReadyAt,
       activeFaults,
+      partsInventoryKg,
       sampleQuality,
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
@@ -2911,6 +2949,7 @@ export function MissionSimulation() {
         surveyedNodes,
         sampleStages,
         resourceYield,
+        partsInventoryKg,
       },
       node,
     );
