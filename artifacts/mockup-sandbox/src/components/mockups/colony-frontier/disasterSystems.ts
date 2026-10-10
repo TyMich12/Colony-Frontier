@@ -2,6 +2,7 @@ import type { Tier } from "./_shared/gameData";
 import { dustRemainingFraction } from "./solar-surface/state";
 
 export const TIER_ORDER: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
+export const LEVEL_ONE_ARRIVAL_SIMULATED_SECONDS = 14 * 30;
 type Triple = [number, number, number];
 type Baseline = { label: string; unit: string; values: Record<Tier, Triple>; lowerIsBetter?: boolean };
 
