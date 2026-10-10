@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+import { getSolarEnvironment, LEVEL_ONE_ARRIVAL_SIMULATED_SECONDS } from "./disasterSystems";
 
 export type MissionResourceNode = {
   id: string;
@@ -21,6 +22,7 @@ type Props = {
   buildings: Record<string, BuildingRuntime>;
   selectedBuildingId: string | null;
   elapsed: number;
+  isLevelOneArrival: boolean;
   environmentLabel: "MOON" | "MARS";
   environmentTitle: string;
   activeEventTrackId: string | null;
@@ -395,7 +397,7 @@ function Beacon({ color, active, height = 2.1 }: { color: string; active: boolea
   );
 }
 
-function BuildingArt({ id, accent }: { id: string; accent: string }) {
+function BuildingArt({ id, accent, solarTilt = 0.18, solarAzimuth = 0 }: { id: string; accent: string; solarTilt?: number; solarAzimuth?: number }) {
   const p = palette(id);
 
   if (id === "habitat") {
@@ -585,10 +587,10 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         </RoundedBox>
         <mesh position={[0, 0.38, 0]}><cylinderGeometry args={[0.12, 0.16, 0.42, 10]} /><meshStandardMaterial color="#879592" metalness={0.75} /></mesh>
         {[-0.85, 0.85].map((x) => (
-          <group key={x} position={[x, 0.82, 0]}>
-            <mesh rotation={[0.18, 0, 0]} castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} /></mesh>
-            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
-            {[-0.47, 0, 0.47].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.018, 0.015, 1.53]} /><meshStandardMaterial color="#6c9fb3" /></mesh>)}
+          <group key={x} position={[x, 0.82, 0]} rotation={[solarTilt, solarAzimuth, 0]}>
+            <mesh castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} /></mesh>
+            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
+            {[-0.47, 0, 0.47].map((z) => <mesh key={z} position={[0, 0.035, z]}><boxGeometry args={[0.018, 0.015, 1.53]} /><meshStandardMaterial color="#6c9fb3" /></mesh>)}
             {[-0.8, 0.8].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.06, 0.04, 0.04]} /><meshStandardMaterial color="#b3beb9" metalness={0.75} /></mesh>)}
             <mesh position={[0, -0.31, 0]} castShadow><cylinderGeometry args={[0.055, 0.065, 0.64, 10]} /><meshStandardMaterial color="#83918f" metalness={0.68} /></mesh>
             {[-0.48, 0.48].map((z) => <mesh key={z} position={[0, -0.29, z]} rotation={[0, 0, z * 0.43]}><boxGeometry args={[0.045, 0.56, 0.045]} /><meshStandardMaterial color="#78898d" metalness={0.62} /></mesh>)}
@@ -1757,7 +1759,7 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 }
 
 function ColonyBuilding({
-  track, tier, runtime, selected, alerted, position, onClick, mars
+  track, tier, runtime, selected, alerted, position, onClick, mars, solarTilt, solarAzimuth
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1767,6 +1769,8 @@ function ColonyBuilding({
   position: [number, number];
   onClick: () => void;
   mars: boolean;
+  solarTilt: number;
+  solarAzimuth: number;
 }) {
   const [x, z] = position;
   const p = palette(track.id);
@@ -1781,7 +1785,7 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} solarTilt={track.id === "solar" ? solarTilt : 0.18} solarAzimuth={track.id === "solar" ? solarAzimuth : 0} />
       </group>
       <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       {track.id !== "habitat" && (
@@ -1859,6 +1863,17 @@ function MissionGuide({ mars }: { mars: boolean }) {
 
 function Scene({ props }: { props: Props }) {
   const mars = props.environmentLabel === "MARS";
+  const levelOneArrival = !mars && props.isLevelOneArrival;
+  const solarEnvironment = getSolarEnvironment(props.elapsed, LEVEL_ONE_ARRIVAL_SIMULATED_SECONDS, levelOneArrival);
+  const daylightFraction = levelOneArrival ? solarEnvironment.sunlightFraction : mars ? 0.82 : 0.96;
+  const sunElevationDegrees = levelOneArrival ? solarEnvironment.sunElevationDegrees : mars ? 45 : 73.7;
+  // The Sun advances from eastern horizon, reaches its highest point halfway through the
+  // 14-day lunar daylight mission, and approaches the western horizon at mission end.
+  const sunAzimuthRadians = levelOneArrival ? (solarEnvironment.phase * 180 - 90) * Math.PI / 180 : 0;
+  const panelTiltRadians = levelOneArrival ? Math.max(0.12, Math.min(1.30, (90 - sunElevationDegrees) * Math.PI / 180)) : 0.18;
+  const sunPosition: [number, number, number] = levelOneArrival
+    ? [Math.sin(sunAzimuthRadians) * 42, Math.max(0.8, Math.sin(sunElevationDegrees * Math.PI / 180) * 55), Math.cos(sunAzimuthRadians) * 42]
+    : [18, 34, 20];
   const roverTier = props.selected.rover ?? "Foundation";
   const roverTierIndex = roverTier === "Frontier" ? 1 : roverTier === "Apex" ? 2 : roverTier === "Research" ? 3 : 0;
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
@@ -1878,10 +1893,10 @@ function Scene({ props }: { props: Props }) {
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
     >
-      <color attach="background" args={[mars ? "#7b4638" : "#55545a"]} />
-      <ambientLight intensity={0.68} color={mars ? "#ffe6db" : "#edf3ff"} />
-      <hemisphereLight args={[mars ? "#ffe5da" : "#f7f9ff", mars ? "#3d2722" : "#2f3035", 1.0]} />
-      <directionalLight position={[18, 34, 20]} intensity={1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
+      <color attach="background" args={[mars ? "#7b4638" : levelOneArrival && daylightFraction < 0.12 ? "#18212b" : levelOneArrival && daylightFraction < 0.38 ? "#353943" : "#55545a"]} />
+      <ambientLight intensity={levelOneArrival ? 0.14 + daylightFraction * 0.50 : 0.68} color={mars ? "#ffe6db" : levelOneArrival && daylightFraction < 0.22 ? "#9cb5d2" : "#edf3ff"} />
+      <hemisphereLight args={[mars ? "#ffe5da" : "#f7f9ff", mars ? "#3d2722" : "#2f3035", levelOneArrival ? 0.18 + daylightFraction * 0.82 : 1.0]} />
+      <directionalLight position={sunPosition} color={levelOneArrival && daylightFraction < 0.25 ? "#a8bddb" : "#fff0d0"} intensity={levelOneArrival ? 0.08 + daylightFraction * 1.62 : 1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
       <RoverRockField mars={mars} />
@@ -1901,6 +1916,8 @@ function Scene({ props }: { props: Props }) {
             position={POSITIONS[track.id] ?? [0, 0]}
             onClick={() => props.onSelect(track.id)}
             mars={mars}
+            solarTilt={panelTiltRadians}
+            solarAzimuth={sunAzimuthRadians}
           />
         ))}
         {props.tracks.some((track) => track.id === "rover") && (
