@@ -1773,10 +1773,10 @@ function ResourceInspector({
   const stageIndex = flow.findIndex((item) => item.id === stage);
   const isThisOperation = Boolean(operation && operation.targetId === node.id);
   const nextAction =
-    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: Math.max(12, 18 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "Needs a working rover, navigation, communications, and an operational power path." } :
-    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: Math.max(16, (hasExtraction ? 20 : 27) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance)), detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
-    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: Math.max(8, 16 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "The rover drives the sealed container to the habitat so chain of custody is preserved. Navigation maintains return-route accuracy." } :
-    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Analyze in science laboratory" : "Analysis locked · laboratory required", seconds: Math.max(5, 20 / sciencePerformance), detail: "A deployed, operational science laboratory is mandatory. There is no portable-assay bypass." } :
+    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: 18, detail: "Needs a working rover, navigation, communications, and an operational power path." } :
+    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: hasExtraction ? 20 : 27, detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
+    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: 16, detail: "The rover drives the sealed container to the habitat so chain of custody is preserved. Navigation maintains return-route accuracy." } :
+    stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Analyze in science laboratory" : "Analysis locked · laboratory required", seconds: 20, detail: "A deployed, operational science laboratory is mandatory. There is no portable-assay bypass." } :
     null;
   const blockers = nextAction ? getBlockers("field", nextAction.id, node.id) : [];
   const canStart = !operation && !actionBusy && blockers.length === 0;
@@ -2012,12 +2012,9 @@ export function MissionSimulation() {
       case "ANALYZE":
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "ANALYSED" }));
-          const scienceTier = tierLevel(pending?.selected.science ?? "Foundation");
-          const scienceRetrofit = buildingsRef.current.science?.upgradeLevel ?? 0;
-          const sciencePerformance = systemPerformanceMultiplier(pending?.selected.science ?? "Foundation", scienceRetrofit);
+          const scienceAccuracy = getAdditionalRating("science", "accuracy", pending?.selected.science ?? "Foundation", buildingsRef.current.science?.upgradeLevel ?? 0);
           const integrity = sampleQuality[node.id] ?? 64;
-          const confidence = clamp(integrity + (pending?.selected.science ? scienceTier * 5 + scienceRetrofit * 2 : -12), 42, 99);
-          const scienceBonus = pending?.selected.science ? scienceTier * 2 + scienceRetrofit * 0.8 : 0;
+          const confidence = clamp(integrity * 0.55 + scienceAccuracy * 0.45, 42, 99);
           const finding = node.kind === "ICE"
             ? confidence >= 82 ? "A strong volatile / ice signature is supported by the assay; preserve a sealed aliquot for confirmation." : "The volatile signature is suggestive but not conclusive; repeat the assay before treating this as a verified ice reserve."
             : node.kind === "MINERAL"
@@ -2025,9 +2022,10 @@ export function MissionSimulation() {
               : node.kind === "SCIENCE"
                 ? confidence >= 82 ? "The reference readings are internally consistent and suitable for comparison with later observations." : "Instrument and sample uncertainty remain high; repeat calibration before using this as a reference."
                 : confidence >= 82 ? "The sample supports a consistent regolith classification and can guide a follow-up collection." : "Particle and composition evidence are not decisive; collect a better-sealed replicate for confirmation.";
-          setResourceYield((value) => value + (confidence >= 82 ? 2 : 1) * sciencePerformance);
-          setScore((value) => clamp(value + Math.round((4 + confidence / 18 + scienceBonus) * sciencePerformance)));
-          message = `LAB RESULT · ${node.label}. Confidence: ${Math.round(confidence)}% · specimen integrity ${Math.round(integrity)}%. ${finding} Research value: +${((confidence >= 82 ? 2 : 1) * sciencePerformance + scienceBonus).toFixed(1)} units. The result is logged with its uncertainty instead of being treated as absolute proof.`;
+          const researchUnits = confidence >= 82 ? 2 : 1;
+          setResourceYield((value) => value + researchUnits);
+          setScore((value) => clamp(value + Math.round(4 + confidence / 18)));
+          message = `LAB RESULT · ${node.label}. Confidence: ${Math.round(confidence)}% · specimen integrity ${Math.round(integrity)}%. ${finding} Research value: +${researchUnits} units. The measured science accuracy is ${scienceAccuracy}%; no tier multiplier is applied.`;
           // Keep lab analysis from overwriting the rover’s independent travel state.
         }
         break;
@@ -2983,38 +2981,33 @@ export function MissionSimulation() {
     const hasScience = pending.selected.science !== undefined;
     const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover") || (hasRover && operation.kind === "SYSTEM_ACTION" && operation.targetId === "solar" && operation.actionId === "clean") || (hasRover && operation.kind === "REPAIR" && roverTask.startsWith("REPAIRING ")));
     if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress) || (hasScience && activeOperationsRef.current.science)) return;
-    const roverTier = tierLevel(pending.selected.rover ?? "Foundation");
-    const extractionTier = tierLevel(pending.selected.extraction ?? "Foundation");
-    const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
-    const navigationTier = tierLevel(pending.selected.navigation ?? "Foundation");
-    const roverPerformance = systemPerformanceMultiplier(pending.selected.rover ?? "Foundation", buildings.rover?.upgradeLevel ?? 0);
-    const extractionPerformance = systemPerformanceMultiplier(pending.selected.extraction ?? "Foundation", buildings.extraction?.upgradeLevel ?? 0);
-    const sciencePerformance = systemPerformanceMultiplier(pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
-    const navigationPerformance = systemPerformanceMultiplier(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0);
+    const navigationErrorM = getBaselineRating("navigation", pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0);
+    const navigationAccuracy = clamp(100 - navigationErrorM, 0, 100);
+    const scienceAccuracy = getAdditionalRating("science", "accuracy", pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
 
     if (action === "survey" && stage === "UNSURVEYED") {
-      const duration = Math.max(12, 18 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
+      const duration = 18;
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`SURVEYING ${node.label}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
     if (action === "sample" && stage === "SURVEYED") {
-      const duration = Math.max(16, (hasExtraction ? 20 : 27) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance));
+      const duration = hasExtraction ? 20 : 27;
       if (metrics.power < 7 || metrics.battery < 3) {
         setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3, ratedBatteryCapacityKWh(pending.selected, buildings))}. Restore the energy margin first.`);
         return;
       }
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
-      const quality = clamp(66 + (hasExtraction ? 13 + extractionTier * 5 + (buildings.extraction?.upgradeLevel ?? 0) * 2 : 0) + (hasRover ? 7 + roverTier * 2.5 + (buildings.rover?.upgradeLevel ?? 0) * 0.9 : 0) + navigationTier * 2 + (buildings.navigation?.upgradeLevel ?? 0) * 0.7 - (equipmentFault ? 12 : 0), 38, 98);
+      const quality = clamp((hasRover ? 60 : 45) + (hasExtraction ? 10 : 0) + navigationAccuracy * 0.15 + scienceAccuracy * 0.10 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId, hasRover);
-      setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 - extractionTier * 0.65 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
+      setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
       setRoverTask(hasRover ? `COLLECTING ${node.label}` : hasExtraction ? "DRILLING CORE" : "EVA SAMPLING");
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
-      const duration = Math.max(8, 16 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
+      const duration = 16;
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`TRANSFERRING ${node.label}`);
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
@@ -3022,7 +3015,7 @@ export function MissionSimulation() {
     }
     if (action === "analyze" && stage === "DELIVERED") {
       const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
-      const duration = Math.max(5, 20 / sciencePerformance);
+      const duration = 20;
       if (metrics.power < 5) {
         setOperationResult("ANALYSIS HELD · Insufficient power for the spectrometer / field assay. Restore power before analysing.");
         return;
@@ -3101,7 +3094,7 @@ export function MissionSimulation() {
       setAiMessage(`RETROFIT STARTED · ${installation.metric} ${installation.directGain}. Consuming ${installation.materialKg} kg material and ${installation.energyKWh} kWh; installation time ${installation.durationMinutes} simulated minutes. Rated capability will change only when commissioning completes; condition and faults are not repaired.`);
       return;
     }
-    const matchingFaults = Object.values(activeFaults).filter((fault) =>    const matchingFaults = Object.values(activeFaults).filter((fault) =>
+    const matchingFaults = Object.values(activeFaults).filter((fault) =>
       fault.targetTrackId === trackId && effectiveAction === "repair-active",
     );
     if (matchingFaults.length > 0) {
