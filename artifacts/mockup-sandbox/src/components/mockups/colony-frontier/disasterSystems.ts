@@ -211,8 +211,14 @@ export function getRepairOption(systemId:string,tier:Tier,retrofitLevel:number,m
  const helperDefs=helpers.map(id=>definition.helpers[id]).filter(Boolean);
  helperDefs.forEach(helper=>addDef(effects,helper.effect,tier,retrofitLevel,effectSummary));
  const labels=helperDefs.map(helper=>helper.name);
- const name=count===0?definition.standaloneName:count===3?definition.integratedName:labels.join(" + ");
- const description=count===0?definition.standaloneDescription:helperDefs.map(helper=>helper.description).join(" ");
+ const name=count===0
+   ? definition.standaloneName
+   : count===3
+     ? definition.integratedName
+     : definition.standaloneName + " + " + labels.join(" + ");
+ const description=count===0
+   ? definition.standaloneDescription
+   : definition.standaloneDescription + " Supporting procedure: " + helperDefs.map(helper=>helper.description).join(" ");
  const durationSeconds=Math.max(12,Math.round(DURATIONS[tier][count]+(SYSTEM_REPAIR_TIME_ADDITIONS[systemId]??[0,0,0,0])[count]+Math.max(0,severity-1)*5-retrofitLevel*2));
  const baseCosts=COSTS[tier][count];
  const adjustment=SYSTEM_REPAIR_COST_ADJUSTMENTS[systemId]??{power:[0,0,0,0] as [number,number,number,number],battery:[0,0,0,0] as [number,number,number,number]};
