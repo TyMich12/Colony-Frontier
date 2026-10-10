@@ -921,61 +921,79 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
   const drillRef = useRef<THREE.Group>(null);
-  const targetLabel = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE "]
-    .find((prefix) => task.startsWith(prefix));
-  const target = (targetNodeId ? resourceNodes.find((node) => node.id === targetNodeId) : undefined) ?? (targetLabel ? resourceNodes.find((node) => node.label === task.slice(targetLabel.length)) : undefined);
+  const lastTaskRef = useRef("");
+  const initializedRef = useRef(false);
+
+  const prefixes = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE ", "TRANSFERRING "];
+  const taskPrefix = prefixes.find((prefix) => task.startsWith(prefix));
+  const taskNodeLabel = taskPrefix ? task.slice(taskPrefix.length) : "";
+  const target = (targetNodeId ? resourceNodes.find((node) => node.id === targetNodeId) : undefined)
+    ?? (taskNodeLabel ? resourceNodes.find((node) => node.label === taskNodeLabel) : undefined);
   const isCollecting = task.startsWith("COLLECTING ");
   const isTransferring = task.startsWith("TRANSFERRING ");
-  const isReturning = task === "RETURNING" || task === "REPAIR VERIFIED" || task === "SAMPLE DELIVERED";
+  const isReturning = ["RETURNING", "REPAIR VERIFIED", "SAMPLE DELIVERED"].includes(task);
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
+  const isSurveying = task.startsWith("SURVEYING ") || task.startsWith("MAPPING ");
   const isRouting = task === "REROUTING" || task === "FORCED THROUGH";
-  const destination: [number, number] = isTransferring
+  const destination: [number, number] = isTransferring || isReturning
     ? POSITIONS.habitat
-    : target
+    : target && (isCollecting || isSurveying || task.startsWith("AT SITE "))
       ? nodeWorldPosition(target)
       : isCleaning
-      ? POSITIONS.solar
-      : repairTarget && POSITIONS[repairTarget]
-        ? POSITIONS[repairTarget]
-        : isRouting && resourceNodes[0]
-          ? nodeWorldPosition(resourceNodes[0])
-          : isReturning
-            ? position
+        ? POSITIONS.solar
+        : repairTarget && POSITIONS[repairTarget]
+          ? POSITIONS[repairTarget]
+          : isRouting && resourceNodes[0]
+            ? nodeWorldPosition(resourceNodes[0])
             : position;
-  const isMovingTask = Boolean(targetLabel && target) || isTransferring || isReturning || isCleaning || Boolean(repairTarget && POSITIONS[repairTarget]) || isRouting;
-  useEffect(() => {
-    if (!ref.current || ref.current.userData.roverPositionInitialized) return;
-    ref.current.position.set(position[0], PAD_Y + 0.47, position[1]);
-    ref.current.userData.roverPositionInitialized = true;
-  }, [position[0], position[1]]);
+  const hasDestination = Boolean(
+    isTransferring || isReturning || isCleaning || isRouting ||
+    (target && (isCollecting || isSurveying || task.startsWith("AT SITE "))) ||
+    (repairTarget && POSITIONS[repairTarget]),
+  );
 
-  // Move visually using frame delta, independent of the mission-time speed setting.
-  useFrame(({ clock, delta }) => {
+  useEffect(() => {
     if (!ref.current) return;
-    const current = ref.current.position;
+    if (!initializedRef.current) {
+      ref.current.position.set(POSITIONS.rover[0], PAD_Y + 0.47, POSITIONS.rover[1]);
+      initializedRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    // A new assignment is a new navigation command. Do not reset the vehicle to its spawn.
+    if (task !== lastTaskRef.current) lastTaskRef.current = task;
+  }, [task, targetNodeId]);
+
+  useFrame(({ clock, delta }) => {
+    const rover = ref.current;
+    if (!rover) return;
+    const current = rover.position;
     let travelled = 0;
-    const returningToLaunch = isReturning && Math.hypot(destination[0] - position[0], destination[1] - position[1]) < 0.1;
-    if (isMovingTask && !returningToLaunch) {
+    if (hasDestination) {
       const dx = destination[0] - current.x;
       const dz = destination[1] - current.z;
       const distance = Math.hypot(dx, dz);
-      const arriveRadius = isCollecting ? 0.42 : 0.22;
-      if (distance > arriveRadius) {
-        const movementRate = isCollecting ? 5.8 : isTransferring ? 8.5 : 10.5;
-        const move = Math.min(Math.max(0, delta) * movementRate * Math.max(0.85, performanceMultiplier), distance - arriveRadius);
-        if (move > 0) {
-          current.x += dx / distance * move;
-          current.z += dz / distance * move;
-          travelled = move;
-          ref.current.rotation.y = Math.atan2(dx, dz);
-        }
+      const arriveRadius = isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28;
+      if (distance > arriveRadius && distance > 0.0001) {
+        // Use frame delta, not the mission clock, so a rover doesn't freeze when a job timer is paused.
+        const baseSpeed = isCollecting ? 3.4 : isTransferring || isReturning ? 5.6 : 6.8;
+        const move = Math.min(Math.max(0, delta) * baseSpeed * Math.max(0.85, performanceMultiplier), distance - arriveRadius);
+        current.x += (dx / distance) * move;
+        current.z += (dz / distance) * move;
+        travelled = move;
+        rover.rotation.y = Math.atan2(dx, dz);
       }
     }
-    current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * 5.5) * (travelled > 0 ? 0.014 : 0.004);
+    current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
     if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
-    if (drillRef.current) drillRef.current.position.y = isCollecting ? 0.14 + (Math.sin(clock.getElapsedTime() * 15) + 1) * 0.035 : 0.14;
+    if (drillRef.current) {
+      drillRef.current.rotation.y = isCollecting ? clock.getElapsedTime() * 4.5 : 0;
+      drillRef.current.position.y = isCollecting ? 0.14 + (Math.sin(clock.getElapsedTime() * 15) + 1) * 0.035 : 0.14;
+    }
   });
+
   const wheelZ = [-0.55, 0, 0.55];
   return (
     <group ref={ref} onClick={(e) => { e.stopPropagation(); onClick(); }}>
@@ -1050,16 +1068,6 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
           <meshStandardMaterial color="#49d7ea" emissive="#1a8796" emissiveIntensity={0.8} metalness={0.5} roughness={0.18} />
         </mesh>
       ))}
-      <mesh position={[-0.58, 0.43, -0.12]} rotation={[0.4, 0, 0.3]}>
-        <cylinderGeometry args={[0.24, 0.09, 0.08, 22, 1, true]} />
-        <meshStandardMaterial color="#c3c8c0" side={THREE.DoubleSide} metalness={0.45} roughness={0.36} />
-      </mesh>
-      {[-0.42, 0.42].map((x) => (
-        <mesh key={x} position={[x, 0.02, 0.58]}>
-          <sphereGeometry args={[0.07, 12, 8]} />
-          <meshStandardMaterial color="#fff0a6" emissive="#ffca63" emissiveIntensity={1.15} />
-        </mesh>
-      ))}
       <group ref={drillRef} position={[0.48, 0.14, 0.53]} rotation={[0.1, 0, -0.22]}>
         <mesh position={[0, 0.15, 0.18]} rotation={[0.55, 0, 0]}>
           <cylinderGeometry args={[0.045, 0.055, 0.4, 9]} />
@@ -1074,15 +1082,10 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
           <meshStandardMaterial color="#6b7673" metalness={0.65} roughness={0.35} />
         </mesh>
       </group>
-      <mesh position={[0, 0.38, -0.42]}>
-        <boxGeometry args={[0.3, 0.12, 0.24]} />
-        <meshStandardMaterial color="#4b6264" metalness={0.4} roughness={0.48} />
-      </mesh>
       <SelectionRing selected={selected} alerted={alerted} radius={1.34} height={-0.32} />
     </group>
   );
 }
-
 function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected: boolean; alerted: boolean; radius: number; height?: number }) {
   const ref = useRef<THREE.Mesh>(null);
   const haloRef = useRef<THREE.Mesh>(null);
