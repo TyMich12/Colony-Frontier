@@ -2365,7 +2365,7 @@ export function MissionSimulation() {
               : batteryOnline
                 ? 10 + batteryTier * 1.5 + batteryUpgrade * 0.45
                 : 0;
-        const lunarThermalDemand = isLevelOneArrivalMission && hasThermalControl
+        const lunarThermalDemand = isLevelOneArrivalMission && thermalOnline
           ? Math.min(12, Math.abs(21 - lunarDayEnvironment.regolithTemperatureC) * 0.035)
           : 0;
         const powerBase = Math.max(0, powerSupply - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) - lunarThermalDemand + (emergencyPowerMode ? 9 : 0));
