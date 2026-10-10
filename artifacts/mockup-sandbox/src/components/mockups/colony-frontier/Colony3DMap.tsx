@@ -83,6 +83,77 @@ function nodeWorldPosition(node: MissionResourceNode): [number, number] {
   return [(node.x - 500) / 22, (node.y - 300) / 10];
 }
 
+// Grid-based A* pathfinder for the rover. Facility footprints are obstacles, and
+// the rover follows the resulting waypoints rather than trying to drive through buildings.
+function findRoverPath(start: [number, number], goal: [number, number]): [number, number][] {
+  const step = 2;
+  const limit = 14;
+  const toGrid = (point: [number, number]) => ({
+    x: Math.max(-limit, Math.min(limit, Math.round(point[0] / step))),
+    z: Math.max(-limit, Math.min(limit, Math.round(point[1] / step))),
+  });
+  const startGrid = toGrid(start);
+  const goalGrid = toGrid(goal);
+  const key = (x: number, z: number) => `${x},${z}`;
+  const startKey = key(startGrid.x, startGrid.z);
+  const goalKey = key(goalGrid.x, goalGrid.z);
+  const blocked = (x: number, z: number) => {
+    if (key(x, z) === startKey || key(x, z) === goalKey) return false;
+    const wx = x * step;
+    const wz = z * step;
+    return Object.entries(POSITIONS).some(([id, [bx, bz]]) => {
+      if (id === "rover") return false;
+      const radius = id === "habitat" ? 5.1 : id === "solar" ? 3.9 : 3.25;
+      return Math.hypot(wx - bx, wz - bz) < radius;
+    });
+  };
+  const open = [startGrid];
+  const cameFrom = new Map<string, string>();
+  const gScore = new Map<string, number>([[startKey, 0]]);
+  const pointFor = new Map<string, { x: number; z: number }>([[startKey, startGrid]]);
+  const closed = new Set<string>();
+  const heuristic = (x: number, z: number) => Math.hypot(goalGrid.x - x, goalGrid.z - z);
+  const directions = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] as const;
+  let found = false;
+  while (open.length) {
+    open.sort((a, b) => (gScore.get(key(a.x, a.z)) ?? Infinity) + heuristic(a.x, a.z) - ((gScore.get(key(b.x, b.z)) ?? Infinity) + heuristic(b.x, b.z)));
+    const current = open.shift()!;
+    const currentKey = key(current.x, current.z);
+    if (currentKey === goalKey) { found = true; break; }
+    if (closed.has(currentKey)) continue;
+    closed.add(currentKey);
+    for (const [dx, dz] of directions) {
+      const x = current.x + dx;
+      const z = current.z + dz;
+      if (Math.abs(x) > limit || Math.abs(z) > limit || blocked(x, z)) continue;
+      // Prevent diagonal corner-cutting between two adjacent building footprints.
+      if (dx && dz && (blocked(current.x + dx, current.z) || blocked(current.x, current.z + dz))) continue;
+      const nextKey = key(x, z);
+      if (closed.has(nextKey)) continue;
+      const tentative = (gScore.get(currentKey) ?? Infinity) + (dx && dz ? Math.SQRT2 : 1);
+      if (tentative >= (gScore.get(nextKey) ?? Infinity)) continue;
+      cameFrom.set(nextKey, currentKey);
+      gScore.set(nextKey, tentative);
+      pointFor.set(nextKey, { x, z });
+      if (!open.some((point) => key(point.x, point.z) === nextKey)) open.push({ x, z });
+    }
+  }
+  if (!found) return [goal];
+  const path: [number, number][] = [];
+  let cursor = goalKey;
+  while (cursor !== startKey) {
+    const point = pointFor.get(cursor);
+    if (!point) return [goal];
+    path.push([point.x * step, point.z * step]);
+    const previous = cameFrom.get(cursor);
+    if (!previous) return [goal];
+    cursor = previous;
+  }
+  path.reverse();
+  path.push(goal);
+  return path;
+}
+
 function tierColor(tier: Tier) {
   return tier === "Foundation"
     ? "#63df8c"
@@ -921,8 +992,10 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
   const drillRef = useRef<THREE.Group>(null);
-  const lastTaskRef = useRef("");
   const initializedRef = useRef(false);
+  const routeRef = useRef<[number, number][]>([]);
+  const routeCursorRef = useRef(0);
+  const commandKeyRef = useRef("");
 
   const prefixes = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE ", "TRANSFERRING "];
   const taskPrefix = prefixes.find((prefix) => task.startsWith(prefix));
@@ -938,7 +1011,7 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
   const isRouting = task === "REROUTING" || task === "FORCED THROUGH";
   const destination: [number, number] = isTransferring || isReturning
     ? POSITIONS.habitat
-    : target && (isCollecting || isSurveying || task.startsWith("AT SITE "))
+    : target && (targetNodeId || isCollecting || isSurveying || task.startsWith("AT SITE "))
       ? nodeWorldPosition(target)
       : isCleaning
         ? POSITIONS.solar
@@ -947,8 +1020,9 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
           : isRouting && resourceNodes[0]
             ? nodeWorldPosition(resourceNodes[0])
             : position;
+  // A real work-order target is authoritative: movement must not depend on the status text.
   const hasDestination = Boolean(
-    isTransferring || isReturning || isCleaning || isRouting ||
+    isTransferring || isReturning || isCleaning || isRouting || targetNodeId ||
     (target && (isCollecting || isSurveying || task.startsWith("AT SITE "))) ||
     (repairTarget && POSITIONS[repairTarget]),
   );
@@ -961,29 +1035,44 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
     }
   }, []);
 
-  useEffect(() => {
-    // A new assignment is a new navigation command. Do not reset the vehicle to its spawn.
-    if (task !== lastTaskRef.current) lastTaskRef.current = task;
-  }, [task, targetNodeId]);
-
   useFrame(({ clock, delta }) => {
     const rover = ref.current;
     if (!rover) return;
     const current = rover.position;
     let travelled = 0;
-    if (hasDestination) {
-      const dx = destination[0] - current.x;
-      const dz = destination[1] - current.z;
-      const distance = Math.hypot(dx, dz);
-      const arriveRadius = isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28;
-      if (distance > arriveRadius && distance > 0.0001) {
-        // Use frame delta, not the mission clock, so a rover doesn't freeze when a job timer is paused.
-        const baseSpeed = isCollecting ? 3.4 : isTransferring || isReturning ? 5.6 : 6.8;
-        const move = Math.min(Math.max(0, delta) * baseSpeed * Math.max(0.85, performanceMultiplier), distance - arriveRadius);
-        current.x += (dx / distance) * move;
-        current.z += (dz / distance) * move;
-        travelled = move;
-        rover.rotation.y = Math.atan2(dx, dz);
+    const commandKey = hasDestination
+      ? `${task}|${targetNodeId ?? ""}|${destination[0].toFixed(2)}|${destination[1].toFixed(2)}`
+      : "IDLE";
+    if (commandKey !== commandKeyRef.current) {
+      commandKeyRef.current = commandKey;
+      routeCursorRef.current = 0;
+      routeRef.current = hasDestination
+        ? findRoverPath([current.x, current.z], destination)
+        : [];
+    }
+    if (hasDestination && routeRef.current.length) {
+      // Follow A* waypoints. The final waypoint is the actual site or service target.
+      let waypoint = routeRef.current[routeCursorRef.current];
+      while (waypoint && Math.hypot(waypoint[0] - current.x, waypoint[1] - current.z) < 0.34) {
+        routeCursorRef.current += 1;
+        waypoint = routeRef.current[routeCursorRef.current];
+      }
+      if (waypoint) {
+        const dx = waypoint[0] - current.x;
+        const dz = waypoint[1] - current.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > 0.0001) {
+          const finalWaypoint = routeCursorRef.current >= routeRef.current.length - 1;
+          const arriveRadius = finalWaypoint ? (isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28) : 0.08;
+          if (distance > arriveRadius) {
+            const baseSpeed = isCollecting ? 3.4 : isTransferring || isReturning ? 5.6 : 6.8;
+            const move = Math.min(Math.max(0, delta) * baseSpeed * Math.max(0.85, performanceMultiplier), distance - arriveRadius);
+            current.x += (dx / distance) * move;
+            current.z += (dz / distance) * move;
+            travelled = move;
+            rover.rotation.y = Math.atan2(dx, dz);
+          }
+        }
       }
     }
     current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
