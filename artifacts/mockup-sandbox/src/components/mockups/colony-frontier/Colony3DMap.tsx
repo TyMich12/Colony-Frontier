@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Billboard, Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -83,11 +83,39 @@ function nodeWorldPosition(node: MissionResourceNode): [number, number] {
   return [(node.x - 500) / 22, (node.y - 300) / 10];
 }
 
-// Grid-based A* pathfinder for the rover. Facility footprints are obstacles, and
-// the rover follows the resulting waypoints rather than trying to drive through buildings.
-function findRoverPath(start: [number, number], goal: [number, number]): [number, number][] {
+type RoverRockObstacle = {
+  id: string;
+  label: string;
+  x: number;
+  z: number;
+  radius: number;
+  rerouteRoll: number;
+};
+
+const ROVER_ROUTE_ROCKS: RoverRockObstacle[] = [
+  { id: "central-boulder", label: "CENTRAL BOULDER", x: 1, z: -13, radius: 1.9, rerouteRoll: 0.64 },
+  { id: "eastern-ridge", label: "EASTERN BOULDER RIDGE", x: 26, z: -10, radius: 1.8, rerouteRoll: 0.76 },
+  { id: "southern-scree", label: "SOUTHERN SCREE", x: 27, z: -25, radius: 1.55, rerouteRoll: 0.85 },
+  { id: "western-scree", label: "WESTERN SCREE", x: -18, z: 14, radius: 2.0, rerouteRoll: 0.93 },
+];
+
+const SITE_ROUTE_CHALLENGES: Record<string, string> = {
+  ice: "central-boulder",
+  mineral: "eastern-ridge",
+  science: "southern-scree",
+  regolith: "western-scree",
+};
+
+// Grid-based A*: buildings and the same physical boulders rendered in the scene are obstacles.
+// An optional ignored rock is used only for the first, low-confidence approach so the rover can
+// reach the near side of a visible obstacle, pause, announce the diversion, and re-plan around it.
+function findRoverPath(
+  start: [number, number],
+  goal: [number, number],
+  ignoredRockId?: string | null,
+): [number, number][] {
   const step = 2;
-  const limit = 14;
+  const limit = 18; // ±36 world units; includes the remote science / extraction sites.
   const toGrid = (point: [number, number]) => ({
     x: Math.max(-limit, Math.min(limit, Math.round(point[0] / step))),
     z: Math.max(-limit, Math.min(limit, Math.round(point[1] / step))),
@@ -101,11 +129,15 @@ function findRoverPath(start: [number, number], goal: [number, number]): [number
     if (key(x, z) === startKey || key(x, z) === goalKey) return false;
     const wx = x * step;
     const wz = z * step;
-    return Object.entries(POSITIONS).some(([id, [bx, bz]]) => {
+    const nearBuilding = Object.entries(POSITIONS).some(([id, [bx, bz]]) => {
       if (id === "rover") return false;
       const radius = id === "habitat" ? 5.1 : id === "solar" ? 3.9 : 3.25;
       return Math.hypot(wx - bx, wz - bz) < radius;
     });
+    const nearRock = ROVER_ROUTE_ROCKS.some((rock) =>
+      rock.id !== ignoredRockId && Math.hypot(wx - rock.x, wz - rock.z) < rock.radius + 0.8,
+    );
+    return nearBuilding || nearRock;
   };
   const open = [startGrid];
   const cameFrom = new Map<string, string>();
@@ -115,18 +147,22 @@ function findRoverPath(start: [number, number], goal: [number, number]): [number
   const heuristic = (x: number, z: number) => Math.hypot(goalGrid.x - x, goalGrid.z - z);
   const directions = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] as const;
   let found = false;
+
   while (open.length) {
-    open.sort((a, b) => (gScore.get(key(a.x, a.z)) ?? Infinity) + heuristic(a.x, a.z) - ((gScore.get(key(b.x, b.z)) ?? Infinity) + heuristic(b.x, b.z)));
+    open.sort((a, b) =>
+      (gScore.get(key(a.x, a.z)) ?? Infinity) + heuristic(a.x, a.z) -
+      ((gScore.get(key(b.x, b.z)) ?? Infinity) + heuristic(b.x, b.z)),
+    );
     const current = open.shift()!;
     const currentKey = key(current.x, current.z);
     if (currentKey === goalKey) { found = true; break; }
     if (closed.has(currentKey)) continue;
     closed.add(currentKey);
+
     for (const [dx, dz] of directions) {
       const x = current.x + dx;
       const z = current.z + dz;
       if (Math.abs(x) > limit || Math.abs(z) > limit || blocked(x, z)) continue;
-      // Prevent diagonal corner-cutting between two adjacent building footprints.
       if (dx && dz && (blocked(current.x + dx, current.z) || blocked(current.x, current.z + dz))) continue;
       const nextKey = key(x, z);
       if (closed.has(nextKey)) continue;
@@ -138,20 +174,29 @@ function findRoverPath(start: [number, number], goal: [number, number]): [number
       if (!open.some((point) => key(point.x, point.z) === nextKey)) open.push({ x, z });
     }
   }
-  if (!found) return [goal];
+
+  if (!found) return [];
   const path: [number, number][] = [];
   let cursor = goalKey;
   while (cursor !== startKey) {
     const point = pointFor.get(cursor);
-    if (!point) return [goal];
+    if (!point) return [];
     path.push([point.x * step, point.z * step]);
     const previous = cameFrom.get(cursor);
-    if (!previous) return [goal];
+    if (!previous) return [];
     cursor = previous;
   }
   path.reverse();
   path.push(goal);
   return path;
+}
+
+function rockApproachPoint(start: [number, number], rock: RoverRockObstacle): [number, number] {
+  const dx = start[0] - rock.x;
+  const dz = start[1] - rock.z;
+  const distance = Math.max(0.001, Math.hypot(dx, dz));
+  const standOff = rock.radius + 0.72;
+  return [rock.x + (dx / distance) * standOff, rock.z + (dz / distance) * standOff];
 }
 
 function tierColor(tier: Tier) {
@@ -988,14 +1033,44 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   );
 }
 
-function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected, alerted, performanceMultiplier }: { task: string; position: [number, number]; resourceNodes: MissionResourceNode[]; targetNodeId: string | null; onClick: () => void; selected: boolean; alerted: boolean; performanceMultiplier: number }) {
+function Rover({
+  task,
+  position,
+  resourceNodes,
+  targetNodeId,
+  onClick,
+  selected,
+  alerted,
+  performanceMultiplier,
+  navigationAccuracy,
+  simulationSpeed,
+}: {
+  task: string;
+  position: [number, number];
+  resourceNodes: MissionResourceNode[];
+  targetNodeId: string | null;
+  onClick: () => void;
+  selected: boolean;
+  alerted: boolean;
+  performanceMultiplier: number;
+  navigationAccuracy: number;
+  simulationSpeed: number;
+}) {
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
   const drillRef = useRef<THREE.Group>(null);
-  const initializedRef = useRef(false);
   const routeRef = useRef<[number, number][]>([]);
   const routeCursorRef = useRef(0);
   const commandKeyRef = useRef("");
+  const encounteredRouteRef = useRef<string | null>(null);
+  const reroutePlanRef = useRef<{
+    commandKey: string;
+    rockId: string;
+    destination: [number, number];
+    phase: "APPROACH" | "HOLD";
+    resumeAt: number;
+  } | null>(null);
+  const [rerouteNotice, setRerouteNotice] = useState<string | null>(null);
 
   const prefixes = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE ", "TRANSFERRING "];
   const taskPrefix = prefixes.find((prefix) => task.startsWith(prefix));
@@ -1004,69 +1079,132 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
     ?? (taskNodeLabel ? resourceNodes.find((node) => node.label === taskNodeLabel) : undefined);
   const isCollecting = task.startsWith("COLLECTING ");
   const isTransferring = task.startsWith("TRANSFERRING ");
+  const isSurveying = task.startsWith("SURVEYING ") || task.startsWith("MAPPING ");
   const isReturning = ["RETURNING", "REPAIR VERIFIED", "SAMPLE DELIVERED"].includes(task);
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
-  const isSurveying = task.startsWith("SURVEYING ") || task.startsWith("MAPPING ");
-  const isRouting = task === "REROUTING" || task === "FORCED THROUGH";
   const destination: [number, number] = isTransferring || isReturning
-    ? POSITIONS.habitat
+    ? position
     : target && (targetNodeId || isCollecting || isSurveying || task.startsWith("AT SITE "))
       ? nodeWorldPosition(target)
       : isCleaning
         ? POSITIONS.solar
         : repairTarget && POSITIONS[repairTarget]
           ? POSITIONS[repairTarget]
-          : isRouting && resourceNodes[0]
-            ? nodeWorldPosition(resourceNodes[0])
-            : position;
-  // A real work-order target is authoritative: movement must not depend on the status text.
+          : position;
   const hasDestination = Boolean(
-    isTransferring || isReturning || isCleaning || isRouting || targetNodeId ||
+    isTransferring || isReturning || isCleaning || targetNodeId ||
     (target && (isCollecting || isSurveying || task.startsWith("AT SITE "))) ||
     (repairTarget && POSITIONS[repairTarget]),
   );
 
+  // Start at the actual launch coordinate from the first rendered frame. Never rely on an effect
+  // to move an origin-positioned (and easily mis-hit) vehicle into view after mount.
   useEffect(() => {
-    if (!ref.current) return;
-    if (!initializedRef.current) {
-      ref.current.position.set(POSITIONS.rover[0], PAD_Y + 0.47, POSITIONS.rover[1]);
-      initializedRef.current = true;
+    if (ref.current) {
+      ref.current.position.set(position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]);
     }
-  }, []);
+  }, [position[0], position[1]]);
 
   useFrame(({ clock, delta }) => {
     const rover = ref.current;
     if (!rover) return;
     const current = rover.position;
+    const start: [number, number] = [current.x, current.z];
     let travelled = 0;
+
+    if (simulationSpeed <= 0) {
+      current.y = terrainHeight(current.x, current.z) + 0.47;
+      return;
+    }
+
     const commandKey = hasDestination
       ? `${task}|${targetNodeId ?? ""}|${destination[0].toFixed(2)}|${destination[1].toFixed(2)}`
       : "IDLE";
+
     if (commandKey !== commandKeyRef.current) {
       commandKeyRef.current = commandKey;
       routeCursorRef.current = 0;
-      routeRef.current = hasDestination
-        ? findRoverPath([current.x, current.z], destination)
-        : [];
-    }
-    if (hasDestination && routeRef.current.length) {
-      // Follow A* waypoints. The final waypoint is the actual site or service target.
-      let waypoint = routeRef.current[routeCursorRef.current];
-      while (waypoint && Math.hypot(waypoint[0] - current.x, waypoint[1] - current.z) < 0.34) {
-        routeCursorRef.current += 1;
-        waypoint = routeRef.current[routeCursorRef.current];
+      reroutePlanRef.current = null;
+      encounteredRouteRef.current = null;
+      setRerouteNotice(null);
+
+      if (!hasDestination || Math.hypot(destination[0] - current.x, destination[1] - current.z) < 1.2) {
+        routeRef.current = [];
+      } else {
+        const siteKey = target?.id.split("-").slice(-1)[0] ?? "";
+        const rockId = isSurveying || isCollecting ? SITE_ROUTE_CHALLENGES[siteKey] : undefined;
+        const rock = rockId ? ROVER_ROUTE_ROCKS.find((item) => item.id === rockId) : undefined;
+        // Each field corridor has a repeatable mapped difficulty. A higher Nav tier / retrofit
+        // has greater accuracy, so it detects more of these boulders before driving up to them.
+        const siteChallenge = Boolean(
+          rock &&
+          navigationAccuracy < rock.rerouteRoll &&
+          Math.hypot(destination[0] - current.x, destination[1] - current.z) > 1.2,
+        );
+        if (siteChallenge && rock) {
+          const approach = rockApproachPoint(start, rock);
+          const firstLeg = findRoverPath(start, approach, rock.id);
+          if (firstLeg.length) {
+            routeRef.current = firstLeg;
+            reroutePlanRef.current = {
+              commandKey,
+              rockId: rock.id,
+              destination: [...destination],
+              phase: "APPROACH",
+              resumeAt: 0,
+            };
+          } else {
+            routeRef.current = findRoverPath(start, destination);
+          }
+        } else {
+          routeRef.current = findRoverPath(start, destination);
+        }
       }
+    }
+
+    const reroutePlan = reroutePlanRef.current;
+    if (reroutePlan && reroutePlan.commandKey === commandKey && reroutePlan.phase === "HOLD") {
+      if (clock.getElapsedTime() < reroutePlan.resumeAt) {
+        current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * 2.2) * 0.006;
+        return;
+      }
+      // Re-plan around the actual boulder field after the vehicle has stopped at the near side.
+      routeRef.current = findRoverPath(start, reroutePlan.destination);
+      routeCursorRef.current = 0;
+      encounteredRouteRef.current = commandKey;
+      reroutePlanRef.current = null;
+      setRerouteNotice(null);
+    }
+
+    if (hasDestination && routeRef.current.length) {
+      const path = routeRef.current;
+      let waypoint = path[routeCursorRef.current];
+      while (waypoint && Math.hypot(waypoint[0] - current.x, waypoint[1] - current.z) < 0.42) {
+        routeCursorRef.current += 1;
+        waypoint = path[routeCursorRef.current];
+      }
+
+      const activeReroute = reroutePlanRef.current;
+      if (activeReroute && activeReroute.phase === "APPROACH" && routeCursorRef.current >= path.length) {
+        activeReroute.phase = "HOLD";
+        activeReroute.resumeAt = clock.getElapsedTime() + 1.25;
+        const rock = ROVER_ROUTE_ROCKS.find((item) => item.id === activeReroute.rockId);
+        setRerouteNotice(`REROUTING · ${rock?.label ?? "ROCK AHEAD"}`);
+        current.y = terrainHeight(current.x, current.z) + 0.47;
+        return;
+      }
+
       if (waypoint) {
         const dx = waypoint[0] - current.x;
         const dz = waypoint[1] - current.z;
         const distance = Math.hypot(dx, dz);
         if (distance > 0.0001) {
-          const finalWaypoint = routeCursorRef.current >= routeRef.current.length - 1;
+          const finalWaypoint = routeCursorRef.current >= path.length - 1;
           const arriveRadius = finalWaypoint ? (isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28) : 0.08;
           if (distance > arriveRadius) {
-            const baseSpeed = isCollecting ? 3.4 : isTransferring || isReturning ? 5.6 : 6.8;
-            const move = Math.min(Math.max(0, delta) * baseSpeed * Math.max(0.85, performanceMultiplier), distance - arriveRadius);
+            const baseSpeed = isCollecting ? 1.2 : isTransferring || isReturning ? 5.2 : 6.3;
+            const move = Math.min(Math.max(0, delta) * baseSpeed * Math.max(0.9, performanceMultiplier), distance - arriveRadius);
             current.x += (dx / distance) * move;
             current.z += (dz / distance) * move;
             travelled = move;
@@ -1075,6 +1213,7 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
         }
       }
     }
+
     current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
     if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
     if (drillRef.current) {
@@ -1084,16 +1223,23 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
   });
 
   const wheelZ = [-0.55, 0, 0.55];
+  const basePosition: [number, number, number] = [position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]];
   return (
-    <group ref={ref} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-      <mesh castShadow position={[0, 0.01, 0]}>
+    <group ref={ref} position={basePosition} frustumCulled={false}>
+      <mesh
+        castShadow
+        position={[0, 0.01, 0]}
+        onClick={(event) => { event.stopPropagation(); onClick(); }}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = ""; }}
+      >
         <RoundedBox args={[1.72, 0.28, 1.12]} radius={0.12} smoothness={4}>
-          <meshStandardMaterial color="#b99a5d" roughness={0.64} metalness={0.3} />
+          <meshStandardMaterial color="#c8ab66" roughness={0.58} metalness={0.28} />
         </RoundedBox>
       </mesh>
       <mesh castShadow position={[0, 0.22, 0.02]}>
         <RoundedBox args={[1.22, 0.18, 0.82]} radius={0.08} smoothness={3}>
-          <meshStandardMaterial color="#d7bd7a" roughness={0.55} metalness={0.24} />
+          <meshStandardMaterial color="#e0cb8d" roughness={0.52} metalness={0.24} />
         </RoundedBox>
       </mesh>
       {[-1, 1].map((side) => (
@@ -1103,8 +1249,8 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
             <meshStandardMaterial color="#515b5d" metalness={0.58} roughness={0.36} />
           </mesh>
           {wheelZ.map((z, wheelIndex) => (
-            <group key={z} ref={(el) => { wheelRefs.current[(side === -1 ? 0 : 3) + wheelIndex] = el; }} position={[side * 0.82, -0.16, z]}>
-              <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
+            <group key={z} ref={(element) => { wheelRefs.current[(side === -1 ? 0 : 3) + wheelIndex] = element; }} position={[side * 0.82, -0.16, z]}>
+              <mesh castShadow rotation={[0, 0, Math.PI / 2}>
                 <cylinderGeometry args={[0.235, 0.235, 0.19, 20]} />
                 <meshStandardMaterial color="#1e2528" roughness={0.96} metalness={0.04} />
               </mesh>
@@ -1116,8 +1262,8 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
                 <torusGeometry args={[0.157, 0.024, 6, 20]} />
                 <meshStandardMaterial color="#c7b16f" metalness={0.56} roughness={0.34} />
               </mesh>
-              {Array.from({ length: 10 }, (_, i) => (
-                <mesh key={i} position={[side * 0.1, Math.sin(i * Math.PI / 5) * 0.19, Math.cos(i * Math.PI / 5) * 0.19]} rotation={[i * Math.PI / 5, 0, 0]}>
+              {Array.from({ length: 10 }, (_, index) => (
+                <mesh key={index} position={[side * 0.1, Math.sin(index * Math.PI / 5) * 0.19, Math.cos(index * Math.PI / 5) * 0.19]} rotation={[index * Math.PI / 5, 0, 0]}>
                   <boxGeometry args={[0.018, 0.045, 0.07]} />
                   <meshStandardMaterial color="#343b3d" roughness={0.88} />
                 </mesh>
@@ -1172,9 +1318,19 @@ function Rover({ task, position, resourceNodes, targetNodeId, onClick, selected,
         </mesh>
       </group>
       <SelectionRing selected={selected} alerted={alerted} radius={1.34} height={-0.32} />
+      {rerouteNotice && (
+        <Billboard position={[0, 2.15, 0]} follow frustumCulled={false}>
+          <mesh position={[0, 0.02, -0.025]}>
+            <planeGeometry args={[3.8, 0.55]} />
+            <meshBasicMaterial color="#17212a" transparent opacity={0.94} depthWrite={false} />
+          </mesh>
+          <Text frustumCulled={false} fontSize={0.25} color="#ffcf65" outlineWidth={0.03} outlineColor="#171a1c" anchorX="center" anchorY="middle">{rerouteNotice}</Text>
+        </Billboard>
+      )}
     </group>
   );
 }
+
 function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected: boolean; alerted: boolean; radius: number; height?: number }) {
   const ref = useRef<THREE.Mesh>(null);
   const haloRef = useRef<THREE.Mesh>(null);
@@ -1216,6 +1372,35 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
           <meshBasicMaterial color="#ff7988" transparent opacity={0.9} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
+    </group>
+  );
+}
+
+function RoverRockField({ mars }: { mars: boolean }) {
+  const rockColor = mars ? "#806357" : "#77766f";
+  const highlight = mars ? "#bd9273" : "#a8a69a";
+  return (
+    <group>
+      {ROVER_ROUTE_ROCKS.map((rock, index) => {
+        const y = terrainHeight(rock.x, rock.z);
+        const scale = rock.radius / 1.8;
+        return (
+          <group key={rock.id} position={[rock.x, y - 0.06, rock.z]}>
+            <mesh castShadow receiveShadow position={[0, 0.56 * scale, 0]} scale={[1.35 * scale, 0.86 * scale, 1.08 * scale]}>
+              <dodecahedronGeometry args={[1, 1]} />
+              <meshStandardMaterial color={rockColor} roughness={0.98} flatShading />
+            </mesh>
+            <mesh castShadow receiveShadow position={[-0.82 * scale, 0.28 * scale, 0.32 * scale]} scale={[0.72 * scale, 0.58 * scale, 0.7 * scale]}>
+              <icosahedronGeometry args={[1, 0]} />
+              <meshStandardMaterial color={index % 2 ? rockColor : highlight} roughness={1} flatShading />
+            </mesh>
+            <mesh castShadow receiveShadow position={[0.86 * scale, 0.22 * scale, -0.35 * scale]} scale={[0.58 * scale, 0.47 * scale, 0.64 * scale]}>
+              <dodecahedronGeometry args={[1, 0]} />
+              <meshStandardMaterial color={highlight} roughness={1} flatShading />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1626,7 +1811,7 @@ function MissionGuide({ mars }: { mars: boolean }) {
         <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
           <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable, manage supplies, and complete the mission objectives.
           <br/><b style={{color:"#e8eee9"}}>2.</b> A disaster opens a response popup and pauses the clock. Choose there first; if a fault remains, open the red-ringed system and run its repair.
-          <br/><b style={{color:"#e8eee9"}}>3.</b> Open any system to see its work timer. Different systems can work in parallel; the rover drives to survey, sample, clean, or assigned repair sites.
+          <br/><b style={{color:"#e8eee9"}}>3.</b> Field sites sit beyond the outpost: pan the map to find them. The rover follows its plotted route; better Navigation reduces surprise boulder detours.
         </div>
         <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
           <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
@@ -1645,6 +1830,12 @@ function Scene({ props }: { props: Props }) {
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
   // A complete technology-tier step (+18%) is always better than both field retrofits together (+10%).
   const roverPerformanceMultiplier = 1 + roverTierIndex * 0.18 + Math.max(0, Math.min(2, roverRetrofitLevel)) * 0.05;
+  const navTier = props.selected.navigation ?? "Foundation";
+  const navTierIndex = navTier === "Frontier" ? 1 : navTier === "Apex" ? 2 : navTier === "Research" ? 3 : 0;
+  const navRetrofitLevel = props.buildings.navigation?.upgradeLevel ?? 0;
+  const navCondition = props.buildings.navigation?.condition ?? 100;
+  // Accuracy increases by tier first; two retrofits add less than one full tier step.
+  const navigationAccuracy = Math.max(0.42, Math.min(0.98, (0.60 + navTierIndex * 0.10 + Math.max(0, Math.min(2, navRetrofitLevel)) * 0.04) * (0.65 + 0.35 * navCondition / 100)));
   return (
     <Canvas
       orthographic
@@ -1659,6 +1850,7 @@ function Scene({ props }: { props: Props }) {
       <directionalLight position={[18, 34, 20]} intensity={1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
+      <RoverRockField mars={mars} />
       <Foundation mars={mars} />
       <group frustumCulled={false}>
         <MissionGuide mars={mars} />
@@ -1680,7 +1872,7 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} performanceMultiplier={roverPerformanceMultiplier} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} performanceMultiplier={roverPerformanceMultiplier} navigationAccuracy={navigationAccuracy} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
         <Crew mars={mars} />
