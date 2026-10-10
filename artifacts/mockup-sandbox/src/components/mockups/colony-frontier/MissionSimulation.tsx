@@ -438,7 +438,9 @@ type ActionRequirementContext = {
 };
 
 function systemIsOperational(systemId: string, context: ActionRequirementContext, visiting = new Set<string>()): boolean {
-  if (!context.selected[systemId] || Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId)) return false;
+  const systemFaults = Object.values(context.activeFaults).filter((fault) => fault.targetTrackId === systemId);
+  const onlyRecoverableSolarDust = systemId === "solar" && systemFaults.length > 0 && systemFaults.every((fault) => ["solar-dust", "regional-dust-front"].includes(fault.eventId));
+  if (!context.selected[systemId] || (systemFaults.length > 0 && !onlyRecoverableSolarDust)) return false;
   if ((context.buildings[systemId]?.condition ?? 100) < 25) return false;
   if (visiting.has(systemId)) return false;
   const nextVisiting = new Set(visiting);
@@ -2351,11 +2353,9 @@ export function MissionSimulation() {
           alignmentErrorDegrees: solarRuntime?.alignmentErrorDegrees ?? 5,
           solarStringLossPct: solarRuntime?.solarStringLossPct ?? 0,
         });
-        const solarDustTransmission = isLevelOneArrivalMission
-          ? solarActual.dustTransmission
-          : dustRemainingFraction(pending.campaign === "mars" ? "mars" : "moon", solarDust);
-        const solarPointingFactor = Math.max(0, Math.cos(((solarRuntime?.alignmentErrorDegrees ?? 5) * Math.PI) / 180));
-        const solarStringFactor = Math.max(0, 1 - (solarRuntime?.solarStringLossPct ?? 0) / 100);
+        const solarDustTransmission = isLevelOneArrivalMission ? 1 : dustRemainingFraction(pending.campaign === "mars" ? "mars" : "moon", solarDust);
+        const solarPointingFactor = isLevelOneArrivalMission ? 1 : Math.max(0, Math.cos(((solarRuntime?.alignmentErrorDegrees ?? 5) * Math.PI) / 180));
+        const solarStringFactor = isLevelOneArrivalMission ? 1 : Math.max(0, 1 - (solarRuntime?.solarStringLossPct ?? 0) / 100);
         // 3 power-reserve index points per available kW bridges the physical panel model to
         // the existing reserve UI. Rated kW is never increased by a repair; repairs correct losses.
         const solarGeneration = solarOnline
