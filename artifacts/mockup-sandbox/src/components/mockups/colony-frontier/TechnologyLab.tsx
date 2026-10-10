@@ -27,6 +27,7 @@ import {
   ProgressBar,
   SectionLabel,
 } from "./_shared/GameShell";
+import { ADDITIONAL_METRICS, SYSTEM_BASELINES, type RatingRow } from "./_shared/simulationBalance";
 import {
   formatCredits,
   technologyTracks,
@@ -58,6 +59,11 @@ const categoryIcons = {
 } as const;
 
 const tierOrder: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
+const progressLabels = ["0/2", "1/2", "2/2"] as const;
+
+function formatRatingValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(4).replace(/\.?0+$/, "");
+}
 
 function Metric({
   label,
@@ -89,17 +95,30 @@ function UnlockCopy({ tier, researchTokens = 0 }: { tier: Tier; researchTokens?:
 function EquipmentRow({
   tier,
   equipment,
+  systemId,
   isUnlocked,
   isSelected,
   onSelect,
 }: {
   tier: Tier;
   equipment: Equipment;
+  systemId: string;
   isUnlocked: boolean;
   isSelected: boolean;
   onSelect: () => void;
 }) {
   const meta = tierMeta[tier];
+  const baselineRow = SYSTEM_BASELINES.find((row) => row.id === systemId);
+  const capabilityRows: RatingRow[] = baselineRow
+    ? [
+        baselineRow,
+        ...ADDITIONAL_METRICS.filter(
+          (row) => row.id === systemId && row.metric !== baselineRow.metric,
+        ),
+      ]
+    : [];
+  const tierStartIndex = tierOrder.indexOf(tier) * 3;
+
   return (
     <button
       type="button"
@@ -163,6 +182,49 @@ function EquipmentRow({
       <p className="mt-3 border-l-2 border-[#526c5a] bg-[#10252a] px-3 py-2 text-xs leading-5 text-[#a9c0b5]">
         {equipment.description}
       </p>
+
+      <div className="mt-3 rounded border border-[#29434a] bg-[#0a1b21] p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#9fcebf]">
+            Direct workbook ratings
+          </p>
+          <p className="text-[8px] uppercase tracking-[0.12em] text-[#77948c]">
+            {tier} · absolute values
+          </p>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,54px)] gap-2 border-b border-[#29434a] pb-2">
+          <p className="text-[8px] uppercase tracking-[0.08em] text-[#6f8b88]">Metric / unit</p>
+          {progressLabels.map((label) => (
+            <p key={label} className="text-right text-[8px] font-bold text-[#a9c4b9]">
+              {label}
+            </p>
+          ))}
+        </div>
+        {capabilityRows.map((row) => (
+          <div
+            key={`${row.id}-${row.metric}`}
+            className="grid grid-cols-[minmax(0,1fr)_repeat(3,54px)] items-center gap-2 border-t border-[#22393f] py-2 first:border-t-0"
+          >
+            <div className="min-w-0 pr-1">
+              <p className="text-left text-[9px] leading-4 text-[#b7cbc2]">{row.metric}</p>
+              <p className="text-left text-[8px] leading-3 text-[#718c8a]">
+                {row.unit} · {row.direction.toLowerCase().startsWith("lower") ? "lower is better" : "higher is better"}
+              </p>
+            </div>
+            {progressLabels.map((label, progress) => {
+              const value = row.values[tierStartIndex + progress];
+              return (
+                <p key={`${row.id}-${row.metric}-${label}`} className="text-right font-mono text-[10px] font-semibold text-[#e2efdd]">
+                  {typeof value === "number" ? formatRatingValue(value) : "—"}
+                </p>
+              );
+            })}
+          </div>
+        ))}
+        <p className="mt-2 text-[8px] leading-4 text-[#6f8e87]">
+          0/2, 1/2 and 2/2 are listed separately. Each is a direct rating; no global tier or retrofit multiplier is applied.
+        </p>
+      </div>
     </button>
   );
 }
@@ -275,6 +337,7 @@ export function TechnologyLab() {
                   key={tier}
                   tier={tier}
                   equipment={equipment}
+                  systemId={selectedTrack.id}
                   isUnlocked={isUnlocked}
                   isSelected={selectedTier === tier}
                   onSelect={() => setSelectedTier(tier)}
