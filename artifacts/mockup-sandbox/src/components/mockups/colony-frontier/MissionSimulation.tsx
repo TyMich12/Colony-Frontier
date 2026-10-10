@@ -2981,7 +2981,10 @@ export function MissionSimulation() {
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
     const repairVariantHelpers = decodeRepairVariant(trackId, action);
-    const effectiveAction = repairVariantHelpers ? "repair-active" : action;
+    const integratedVariant = decodeActionVariant(trackId, action);
+    const baseActionId = integratedVariant?.baseActionId ?? action;
+    const integratedHelpers = integratedVariant?.supportSystems ?? [];
+    const effectiveAction = repairVariantHelpers ? "repair-active" : baseActionId;
     const fallbackKey = `${trackId}:${action}`;
     const hasOwnActiveFault = Object.values(activeFaults).some((fault) => fault.targetTrackId === trackId);
     const emergencyOverride = action.startsWith("fallback-") && fallbackEmergencyOverride(action, trackId, metrics, hasOwnActiveFault);
@@ -3003,7 +3006,7 @@ export function MissionSimulation() {
       setOperationResult("ROVER UNAVAILABLE · The rover is already committed to field work. Finish that job or return it to base before dispatching it elsewhere.");
       return;
     }
-    if (action === "upgrade") {
+    if (baseActionId === "upgrade") {
       const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
       if ((current.upgradeLevel ?? 0) >= 2) {
         setAiMessage(`${trackId.toUpperCase()} has reached its maximum module upgrade level.`);
@@ -3061,7 +3064,6 @@ export function MissionSimulation() {
       return;
     }
 
-    const actionDurations = SYSTEM_ACTION_SECONDS;
     const actionLabels: Record<string, string> = {
       clean: "Clean solar array", tune: "Tune solar tracking", balance: "Balance battery cells", reserve: "Protect battery reserve",
       reset: "Reset oxygen loop", boost: "Boost oxygen processing", flush: "Flush water recovery", purify: "Deep-purify water",
@@ -3073,35 +3075,52 @@ export function MissionSimulation() {
       process: "Process local feedstock", purge: "Purge ISRU line", "tune-crops": "Tune greenhouse controls", harvest: "Harvest crop output",
       service: "Run maintenance service", diagnostics: "Run predictive diagnostics", "request-earth-report": "Request Earth Mission Control report",
     };
-    if (action === "survey") {
+    const actionPerformance = operationPerformanceMultiplier(
+      trackId,
+      pending.selected,
+      buildings,
+      integratedHelpers,
+    );
+    if (baseActionId === "survey") {
       const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
       const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
       if (nextNode) setRoverTask(`SURVEYING ${nextNode.label}`);
-    } else if (action === "return") {
+    } else if (baseActionId === "return") {
       setRoverTask("RETURNING");
-    } else if (action === "clean" && pending.selected.rover) {
+    } else if (baseActionId === "clean" && integratedHelpers.includes("rover")) {
       setRoverTask("CLEANING ARRAY");
     }
     if (action.startsWith("fallback-")) {
       setFallbackReadyAt((current) => ({ ...current, [fallbackKey]: elapsed + 70 }));
     }
+    const baseDuration = baseActionId === "request-earth-report"
+      ? earthReportDelaySeconds(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0)
+      : (actionDurations[baseActionId] ?? 6);
+    const duration = baseDuration === 0 ? 0 : Math.max(3, Math.round(baseDuration / actionPerformance));
+    const supportsLabel = integratedHelpers.length
+      ? ` · integrated with ${integratedHelpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id).join(" + ")}`
+      : "";
     beginOperation(
       "SYSTEM_ACTION",
       trackId,
-      actionLabels[action] ?? `Operate ${trackId}`,
-      action === "request-earth-report" ? earthReportDelaySeconds(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0) : (actionDurations[action] ?? 6),
+      `${actionLabels[baseActionId] ?? `Operate ${trackId}`}${supportsLabel}`,
+      duration,
       undefined,
       undefined,
       action,
       trackId,
-      (trackId === "rover" && pending.selected.rover !== undefined) || (trackId === "solar" && action === "clean" && pending.selected.rover !== undefined),
+      (trackId === "rover" && pending.selected.rover !== undefined) ||
+        (trackId === "solar" && baseActionId === "clean" && integratedHelpers.includes("rover"),
     );
+
   };
 
   const applyBuildingAction = (trackId: string, action: string) => {
     if (!pending) return;
-    const upgradeLevel = buildings[trackId]?.upgradeLevel ?? 0;
-    const actionPerformance = systemPerformanceMultiplier(pending.selected[trackId] ?? "Foundation", upgradeLevel);
+    const integratedVariant = decodeActionVariant(trackId, action);
+    const baseActionId = integratedVariant?.baseActionId ?? action;
+    const integratedHelpers = integratedVariant?.supportSystems ?? [];
+    const actionPerformance = operationPerformanceMultiplier(trackId, pending.selected, buildings, integratedHelpers);
     const gain = (amount: number) => amount * actionPerformance;
     const cost = (amount: number) => amount / actionPerformance;
     const conditionBoost = (amount: number) => {
@@ -3113,7 +3132,7 @@ export function MissionSimulation() {
       });
     };
 
-    switch (action) {
+    switch (baseActionId) {
       case "upgrade": {
         setMetrics((current) => ({ ...current, power: clamp(current.power - 8), battery: clamp(current.battery - 5) }));
         setBuildings((current) => {
