@@ -8,14 +8,14 @@ type Baseline = { label: string; unit: string; values: Record<Tier, Triple>; low
 export const SYSTEM_BASELINES: Record<string, Baseline> = {
   solar:{label:"Rated solar output at reference noon",unit:"kW",values:{Foundation:[8,9,10],Frontier:[12,13.5,15],Apex:[18,20,22],Research:[25,27,29]}},
   battery:{label:"Usable storage capacity",unit:"kWh",values:{Foundation:[40,44,48],Frontier:[60,66,72],Apex:[90,99,108],Research:[130,143,156]}},
-  oxygen:{label:"Oxygen processing capacity",unit:"kg O₂/day",values:{Foundation:[3.6,3.8,4],Frontier:[4,4.2,4.4],Apex:[4.4,4.7,5],Research:[4.8,5.1,5.4]}},
+  oxygen:{label:"Oxygen processing capacity",unit:"kg O₂/day",values:{Foundation:[3.6,3.8,4],Frontier:[4,4.2,4.4],Apex:[4.4,4.7,5],Research:[5.1,5.4,5.7]}},
   water:{label:"Water recovery",unit:"%",values:{Foundation:[60,64,68],Frontier:[70,74,78],Apex:[80,84,88],Research:[90,93,96]}},
   co2:{label:"CO₂ removal capacity",unit:"kg CO₂/day",values:{Foundation:[4,4.2,4.4],Frontier:[4.5,4.7,4.9],Apex:[5,5.2,5.4],Research:[5.5,5.7,5.9]}},
   thermal:{label:"Heat rejection capacity",unit:"kW thermal",values:{Foundation:[4,4.5,5],Frontier:[6,6.5,7],Apex:[9,9.5,10],Research:[12,12.5,13]}},
   comms:{label:"Data-link throughput",unit:"Mbit/s",values:{Foundation:[1,2,3],Frontier:[5,7,9],Apex:[20,25,30],Research:[100,115,130]}},
   habitat:{label:"Pressure-control deviation (lower is better)",unit:"kPa from target",lowerIsBetter:true,values:{Foundation:[2,1.8,1.6],Frontier:[1.5,1.3,1.1],Apex:[1,.85,.7],Research:[.5,.4,.3]}},
   radiation:{label:"Dose reduction in reference exposure",unit:"%",values:{Foundation:[20,24,28],Frontier:[30,34,38],Apex:[40,44,48],Research:[50,54,58]}},
-  grid:{label:"Power distribution efficiency",unit:"%",values:{Foundation:[85,87,89],Frontier:[90,92,94],Apex:[94,95,96],Research:[97,98,99]}},
+  grid:{label:"Power distribution efficiency",unit:"%",values:{Foundation:[85,87,89],Frontier:[90,91,92],Apex:[94,95,96],Research:[97,98,99]}},
   science:{label:"Sample-analysis throughput",unit:"samples/day",values:{Foundation:[1,1.2,1.4],Frontier:[2,2.3,2.6],Apex:[3,3.4,3.8],Research:[4,4.5,5]}},
   navigation:{label:"Position uncertainty (lower is better)",unit:"m",lowerIsBetter:true,values:{Foundation:[50,40,30],Frontier:[20,16,12],Apex:[5,4,3],Research:[1,.75,.5]}},
   rover:{label:"Safe surface cruise speed",unit:"km/h",values:{Foundation:[3,3.5,4],Frontier:[5,5.7,6.4],Apex:[7,7.8,8.6],Research:[10,11,12]}},
@@ -164,6 +164,31 @@ const D:Record<string,SystemRepairDefinition>={
 
 const CATEGORY_BY_COUNT=["Standalone Options","Enhanced Options","Dual-System Options","Fully Integrated"] as const;
 const DURATIONS:Record<Tier,[number,number,number,number]>={Foundation:[30,34,42,52],Frontier:[27,31,38,46],Apex:[24,28,34,40],Research:[20,23,28,34]};
+const SYSTEM_REPAIR_COST_ADJUSTMENTS:Record<string,{power:[number,number,number,number];battery:[number,number,number,number]}>={
+ solar:{power:[0,0,0,0],battery:[0,0,0,0]},
+ battery:{power:[0,0,1,1],battery:[0,1,1,1]},
+ grid:{power:[0,1,1,1],battery:[0,0,1,1]},
+ habitat:{power:[0,0,1,2],battery:[0,1,1,1]},
+ water:{power:[0,0,1,1],battery:[0,0,1,1]},
+ oxygen:{power:[0,0,1,1],battery:[0,0,1,1]},
+ co2:{power:[0,0,1,1],battery:[0,0,1,1]},
+ thermal:{power:[0,1,1,1],battery:[0,1,1,1]},
+ comms:{power:[0,0,0,1],battery:[0,0,0,1]},
+ radiation:{power:[0,0,1,1],battery:[0,0,1,1]},
+ rover:{power:[0,0,1,1],battery:[0,1,1,1]},
+ extraction:{power:[0,1,1,2],battery:[0,1,1,2]},
+ isru:{power:[0,1,1,2],battery:[0,1,1,2]},
+ agriculture:{power:[0,0,1,1],battery:[0,0,1,1]},
+ maintenance:{power:[0,0,0,1],battery:[0,0,0,1]},
+ science:{power:[0,0,1,1],battery:[0,0,1,1]},
+ navigation:{power:[0,0,0,1],battery:[0,0,0,1]},
+};
+const SYSTEM_REPAIR_TIME_ADDITIONS:Record<string,[number,number,number,number]>={
+ solar:[0,0,1,2],battery:[2,2,3,4],grid:[1,1,2,3],habitat:[3,3,4,6],
+ water:[1,1,2,3],oxygen:[1,1,2,3],co2:[1,1,2,3],thermal:[2,2,3,4],
+ comms:[0,0,1,2],radiation:[3,3,4,6],rover:[2,2,3,4],extraction:[4,4,5,7],
+ isru:[4,4,5,7],agriculture:[2,2,3,4],maintenance:[2,2,3,4],science:[2,2,3,4],navigation:[1,1,2,3],
+};
 const COSTS:Record<Tier,Array<{powerCost:number;batteryCost:number}>>={
  Foundation:[{powerCost:2,batteryCost:1},{powerCost:3,batteryCost:1},{powerCost:4,batteryCost:2},{powerCost:5,batteryCost:3}],
  Frontier:[{powerCost:2,batteryCost:1},{powerCost:3,batteryCost:1},{powerCost:4,batteryCost:2},{powerCost:5,batteryCost:2}],
@@ -188,8 +213,10 @@ export function getRepairOption(systemId:string,tier:Tier,retrofitLevel:number,m
  const labels=helperDefs.map(helper=>helper.name);
  const name=count===0?definition.standaloneName:count===3?definition.integratedName:labels.join(" + ");
  const description=count===0?definition.standaloneDescription:helperDefs.map(helper=>helper.description).join(" ");
- const durationSeconds=Math.max(12,Math.round(DURATIONS[tier][count]+Math.max(0,severity-1)*5-retrofitLevel*2));
- const costs=COSTS[tier][count];
+ const durationSeconds=Math.max(12,Math.round(DURATIONS[tier][count]+(SYSTEM_REPAIR_TIME_ADDITIONS[systemId]??[0,0,0,0])[count]+Math.max(0,severity-1)*5-retrofitLevel*2));
+ const baseCosts=COSTS[tier][count];
+ const adjustment=SYSTEM_REPAIR_COST_ADJUSTMENTS[systemId]??{power:[0,0,0,0] as [number,number,number,number],battery:[0,0,0,0] as [number,number,number,number]};
+ const costs={powerCost:baseCosts.powerCost+adjustment.power[count],batteryCost:baseCosts.batteryCost+adjustment.battery[count]};
  return {id:"repair-variant:"+systemId+":"+mask,mask,category:CATEGORY_BY_COUNT[count],name,description,helpers,durationSeconds,powerCost:costs.powerCost,batteryCost:costs.batteryCost,effects,effectSummary};
 }
 export function getRepairOptionForAction(systemId:string,tier:Tier,retrofitLevel:number,actionId:string,severity=1):RepairOption|null {
