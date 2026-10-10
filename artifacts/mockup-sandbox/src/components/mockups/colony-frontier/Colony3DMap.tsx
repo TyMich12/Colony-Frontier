@@ -397,8 +397,11 @@ function Beacon({ color, active, height = 2.1 }: { color: string; active: boolea
   );
 }
 
-function BuildingArt({ id, accent, solarTilt = 0.18, solarAzimuth = 0 }: { id: string; accent: string; solarTilt?: number; solarAzimuth?: number }) {
+function BuildingArt({ id, accent, solarTilt = 0.18, solarAzimuth = 0, solarDust = 0 }: { id: string; accent: string; solarTilt?: number; solarAzimuth?: number; solarDust?: number }) {
   const p = palette(id);
+  const dustFraction = Math.max(0, Math.min(1, solarDust / 100));
+  const solarPanelColor = new THREE.Color("#12334f").lerp(new THREE.Color("#b5a78e"), dustFraction);
+  const solarCellLineColor = new THREE.Color("#79b9ca").lerp(new THREE.Color("#aaa08e"), dustFraction);
 
   if (id === "habitat") {
     return (
@@ -588,8 +591,8 @@ function BuildingArt({ id, accent, solarTilt = 0.18, solarAzimuth = 0 }: { id: s
         <mesh position={[0, 0.38, 0]}><cylinderGeometry args={[0.12, 0.16, 0.42, 10]} /><meshStandardMaterial color="#879592" metalness={0.75} /></mesh>
         {[-0.85, 0.85].map((x) => (
           <group key={x} position={[x, 0.82, 0]} rotation={[solarTilt, solarAzimuth, 0]}>
-            <mesh castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} /></mesh>
-            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
+            <mesh castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color={solarPanelColor} roughness={0.22 + dustFraction * 0.55} metalness={0.52 * (1 - dustFraction * 0.75)} /></mesh>
+            {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color={solarCellLineColor} metalness={0.3 * (1 - dustFraction * 0.8)} /></mesh>)}
             {[-0.47, 0, 0.47].map((z) => <mesh key={z} position={[0, 0.035, z]}><boxGeometry args={[0.018, 0.015, 1.53]} /><meshStandardMaterial color="#6c9fb3" /></mesh>)}
             {[-0.8, 0.8].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.06, 0.04, 0.04]} /><meshStandardMaterial color="#b3beb9" metalness={0.75} /></mesh>)}
             <mesh position={[0, -0.31, 0]} castShadow><cylinderGeometry args={[0.055, 0.065, 0.64, 10]} /><meshStandardMaterial color="#83918f" metalness={0.68} /></mesh>
@@ -1785,7 +1788,7 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} solarTilt={track.id === "solar" ? solarTilt : 0.18} solarAzimuth={track.id === "solar" ? solarAzimuth : 0} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} solarTilt={track.id === "solar" ? solarTilt : 0.18} solarAzimuth={track.id === "solar" ? solarAzimuth : 0} solarDust={track.id === "solar" ? runtime.dust : 0} />
       </group>
       <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       {track.id !== "habitat" && (
@@ -1872,7 +1875,7 @@ function Scene({ props }: { props: Props }) {
   const sunAzimuthRadians = levelOneArrival ? (solarEnvironment.phase * 180 - 90) * Math.PI / 180 : 0;
   const panelTiltRadians = levelOneArrival ? Math.max(0.12, Math.min(1.30, (90 - sunElevationDegrees) * Math.PI / 180)) : 0.18;
   const sunPosition: [number, number, number] = levelOneArrival
-    ? [Math.sin(sunAzimuthRadians) * 42, Math.max(0.8, Math.sin(sunElevationDegrees * Math.PI / 180) * 55), Math.cos(sunAzimuthRadians) * 42]
+    ? [Math.cos(sunElevationDegrees * Math.PI / 180) * Math.sin(sunAzimuthRadians) * 60, Math.max(0.8, Math.sin(sunElevationDegrees * Math.PI / 180) * 60), Math.cos(sunElevationDegrees * Math.PI / 180) * Math.cos(sunAzimuthRadians) * 60]
     : [18, 34, 20];
   const roverTier = props.selected.rover ?? "Foundation";
   const roverTierIndex = roverTier === "Frontier" ? 1 : roverTier === "Apex" ? 2 : roverTier === "Research" ? 3 : 0;
@@ -1917,7 +1920,7 @@ function Scene({ props }: { props: Props }) {
             onClick={() => props.onSelect(track.id)}
             mars={mars}
             solarTilt={panelTiltRadians}
-            solarAzimuth={sunAzimuthRadians}
+            solarAzimuth={sunAzimuthRadians + (levelOneArrival ? (props.buildings.solar?.alignmentErrorDegrees ?? 5) * Math.PI / 180 : 0)}
           />
         ))}
         {props.tracks.some((track) => track.id === "rover") && (
