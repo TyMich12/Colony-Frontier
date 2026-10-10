@@ -3095,17 +3095,12 @@ export function MissionSimulation() {
 
     switch (baseActionId) {
       case "upgrade": {
-        setMetrics((current) => ({ ...current, power: clamp(current.power - 8), battery: clamp(current.battery - 5) }));
-        setBuildings((current) => {
-          const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          const upgradeLevel = Math.min(2, (previous.upgradeLevel ?? 0) + 1);
-          const condition = clamp(previous.condition + 8);
-          return { ...current, [trackId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
-        });
-        setAiMessage("Retrofits are installed through the workbook-driven installation process; no generic tier multiplier or condition bonus applies.");
+        // Deliberately no side effects here: handleBuildingAction routes this action
+        // through the workbook's timed, costed retrofit installer.
+        setAiMessage("Generic upgrade shortcut disabled. Use the workbook-driven retrofit installation.");
         break;
       }
-      case "fallback-solar": {
+            case "fallback-solar": {
         const dustReduction = gain(7);
         setBuildings((current) => {
           const previous = current.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
