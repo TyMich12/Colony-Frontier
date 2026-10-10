@@ -51,8 +51,10 @@ import {
 } from "./missionRuntime";
 import { Colony3DMap } from "./Colony3DMap";
 
-const TOTAL_MISSION_SECONDS = 14 * 30;
-const EVENT_TIMES = [42, 88, 135, 183, 232, 282, 332, 382];
+const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
+const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
+const EVENT_TIMES = [0.10, 0.21, 0.32, 0.44, 0.55, 0.67, 0.79, 0.91].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
+const STARTING_REPAIR_PARTS_KG = 60; // On-site spares; game-balance assumption, no launch-mass change.
 
 const starterCategories = new Set([
   "solar",
@@ -776,10 +778,11 @@ function buildingStatus(condition: number): string {
 }
 
 function formatMissionTime(seconds: number): string {
-  const day = Math.min(14, Math.floor(seconds / 30) + 1);
-  const dayProgress = Math.floor(seconds % 30);
-  const hour = Math.floor((dayProgress / 30) * 24);
-  const minute = Math.floor((((dayProgress / 30) * 24) % 1) * 60);
+  const bounded = Math.max(0, Math.min(TOTAL_MISSION_SECONDS, seconds));
+  const day = Math.min(14, Math.floor(bounded / LEVEL1_ENVIRONMENT.secondsPerEarthDay) + 1);
+  const dayProgress = bounded % LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+  const hour = Math.floor(dayProgress / 3600);
+  const minute = Math.floor((dayProgress % 3600) / 60);
   return `DAY ${day.toString().padStart(2, "0")} · ${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
@@ -2114,7 +2117,7 @@ export function MissionSimulation() {
         let changed = false;
         const next = { ...current };
         for (const [key, operation] of Object.entries(current)) {
-          const remaining = Math.max(0, operation.remainingSeconds - 0.25 * speed);
+          const remaining = Math.max(0, operation.remainingSeconds - 0.25 * speed * GAME_TIME_ACCELERATION);
           if (remaining <= 0) {
             if (!operationCompletionRef.current.has(operation.id)) {
               operationCompletionRef.current.add(operation.id);
@@ -2154,11 +2157,11 @@ export function MissionSimulation() {
 
     const timer = window.setInterval(() => {
       setElapsed((current) => {
-        const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed);
+        const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed * GAME_TIME_ACCELERATION);
 
         const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
-        const scheduleShift = Math.min(18, (missionStage - 1) * 2.2) + (pending.campaign === "mars" ? 4 : 0);
-        const nextEventAt = Math.max(22, EVENT_TIMES[eventPointerRef.current] - scheduleShift);
+        const scheduleShift = Math.min(TOTAL_MISSION_SECONDS * 0.04, (missionStage - 1) * TOTAL_MISSION_SECONDS * 0.003) + (pending.campaign === "mars" ? TOTAL_MISSION_SECONDS * 0.01 : 0);
+        const nextEventAt = Math.max(TOTAL_MISSION_SECONDS * 0.01, EVENT_TIMES[eventPointerRef.current] - scheduleShift);
         if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= nextEventAt) {
           const eventIndex = eventPointerRef.current;
           const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventIndex, metrics);
@@ -2176,7 +2179,7 @@ export function MissionSimulation() {
               : event.trackId;
             const shock = 1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0));
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
-            const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25);
+            const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
 
             // The fault is live while the incident panel is open, not merely a one-off score penalty.
             setActiveFaults((current) => ({
@@ -2320,10 +2323,10 @@ export function MissionSimulation() {
         const thermalCorrection = hasThermalControl
           ? (0.009 + thermalTier * 0.0045 + thermalUpgrade * 0.0021)
           : 0.0022;
-        const dt = 0.25 * speed;
+        const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
           const isBeingRepaired = activeOperationsRef.current[fault.targetTrackId]?.kind === "REPAIR";
-          const amount = dt * fault.severity * (isBeingRepaired ? 0.25 : 1);
+          const amount = (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * fault.severity * (isBeingRepaired ? 0.25 : 1);
           switch (fault.eventId) {
             case "solar-dust":
             case "regional-dust-front": impact.power += 0.34 * amount; impact.battery += 0.08 * amount; break;
@@ -2385,7 +2388,7 @@ export function MissionSimulation() {
         return next;
       });
 
-      const dt = 0.25 * speed;
+      const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
       if (Object.keys(activeFaults).length > 0) {
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).map(([key, fault]) => {
           const isBeingRepaired = activeOperationsRef.current[fault.targetTrackId]?.kind === "REPAIR";
@@ -2930,8 +2933,8 @@ export function MissionSimulation() {
       kind,
       targetId,
       label,
-      totalSeconds: durationSeconds,
-      remainingSeconds: durationSeconds,
+      totalSeconds: kind === "REPAIR" || kind === "UPGRADE" ? durationSeconds : durationSeconds * GAME_TIME_ACCELERATION,
+      remainingSeconds: kind === "REPAIR" || kind === "UPGRADE" ? durationSeconds : durationSeconds * GAME_TIME_ACCELERATION,
       operationKey,
       ...(roverAssigned ? { roverAssigned: true } : {}),
       ...(targetLevel !== undefined ? { targetLevel } : {}),
@@ -2946,7 +2949,7 @@ export function MissionSimulation() {
     }
     setOperationResult(null);
     setManualActions((value) => value + 1);
-    setAiMessage(`${label} started. Estimated duration: ${durationSeconds} simulated seconds at 1× speed. Other systems remain available while this job runs.`);
+    setAiMessage(`${label} started. Estimated duration: ${kind === "REPAIR" || kind === "UPGRADE" ? `${(durationSeconds / 60).toFixed(1)} game minutes` : `${durationSeconds} task seconds at standard speed`}. Other systems remain available while this job runs.`);
   };
 
   const handleResourceAction = (nodeId: string, action: string) => {
