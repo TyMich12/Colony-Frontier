@@ -657,7 +657,7 @@ function dustTransmission(dust: number): number {
   return points[points.length - 1].transmission;
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0): { label: string; value: string } {
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, condition = 100, dust = 0, elapsedSeconds = TOTAL_MISSION_SECONDS / 2, isLevelOneArrival = false): { label: string; value: string } {
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
   const stateIndex = baselineStateIndex(tier, upgradeLevel);
@@ -671,10 +671,12 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   let value = formatRating(rating) + " " + baseline.unit;
   switch (systemId) {
     case "solar": {
-      const day7 = interpolateSolarProfile(7);
-      const actualKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust));
-      label = "Rated electrical output · Day 7 reference and current dust";
-      value = formatRating(rating) + " kW rated · " + actualKW.toFixed(3) + " kW at Day 7 checkpoint · " + (actualKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5) + " kWh / 10 sim s";
+      const solarDay = isLevelOneArrival ? elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay : 7;
+      const profile = interpolateSolarProfile(Math.max(0, Math.min(14, solarDay)));
+      const conditionFactor = Math.max(0, Math.min(1, condition / 100));
+      const actualKW = Math.min(rating, rating * profile.sunlightGeometry * (1 - profile.cellTemperatureLoss) * dustTransmission(dust) * conditionFactor);
+      label = isLevelOneArrival ? "Live solar output · sunlight, temperature, dust and condition" : "Rated electrical output · Day 7 reference and current dust";
+      value = formatRating(rating) + " kW rated · " + actualKW.toFixed(3) + " kW actual · " + (actualKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5) + " kWh / 10 simulated seconds";
       break;
     }
     case "battery": value += extra("continuous discharge power"); break;
@@ -1193,7 +1195,7 @@ function MissionTaskRibbon({
   activeEvent: MissionEvent | null;
   roverTask: string;
 }) {
-  const day = Math.min(14, Math.floor(elapsed / 30) + 1);
+  const day = Math.min(14, Math.floor(elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay) + 1);
   const eventGoal = EVENT_TIMES.length;
   const surveyedCount = Object.values(sampleStages).filter((stage) => stage !== "UNSURVEYED").length;
   const analysedCount = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
@@ -1412,7 +1414,7 @@ function BuildingInspector({
   };
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
-  const [showRepairMethods, setShowRepairMethods] = useState(false);
+  const [showRepairMethods, setShowRepairMethods] = useState(true);
   const [repairCategory, setRepairCategory] = useState<"Standalone" | "Enhanced" | "Dual" | "Integrated">("Standalone");
   const repairOptions = getRepairOptions(track.id);
   const standaloneOption = repairOptions.find((option) => option.category === "Standalone");
@@ -1974,6 +1976,8 @@ export function MissionSimulation() {
       ? roverFieldWorkOrder?.targetId ?? null
       : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
+  const missionNumber = Number.parseInt((pending?.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 0;
+  const isLevelOneArrivalMission = Boolean(pending?.campaign === "moon" && (missionNumber === 1 || pending?.missionTitle.toLowerCase().includes("arrival")));
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
   const physicalTelemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
 
