@@ -1447,7 +1447,7 @@ function BuildingInspector({
                 {" "}Queue estimate: <span className="font-bold text-[#f0cf69]">{earthReportDelaySeconds(tier, upgradeLevel) === 0 ? "INSTANT · local cache" : `${earthReportDelaySeconds(tier, upgradeLevel)} simulated seconds`}</span>.
               </p>
             </div>
-            <p className="mt-2 text-[8px] leading-4 text-[#6f95aa]">This is a compressed Earth processing / command queue, not adjustable light-speed. Navigation tiers shorten the queue; Research with 2/2 retrofits caches guidance locally for instant delivery.</p>
+            <p className="mt-2 text-[8px] leading-4 text-[#6f95aa]">This is a compressed Earth processing / command queue, not adjustable light-speed. Each higher Navigation tier shortens the queue more than both retrofits combined; Research with 2/2 caches guidance locally for instant delivery.</p>
             {earthReport && (
               <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-[#2c4a5d] bg-[#07131f] p-3">
                 <pre className="whitespace-pre-wrap font-mono text-[9px] leading-4 text-[#d1e3ee]">{earthReport}</pre>
@@ -1497,7 +1497,7 @@ function BuildingInspector({
               </span>
               <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
             </button>
-            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least 5% power and 2% battery reserve.</p>}
+            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2)}.</p>}
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Integrated repair methods</span>
@@ -1604,6 +1604,7 @@ function BuildingInspector({
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
+          <span className="mt-1 block text-[7px] leading-3 text-[#779891]">Shown at Foundation 0/2. Higher technology tiers improve the base result more than both retrofit steps combined.</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Basic fix available · no optional systems" : "Specialist prerequisites satisfied"}</span>}
                 </span>
               </span>
@@ -1615,7 +1616,7 @@ function BuildingInspector({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
-              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 8% power + 5% battery up front · takes about 18–26 seconds. Production and wear benefits begin only when installation completes.</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 0.96 kW available-power margin + 2.40 kWh stored energy upfront · takes about 18–26 seconds. Output and wear benefits begin only when installation completes.</p>
             </div>
             <button
               type="button"
@@ -1627,7 +1628,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || "Requires at least 8% power and 5% battery reserve."}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -3816,7 +3817,7 @@ export function MissionSimulation() {
                     </div>
                     <button type="button" onClick={() => setDashboardOpen(false)} className="rounded-lg border border-[#425a5d] px-2.5 py-1.5 text-xs text-[#b4c4c2]" aria-label="Close systems dashboard">×</button>
                   </div>
-                  <p className="mt-2 text-[9px] leading-4 text-[#87a29f]">{emergencyPowerMode ? "ECO POWER ACTIVE · non-critical loads are shed. Power margin improves, but food production / battery charging are less efficient." : "Healthy systems still need monitoring. Warning colours show loss of margin, not simply whether a disaster has fired."}</p>
+                  <p className="mt-2 text-[9px] leading-4 text-[#87a29f]">{emergencyPowerMode ? "ECO POWER ACTIVE · non-critical loads are shed. Available-power margin improves, but edible-food output / stored-energy charging are less efficient." : "Resource values are shown in physical units using the stated outpost capacity model. Warning colours indicate reduced operating margin."}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 p-3">
