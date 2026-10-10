@@ -58,9 +58,10 @@ import {
   getRepairOptionForAction,
   getSolarEnvironment,
   getSolarActualOutputKW,
+  LEVEL_ONE_ARRIVAL_SIMULATED_SECONDS,
 } from "./disasterSystems";
 
-const TOTAL_MISSION_SECONDS = 14 * 30;
+const TOTAL_MISSION_SECONDS = LEVEL_ONE_ARRIVAL_SIMULATED_SECONDS;
 const EVENT_TIMES = [42, 88, 135, 183, 232, 282, 332, 382];
 
 const starterCategories = new Set([
