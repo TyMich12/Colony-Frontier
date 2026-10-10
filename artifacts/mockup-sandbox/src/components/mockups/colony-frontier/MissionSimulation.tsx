@@ -747,7 +747,7 @@ function initialBuildings(selected: Record<string, Tier>): Record<string, Buildi
       trackId,
       {
         condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0,
-        ...(trackId === "solar" ? { alignmentErrorDegrees: 5, solarStringLossPct: 0 } : {}),
+        ...(trackId === "solar" ? { alignmentErrorDegrees: 5, solarStringLossPct: 3 } : {}),
       },
     ]),
   );
