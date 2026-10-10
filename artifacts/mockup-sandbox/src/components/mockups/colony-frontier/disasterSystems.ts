@@ -243,13 +243,31 @@ export function getSolarEnvironment(elapsedSeconds:number,totalMissionSeconds:nu
  const panelTemperatureFactor=Math.max(.75,Math.min(1.12,1-.004*(panelTemperatureC-25)));
  return {phase,sunlightFraction,sunElevationDegrees,irradianceWm2,regolithTemperatureC,panelTemperatureC,panelTemperatureFactor};
 }
-export function getSolarActualOutputKW(args:{tier:Tier;retrofitLevel:number;elapsedSeconds:number;totalMissionSeconds:number;isLevelOneArrival:boolean;condition:number;dust:number;alignmentErrorDegrees?:number;solarStringLossPct?:number}) {
+export function getSolarActualOutputKW(args:{tier:Tier;retrofitLevel:number;elapsedSeconds:number;totalMissionSeconds:number;isLevelOneArrival:boolean;condition:number;dust:number;environmentLabel?:"MOON"|"MARS";alignmentErrorDegrees?:number;solarStringLossPct?:number}) {
  const env=getSolarEnvironment(args.elapsedSeconds,args.totalMissionSeconds,args.isLevelOneArrival);
  const rating=getSystemOutput("solar",args.tier,args.retrofitLevel).numeric;
- const dustTransmission=dustRemainingFraction(args.isLevelOneArrival ? "moon" : "mars",args.dust);
+ const dustEnvironment=args.environmentLabel==="MARS" ? "mars" : args.environmentLabel==="MOON" || args.isLevelOneArrival ? "moon" : "mars";
+ const dustTransmission=dustRemainingFraction(dustEnvironment,args.dust);
  const pointing=Math.max(0,Math.cos(Math.max(0,Math.min(89,args.alignmentErrorDegrees??0))*Math.PI/180));
  const stringFraction=Math.max(0,1-Math.max(0,Math.min(100,args.solarStringLossPct??0))/100);
- const actualKW=rating*env.sunlightFraction*env.panelTemperatureFactor*Math.max(0,Math.min(1,args.condition/100))*dustTransmission*pointing*stringFraction;
+ const conditionFraction=Math.max(0,Math.min(1,args.condition/100));
+ const actualKW=rating*env.sunlightFraction*env.panelTemperatureFactor*conditionFraction*dustTransmission*pointing*stringFraction;
+ const simulatedIntervalSeconds=args.isLevelOneArrival ? Math.min(10,Math.max(0,args.totalMissionSeconds-args.elapsedSeconds)) : 10;
  const gameSecondsPerSimulatedSecond=args.isLevelOneArrival ? LEVEL_ONE_ARRIVAL_GAME_SECONDS/Math.max(1,args.totalMissionSeconds) : 1;
- return {...env,ratedKW:rating,actualKW,energyKWhPer10SimulatedSeconds:actualKW*10*gameSecondsPerSimulatedSecond/3600,dustTransmission,pointingFraction:pointing,stringFraction};
+ // Arrival compresses eight in-game hours into ten simulated seconds. Integrate the daylight curve
+ // over that interval rather than treating the instantaneous dawn/noon output as constant for 8 hours.
+ let averageKW=actualKW;
+ if(args.isLevelOneArrival && simulatedIntervalSeconds>0) {
+   let weightedSum=0;
+   for(let i=0;i<=8;i++) {
+     const sampleTime=Math.min(args.totalMissionSeconds,args.elapsedSeconds+simulatedIntervalSeconds*i/8);
+     const sample=getSolarEnvironment(sampleTime,args.totalMissionSeconds,true);
+     const sampleKW=rating*sample.sunlightFraction*sample.panelTemperatureFactor*conditionFraction*dustTransmission*pointing*stringFraction;
+     const weight=i===0 || i===8 ? 1 : i%2===0 ? 2 : 4;
+     weightedSum+=sampleKW*weight;
+   }
+   averageKW=weightedSum/24;
+ }
+ const energyKWhPer10SimulatedSeconds=averageKW*simulatedIntervalSeconds*gameSecondsPerSimulatedSecond/3600;
+ return {...env,ratedKW:rating,actualKW,energyKWhPer10SimulatedSeconds,dustTransmission,pointingFraction:pointing,stringFraction};
 }
