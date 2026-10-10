@@ -1011,19 +1011,19 @@ function BuildingShape({
 }
 
 const RESOURCE_NODES: Record<"MOON" | "MARS", ResourceNode[]> = {
-  // Field sites sit beyond the traffic lanes and facility pads so the crew can
-  // actually reach them without resource markers hiding on top of road junctions.
+  // Four sites sit beyond the facility pads and service-road perimeter. Their coordinates
+  // map to world-space positions near (±30, ±25), so field work requires an actual outbound trip.
   MOON: [
-    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: 82, y: 200, description: "A cold-trap site with a strong water-ice signature." },
-    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 896, y: 340, description: "A bright mineral ridge worth a future extraction run." },
-    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 852, y: 150, description: "Fresh crater ejecta may contain useful scientific data." },
-    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: 82, y: 410, description: "A broad regolith field suitable for rover mapping." },
+    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: -160, y: 120, description: "A cold-trap site beyond the west perimeter with a strong water-ice signature." },
+    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 1160, y: 440, description: "A mineral ridge beyond the east service lanes; core drilling can verify the ilmenite-rich signal." },
+    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 1140, y: 10, description: "A remote crater ejecta deposit outside the south-east perimeter." },
+    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: -160, y: 550, description: "A broad regolith field beyond the western ridge suitable for rover mapping." },
   ],
   MARS: [
-    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: 60, y: 200, description: "Orbital data suggests shallow buried water ice." },
-    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 918, y: 340, description: "A high-value iron-rich ridge sits beyond the outpost." },
-    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 852, y: 150, description: "An exposed basalt layer is ideal for geological sampling." },
-    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: 82, y: 410, description: "A wide dust plain offers an easy autonomous mapping route." },
+    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: -160, y: 120, description: "Orbital data suggests shallow buried water ice beyond the west side of the outpost." },
+    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 1160, y: 440, description: "An iron-rich ridge beyond the outpost's east traffic lanes." },
+    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 1140, y: 10, description: "A remote basalt outcrop beyond the south-east perimeter, suitable for geological sampling." },
+    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: -160, y: 550, description: "A distant dust plain beyond the west-north service road." },
   ],
 };
 
