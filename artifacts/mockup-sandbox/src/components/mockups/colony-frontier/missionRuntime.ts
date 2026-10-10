@@ -33,6 +33,10 @@ export type BuildingRuntime = {
   status: string;
   /** Temporary in-mission module upgrades (0–2), independent of unlocked technology tier. */
   upgradeLevel?: number;
+  /** Solar array pointing error, degrees from the best Sun-incidence vector. */
+  alignmentErrorDegrees?: number;
+  /** Estimated power loss from weak or isolated solar cell strings, in percentage points. */
+  solarStringLossPct?: number;
 };
 
 export type MissionDecision = {
