@@ -2022,45 +2022,97 @@ export function MissionSimulation() {
       case "REPAIR": {
         const repairTarget = operation.targetId;
         const faults = Object.values(activeFaultsRef.current).filter((fault) => fault.targetTrackId === repairTarget);
-        const repairSupportSystems = decodeRepairVariant(repairTarget, operation.actionId ?? "") ?? [];
-        const repairMultiplier = operationPerformanceMultiplier(repairTarget, pending?.selected ?? {}, buildingsRef.current, repairSupportSystems);
+        const highestSeverity = Math.max(1, ...faults.map((fault) => fault.severity));
+        const repairPlan = getRepairOptionForAction(
+          repairTarget,
+          pending?.selected[repairTarget] ?? "Foundation",
+          buildingsRef.current[repairTarget]?.upgradeLevel ?? 0,
+          operation.actionId ?? "",
+          highestSeverity,
+        ) ?? getRepairOption(
+          repairTarget,
+          pending?.selected[repairTarget] ?? "Foundation",
+          buildingsRef.current[repairTarget]?.upgradeLevel ?? 0,
+          0,
+          highestSeverity,
+        );
+        const effects = repairPlan.effects;
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
         setBuildings((current) => {
           const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          const condition = clamp(previous.condition + 12 * repairMultiplier);
-          const repaired = { ...current, [repairTarget]: { ...previous, condition, status: buildingStatus(condition) } };
-          if (faults.some((fault) => fault.eventId === "solar-dust" || fault.eventId === "regional-dust-front")) {
-            repaired.solar = { ...(repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((repaired.solar?.dust ?? 0) - 8) };
+          const condition = clamp(previous.condition + effects.condition);
+          const updated = {
+            ...current,
+            [repairTarget]: {
+              ...previous,
+              condition,
+              status: buildingStatus(condition),
+              ...(repairTarget === "solar" ? {
+                dust: clamp(previous.dust - effects.dust),
+                alignmentErrorDegrees: Math.max(0, (previous.alignmentErrorDegrees ?? 5) - effects.alignment),
+                solarStringLossPct: Math.max(0, (previous.solarStringLossPct ?? 0) - effects.stringLoss),
+              } : {}),
+            },
+          };
+          if (effects.otherCondition > 0) {
+            const weakest = Object.entries(updated)
+              .filter(([id]) => id !== repairTarget && Boolean(pending?.selected[id]))
+              .sort(([, a], [, b]) => a.condition - b.condition)[0];
+            if (weakest) {
+              const [targetId, target] = weakest;
+              const nextCondition = clamp(target.condition + effects.otherCondition);
+              updated[targetId] = { ...target, condition: nextCondition, status: buildingStatus(nextCondition) };
+            }
           }
-          return repaired;
+          return updated;
         });
         setMetrics((current) => {
-          let next = { ...current, power: clamp(current.power + 2 * repairMultiplier), battery: clamp(current.battery + 2 * repairMultiplier) };
+          let next = {
+            ...current,
+            power: clamp(current.power + effects.power),
+            battery: clamp(current.battery + effects.battery),
+            oxygen: clamp(current.oxygen + effects.oxygen),
+            water: clamp(current.water + effects.water),
+            food: clamp(current.food + effects.food),
+            habitat: clamp(current.habitat + effects.habitat),
+            radiation: clamp(current.radiation - effects.radiation),
+          };
+          const distanceToTarget = Math.abs(21 - current.temperature);
+          const temperatureStep = Math.min(distanceToTarget, effects.temperature);
+          next = { ...next, temperature: clamp(current.temperature + Math.sign(21 - current.temperature) * temperatureStep, 16, 28) };
+          // Clearing a fault stops its ongoing losses; these are limited, fixed post-repair checks,
+          // not tier multipliers or free resource generation.
           for (const fault of faults) {
             switch (fault.eventId) {
               case "solar-dust":
               case "regional-dust-front":
-                next = { ...next, power: clamp(next.power + 4 * repairMultiplier), battery: clamp(next.battery + 2 * repairMultiplier) };
+                next = { ...next, battery: clamp(next.battery + 1) };
                 break;
-              case "battery-thermal": next = { ...next, battery: clamp(next.battery + 7 * repairMultiplier) }; break;
+              case "battery-thermal": next = { ...next, battery: clamp(next.battery + 4) }; break;
               case "oxygen-filter":
-              case "co2-scrubber-loading": next = { ...next, oxygen: clamp(next.oxygen + 6 * repairMultiplier) }; break;
-              case "water-filter": next = { ...next, water: clamp(next.water + 6 * repairMultiplier) }; break;
+              case "co2-scrubber-loading": next = { ...next, oxygen: clamp(next.oxygen + 3) }; break;
+              case "water-filter": next = { ...next, water: clamp(next.water + 3) }; break;
               case "habitat-pressure":
-              case "micrometeoroid-impact": next = { ...next, habitat: clamp(next.habitat + 6 * repairMultiplier) }; break;
-              case "radiation-burst": next = { ...next, radiation: clamp(next.radiation - 4 * repairMultiplier) }; break;
+              case "micrometeoroid-impact": next = { ...next, habitat: clamp(next.habitat + 3) }; break;
+              case "radiation-burst": next = { ...next, radiation: clamp(next.radiation - 2) }; break;
               case "polar-shadow-cold-soak":
-              case "thermal-drift": next = { ...next, temperature: clamp(next.temperature + (21 - next.temperature) * Math.min(0.7, 0.35 * repairMultiplier), 16, 28) }; break;
+              case "thermal-drift": next = { ...next, temperature: clamp(next.temperature + Math.sign(21-next.temperature) * Math.min(.5, Math.abs(21-next.temperature)),16,28) }; break;
               case "grid-overload":
-              case "core-power": next = { ...next, power: clamp(next.power + 5 * repairMultiplier), battery: clamp(next.battery + 3 * repairMultiplier) }; break;
-              case "agriculture-stress": next = { ...next, food: clamp(next.food + 5 * repairMultiplier), water: clamp(next.water - 1 / repairMultiplier) }; break;
+              case "core-power": next = { ...next, power: clamp(next.power + 3), battery: clamp(next.battery + 2) }; break;
+              case "agriculture-stress": next = { ...next, food: clamp(next.food + 3), water: clamp(next.water - 1) }; break;
               default: break;
             }
           }
           return next;
         });
-        setScore((value) => clamp(value + 6));
-        message = `REPAIR VERIFIED · ${technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget} passed its post-maintenance check. The live fault has been removed, the module condition has improved, and affected reserves are recovering. ${faults.length} fault(s) cleared.`;
+        if (effects.score > 0) setScore((value) => clamp(value + effects.score));
+        if (effects.yield > 0) setResourceYield((value) => value + effects.yield);
+        setScore((value) => clamp(value + 4));
+        const helpersText = repairPlan.helpers.length
+          ? " Support systems: " + repairPlan.helpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id).join(" + ") + "."
+          : " No optional support systems required.";
+        message = "REPAIR VERIFIED · " + (technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget) + " · " + repairPlan.name + ". " +
+          repairPlan.effectSummary.join(" · ") + "." + helpersText + " Fault cleared and system returned to service.";
         if (operation.roverAssigned) setRoverTask("REPAIR VERIFIED");
         break;
       }
