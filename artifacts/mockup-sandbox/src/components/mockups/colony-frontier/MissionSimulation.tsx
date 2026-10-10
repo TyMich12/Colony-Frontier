@@ -401,7 +401,7 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
   experiment: { all: ["navigation", "comms", "thermal"], any: ["grid", "battery"], minPower: 3, analysedSample: true },
   "nav-calibrate": { minPower: 2 },
   route: { all: ["rover", "comms"], any: ["grid", "battery"], minPower: 2 },
-  survey: { minPower: 2 },
+  survey: { all: ["rover", "navigation", "comms"], any: ["grid", "battery"], minPower: 2, minBattery: 1 },
   return: { all: ["navigation"], any: ["battery", "grid"], minPower: 1 },
   inspect: {},
   "extract-test": { minPower: 5, minBattery: 2, surveyedSite: true },
@@ -431,7 +431,7 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
   "repair-active": { minPower: 5, minBattery: 2 },
   upgrade: { minPower: 8, minBattery: 5 },
   sample: { all: ["rover", "navigation"], any: ["battery", "grid"], minPower: 7, minBattery: 3 },
-  transfer: { all: ["rover", "habitat"], any: ["battery", "grid"], minPower: 2 },
+  transfer: { all: ["rover", "navigation", "habitat"], any: ["battery", "grid"], minPower: 2, minBattery: 1 },
   analyze: { all: ["science", "habitat"], any: ["grid", "battery"], minPower: 5 },
 };
 
@@ -1735,9 +1735,9 @@ function ResourceInspector({
   const stageIndex = flow.findIndex((item) => item.id === stage);
   const isThisOperation = Boolean(operation && operation.targetId === node.id);
   const nextAction =
-    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: Math.max(5, 12 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "Needs a working rover, navigation, communications, and an operational power path." } :
-    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: Math.max(7, (hasExtraction ? 16 : 24) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance)), detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
-    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: Math.max(6, 14 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "The rover drives the sealed container to the habitat so chain of custody is preserved." } :
+    stage === "UNSURVEYED" ? { id: "survey", label: hasRover ? "Dispatch rover to survey" : "Site survey locked · rover required", seconds: Math.max(12, 18 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "Needs a working rover, navigation, communications, and an operational power path." } :
+    stage === "SURVEYED" ? { id: "sample", label: node.kind === "ICE" || node.kind === "MINERAL" ? (hasExtraction ? "Drill & collect core" : "Core sample locked · drill required") : "Collect field specimen", seconds: Math.max(16, (hasExtraction ? 20 : 27) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance)), detail: node.kind === "ICE" || node.kind === "MINERAL" ? "Subsurface ice/mineral cores need an extraction drill, rover, navigation, and energy." : "The rover must physically reach this surveyed site to collect and seal the surface specimen." } :
+    stage === "COLLECTED" ? { id: "transfer", label: "Return sealed sample to habitat", seconds: Math.max(8, 16 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance)), detail: "The rover drives the sealed container to the habitat so chain of custody is preserved. Navigation maintains return-route accuracy." } :
     stage === "DELIVERED" ? { id: "analyze", label: hasScience ? "Analyze in science laboratory" : "Analysis locked · laboratory required", seconds: Math.max(5, 20 / sciencePerformance), detail: "A deployed, operational science laboratory is mandatory. There is no portable-assay bypass." } :
     null;
   const blockers = nextAction ? getBlockers("field", nextAction.id, node.id) : [];
