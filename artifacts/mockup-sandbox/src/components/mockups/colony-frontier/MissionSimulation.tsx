@@ -2350,14 +2350,15 @@ export function MissionSimulation() {
         // the existing reserve UI. Rated kW is never increased by a repair; repairs correct losses.
         const solarGeneration = solarOnline
           ? isLevelOneArrivalMission
-            ? solarActual.actualKW * 3
+            ? solarActual.actualKW * 3 * (gridOnline ? gridDeliveryEfficiency : 0.7)
             : (24 + solarTier * 7.5 + solarUpgrade * 2.5) * solarAvailability * solarConditionFactor * solarDustTransmission * solarPointingFactor * solarStringFactor
           : 0;
         const gridTier = tierLevel(pending.selected.grid ?? "Foundation");
+        const gridDeliveryEfficiency = getSystemOutput("grid", pending.selected.grid ?? "Foundation", gridUpgrade).numeric / 100;
         // A live grid carries generation and distributes it. Without the grid, stored energy can
         // support only a reduced local bus; without either source, colony power margin collapses.
         const powerSupply = solarOnline && gridOnline
-          ? (isLevelOneArrivalMission ? 24 : 48) + solarGeneration + gridTier * 4 + gridUpgrade * 1.25
+          ? (isLevelOneArrivalMission ? 24 : 48) + solarGeneration + (isLevelOneArrivalMission ? 0 : gridTier * 4 + gridUpgrade * 1.25)
           : batteryOnline && gridOnline
             ? 24 + batteryTier * 2 + batteryUpgrade * 0.6 + gridTier * 2 + gridUpgrade * 0.65
             : solarOnline && batteryOnline
@@ -2397,8 +2398,9 @@ export function MissionSimulation() {
         const hasThermalControl = thermalOnline;
         const ambientTemperature = isLevelOneArrivalMission ? lunarDayEnvironment.regolithTemperatureC : blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
+        const ratedHeatRejectionKW = getSystemOutput("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade).numeric;
         const thermalCorrection = hasThermalControl
-          ? (0.009 + thermalTier * 0.0045 + thermalUpgrade * 0.0021)
+          ? Math.min(0.04, 0.003 + ratedHeatRejectionKW * 0.0015)
           : 0.0022;
         const dt = 0.25 * speed;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
