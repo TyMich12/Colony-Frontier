@@ -446,6 +446,31 @@ function collectSystemBlockers(systemId: string, context: ActionRequirementConte
   }
 }
 
+// Repair support checks the helper's own health and an available energy bus without
+// recursively making essential Solar or Habitat systems prerequisites.
+function collectRepairSupportBlockers(systemId: string, context: ActionRequirementContext, blockers: string[]): void {
+  if (!context.selected[systemId]) {
+    blockers.push(`Install ${SYSTEM_LABELS[systemId] ?? systemId} first`);
+    return;
+  }
+  if (Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId)) {
+    blockers.push(`Repair ${SYSTEM_LABELS[systemId] ?? systemId} first`);
+    return;
+  }
+  if ((context.buildings[systemId]?.condition ?? 100) < 25) {
+    blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
+    return;
+  }
+  if (systemId !== "battery" && systemId !== "grid") {
+    const energyAvailable = ["battery", "grid"].some((energyId) =>
+      Boolean(context.selected[energyId]) &&
+      !Object.values(context.activeFaults).some((fault) => fault.targetTrackId === energyId) &&
+      (context.buildings[energyId]?.condition ?? 100) >= 25,
+    );
+    if (!energyAvailable) blockers.push("Needs a healthy Battery or Power Grid; the grid may run from stored battery energy without Solar");
+  }
+}
+
 function getActionBlockers(
   systemId: string,
   actionId: string,
@@ -455,7 +480,7 @@ function getActionBlockers(
   const repairHelpers = decodeRepairVariant(systemId, actionId);
   if (repairHelpers) {
     const blockers = getActionBlockers(systemId, "repair-active", context, node);
-    for (const helperId of repairHelpers) collectSystemBlockers(helperId, context, blockers);
+    for (const helperId of repairHelpers) collectRepairSupportBlockers(helperId, context, blockers);
     return [...new Set(blockers)];
   }
   const variant = decodeActionVariant(systemId, actionId);
