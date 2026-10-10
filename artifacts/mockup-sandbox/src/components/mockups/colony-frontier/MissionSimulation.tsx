@@ -237,22 +237,43 @@ type ActionVariantProfile = {
 // and all three. These are actual support-system variants, not cosmetic button changes.
 const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
   solar: { actionId: "clean", label: "Solar-array cleaning", helpers: ["rover", "maintenance", "navigation"] },
-  battery: { actionId: "balance", label: "Battery-cell balancing", helpers: ["solar", "grid", "thermal"] },
-  grid: { actionId: "balance-grid", label: "Power-bus balancing", helpers: ["solar", "battery", "maintenance"] },
+  battery: { actionId: "balance", label: "Battery-cell balancing", helpers: ["grid", "thermal", "maintenance"] },
+  grid: { actionId: "balance-grid", label: "Power-bus balancing", helpers: ["battery", "maintenance", "comms"] },
   habitat: { actionId: "repair", label: "Habitat seal repair", helpers: ["maintenance", "thermal", "isru"] },
   water: { actionId: "flush", label: "Water-recovery flush", helpers: ["thermal", "co2", "maintenance"] },
   oxygen: { actionId: "reset", label: "Oxygen-loop reset", helpers: ["water", "co2", "thermal"] },
-  co2: { actionId: "scrub", label: "CO₂ sorbent regeneration", helpers: ["habitat", "oxygen", "agriculture"] },
-  thermal: { actionId: "dump", label: "Thermal-loop correction", helpers: ["habitat", "grid", "battery"] },
+  co2: { actionId: "scrub", label: "CO₂ sorbent regeneration", helpers: ["oxygen", "agriculture", "maintenance"] },
+  thermal: { actionId: "dump", label: "Thermal-loop correction", helpers: ["grid", "battery", "maintenance"] },
   comms: { actionId: "repoint", label: "High-gain antenna realignment", helpers: ["navigation", "maintenance", "grid"] },
-  radiation: { actionId: "shelter", label: "Radiation shelter protocol", helpers: ["habitat", "thermal", "battery"] },
+  radiation: { actionId: "shelter", label: "Radiation shelter protocol", helpers: ["thermal", "battery", "maintenance"] },
   science: { actionId: "calibrate", label: "Science-instrument calibration", helpers: ["navigation", "comms", "thermal"] },
   navigation: { actionId: "nav-calibrate", label: "Navigation calibration", helpers: ["comms", "maintenance", "grid"] },
   rover: { actionId: "survey", label: "Rover field survey", helpers: ["navigation", "comms", "grid"] },
-  extraction: { actionId: "extract-test", label: "Core-drill test run", helpers: ["rover", "navigation", "water"] },
+  extraction: { actionId: "extract-test", label: "Core-drill test run", helpers: ["rover", "navigation", "maintenance"] },
   isru: { actionId: "process", label: "ISRU feedstock processing", helpers: ["water", "thermal", "science"] },
   agriculture: { actionId: "tune-crops", label: "Controlled-crop tuning", helpers: ["water", "co2", "thermal"] },
   maintenance: { actionId: "service", label: "Preventative system service", helpers: ["comms", "navigation", "grid"] },
+};
+
+// Standalone repairs are always available. Optional integrations never require essential Solar or Habitat as support.
+const REPAIR_SUPPORT_PROFILES: Record<string, [string, string, string]> = {
+  solar: ["maintenance", "rover", "navigation"],
+  battery: ["thermal", "grid", "maintenance"],
+  grid: ["battery", "maintenance", "comms"],
+  habitat: ["maintenance", "thermal", "isru"],
+  water: ["thermal", "co2", "maintenance"],
+  oxygen: ["water", "co2", "thermal"],
+  co2: ["oxygen", "agriculture", "maintenance"],
+  thermal: ["grid", "battery", "maintenance"],
+  comms: ["navigation", "maintenance", "grid"],
+  radiation: ["thermal", "battery", "maintenance"],
+  science: ["navigation", "comms", "thermal"],
+  navigation: ["comms", "maintenance", "grid"],
+  rover: ["navigation", "comms", "maintenance"],
+  extraction: ["rover", "navigation", "maintenance"],
+  isru: ["water", "thermal", "science"],
+  agriculture: ["water", "co2", "thermal"],
+  maintenance: ["comms", "navigation", "grid"],
 };
 
 const SUPPORT_SHORT_LABELS: Record<string, string> = {
@@ -275,6 +296,14 @@ function decodeActionVariant(systemId: string, actionId: string): DecodedActionV
     mask,
     supportSystems: profile.helpers.filter((_, bit) => (mask & (1 << bit)) !== 0),
   };
+}
+
+function decodeRepairVariant(systemId: string, actionId: string): string[] | null {
+  const match = /^repair-variant:([^:]+):([0-7])$/.exec(actionId);
+  const helpers = REPAIR_SUPPORT_PROFILES[systemId];
+  if (!match || match[1] !== systemId || !helpers) return null;
+  const mask = Number(match[2]);
+  return helpers.filter((_, bit) => (mask & (1 << bit)) !== 0);
 }
 
 function buildSystemActionChoices(systemId: string, actions: EventChoice[]): EventChoice[] {
@@ -423,6 +452,12 @@ function getActionBlockers(
   context: ActionRequirementContext,
   node?: ResourceNode,
 ): string[] {
+  const repairHelpers = decodeRepairVariant(systemId, actionId);
+  if (repairHelpers) {
+    const blockers = getActionBlockers(systemId, "repair-active", context, node);
+    for (const helperId of repairHelpers) collectSystemBlockers(helperId, context, blockers);
+    return [...new Set(blockers)];
+  }
   const variant = decodeActionVariant(systemId, actionId);
   if (variant) {
     const blockers = getActionBlockers(systemId, variant.baseActionId, context, node);
@@ -1254,7 +1289,14 @@ function BuildingInspector({
   };
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
+  const [showRepairMethods, setShowRepairMethods] = useState(false);
   const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
+  const repairHelpers = REPAIR_SUPPORT_PROFILES[track.id] ?? ["maintenance", "navigation", "grid"];
+  const repairOptions = Array.from({ length: 8 }, (_, mask) => ({
+    id: `repair-variant:${track.id}:${mask}`,
+    mask,
+    helpers: repairHelpers.filter((_, bit) => (mask & (1 << bit)) !== 0),
+  })).filter((option) => option.mask !== 0);
   const actions = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return !variant || variant.mask === 0 || showIntegratedMethods; });
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
@@ -1385,6 +1427,27 @@ function BuildingInspector({
               <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
             </button>
             {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least 5% power and 2% battery reserve.</p>}
+            <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
+              <span>
+                <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Integrated repair methods</span>
+                <span className="mt-0.5 block text-[8px] text-[#8faeae]">Optional support speeds the job; standalone repair always remains available.</span>
+              </span>
+              <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "7 METHODS +"}</span>
+            </button>
+            {showRepairMethods && <div className="mt-2 grid gap-1.5">
+              {repairOptions.map((option) => {
+                const labels = option.helpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id);
+                const blockers = getBlockers(track.id, option.id);
+                const duration = Math.max(12, Math.round((27 + activeFault.severity * 7) / operationPerformanceMultiplier(track.id, selected, { [track.id]: runtime }, option.helpers)));
+                return <button key={option.id} type="button" onClick={() => onAction(option.id)} disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2 || blockers.length > 0} className="flex items-center justify-between gap-2 rounded-lg border border-[#354f59] bg-[#0d1c22] px-3 py-2 text-left hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-40">
+                  <span className="min-w-0">
+                    <span className="block text-[9px] font-bold text-[#e1eeee]">{labels.join(" + ")}</span>
+                    <span className="mt-0.5 block text-[8px] leading-3 text-[#91aaa9]">{blockers.length ? blockers.join(" · ") : "All support systems online"}</span>
+                  </span>
+                  <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">~{duration}s</span>
+                </button>;
+              })}
+            </div>}
           </section>
         )}
 
@@ -2844,6 +2907,8 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
+    const repairVariantHelpers = decodeRepairVariant(trackId, action);
+    const effectiveAction = repairVariantHelpers ? "repair-active" : action;
     const fallbackKey = `${trackId}:${action}`;
     const hasOwnActiveFault = Object.values(activeFaults).some((fault) => fault.targetTrackId === trackId);
     const emergencyOverride = action.startsWith("fallback-") && fallbackEmergencyOverride(action, trackId, metrics, hasOwnActiveFault);
@@ -2883,7 +2948,7 @@ export function MissionSimulation() {
       return;
     }
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
-      fault.targetTrackId === trackId && action === "repair-active",
+      fault.targetTrackId === trackId && effectiveAction === "repair-active",
     );
     if (matchingFaults.length > 0) {
       // A repair is a timed operation. The fault stays live and keeps degrading reserves
@@ -2900,12 +2965,13 @@ export function MissionSimulation() {
         setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
         return;
       }
-      const repairTier = tierLevel(pending.selected.maintenance ?? pending.selected[repairTargetId] ?? "Foundation");
       const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
       const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
-      const duration = Math.max(16, 27 + highestSeverity * 7 + missionStage * 1.4 - repairTier * 2 - (pending.selected.maintenance ? 5 : 0));
+      const supportSystems = repairVariantHelpers ?? [];
+      const repairPerformance = operationPerformanceMultiplier(repairTargetId, pending.selected, buildings, supportSystems);
+      const duration = Math.max(12, Math.round((27 + highestSeverity * 7 + missionStage * 1.4 - (pending.selected.maintenance ? 5 : 0)) / repairPerformance));
       setMetrics((current) => ({ ...current, power: clamp(current.power - 4), battery: clamp(current.battery - 2) }));
-      const roverCanAssist = pending.selected.rover !== undefined && !roverOnFieldJob;
+      const roverCanAssist = pending.selected.rover !== undefined && supportSystems.includes("rover") && !roverOnFieldJob;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
         "REPAIR",
@@ -2918,7 +2984,7 @@ export function MissionSimulation() {
         repairTargetId,
         roverCanAssist,
       );
-      setAiMessage(`REPAIR STARTED · ${repairTargetId.toUpperCase()}. Isolation is in progress; ${Math.ceil(duration)} seconds are required for repair and a return-to-service check. Other systems continue running until the test passes.`);
+      setAiMessage(`REPAIR STARTED · ${repairTargetId.toUpperCase()}. ${supportSystems.length ? `Integrated support: ${supportSystems.join(" + ")}. ` : "Standalone procedure; no optional support systems required. " }Isolation, repair and return-to-service verification need ${Math.ceil(duration)} seconds.`);
       return;
     }
 
