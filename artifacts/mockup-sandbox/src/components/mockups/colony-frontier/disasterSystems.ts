@@ -3,6 +3,7 @@ import { dustRemainingFraction } from "./solar-surface/state";
 
 export const TIER_ORDER: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
 export const LEVEL_ONE_ARRIVAL_SIMULATED_SECONDS = 14 * 30;
+export const LEVEL_ONE_ARRIVAL_GAME_SECONDS = 14 * 24 * 60 * 60;
 type Triple = [number, number, number];
 type Baseline = { label: string; unit: string; values: Record<Tier, Triple>; lowerIsBetter?: boolean };
 
@@ -249,5 +250,6 @@ export function getSolarActualOutputKW(args:{tier:Tier;retrofitLevel:number;elap
  const pointing=Math.max(0,Math.cos(Math.max(0,Math.min(89,args.alignmentErrorDegrees??0))*Math.PI/180));
  const stringFraction=Math.max(0,1-Math.max(0,Math.min(100,args.solarStringLossPct??0))/100);
  const actualKW=rating*env.sunlightFraction*env.panelTemperatureFactor*Math.max(0,Math.min(1,args.condition/100))*dustTransmission*pointing*stringFraction;
- return {...env,ratedKW:rating,actualKW,energyKWhPer10SimulatedSeconds:actualKW*10/3600,dustTransmission,pointingFraction:pointing,stringFraction};
+ const gameSecondsPerSimulatedSecond=args.isLevelOneArrival ? LEVEL_ONE_ARRIVAL_GAME_SECONDS/Math.max(1,args.totalMissionSeconds) : 1;
+ return {...env,ratedKW:rating,actualKW,energyKWhPer10SimulatedSeconds:actualKW*10*gameSecondsPerSimulatedSecond/3600,dustTransmission,pointingFraction:pointing,stringFraction};
 }
