@@ -106,57 +106,74 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
 };
 
 const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
-  clean: "Dust layer reduced by 16 percentage points (24 with rover) · recover up to 220 kJ per 10 simulated seconds while the array is under target",
-  tune: "Power +3 · condition +1", balance: "Battery +5 · power +2", reserve: "Battery +8 · power −2",
-  reset: "Oxygen +3 · power −2", boost: "Oxygen +6 · power −4 · condition −1",
-  flush: "Water +4 · power −2", purify: "Water +6 · power −4",
-  scrub: "Oxygen +2 · power −1", recover: "Oxygen +1 · power −1 · condition +1",
-  dump: "Moves temperature 36% toward 21°C · power −2", insulate: "Moves temperature 22% toward 21°C · power −1 · condition +1",
-  repoint: "Condition +1 · score +3", test: "Link check · condition +1 · score +2",
-  repair: "Habitat condition +14 (+28 with Maintenance) · integrity +5 · battery −2", seal: "Habitat condition +3 · integrity +3 · battery −1",
-  shield: "Radiation index −2 · battery −1 · condition +1", shelter: "Radiation index −3 · battery −2 · power −1",
-  "balance-grid": "Power +3 · battery +2 · condition +1", prioritize: "Oxygen +1 · water +1 · battery +3 · power −1",
-  calibrate: "Condition +1 · score +4", experiment: "Research yield +1 · score +7 · power −2",
-  "nav-calibrate": "Navigation condition +1 · score +3", route: "Navigation condition +1 · score +2",
-  survey: "Maps next site · unlocks sealed-sample collection", return: "Rover returns to launch lane",
-  inspect: "Reports condition · score +1", "extract-test": "Yield +4 · power −4 · battery −1 · condition −1 · score +5",
-  extract: "Yield +5 · power −5 · battery −2 · score +7", process: "Yield +3 · power −5 · battery −1 · score +5",
-  purge: "Condition +2 · power −1", "tune-crops": "Food +5 · water −2 · power −2 · condition +1",
-  harvest: "Food +7 · water −2 · yield +1 · score +3", service: "Raises the weakest system's condition by 10",
-  diagnostics: "Checks live faults and reports the weakest system · score +3",
-  "fallback-solar": "BASIC · no optional systems needed · dust −7 percentage points · recover up to 70 kJ per 10 simulated seconds while the array is under target",
-  "fallback-battery": "Recover ~1% usable reserve by isolating parasitic draw · no generator required",
-  "fallback-grid": "Emergency manual load shedding · power margin +1 · ECO loads enabled",
-  "fallback-habitat": "Emergency seal patch · habitat integrity +1.5 · condition +3",
-  "fallback-water": "Gravity-fed condensate recovery · water +1 · no powered purifier required",
-  "fallback-oxygen": "Release a small amount from the built-in emergency oxygen buffer · oxygen +1",
-  "fallback-co2": "Swap passive sorbent cartridge · condition +1 · oxygen margin +0.8",
-  "fallback-thermal": "Close passive insulation shutters · gently damp temperature drift without a heater load",
-  "fallback-radiation": "Move crew behind passive shielding · exposure index −0.5",
-  "fallback-comms": "Reset the local low-rate beacon · condition +1",
-  "fallback-navigation": "Re-zero inertial sensors for dead-reckoning · condition +1",
-  "fallback-rover": "Inspect wheel encoders and clear a local drive fault · condition +2",
-  "fallback-extraction": "Unload the drill torque latch · condition +1 without extracting material",
-  "fallback-isru": "Isolate and purge the process line · condition +1, no feedstock required",
-  "fallback-science": "Re-zero the bench instruments · condition +1, no sample consumed",
-  "fallback-agriculture": "Harvest the last ready edible biomass · food +1 without a full water loop",
-  "fallback-maintenance": "Manual walk-around service · condition +2 on the weakest healthy module",
-  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust −32 percentage points · recover up to 450 kJ per 10 simulated seconds while the array is under target",
-  "battery-thermal-recondition": "Thermal conditioning plus supervised BMS balancing · larger reserve recovery",
-  "oxygen-electrolyser-burst": "Electrolyse reclaimed water for extra oxygen · water and power consumed",
-  "water-distillate-recovery": "Recover more condensate using waste heat · larger water gain with a power cost",
-  "co2-crop-loop": "Route scrubbed CO₂ into a compatible greenhouse loop · oxygen margin and crop support improve",
-  "thermal-waste-heat-recovery": "Recover waste heat from the power system · temperature stabilises with less net energy loss",
-  "comms-priority-window": "Reserve a high-gain uplink window using navigation timing",
-  "habitat-composite-patch": "Use processed structural composite and thermal-controlled curing · stronger seal repair",
-  "radiation-regolith-berm": "Use excavated regolith to thicken local shielding · lower exposure index",
-  "grid-black-start": "Black-start the bus from a charged battery and stable solar input · strong power recovery",
-  "science-fusion": "Fuse analysed specimen data with navigation and thermal telemetry · high research yield",
-  "request-earth-report": "Earth Mission Control report · up to 20 simulated seconds; Research navigation with 2/2 caches locally for instant delivery",
-  "extraction-waterjet": "Water-assisted drilling with rover alignment · higher yield, but water and energy costs",
-  "isru-oxygen-feed": "Process verified drill feedstock into useful oxygen-bearing products",
-  "agriculture-closed-loop": "Close the water / CO₂ / thermal loop for a larger food gain at meaningful energy cost",
-  "maintenance-overhaul": "Preventative multi-module service using telemetry and an available work crew",
+  clean: "Dust-coverage estimate −16 points (−24 with rover) · up to 220 kJ recovered per 10 simulated seconds while below target output",
+  tune: "Available electrical power +0.36 kW · array condition index +1",
+  balance: "Stored energy +2.40 kWh · available power +0.24 kW",
+  reserve: "Stored energy +3.84 kWh · available power −0.24 kW",
+  reset: "O₂ reserve +0.72 kg · available power −0.24 kW",
+  boost: "O₂ reserve +1.44 kg · available power −0.48 kW · condition index −1",
+  flush: "Recovered water +7.2 L · available power −0.24 kW",
+  purify: "Recovered water +10.8 L · available power −0.48 kW",
+  scrub: "O₂ reserve +0.48 kg · available power −0.12 kW",
+  recover: "O₂ reserve +0.24 kg · available power −0.12 kW · condition index +1",
+  dump: "Moves cabin temperature 36% closer to 21°C · available power −0.24 kW",
+  insulate: "Moves cabin temperature 22% closer to 21°C · available power −0.12 kW · condition index +1",
+  repoint: "Antenna condition index +1 · link alignment verified",
+  test: "Communications link health verified at rated Mbit/s throughput · condition index +1",
+  repair: "Habitat condition index +14 (+28 with Maintenance) · integrity index +5 · stored energy −0.96 kWh",
+  seal: "Habitat condition index +3 · integrity index +3 · stored energy −0.48 kWh",
+  shield: "Exposure-risk index −2 points · stored energy −0.48 kWh · condition index +1",
+  shelter: "Exposure-risk index −3 points · stored energy −0.96 kWh · available power −0.12 kW",
+  "balance-grid": "Available power +0.36 kW · stored energy +0.96 kWh · condition index +1",
+  prioritize: "O₂ reserve +0.24 kg · water reserve +1.8 L · stored energy +1.44 kWh · available power −0.12 kW",
+  calibrate: "Instrument condition index +1 · reference baseline verified",
+  experiment: "Research data yield +1 unit · available power −0.24 kW",
+  "nav-calibrate": "Position uncertainty improves · navigation condition index +1",
+  route: "Rover route solution updated · position uncertainty improves",
+  survey: "Maps the next site and enables sealed-specimen collection",
+  return: "Rover returns to the launch pad",
+  inspect: "Reports current system condition and fault state",
+  "extract-test": "Feedstock yield +4 kg · available power −0.48 kW · stored energy −0.48 kWh · condition index −1",
+  extract: "Feedstock yield +5 kg · available power −0.60 kW · stored energy −0.96 kWh",
+  process: "Processed feedstock yield +3 kg · available power −0.60 kW · stored energy −0.48 kWh",
+  purge: "Process-line condition index +2 · available power −0.12 kW",
+  "tune-crops": "Edible food reserve +2.1 kg · water reserve −3.6 L · available power −0.24 kW · condition index +1",
+  harvest: "Edible food reserve +2.9 kg · water reserve −3.6 L · feedstock yield +1 kg",
+  service: "Raises the weakest healthy system's condition index by 10 points",
+  diagnostics: "Checks active faults and identifies the weakest healthy system",
+  "fallback-solar": "BASIC · no optional systems · dust coverage −7 points · up to 70 kJ recovered per 10 simulated seconds while below target output",
+  "fallback-battery": "Enables load shedding and reduces parasitic draw; stored energy is conserved, not created",
+  "fallback-grid": "Manual breaker isolation reduces demand; available power margin improves by about 0.12 kW",
+  "fallback-habitat": "Emergency seal patch · habitat integrity index +1.5 · condition index +3",
+  "fallback-water": "Gravity-fed condensate recovery · water reserve +1.8 L · no powered purifier required",
+  "fallback-oxygen": "Releases 0.24 kg O₂ from the built-in emergency buffer",
+  "fallback-co2": "Passive sorbent swap · condition index +1 · cabin O₂ reserve margin improves",
+  "fallback-thermal": "Closes passive insulation shutters, gently damping cabin temperature drift without a heater load",
+  "fallback-radiation": "Moves crew behind passive shielding, reducing the exposure-risk index by 0.5 points",
+  "fallback-comms": "Resets the local low-rate beacon · condition index +1",
+  "fallback-navigation": "Re-zeros inertial sensors for dead-reckoning · condition index +1",
+  "fallback-rover": "Inspects wheel encoders and clears a local drive fault · condition index +2",
+  "fallback-extraction": "Unloads the drill torque latch · condition index +1 without extracting material",
+  "fallback-isru": "Isolates and purges the process line · condition index +1, no feedstock required",
+  "fallback-science": "Re-zeros the bench instruments · condition index +1, no specimen consumed",
+  "fallback-agriculture": "Harvests 0.42 kg of ready edible biomass without the complete water loop",
+  "fallback-maintenance": "Manual walk-around service · condition index +2 on the weakest healthy module",
+  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust coverage −32 points · up to 450 kJ recovered per 10 simulated seconds while below target output",
+  "battery-thermal-recondition": "Thermal conditioning improves battery health and recovers additional stored energy at a measured power cost",
+  "oxygen-electrolyser-burst": "Electrolyses reclaimed water into extra oxygen · water and electrical energy consumed",
+  "water-distillate-recovery": "Recovers more condensate using waste heat · water yield improves with an electrical cost",
+  "co2-crop-loop": "Routes scrubbed CO₂ into the greenhouse loop · supports crop carbon supply and life-support balance",
+  "thermal-waste-heat-recovery": "Recovers usable waste heat from the power system to reduce cabin-temperature drift",
+  "comms-priority-window": "Reserves a high-gain uplink window using navigation timing",
+  "habitat-composite-patch": "Uses processed structural composite and thermal-controlled curing for a stronger seal repair",
+  "radiation-regolith-berm": "Uses excavated regolith mass to improve shielding and lower future exposure risk",
+  "grid-black-start": "Restarts the distribution bus from stored battery energy and stable solar input",
+  "science-fusion": "Fuses analysed specimen data with navigation / thermal telemetry for higher research yield",
+  "request-earth-report": "Earth Mission Control report · up to 20 simulated seconds; Navigation Research at 2/2 caches guidance locally",
+  "extraction-waterjet": "Water-assisted drilling improves core recovery but consumes water and electrical energy",
+  "isru-oxygen-feed": "Converts verified drill feedstock into oxygen-bearing products",
+  "agriculture-closed-loop": "Combines water / CO₂ / thermal systems for increased edible biomass production",
+  "maintenance-overhaul": "Uses comms, navigation and power-grid telemetry for multi-system preventive service",
 };
 
 type MissionEvent = {
@@ -535,8 +552,8 @@ function getActionBlockers(
   if (actionId === "transfer" && node && stage !== "COLLECTED") blockers.push("Secure a specimen at this site before returning it");
   if (actionId === "analyze" && node && stage !== "DELIVERED") blockers.push("Return the sealed specimen to the habitat laboratory first");
 
-  if (rule.minPower !== undefined && context.metrics.power < rule.minPower) blockers.push(`Power must be at least ${rule.minPower}%`);
-  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Battery reserve must be at least ${rule.minBattery}%`);
+  if (rule.minPower !== undefined && context.metrics.power < rule.minPower) blockers.push(`Requires ${physicalThreshold("power", rule.minPower)}`);
+  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Requires ${physicalThreshold("battery", rule.minBattery)}`);
   return [...new Set(blockers)];
 }
 
@@ -659,6 +676,35 @@ function fallbackEmergencyOverride(
 
 function clamp(value: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, value));
+}
+
+// Resource gauges are stored internally on a 0–100 scale, but the player sees the outpost's
+// declared physical quantities, not fictitious percentages of power, energy, gas or water.
+const RESOURCE_CAPACITIES = {
+  availablePowerKW: 12,
+  storedEnergyKWh: 48,
+  oxygenReserveKg: 24,
+  waterReserveL: 180,
+  foodReserveKg: 42,
+} as const;
+
+function physicalResourceTelemetry(metrics: MissionMetrics) {
+  return {
+    power: `${(metrics.power / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(1)} kW`,
+    battery: `${(metrics.battery / 100 * RESOURCE_CAPACITIES.storedEnergyKWh).toFixed(1)} kWh`,
+    oxygen: `${(metrics.oxygen / 100 * RESOURCE_CAPACITIES.oxygenReserveKg).toFixed(1)} kg O₂`,
+    water: `${Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL)} L`,
+    food: `${(metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1)} kg food`,
+    habitat: `Integrity index ${Math.round(metrics.habitat)}/100`,
+    radiation: `Exposure-risk index ${Math.round(metrics.radiation)}/100`,
+    temperature: `${metrics.temperature.toFixed(1)} °C`,
+  };
+}
+
+function physicalThreshold(resource: "power" | "battery", points: number): string {
+  return resource === "power"
+    ? `${(points / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(2)} kW available power`
+    : `${(points / 100 * RESOURCE_CAPACITIES.storedEnergyKWh).toFixed(2)} kWh stored energy`;
 }
 
 function buildingStatus(condition: number): string {
@@ -1363,8 +1409,8 @@ function BuildingInspector({
           <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.16em]">
-                <span className="text-[#87999d]">System condition</span>
-                <span style={{ color: resourceColor(runtime.condition) }}>{condition}%</span>
+                <span className="text-[#87999d]">Equipment condition index</span>
+                <span style={{ color: resourceColor(runtime.condition) }}>{condition}/100</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-[#22343a]">
                 <div className="h-full rounded-full transition-all" style={{ width: `${condition}%`, background: resourceColor(runtime.condition) }} />
@@ -1845,6 +1891,7 @@ export function MissionSimulation() {
       : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
+  const physicalTelemetry = physicalResourceTelemetry(metrics);
 
   const finishOperation = useCallback((operation: MissionOperation) => {
     const node = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((item) => item.id === operation.targetId);
@@ -2876,16 +2923,16 @@ export function MissionSimulation() {
     const navigationPerformance = systemPerformanceMultiplier(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0);
 
     if (action === "survey" && stage === "UNSURVEYED") {
-      const duration = Math.max(5, 12 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
+      const duration = Math.max(12, 18 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`SURVEYING ${node.label}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
     if (action === "sample" && stage === "SURVEYED") {
-      const duration = Math.max(7, (hasExtraction ? 16 : 24) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance));
+      const duration = Math.max(16, (hasExtraction ? 20 : 27) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance));
       if (metrics.power < 7 || metrics.battery < 3) {
-        setOperationResult("COLLECTION HELD · Sampling requires at least 7% power and 3% battery reserve. Restore the energy margin first.");
+        setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3)}. Restore the energy margin first.`);
         return;
       }
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
@@ -2897,7 +2944,7 @@ export function MissionSimulation() {
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
-      const duration = Math.max(6, 14 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
+      const duration = Math.max(8, 16 / combinedPerformanceMultiplier(roverPerformance, navigationPerformance));
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`TRANSFERRING ${node.label}`);
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
@@ -2962,7 +3009,7 @@ export function MissionSimulation() {
         return;
       }
       if (metrics.power < 8 || metrics.battery < 5) {
-        setAiMessage("Retrofit unavailable: reserve at least 8% power and 5% battery before isolating this system.");
+        setAiMessage(`Retrofit unavailable: reserve at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5)} before isolating this system.`);
         return;
       }
       const targetLevel = (current.upgradeLevel ?? 0) + 1;
@@ -2986,7 +3033,7 @@ export function MissionSimulation() {
         return;
       }
       if (metrics.power < 5 || metrics.battery < 2) {
-        setOperationResult("REPAIR HELD · A controlled repair requires at least 5% power and 2% battery to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.");
+        setOperationResult(`REPAIR HELD · A controlled repair requires at least ${physicalThreshold("power", 5)} and ${physicalThreshold("battery", 2)} to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.`);
         setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
         return;
       }
@@ -3238,22 +3285,22 @@ export function MissionSimulation() {
         break;
       case "request-earth-report": {
         const openFaults = Object.values(activeFaults);
+        const telemetry = physicalResourceTelemetry(metrics);
         const weakest = [
-          {label:"POWER MARGIN", value:metrics.power, unit:"%"},
-          {label:"BATTERY RESERVE", value:metrics.battery, unit:"%"},
-          {label:"OXYGEN RESERVE", value:metrics.oxygen, unit:"%"},
-          {label:"WATER RESERVE", value:metrics.water, unit:"%"},
-          {label:"FOOD RESERVE", value:metrics.food, unit:"%"},
-          {label:"HABITAT INTEGRITY", value:metrics.habitat, unit:"%"},
+          {label:"AVAILABLE POWER", value:metrics.power, display:telemetry.power},
+          {label:"STORED ENERGY", value:metrics.battery, display:telemetry.battery},
+          {label:"OXYGEN RESERVE", value:metrics.oxygen, display:telemetry.oxygen},
+          {label:"WATER RESERVE", value:metrics.water, display:telemetry.water},
+          {label:"FOOD RESERVE", value:metrics.food, display:telemetry.food},
         ].sort((a,b)=>a.value-b.value)[0];
         const analysedCount = Object.values(sampleStages).filter((stage)=>stage==="ANALYSED").length;
         const report = [
           "EARTH MISSION CONTROL // OUTPOST OPERATIONS REPORT",
           `MISSION: ${pending.missionTitle} · ${pending.campaign.toUpperCase()} · T+${Math.round(elapsed)} simulated seconds`,
-          `RESOURCE TELEMETRY: power ${Math.round(metrics.power)}% | battery ${Math.round(metrics.battery)}% | O₂ ${Math.round(metrics.oxygen)}% | water ${Math.round(metrics.water)}% | food ${Math.round(metrics.food)}% | habitat ${Math.round(metrics.habitat)}%`,
+          `PHYSICAL TELEMETRY: available power ${telemetry.power} | stored energy ${telemetry.battery} | oxygen ${telemetry.oxygen} | water ${telemetry.water} | edible food ${telemetry.food} | cabin temperature ${telemetry.temperature} | ${telemetry.habitat} | ${telemetry.radiation}`,
           `FIELD SCIENCE: ${surveyedNodes.length} site(s) mapped · ${analysedCount} specimen(s) analysed · ${resourceYield.toFixed(1)} resource / feedstock units logged`,
           `FAULT REGISTER: ${openFaults.length ? openFaults.map((fault)=>`${fault.targetTrackId.toUpperCase()} — ${fault.title}`).join("; ") : "no unresolved faults at report generation"}`,
-          `RECOMMENDED PRIORITY: ${openFaults.length ? "Repair " + openFaults[0].targetTrackId.toUpperCase() + " and verify the affected system before high-load work." : "Prioritise " + weakest.label + " at " + Math.round(weakest.value) + weakest.unit + " and avoid non-essential power draw."}`,
+          `RECOMMENDED PRIORITY: ${openFaults.length ? "Repair " + openFaults[0].targetTrackId.toUpperCase() + " and verify the affected system before high-load work." : "Prioritise " + weakest.label + " at " + weakest.display + " and avoid non-essential power draw."}`,
           "OPERATIONS NOTE: This is a compressed mission-control processing queue. Real signal propagation is determined by Earth–surface distance; the high-tier local cache can display a previously computed recommendation instantly.",
         ].join("\n");
         setEarthReport(report);
@@ -3515,18 +3562,19 @@ export function MissionSimulation() {
   applyBuildingActionRef.current = applyBuildingAction;
 
   const askMissionAi = () => {
+    const telemetry = physicalResourceTelemetry(metrics);
     const weakest = [
-      { label: "battery reserve", value: metrics.battery },
-      { label: "oxygen reserve", value: metrics.oxygen },
-      { label: "water reserve", value: metrics.water },
-      { label: "food reserve", value: metrics.food },
-      { label: "habitat integrity", value: metrics.habitat },
+      { label: "stored energy", value: metrics.battery, display: telemetry.battery },
+      { label: "oxygen reserve", value: metrics.oxygen, display: telemetry.oxygen },
+      { label: "water reserve", value: metrics.water, display: telemetry.water },
+      { label: "edible food", value: metrics.food, display: telemetry.food },
+      { label: "habitat integrity", value: metrics.habitat, display: telemetry.habitat },
     ].sort((a, b) => a.value - b.value)[0];
 
     if (weakest.value < 45) {
-      setAiMessage(`Mission AI diagnosis: your current weakest area is ${weakest.label} at ${Math.round(weakest.value)}%. Prioritise that system before taking another optional risk.`);
+      setAiMessage(`Mission AI diagnosis: your current weakest area is ${weakest.label} at ${weakest.display}. Prioritise that system before taking another optional risk.`);
     } else if (metrics.power < 55) {
-      setAiMessage("Mission AI diagnosis: power generation is your current limiting factor. Reduce non-critical loads and protect battery reserve.");
+      setAiMessage(`Mission AI diagnosis: available power is ${telemetry.power}, currently limiting operations. Reduce non-critical loads and protect stored energy (${telemetry.battery}).`);
     } else if (Math.abs(metrics.temperature - 21) > 2.5) {
       setAiMessage("Mission AI diagnosis: thermal conditions are drifting. Restoring the preferred temperature band will reduce long-term system stress.");
     } else {
@@ -3658,18 +3706,18 @@ export function MissionSimulation() {
             <div className="overflow-hidden rounded-2xl border border-[#41696a] bg-[#08171b]/[0.94] p-2 shadow-[0_10px_34px_rgba(0,0,0,0.48)] backdrop-blur-xl">
               <div className="mb-2 flex items-center justify-between px-1">
                 <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
-                <span className="font-mono text-[9px] font-black text-[#f0cf69]">{Math.round(performance.colonyHealth)}% HEALTH</span>
+                <span className="font-mono text-[9px] font-black text-[#f0cf69]">STABILITY INDEX {Math.round(performance.colonyHealth)}/100</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {[
-                  { label: "POWER", value: metrics.power, icon: <Zap className="h-3 w-3" /> },
-                  { label: "BATTERY", value: metrics.battery, icon: <BatteryCharging className="h-3 w-3" /> },
-                  { label: "O₂", value: metrics.oxygen, icon: <Wind className="h-3 w-3" /> },
-                  { label: "WATER", value: metrics.water, icon: <Droplets className="h-3 w-3" /> },
+                  { label: "POWER", value: metrics.power, display: physicalTelemetry.power, icon: <Zap className="h-3 w-3" /> },
+                  { label: "BATTERY", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
+                  { label: "O₂", value: metrics.oxygen, display: physicalTelemetry.oxygen, icon: <Wind className="h-3 w-3" /> },
+                  { label: "WATER", value: metrics.water, display: physicalTelemetry.water, icon: <Droplets className="h-3 w-3" /> },
                 ].map((metric) => (
                   <div key={metric.label} className={`rounded-xl border p-2 transition-colors ${metric.value < 28 ? "animate-pulse border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
                     <div className="flex items-center justify-between gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.08em]">{metric.label}</span></div>
-                    <div className="mt-1 font-mono text-sm font-black" style={{ color: resourceColor(metric.value) }}>{Math.round(metric.value)}%</div>
+                    <div className="mt-1 font-mono text-sm font-black" style={{ color: resourceColor(metric.value) }}>{metric.display}</div>
                     <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#20373a]"><div className="h-full rounded-full transition-[width]" style={{ width: `${clamp(metric.value)}%`, background: resourceColor(metric.value) }} /></div>
                   </div>
                 ))}
@@ -3965,9 +4013,10 @@ export function MissionSimulation() {
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {[
                         { label: "Target condition", value: Math.round(buildings[activeTargetTrackId ?? activeEvent.trackId]?.condition ?? 100), display: `${Math.round(buildings[activeTargetTrackId ?? activeEvent.trackId]?.condition ?? 100)}%` },
-                        { label: "Power margin", value: metrics.power, display: `${Math.round(metrics.power)}%` },
-                        { label: "Battery reserve", value: metrics.battery, display: `${Math.round(metrics.battery)}%` },
-                        { label: "Life support", value: Math.min(metrics.oxygen, metrics.water), display: `${Math.round(Math.min(metrics.oxygen, metrics.water))}%` },
+                        { label: "Available power", value: metrics.power, display: physicalTelemetry.power },
+                        { label: "Stored energy", value: metrics.battery, display: physicalTelemetry.battery },
+                        { label: "Oxygen reserve", value: metrics.oxygen, display: physicalTelemetry.oxygen },
+                        { label: "Water reserve", value: metrics.water, display: physicalTelemetry.water },
                       ].map((item) => (
                         <div key={item.label} className="rounded-xl border border-[#2d4248] bg-[#0b171d] p-3">
                           <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#8fa7ab]">{item.label}</p>
