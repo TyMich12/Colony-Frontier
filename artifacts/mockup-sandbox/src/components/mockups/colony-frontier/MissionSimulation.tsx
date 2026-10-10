@@ -2363,10 +2363,18 @@ export function MissionSimulation() {
                 : 0;
         const powerBase = Math.max(0, powerSupply - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
         // Stored energy can stabilise the bus during a solar outage, but it drains while discharging.
+        const lunarSolarSurplusPoints = solarGeneration - 15 - optionalCount * 2;
+        const lunarBatteryDelta = lunarSolarSurplusPoints >= 6
+          ? 0.003 + Math.min(0.009, lunarSolarSurplusPoints * 0.00035) + batteryTier * 0.0003 + batteryUpgrade * 0.00015
+          : lunarSolarSurplusPoints >= 0
+            ? 0.001 + batteryTier * 0.00015
+            : lunarSolarSurplusPoints > -8
+              ? -0.012
+              : -0.028;
         const batteryDelta = !batteryOnline
           ? -0.035 * stagePressure
           : solarOnline && gridOnline
-            ? ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0009) * stagePressure * (emergencyPowerMode ? 0.78 : 1)
+            ? (isLevelOneArrivalMission ? lunarBatteryDelta : ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0009)) * stagePressure * (emergencyPowerMode ? 0.78 : 1)
             : -0.018 * stagePressure * (emergencyPowerMode ? 0.78 : 1);
         const oxygenDrain = (oxygenOnline
           ? Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0012 - co2Upgrade * 0.0008)
