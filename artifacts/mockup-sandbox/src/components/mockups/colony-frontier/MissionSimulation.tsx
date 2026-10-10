@@ -591,9 +591,12 @@ function systemPerformanceMultiplier(tier: Tier | undefined, upgradeLevel: numbe
 }
 
 function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
-  return RESOURCE_CAPACITIES.storedEnergyKWh
-    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
-    * Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
+  const tier = selected.battery ?? "Foundation";
+  const retrofitLevel = buildings.battery?.upgradeLevel ?? 0;
+  const ratedCapacity = selected.battery
+    ? getSystemOutput("battery", tier, retrofitLevel).numeric
+    : RESOURCE_CAPACITIES.storedEnergyKWh;
+  return ratedCapacity * Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
 }
 
 // This is a compressed command/processing queue, not the speed-of-light radio delay.
@@ -697,6 +700,7 @@ function buildingStatus(condition: number): string {
 }
 
 function formatMissionTime(seconds: number): string {
+  if (seconds >= TOTAL_MISSION_SECONDS) return "DAY 14 COMPLETE · 14-DAY ARRIVAL";
   const day = Math.min(14, Math.floor(seconds / 30) + 1);
   const dayProgress = Math.floor(seconds % 30);
   const hour = Math.floor((dayProgress / 30) * 24);
@@ -1421,6 +1425,7 @@ function BuildingInspector({
               <div><p className="text-[8px] text-[#819d98]">Panel-plane irradiance</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.irradianceWm2.toFixed(0)} W/m²</p></div>
               <div><p className="text-[8px] text-[#819d98]">Sun elevation</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.sunElevationDegrees.toFixed(1)}°</p></div>
               <div><p className="text-[8px] text-[#819d98]">Panel temperature</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.panelTemperatureC.toFixed(1)}°C</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Surface temperature</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.regolithTemperatureC.toFixed(1)}°C</p></div>
               <div><p className="text-[8px] text-[#819d98]">Dust transmission</p><p className="font-mono text-[10px] text-[#d6e9dd]">{(solarReadings.dustTransmission*100).toFixed(1)}%</p></div>
             </div>
             <p className="mt-2 text-[8px] leading-4 text-[#86a99b]">Rated kW is the clean-array capacity. Current kW changes with sunlight, panel temperature, condition, dust, pointing and weak cell strings. The sunlight profile peaks halfway through Day 1 Arrival's 14-day lunar day.</p>
@@ -1641,7 +1646,7 @@ function BuildingInspector({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
-              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">In-situ retrofit {upgradeLevel}/2 · {nextRetrofit ? nextRetrofit.powerCost + " power-reserve points + " + nextRetrofit.batteryCost + " battery-reserve points" : "maximum installed level"} · {nextRetrofit ? nextRetrofit.durationSeconds + " simulated seconds" : "fully upgraded"}. Installed using on-site inventory and crew time; no added launch mass.</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">In-situ retrofit {upgradeLevel}/2 · {nextRetrofit ? nextRetrofit.powerCost + " power-reserve points + " + nextRetrofit.batteryCost + " battery-reserve points" : "maximum installed level"} · {nextRetrofit ? nextRetrofit.durationSeconds + " simulated seconds" : "fully upgraded"}. Installed using on-site inventory and crew time; no launch mass is added.</p>
             </div>
             <button
               type="button"
@@ -2348,7 +2353,7 @@ export function MissionSimulation() {
         // A live grid carries generation and distributes it. Without the grid, stored energy can
         // support only a reduced local bus; without either source, colony power margin collapses.
         const powerSupply = solarOnline && gridOnline
-          ? 48 + solarGeneration + gridTier * 4 + gridUpgrade * 1.25
+          ? (isLevelOneArrivalMission ? 24 : 48) + solarGeneration + gridTier * 4 + gridUpgrade * 1.25
           : batteryOnline && gridOnline
             ? 24 + batteryTier * 2 + batteryUpgrade * 0.6 + gridTier * 2 + gridUpgrade * 0.65
             : solarOnline && batteryOnline
