@@ -69,7 +69,7 @@ function repairInitialGapKey(metric: string): string {
 }
 function getStandardRepairGap(systemId: string, selected: Record<string, Tier>): number {
   const metric = getPrimaryRepairMetric(systemId);
-  if (!metric || systemId === "solar" || systemId === "maintenance") return 0;
+  if (!metric || systemId === "solar" || systemId === "battery" || systemId === "maintenance") return 0;
   const availableOptions = getRepairOptions(systemId).filter((option) =>
     option.metric === metric && option.requiredSystems.every((supportId) => Boolean(selected[supportId])),
   );
@@ -86,7 +86,7 @@ function repairAdjustedRating(
   repairMetrics: Record<string, number> | undefined,
   lowerIsBetter = false,
 ): number {
-  if (systemId === "solar" || systemId === "maintenance") return ratedValue;
+  if (systemId === "solar" || systemId === "battery" || systemId === "maintenance") return ratedValue;
   const metric = getPrimaryRepairMetric(systemId);
   if (!metric) return ratedValue;
   const gap = Math.max(0, repairMetrics?.[repairGapKey(metric)] ?? 0);
@@ -626,9 +626,7 @@ function tierLevel(tier: Tier): number {
 
 // All system capabilities come from exact workbook ratings for the selected tier and retrofit progress; never apply global tier or retrofit multipliers.
 function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
-  if (!selected.battery) return RESOURCE_CAPACITIES.storedEnergyKWh;
-  const ratedCapacity = getBaselineRating("battery", selected.battery, buildings.battery?.upgradeLevel ?? 0);
-  return repairAdjustedRating("battery", ratedCapacity, buildings.battery?.repairMetrics);
+  return selected.battery ? getBaselineRating("battery", selected.battery, buildings.battery?.upgradeLevel ?? 0) : RESOURCE_CAPACITIES.storedEnergyKWh;
 }
 
 function ratedPowerCapacityKW(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
@@ -2180,7 +2178,8 @@ export function MissionSimulation() {
               : currentDust - Math.max(0, outcome), 0, 100)
           : currentDust;
         const dustFault = repairTarget === "solar" && faults.some((fault) => fault.eventId === "solar-dust" || fault.eventId === "regional-dust-front");
-        const faultResolved = faults.length === 0 || (dustFault
+        const batteryEnergyRepair = repairTarget === "battery" && Boolean(option);
+        const faultResolved = faults.length === 0 || batteryEnergyRepair || (dustFault
           ? dustAfter <= 0.0001
           : remainingGapAfter !== null
             ? remainingGapAfter <= 0.0001
@@ -2228,6 +2227,14 @@ export function MissionSimulation() {
           }
           return repaired;
         });
+        if (option?.systemId === "battery") {
+          const batteryCapacity = ratedBatteryCapacityKWh(pending?.selected ?? {}, buildingsRef.current);
+          const energyRecoveredKWh = Math.max(0, outcome);
+          setMetrics((current) => ({
+            ...current,
+            battery: clamp(current.battery + (batteryCapacity > 0 ? energyRecoveredKWh / batteryCapacity * 100 : 0)),
+          }));
+        }
         setScore((value) => clamp(value + 6));
         const effectLines = option ? [
           /dust removed from (existing deposit|array surface)/i.test(option.metric)
