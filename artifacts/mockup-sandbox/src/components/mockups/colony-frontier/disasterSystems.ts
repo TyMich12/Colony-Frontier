@@ -77,10 +77,10 @@ export const REPAIR_SUPPORT_PROFILES:Record<string,[string,string,string]>={
 };
 
 const D:Record<string,SystemRepairDefinition>={
- solar:{standaloneName:"Manual panel-string inspection",standaloneDescription:"Brush a small accessible panel section; generation improves only because the dust loss is reduced.",integratedName:"Helios Coordinated Recovery",standalone:[effect("dust",[4,5,7,9],n=>"Solar dust index −"+n+" points",1),conditionEffect([1,2,2,3])],helpers:{
+ solar:{standaloneName:"Manual dust brushing and panel inspection",standaloneDescription:"Brush a small accessible panel section and inspect its electrical output; rated capacity stays unchanged while dust loss decreases.",integratedName:"Helios Coordinated Recovery",standalone:[effect("dust",[4,5,7,9],n=>"Solar dust index −"+n+" points",1),conditionEffect([1,2,2,3])],helpers:{
   navigation:{name:"Sun-vector recalibration",description:"Corrects array pointing error so the panel plane faces the Sun more directly.",effect:effect("alignment",[2,3,5,7],n=>"Pointing error −"+n+"°",1)},
   maintenance:{name:"Electrostatic dust mitigation",description:"Uses dry-contact or electrostatic cleaning tools to remove adhered lunar regolith.",effect:effect("dust",[7,11,16,23],n=>"Solar dust index −"+n+" points",2)},
-  science:{name:"Cell-string diagnostics",description:"Finds a weak or isolated electrical string and restores only that measured loss.",effect:effect("stringLoss",[1,2,3,5],n=>"Cell-string loss −"+n+" percentage points",1)}
+  science:{name:"Cell-string diagnostics",description:"Diagnoses a weak cell string, isolates the affected circuit and restores the measured loss without claiming to repair damaged cells.",effect:effect("stringLoss",[1,2,3,5],n=>"Cell-string loss −"+n+" percentage points",1)}
  }},
  battery:{standaloneName:"Isolate weak module and rebalance cells",standaloneDescription:"Disconnects a weak module and balances safe cells; it does not create energy.",integratedName:"Cell-Bank Coordinated Recovery",standalone:[conditionEffect([3,4,5,6]),effect("battery",[1,1.5,2,2.5],n=>"Usable reserve +"+n+" reserve points",.5)],helpers:{
   solar:{name:"Solar-fed charge recovery",description:"Uses measured available solar surplus to restore a controlled amount of charge.",effect:effect("battery",[2,3,4,5],n=>"Usable reserve +"+n+" reserve points",1)},
