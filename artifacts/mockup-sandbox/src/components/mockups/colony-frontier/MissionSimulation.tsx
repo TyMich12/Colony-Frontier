@@ -3872,7 +3872,7 @@ export function MissionSimulation() {
                 <div className="grid grid-cols-2 gap-2 p-3">
                   {[
                     { label: "Available electrical power", value: metrics.power, display: (metrics.power / 100 * 12).toFixed(1) + " kW", inverse: false },
-                    { label: "Stored energy", value: metrics.battery, display: (metrics.battery / 100 * 48).toFixed(1) + " kWh", inverse: false },
+                    { label: "Stored energy", value: metrics.battery, display: physicalTelemetry.battery, inverse: false },
                     { label: "O₂ reserve", value: metrics.oxygen, display: (metrics.oxygen / 100 * 24).toFixed(1) + " kg O₂", inverse: false },
                     { label: "Water reserve", value: metrics.water, display: Math.round(metrics.water / 100 * 180) + " L", inverse: false },
                     { label: "Food reserve", value: metrics.food, display: (metrics.food / 100 * 42).toFixed(1) + " kg food", inverse: false },
