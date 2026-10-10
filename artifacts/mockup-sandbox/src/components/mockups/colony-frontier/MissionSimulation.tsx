@@ -2107,7 +2107,10 @@ export function MissionSimulation() {
       case "ANALYZE":
         if (node) {
           setSampleStages((current) => ({ ...current, [node.id]: "ANALYSED" }));
-          const scienceAccuracy = getAdditionalRating("science", "accuracy", pending?.selected.science ?? "Foundation", buildingsRef.current.science?.upgradeLevel ?? 0);
+          const scienceRatedThroughput = getBaselineRating("science", pending?.selected.science ?? "Foundation", buildingsRef.current.science?.upgradeLevel ?? 0);
+          const scienceThroughput = repairAdjustedRating("science", scienceRatedThroughput, buildingsRef.current.science?.repairMetrics);
+          const scienceThroughputFraction = scienceRatedThroughput > 0 ? clamp(scienceThroughput / scienceRatedThroughput, 0, 1) : 1;
+          const scienceAccuracy = getAdditionalRating("science", "accuracy", pending?.selected.science ?? "Foundation", buildingsRef.current.science?.upgradeLevel ?? 0) * scienceThroughputFraction;
           const integrity = sampleQuality[node.id] ?? 64;
           const confidence = clamp(integrity * 0.55 + scienceAccuracy * 0.45, 42, 99);
           const finding = node.kind === "ICE"
@@ -3175,23 +3178,28 @@ export function MissionSimulation() {
     if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress) || (hasScience && activeOperationsRef.current.science)) return;
     const navigationErrorM = repairAdjustedRating("navigation", getBaselineRating("navigation", pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0), buildings.navigation?.repairMetrics, true);
     const navigationAccuracy = clamp(100 - navigationErrorM, 0, 100);
-    const scienceAccuracy = getAdditionalRating("science", "accuracy", pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
+    const scienceBaseAccuracy = getAdditionalRating("science", "accuracy", pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
+    const scienceAccuracy = scienceBaseAccuracy * (hasScience ? repairCapabilityFraction("science", pending.selected, buildings) : 1);
+    const roverRatedSpeed = hasRover ? getBaselineRating("rover", pending.selected.rover ?? "Foundation", buildings.rover?.upgradeLevel ?? 0) : 0;
+    const roverEffectiveSpeed = hasRover ? repairAdjustedRating("rover", roverRatedSpeed, buildings.rover?.repairMetrics) : 0;
+    const roverTimeFactor = hasRover && roverRatedSpeed > 0 ? clamp(roverRatedSpeed / Math.max(0.1, roverEffectiveSpeed), 1, 4) : 1;
+    const extractionFactor = hasExtraction ? repairCapabilityFraction("extraction", pending.selected, buildings) : 1;
 
     if (action === "survey" && stage === "UNSURVEYED") {
-      const duration = 18;
+      const duration = 18 * roverTimeFactor;
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`SURVEYING ${node.label}`);
       setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
       return;
     }
     if (action === "sample" && stage === "SURVEYED") {
-      const duration = hasExtraction ? 20 : 27;
+      const duration = (hasExtraction ? 20 : 27) * roverTimeFactor;
       if (metrics.power < 7 || metrics.battery < 3) {
         setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3, ratedBatteryCapacityKWh(pending.selected, buildings))}. Restore the energy margin first.`);
         return;
       }
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
-      const quality = clamp((hasRover ? 60 : 45) + (hasExtraction ? 10 : 0) + navigationAccuracy * 0.15 + scienceAccuracy * 0.10 - (equipmentFault ? 12 : 0), 38, 98);
+      const quality = clamp((hasRover ? 60 : 45) + (hasExtraction ? 10 * extractionFactor : 0) + navigationAccuracy * 0.15 + scienceAccuracy * 0.10 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId, hasRover);
       setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
@@ -3199,15 +3207,17 @@ export function MissionSimulation() {
       return;
     }
     if (action === "transfer" && stage === "COLLECTED") {
-      const duration = 16;
+      const duration = 16 * roverTimeFactor;
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`TRANSFERRING ${node.label}`);
       if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
       return;
     }
     if (action === "analyze" && stage === "DELIVERED") {
-      const scienceTier = tierLevel(pending.selected.science ?? "Foundation");
-      const duration = 20;
+      const scienceRatedThroughput = getBaselineRating("science", pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
+      const scienceThroughput = repairAdjustedRating("science", scienceRatedThroughput, buildings.science?.repairMetrics);
+      const scienceThroughputFraction = scienceRatedThroughput > 0 ? clamp(scienceThroughput / scienceRatedThroughput, 0, 1) : 1;
+      const duration = 20 / Math.max(0.25, scienceThroughputFraction);
       if (metrics.power < 5) {
         setOperationResult("ANALYSIS HELD · Insufficient power for the spectrometer / field assay. Restore power before analysing.");
         return;
@@ -3358,8 +3368,16 @@ export function MissionSimulation() {
     if (action.startsWith("fallback-")) {
       setFallbackReadyAt((current) => ({ ...current, [fallbackKey]: elapsed + 70 * GAME_TIME_ACCELERATION }));
     }
+    const navigationQueueDuration = earthReportDelaySeconds(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0);
+    const commsRatedThroughput = pending.selected.comms
+      ? getBaselineRating("comms", pending.selected.comms, buildings.comms?.upgradeLevel ?? 0)
+      : 0;
+    const commsThroughput = pending.selected.comms
+      ? repairAdjustedRating("comms", commsRatedThroughput, buildings.comms?.repairMetrics)
+      : 0;
+    const commsQueueFactor = commsRatedThroughput > 0 ? clamp(commsRatedThroughput / Math.max(0.1, commsThroughput), 1, 5) : 1;
     const baseDuration = baseActionId === "request-earth-report"
-      ? earthReportDelaySeconds(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0)
+      ? Math.ceil(navigationQueueDuration * commsQueueFactor)
       : (actionDurations[baseActionId] ?? 6);
     const duration = baseDuration;
     const supportsLabel = integratedHelpers.length
@@ -3522,10 +3540,12 @@ export function MissionSimulation() {
         conditionBoost(1);
         setAiMessage("WASTE-HEAT DISTILLATION · More condensate was recovered by using available thermal energy, with a smaller net electric cost than an all-electric cycle.");
         break;
-      case "co2-crop-loop":
-        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(3)), food: clamp(current.food + gain(2)), power: clamp(current.power - cost(3)) }));
-        setAiMessage("GREENHOUSE CARBON EXCHANGE · Captured CO₂ was routed into the controlled crop loop. Crop metabolism and lighting remain dependent on water, oxygen and power.");
+      case "co2-crop-loop": {
+        const co2LoopFraction = repairCapabilityFraction("co2", pending?.selected ?? {}, buildingsRef.current);
+        setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen + gain(3)), food: clamp(current.food + gain(2) * co2LoopFraction), power: clamp(current.power - cost(3)) }));
+        setAiMessage("GREENHOUSE CARBON EXCHANGE · Captured CO₂ was routed into the controlled crop loop. Crop benefit is limited by available scrubber throughput; metabolism and lighting remain dependent on water, oxygen and power.");
         break;
+      }
       case "thermal-waste-heat-recovery":
         setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.45, 16, 28), battery: clamp(current.battery + gain(1)), power: clamp(current.power - cost(1)) }));
         conditionBoost(1);
@@ -3775,20 +3795,20 @@ export function MissionSimulation() {
         setAiMessage(`Inspection complete — ${trackId.toUpperCase()} is operating at ${Math.round(buildings[trackId]?.condition ?? 100)}% condition.`);
         break;
       case "extract-test":
-        setResourceYield((value) => value + gain(4));
+        setResourceYield((value) => value + gain(4) * repairCapabilityFraction("extraction", pending?.selected ?? {}, buildingsRef.current));
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(4)), battery: clamp(current.battery - cost(1)) }));
         conditionBoost(-1);
         setScore((value) => clamp(value + gain(5)));
         setAiMessage("Short drill test complete. A usable resource signature was confirmed at the surveyed deposit.");
         break;
       case "extract":
-        setResourceYield((value) => value + gain(5));
+        setResourceYield((value) => value + gain(5) * repairCapabilityFraction("extraction", pending?.selected ?? {}, buildingsRef.current));
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(2)) }));
         setScore((value) => clamp(value + gain(7)));
         setAiMessage("Extraction sample collected. Resource yield increased, but the operation consumed colony power.");
         break;
       case "process":
-        setResourceYield((value) => value + gain(3));
+        setResourceYield((value) => value + gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current));
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
         setScore((value) => clamp(value + gain(5)));
         setAiMessage("ISRU feed processed. Local material was converted into a useful colony stockpile.");
