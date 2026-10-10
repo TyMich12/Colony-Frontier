@@ -617,6 +617,9 @@ function describeRepairOutcome(
   if (/hotspot-fault diagnosis coverage/i.test(metric)) {
     return `Solar hot-spot faults detected: ${amount}%`;
   }
+  if (/faulted strings protected from propagation/i.test(metric)) {
+    return `Fault propagation prevented for ${amount} array string(s)`;
+  }
   if (/faults protected/i.test(metric)) {
     return `Fault propagation prevented for ${amount} ${unit}`;
   }
@@ -2107,7 +2110,18 @@ export function MissionSimulation() {
           return repaired;
         });
         setScore((value) => clamp(value + 6));
-        const effectCopy = option ? `${option.metric}: ${formatRating(outcome)} ${option.unit}${option.secondary && secondaryValue !== null ? ` · ${option.secondary.metric}: ${formatRating(secondaryValue)} ${option.secondary.unit}` : ""}${option.tertiary && tertiaryValue !== null ? ` · ${option.tertiary.metric}: ${formatRating(tertiaryValue)} ${option.tertiary.unit}` : ""}` : "The fault state has been cleared using the fallback standalone service.";
+        const effectLines = option ? [
+          /dust removed from existing deposit/i.test(option.metric) && /% of current dust/i.test(option.unit)
+            ? `Solar dust: removed ${formatRating(outcome)}% of the deposit present when the repair finished`
+            : describeRepairOutcome(repairTarget, option.metric, option.unit, outcome),
+          ...(option.secondary && secondaryValue !== null
+            ? [describeRepairOutcome(repairTarget, option.secondary.metric, option.secondary.unit, secondaryValue)]
+            : []),
+          ...(option.tertiary && tertiaryValue !== null
+            ? [describeRepairOutcome(repairTarget, option.tertiary.metric, option.tertiary.unit, tertiaryValue)]
+            : []),
+        ] : [];
+        const effectCopy = option ? effectLines.join(" · ") : "The fault state has been cleared using the fallback standalone service.";
         message = `REPAIR VERIFIED · ${option?.name ?? "Standalone service"} complete on ${technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget}. ${effectCopy}. ${faults.length} fault(s) cleared. Rated capacity and stored resources were not restored by a hidden bonus; the procedure result is logged as an absolute value.`;
         if (operation.roverAssigned) setRoverTask("REPAIR VERIFIED");
         break;
