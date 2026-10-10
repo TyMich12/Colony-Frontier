@@ -1158,10 +1158,12 @@ function Rover({
         const rock = rockId ? ROVER_ROUTE_ROCKS.find((item) => item.id === rockId) : undefined;
         // Each field corridor has a repeatable mapped difficulty. A higher Nav tier / retrofit
         // has greater accuracy, so it detects more of these boulders before driving up to them.
+        // Only stage the surprise boulder on the outbound leg. Once the rover has reached
+        // a surveyed site, beginning collection must not send it back to the same obstacle.
         const siteChallenge = Boolean(
           rock &&
           navigationAccuracy < rock.rerouteRoll &&
-          Math.hypot(destination[0] - current.x, destination[1] - current.z) > 1.2,
+          Math.hypot(destination[0] - current.x, destination[1] - current.z) > 6,
         );
         if (siteChallenge && rock) {
           const approach = rockApproachPoint(start, rock);
