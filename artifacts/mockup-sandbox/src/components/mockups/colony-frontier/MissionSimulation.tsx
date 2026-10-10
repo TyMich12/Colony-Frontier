@@ -2047,59 +2047,45 @@ export function MissionSimulation() {
       case "UPGRADE": {
         const track = technologyTracks.find((item) => item.id === operation.targetId);
         const level = operation.targetLevel ?? 1;
+        const installation = getRetrofitInstallation(operation.targetId, pending?.selected[operation.targetId], level - 1);
         setBuildings((current) => {
           const previous = current[operation.targetId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          const previousLevel = previous.upgradeLevel ?? 0;
-          const upgradeLevel = Math.max(previousLevel, level);
-          const condition = clamp(previous.condition + 5 * systemPerformanceMultiplier(pending?.selected[operation.targetId], previousLevel));
-          return { ...current, [operation.targetId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
+          return { ...current, [operation.targetId]: { ...previous, upgradeLevel: Math.max(previous.upgradeLevel ?? 0, level) } };
         });
         setScore((value) => clamp(value + 4));
-        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} now has field-upgrade level ${level}/2. The new hardware is visible on the module, and its output / wear model has improved.`;
+        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} is now at ${level}/2. ${installation ? `${installation.metric}: ${installation.directGain}. ` : ""}The selected rating now comes directly from the workbook. Installation did not heal damage, remove dust, clear faults, or change launch mass.`;
         break;
       }
-      case "REPAIR": {
+            case "REPAIR": {
         const repairTarget = operation.targetId;
         const faults = Object.values(activeFaultsRef.current).filter((fault) => fault.targetTrackId === repairTarget);
-        const repairSupportSystems = decodeRepairVariant(repairTarget, operation.actionId ?? "") ?? [];
-        const repairMultiplier = operationPerformanceMultiplier(repairTarget, pending?.selected ?? {}, buildingsRef.current, repairSupportSystems);
+        const optionId = (operation.actionId ?? "").startsWith("repair:") ? (operation.actionId ?? "").slice("repair:".length) : "";
+        const option = getRepairOption(repairTarget, optionId);
+        const selectedTier = pending?.selected[repairTarget] ?? "Foundation";
+        const selectedTiers = pending?.selected ?? {};
+        const effectTierIndex = option ? effectiveRepairTierIndex(selectedTier, option.requiredSystems, selectedTiers) : 0;
+        const outcome = option ? getRepairEffectValue(option, effectTierIndex) : 0;
+        const secondaryValue = option?.secondary && typeof option.secondary.values[effectTierIndex] === "number" ? option.secondary.values[effectTierIndex] as number : null;
+        const tertiaryValue = option?.tertiary && typeof option.tertiary.values[effectTierIndex] === "number" ? option.tertiary.values[effectTierIndex] as number : null;
         setActiveFaults((current) => Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget)));
         setBuildings((current) => {
           const previous = current[repairTarget] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          const condition = clamp(previous.condition + 12 * repairMultiplier);
-          const repaired = { ...current, [repairTarget]: { ...previous, condition, status: buildingStatus(condition) } };
-          if (faults.some((fault) => fault.eventId === "solar-dust" || fault.eventId === "regional-dust-front")) {
-            repaired.solar = { ...(repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((repaired.solar?.dust ?? 0) - 8) };
+          const repairMetrics = { ...(previous.repairMetrics ?? {}) };
+          if (option) {
+            repairMetrics[option.metric] = outcome;
+            if (option.secondary && secondaryValue !== null) repairMetrics[option.secondary.metric] = secondaryValue;
+            if (option.tertiary && tertiaryValue !== null) repairMetrics[option.tertiary.metric] = tertiaryValue;
+          }
+          const repaired = { ...current, [repairTarget]: { ...previous, repairMetrics, status: buildingStatus(previous.condition) } };
+          if (option && /dust removed from existing deposit/i.test(option.metric) && /% of current dust/i.test(option.unit)) {
+            const currentSolar = repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
+            repaired.solar = { ...currentSolar, dust: clamp(currentSolar.dust * (1 - outcome / 100)) };
           }
           return repaired;
         });
-        setMetrics((current) => {
-          let next = { ...current, power: clamp(current.power + 2 * repairMultiplier), battery: clamp(current.battery + 2 * repairMultiplier) };
-          for (const fault of faults) {
-            switch (fault.eventId) {
-              case "solar-dust":
-              case "regional-dust-front":
-                next = { ...next, power: clamp(next.power + 4 * repairMultiplier), battery: clamp(next.battery + 2 * repairMultiplier) };
-                break;
-              case "battery-thermal": next = { ...next, battery: clamp(next.battery + 7 * repairMultiplier) }; break;
-              case "oxygen-filter":
-              case "co2-scrubber-loading": next = { ...next, oxygen: clamp(next.oxygen + 6 * repairMultiplier) }; break;
-              case "water-filter": next = { ...next, water: clamp(next.water + 6 * repairMultiplier) }; break;
-              case "habitat-pressure":
-              case "micrometeoroid-impact": next = { ...next, habitat: clamp(next.habitat + 6 * repairMultiplier) }; break;
-              case "radiation-burst": next = { ...next, radiation: clamp(next.radiation - 4 * repairMultiplier) }; break;
-              case "polar-shadow-cold-soak":
-              case "thermal-drift": next = { ...next, temperature: clamp(next.temperature + (21 - next.temperature) * Math.min(0.7, 0.35 * repairMultiplier), 16, 28) }; break;
-              case "grid-overload":
-              case "core-power": next = { ...next, power: clamp(next.power + 5 * repairMultiplier), battery: clamp(next.battery + 3 * repairMultiplier) }; break;
-              case "agriculture-stress": next = { ...next, food: clamp(next.food + 5 * repairMultiplier), water: clamp(next.water - 1 / repairMultiplier) }; break;
-              default: break;
-            }
-          }
-          return next;
-        });
         setScore((value) => clamp(value + 6));
-        message = `REPAIR VERIFIED · ${technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget} passed its post-maintenance check. The live fault has been removed, the module condition has improved, and affected reserves are recovering. ${faults.length} fault(s) cleared.`;
+        const effectCopy = option ? `${option.metric}: ${formatRating(outcome)} ${option.unit}${option.secondary && secondaryValue !== null ? ` · ${option.secondary.metric}: ${formatRating(secondaryValue)} ${option.secondary.unit}` : ""}${option.tertiary && tertiaryValue !== null ? ` · ${option.tertiary.metric}: ${formatRating(tertiaryValue)} ${option.tertiary.unit}` : ""}` : "The fault state has been cleared using the fallback standalone service.";
+        message = `REPAIR VERIFIED · ${option?.name ?? "Standalone service"} complete on ${technologyTracks.find((track) => track.id === repairTarget)?.category ?? repairTarget}. ${effectCopy}. ${faults.length} fault(s) cleared. Rated capacity and stored resources were not restored by a hidden bonus; the procedure result is logged as an absolute value.`;
         if (operation.roverAssigned) setRoverTask("REPAIR VERIFIED");
         break;
       }
@@ -3071,11 +3057,12 @@ export function MissionSimulation() {
   };
   const handleBuildingAction = (trackId: string, action: string) => {
     if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
-    const repairVariantHelpers = decodeRepairVariant(trackId, action);
+    const repairOption = action.startsWith("repair:") ? getRepairOption(trackId, action.slice("repair:".length)) : action === "repair-active" ? getRepairOptions(trackId).find((option) => option.category === "Standalone") : undefined;
     const integratedVariant = decodeActionVariant(trackId, action);
     const baseActionId = integratedVariant?.baseActionId ?? action;
     const integratedHelpers = integratedVariant?.supportSystems ?? [];
-    const effectiveAction = repairVariantHelpers ? "repair-active" : baseActionId;
+    const effectiveAction = repairOption || action === "repair-active" ? "repair-active" : baseActionId;
+    const repairActionId = repairOption ? `repair:${repairOption.id}` : action;
     const fallbackKey = `${trackId}:${action}`;
     const hasOwnActiveFault = Object.values(activeFaults).some((fault) => fault.targetTrackId === trackId);
     const emergencyOverride = action.startsWith("fallback-") && fallbackEmergencyOverride(action, trackId, metrics, hasOwnActiveFault);
@@ -3099,27 +3086,33 @@ export function MissionSimulation() {
     }
     if (baseActionId === "upgrade") {
       const current = buildings[trackId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-      if ((current.upgradeLevel ?? 0) >= 2) {
-        setAiMessage(`${trackId.toUpperCase()} has reached its maximum module upgrade level.`);
+      const currentLevel = current.upgradeLevel ?? 0;
+      const installation = getRetrofitInstallation(trackId, pending.selected[trackId], currentLevel);
+      if (!installation) {
+        setAiMessage(`${trackId.toUpperCase()} is already at 2/2 retrofit progress for its selected technology tier.`);
         return;
       }
-      if (metrics.power < 8 || metrics.battery < 5) {
-        setAiMessage(`Retrofit unavailable: reserve at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, ratedBatteryCapacityKWh(pending.selected, buildings))} before isolating this system.`);
+      const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
+      const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
+      if (partsInventoryKg < installation.materialKg) {
+        setOperationResult(`RETROFIT LOCKED · ${installation.materialKg} kg of ${installation.kit} material is required; ${partsInventoryKg.toFixed(2)} kg is available. Use locally fabricated material or replenish the stock.`);
         return;
       }
-      const targetLevel = (current.upgradeLevel ?? 0) + 1;
-      const equipmentTier = tierLevel(pending.selected[trackId]);
-      const duration = 18 + equipmentTier * 2 + (current.upgradeLevel ?? 0) * 3;
-      setMetrics((value) => ({ ...value, power: clamp(value.power - 8), battery: clamp(value.battery - 5) }));
-      beginOperation("UPGRADE", trackId, `Installing upgrade kit · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, duration, targetLevel);
+      if (availableEnergyKWh < installation.energyKWh) {
+        setOperationResult(`RETROFIT LOCKED · Requires ${installation.energyKWh} kWh commissioning energy; stored energy is ${availableEnergyKWh.toFixed(1)} kWh. Recharge the battery before installation.`);
+        return;
+      }
+      const targetLevel = currentLevel + 1;
+      setPartsInventoryKg((value) => Math.max(0, value - installation.materialKg));
+      setMetrics((value) => ({ ...value, battery: clamp(value.battery - installation.energyKWh / batteryCapacity * 100) }));
+      beginOperation("UPGRADE", trackId, `Installing ${installation.tier} retrofit ${installation.newProgress} · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, installation.durationMinutes * 60, targetLevel, undefined, "retrofit");
+      setAiMessage(`RETROFIT STARTED · ${installation.metric} ${installation.directGain}. Consuming ${installation.materialKg} kg material and ${installation.energyKWh} kWh; installation time ${installation.durationMinutes} simulated minutes. Rated capability will change only when commissioning completes; condition and faults are not repaired.`);
       return;
     }
-    const matchingFaults = Object.values(activeFaults).filter((fault) =>
+    const matchingFaults = Object.values(activeFaults).filter((fault) =>    const matchingFaults = Object.values(activeFaults).filter((fault) =>
       fault.targetTrackId === trackId && effectiveAction === "repair-active",
     );
     if (matchingFaults.length > 0) {
-      // A repair is a timed operation. The fault stays live and keeps degrading reserves
-      // until isolation, repair, and the post-repair check are complete.
       const repairTargetId = trackId === "maintenance"
         ? [...matchingFaults].sort((a, b) => b.severity - a.severity)[0].targetTrackId
         : trackId;
@@ -3127,33 +3120,43 @@ export function MissionSimulation() {
         setOperationResult(`REPAIR QUEUED · ${repairTargetId.toUpperCase()} already has a work order running. Finish that job before starting another repair on the same system.`);
         return;
       }
-      if (metrics.power < 5 || metrics.battery < 2) {
-        setOperationResult(`REPAIR HELD · A controlled repair requires at least ${physicalThreshold("power", 5)} and ${physicalThreshold("battery", 2, ratedBatteryCapacityKWh(pending.selected, buildings))} to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.`);
-        setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
+      const selectedRepair = repairOption ?? getRepairOptions(trackId).find((option) => option.category === "Standalone");
+      if (!selectedRepair) {
+        setOperationResult("REPAIR LOCKED · No standalone procedure is defined for this system in the balance workbook.");
         return;
       }
-      const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
-      const highestSeverity = Math.max(...matchingFaults.map((fault) => fault.severity));
-      const supportSystems = repairVariantHelpers ?? [];
-      const repairPerformance = operationPerformanceMultiplier(repairTargetId, pending.selected, buildings, supportSystems);
-      const duration = Math.max(12, Math.round((27 + highestSeverity * 7 + missionStage * 1.4 - (pending.selected.maintenance ? 5 : 0)) / repairPerformance));
-      setMetrics((current) => ({ ...current, power: clamp(current.power - 4 / repairPerformance), battery: clamp(current.battery - 2 / repairPerformance) }));
-      const roverCanAssist = pending.selected.rover !== undefined && supportSystems.includes("rover") && !roverOnFieldJob;
+      const tierIndex = effectiveRepairTierIndex(pending.selected[repairTargetId] ?? "Foundation", selectedRepair.requiredSystems, pending.selected);
+      const durationMinutes = selectedRepair.durationsMinutes[tierIndex] ?? selectedRepair.durationsMinutes[0] ?? 30;
+      const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
+      const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
+      if (availableEnergyKWh < selectedRepair.energyKWh) {
+        setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.energyKWh} kWh; stored energy is ${availableEnergyKWh.toFixed(2)} kWh.`);
+        return;
+      }
+      if (partsInventoryKg < selectedRepair.partsMassKg) {
+        setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.partsMassKg} kg parts; ${partsInventoryKg.toFixed(2)} kg is available.`);
+        return;
+      }
+      setMetrics((current) => ({ ...current, battery: clamp(current.battery - selectedRepair.energyKWh / batteryCapacity * 100) }));
+      setPartsInventoryKg((current) => Math.max(0, current - selectedRepair.partsMassKg));
+      const repairSupports = selectedRepair.requiredSystems;
+      const roverCanAssist = pending.selected.rover !== undefined && repairSupports.includes("rover") && !roverOnFieldJob;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
         "REPAIR",
         repairTargetId,
-        `Isolate, repair & verify · ${technologyTracks.find((track) => track.id === repairTargetId)?.category ?? repairTargetId}`,
-        duration,
+        `Repair · ${selectedRepair.name}`,
+        durationMinutes * 60,
         undefined,
         undefined,
-        action,
+        `repair:${selectedRepair.id}`,
         repairTargetId,
         roverCanAssist,
       );
-      setAiMessage(`REPAIR STARTED · ${repairTargetId.toUpperCase()}. ${supportSystems.length ? `Integrated support: ${supportSystems.join(" + ")}. ` : "Standalone procedure; no optional support systems required. " }Isolation, repair and return-to-service verification need ${Math.ceil(duration)} seconds.`);
+      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Tier-limited result: ${durationMinutes} simulated minutes, ${selectedRepair.energyKWh} kWh, and ${selectedRepair.partsMassKg} kg of parts. Support requirements are limited to: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}.`);
       return;
     }
+
 
     const actionLabels: Record<string, string> = {
       clean: "Clean solar array", tune: "Tune solar tracking", balance: "Balance battery cells", reserve: "Protect battery reserve",
