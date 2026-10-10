@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { LEVEL1_ENVIRONMENT, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile } from "./_shared/simulationBalance";
 import {
   Activity,
   AlertTriangle,
@@ -617,9 +618,14 @@ function systemPerformanceMultiplier(tier: Tier | undefined, upgradeLevel: numbe
 }
 
 function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
-  return RESOURCE_CAPACITIES.storedEnergyKWh
-    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
-    * Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
+  return selected.battery ? getBaselineRating("battery", selected.battery, buildings.battery?.upgradeLevel ?? 0) : RESOURCE_CAPACITIES.storedEnergyKWh;
+}
+
+function ratedPowerCapacityKW(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
+  if (selected.grid) return getBaselineRating("grid", selected.grid, buildings.grid?.upgradeLevel ?? 0);
+  if (selected.solar) return getBaselineRating("solar", selected.solar, buildings.solar?.upgradeLevel ?? 0);
+  if (selected.battery) return getAdditionalRating("battery", "continuous discharge power", selected.battery, buildings.battery?.upgradeLevel ?? 0);
+  return RESOURCE_CAPACITIES.availablePowerKW;
 }
 
 // This is a compressed command/processing queue, not the speed-of-light radio delay.
@@ -629,45 +635,57 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
   return Math.max(0, 20 - tierLevel(tier) * 4.8 - Math.max(0, Math.min(2, upgradeLevel)) * 2);
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, condition = 100, dust = 0): { label: string; value: string } {
-  const performance = systemPerformanceMultiplier(tier, upgradeLevel);
-  const outputs: Record<string, { label: string; base: number; unit: string; digits?: number }> = {
-    solar: { label: "Array energy delivered at nominal sunlight", base: 28.8, unit: "kJ / 10 sim s", digits: 1 },
-    battery: { label: "Usable stored energy", base: 12, unit: "kWh", digits: 1 },
-    oxygen: { label: "Oxygen production", base: 0.84, unit: "kg O₂ / crew-day", digits: 2 },
-    water: { label: "Water recovery", base: 96, unit: "L / day", digits: 1 },
-    co2: { label: "CO₂ removal capacity", base: 3.6, unit: "kg / crew-day", digits: 2 },
-    thermal: { label: "Thermal control capacity", base: 4.5, unit: "kW thermal", digits: 2 },
-    comms: { label: "Data-link throughput", base: 2.4, unit: "Mbit/s", digits: 2 },
-    habitat: { label: "Pressure-regulation tolerance", base: 2.0, unit: "kPa band (lower is better)", digits: 2 },
-    radiation: { label: "Shelter residual dose rate", base: 0.18, unit: "mSv / day (lower is better)", digits: 3 },
-    grid: { label: "Power distribution capacity", base: 8, unit: "kW", digits: 2 },
-    science: { label: "Sample analyses", base: 3, unit: "samples / day", digits: 1 },
-    navigation: { label: "Position uncertainty", base: 1.5, unit: "m (lower is better)", digits: 2 },
-    rover: { label: "Cruise speed", base: 0.4, unit: "m/s", digits: 2 },
-    extraction: { label: "Core recovery rate", base: 1.5, unit: "kg / h", digits: 2 },
-    isru: { label: "O₂ from local feedstock", base: 0.7, unit: "kg / day", digits: 2 },
-    agriculture: { label: "Edible biomass yield", base: 0.8, unit: "kg / day", digits: 2 },
-    maintenance: { label: "Repair throughput", base: 1.2, unit: "work units / h", digits: 2 },
-    power: { label: "Managed power margin", base: 8, unit: "kW", digits: 2 },
-  };
-  const output = outputs[systemId] ?? { label: "Nominal system throughput", base: 1, unit: "units / day", digits: 2 };
-  const healthFactor = Math.max(0.25, condition / 100);
-  const limitedUpgrade = Math.max(0, Math.min(2, upgradeLevel));
-  let value: number;
-  if (systemId === "solar") {
-    // 1 normalized generation point is 0.12 kW; over 10 simulated seconds that is 1.2 kJ.
-    // This matches the actual solar-generation equation rather than inventing a larger display rate.
-    const generationPoints = 24 + tierLevel(tier) * 7.5 + limitedUpgrade * 2.5;
-    const solarHealth = Math.max(0, Math.min(1, condition / 100));
-    const dustFactor = Math.max(0.15, 1 - Math.max(0, Math.min(100, dust)) / 100 * 0.85);
-    value = generationPoints * 1.2 * solarHealth * dustFactor;
-  } else if (systemId === "navigation" || systemId === "radiation" || systemId === "habitat") {
-    value = output.base / performance / healthFactor;
-  } else {
-    value = output.base * performance * healthFactor;
+function formatRating(value: number, digits = 2): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function dustTransmission(dust: number): number {
+  const points = LEVEL1_ENVIRONMENT.solarDustTransmissionCurve;
+  const bounded = Math.max(0, Math.min(100, dust));
+  for (let i = 1; i < points.length; i++) {
+    if (bounded <= points[i].dust) {
+      const low = points[i - 1], high = points[i];
+      const portion = (bounded - low.dust) / (high.dust - low.dust);
+      return low.transmission + (high.transmission - low.transmission) * portion;
+    }
   }
-  return { label: output.label, value: value.toFixed(output.digits ?? 2) + " " + output.unit };
+  return points[points.length - 1].transmission;
+}
+
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0): { label: string; value: string } {
+  const baseline = getBaselineRow(systemId);
+  if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
+  const stateIndex = baselineStateIndex(tier, upgradeLevel);
+  const rating = baseline.values[stateIndex] ?? 0;
+  const extra = (needle: string) => {
+    const metric = getAdditionalMetricRow(systemId, needle);
+    const amount = metric?.values[stateIndex];
+    return metric && typeof amount === "number" ? " · " + formatRating(amount) + " " + metric.unit : "";
+  };
+  let label = baseline.metric;
+  let value = formatRating(rating) + " " + baseline.unit;
+  switch (systemId) {
+    case "solar": {
+      const day7 = interpolateSolarProfile(7);
+      const actualKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust));
+      label = "Rated electrical output · Day 7 reference and current dust";
+      value = formatRating(rating) + " kW rated · " + actualKW.toFixed(3) + " kW at Day 7 checkpoint · " + (actualKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5) + " kWh / 10 sim s";
+      break;
+    }
+    case "battery": value += extra("continuous discharge power"); break;
+    case "water": value = formatRating(rating) + "% recovery" + extra("throughput"); break;
+    case "oxygen": value += extra("purity"); break;
+    case "comms": value += extra("link availability"); break;
+    case "grid": value += extra("conversion efficiency"); break;
+    case "science": value += extra("accuracy"); break;
+    case "rover": value += extra("safe range"); break;
+    case "isru": value += extra("purity") + extra("product recovery"); break;
+    case "agriculture": value += extra("water consumed"); break;
+    case "radiation": label = "Radiation avoided during reference event"; value = formatRating(rating) + "% avoided"; break;
+    case "habitat": case "navigation": label += " (lower is better)"; break;
+    default: break;
+  }
+  return { label, value };
 }
 
 function combinedPerformanceMultiplier(...values: number[]): number {
@@ -719,8 +737,8 @@ function clamp(value: number, min = 0, max = 100): number {
 // Resource gauges are stored internally on a 0–100 scale, but the player sees the outpost's
 // declared physical quantities, not fictitious percentages of power, energy, gas or water.
 const RESOURCE_CAPACITIES = {
-  availablePowerKW: 12,
-  storedEnergyKWh: 12,
+  availablePowerKW: 8,
+  storedEnergyKWh: 120,
   oxygenReserveKg: 24,
   waterReserveL: 180,
   foodReserveKg: 42,
@@ -732,8 +750,9 @@ function physicalResourceTelemetry(
   buildings: Record<string, BuildingRuntime> = {},
 ) {
   const batteryCapacityKWh = ratedBatteryCapacityKWh(selected, buildings);
+  const powerCapacityKW = Math.max(1, ratedPowerCapacityKW(selected, buildings));
   return {
-    power: `${(metrics.power / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(1)} kW`,
+    power: `${(metrics.power / 100 * powerCapacityKW).toFixed(1)} kW power margin`,
     battery: `${(metrics.battery / 100 * batteryCapacityKWh).toFixed(2)} kWh`,
     oxygen: `${(metrics.oxygen / 100 * RESOURCE_CAPACITIES.oxygenReserveKg).toFixed(1)} kg O₂`,
     water: `${Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL)} L`,
@@ -764,26 +783,9 @@ function formatMissionTime(seconds: number): string {
   return `DAY ${day.toString().padStart(2, "0")} · ${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
-function initialMetrics(selected: Record<string, Tier>): MissionMetrics {
-  const solar = tierLevel(selected.solar ?? "Foundation");
-  const battery = tierLevel(selected.battery ?? "Foundation");
-  const oxygen = tierLevel(selected.oxygen ?? "Foundation");
-  const water = tierLevel(selected.water ?? "Foundation");
-  const habitat = tierLevel(selected.habitat ?? "Foundation");
-  const radiation = tierLevel(selected.radiation ?? "Foundation");
-  const thermal = tierLevel(selected.thermal ?? "Foundation");
-  const optionalCount = Object.keys(selected).filter((id) => !starterCategories.has(id)).length;
-
-  return {
-    power: clamp(73 + solar * 5.5 + Math.max(0, radiation - 1) * 2 - optionalCount * 3),
-    battery: clamp(68 + battery * 5 - optionalCount * 3),
-    oxygen: clamp(88 + oxygen * 2),
-    water: clamp(86 + water * 2),
-    food: clamp(84 + (selected.agriculture ? tierLevel(selected.agriculture) * 3 : -6)),
-    temperature: clamp(21 + thermal * 0.15, 16, 28),
-    radiation: clamp(10 - radiation * 1.5),
-    habitat: clamp(94 + habitat * 2),
-  };
+function initialMetrics(_selected: Record<string, Tier>): MissionMetrics {
+  // Starting reserves are scenario conditions, never a hidden bonus for higher technology.
+  return { power: 72, battery: 68, oxygen: 88, water: 86, food: 84, temperature: 21, radiation: 10, habitat: 94 };
 }
 
 function getMissionFailureReason(metrics: MissionMetrics): string | null {
