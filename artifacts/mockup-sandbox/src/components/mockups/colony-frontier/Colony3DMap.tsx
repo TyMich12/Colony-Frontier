@@ -1284,7 +1284,7 @@ function Rover({
           </mesh>
           {wheelZ.map((z, wheelIndex) => (
             <group key={z} ref={(element) => { wheelRefs.current[(side === -1 ? 0 : 3) + wheelIndex] = element; }} position={[side * 0.82, -0.16, z]}>
-              <mesh castShadow rotation={[0, 0, Math.PI / 2}>
+              <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.235, 0.235, 0.19, 20]} />
                 <meshStandardMaterial color="#1e2528" roughness={0.96} metalness={0.04} />
               </mesh>
