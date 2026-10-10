@@ -285,26 +285,6 @@ const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
 // Standalone repairs are always available. Optional integrations never require essential Solar or Habitat as support.
 const REPAIR_SUPPORT_PROFILES = BALANCED_REPAIR_SUPPORT_PROFILES;
 
-const REPAIR_METHOD_NAMES: Record<string, string> = {
-  solar: "Robotic dry-brush array recovery",
-  battery: "Thermal-managed cell reconditioning",
-  grid: "Redundant power-bus stabilisation",
-  habitat: "Thermally cured composite seal patch",
-  water: "Heat-assisted water-loop recovery",
-  oxygen: "Closed-loop oxygen regeneration",
-  co2: "Regenerative sorbent-bed service",
-  thermal: "Waste-heat balanced loop recovery",
-  comms: "Navigation-guided antenna alignment",
-  radiation: "Shelter and shielding restoration",
-  science: "Reference-calibrated instrument recovery",
-  navigation: "Inertial-reference recalibration",
-  rover: "Guided wheel and traction service",
-  extraction: "Aligned drill-torque recovery",
-  isru: "Feed-line purge and pressure recovery",
-  agriculture: "Closed-loop crop-module recovery",
-  maintenance: "Telemetry-guided multi-system service",
-};
-
 const SUPPORT_SHORT_LABELS: Record<string, string> = {
   solar: "Solar", battery: "Battery", grid: "Power grid", habitat: "Habitat",
   water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
@@ -1379,6 +1359,7 @@ function BuildingInspector({
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
   const [repairCategory, setRepairCategory] = useState<"Standalone Options" | "Enhanced Options" | "Dual-System Options" | "Fully Integrated">("Standalone Options");
+  useEffect(() => setRepairCategory("Standalone Options"), [track.id, activeFault?.eventId]);
   const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
   const repairOptions = Array.from({ length: 8 }, (_, mask) =>
     getRepairOption(track.id, tier, runtime.upgradeLevel ?? 0, mask, activeFault?.severity ?? 1),
@@ -2018,7 +1999,7 @@ export function MissionSimulation() {
           return { ...current, [operation.targetId]: { ...previous, upgradeLevel, condition, status: buildingStatus(condition) } };
         });
         setScore((value) => clamp(value + 4));
-        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} now has field-upgrade level ${level}/2. The new hardware is visible on the module, and its output / wear model has improved.`;
+        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} now has in-situ retrofit level ${level}/2. Rated capability and service life have improved; no launch mass was added.`;
         break;
       }
       case "REPAIR": {
