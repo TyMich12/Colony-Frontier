@@ -553,7 +553,7 @@ function tierLevel(tier: Tier): number {
   return tier === "Foundation" ? 0 : tier === "Frontier" ? 1 : tier === "Apex" ? 2 : 3;
 }
 
-// Tier jumps always beat two field retrofits: +18% per technology tier versus +5% per retrofit.
+// All system capabilities come from exact workbook ratings for the selected tier and retrofit progress; never apply global tier or retrofit multipliers.
 function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
   return selected.battery ? getBaselineRating("battery", selected.battery, buildings.battery?.upgradeLevel ?? 0) : RESOURCE_CAPACITIES.storedEnergyKWh;
 }
