@@ -1601,9 +1601,6 @@ function BuildingInspector({
                 </button>;
               })}
             </div>}
-            </div>}
-          </section>
-        )}            </div>}
           </section>
         )}
 
