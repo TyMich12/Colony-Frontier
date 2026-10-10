@@ -106,10 +106,10 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
 };
 
 const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
-  clean: "Dust-coverage estimate −16 points (−24 with rover) · up to 220 kJ recovered per 10 simulated seconds while below target output",
+  clean: "Dust-coverage estimate −16 points (−24 with rover) · about 3.9 kJ restored per 10 simulated seconds at Foundation 0/2 while below target output",
   tune: "Available electrical power +0.36 kW · array condition index +1",
-  balance: "Stored energy +2.40 kWh · available power +0.24 kW",
-  reserve: "Stored energy +3.84 kWh · available power −0.24 kW",
+  balance: "Stored energy +0.60 kWh · available power +0.24 kW",
+  reserve: "Stored energy +0.96 kWh · available power −0.24 kW",
   reset: "O₂ reserve +0.72 kg · available power −0.24 kW",
   boost: "O₂ reserve +1.44 kg · available power −0.48 kW · condition index −1",
   flush: "Recovered water +7.2 L · available power −0.24 kW",
@@ -120,12 +120,12 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   insulate: "Moves cabin temperature 22% closer to 21°C · available power −0.12 kW · condition index +1",
   repoint: "Antenna condition index +1 · link alignment verified",
   test: "Communications link health verified at rated Mbit/s throughput · condition index +1",
-  repair: "Habitat condition index +14 (+28 with Maintenance) · integrity index +5 · stored energy −0.96 kWh",
-  seal: "Habitat condition index +3 · integrity index +3 · stored energy −0.48 kWh",
-  shield: "Exposure-risk index −2 points · stored energy −0.48 kWh · condition index +1",
-  shelter: "Exposure-risk index −3 points · stored energy −0.96 kWh · available power −0.12 kW",
-  "balance-grid": "Available power +0.36 kW · stored energy +0.96 kWh · condition index +1",
-  prioritize: "O₂ reserve +0.24 kg · water reserve +1.8 L · stored energy +1.44 kWh · available power −0.12 kW",
+  repair: "Habitat condition index +14 (+28 with Maintenance) · integrity index +5 · stored energy −0.24 kWh",
+  seal: "Habitat condition index +3 · integrity index +3 · stored energy −0.12 kWh",
+  shield: "Exposure-risk index −2 points · stored energy −0.12 kWh · condition index +1",
+  shelter: "Exposure-risk index −3 points · stored energy −0.24 kWh · available power −0.12 kW",
+  "balance-grid": "Available power +0.36 kW · stored energy +0.24 kWh · condition index +1",
+  prioritize: "O₂ reserve +0.24 kg · water reserve +1.8 L · stored energy +0.36 kWh · available power −0.12 kW",
   calibrate: "Instrument condition index +1 · reference baseline verified",
   experiment: "Research data yield +1 unit · available power −0.24 kW",
   "nav-calibrate": "Position uncertainty improves · navigation condition index +1",
@@ -133,15 +133,15 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   survey: "Maps the next site and enables sealed-specimen collection",
   return: "Rover returns to the launch pad",
   inspect: "Reports current system condition and fault state",
-  "extract-test": "Feedstock yield +4 kg · available power −0.48 kW · stored energy −0.48 kWh · condition index −1",
-  extract: "Feedstock yield +5 kg · available power −0.60 kW · stored energy −0.96 kWh",
-  process: "Processed feedstock yield +3 kg · available power −0.60 kW · stored energy −0.48 kWh",
+  "extract-test": "Feedstock yield +4 units · available power −0.48 kW · stored energy −0.12 kWh · condition index −1",
+  extract: "Feedstock yield +5 units · available power −0.60 kW · stored energy −0.24 kWh",
+  process: "Processed feedstock yield +3 units · available power −0.60 kW · stored energy −0.48 kWh",
   purge: "Process-line condition index +2 · available power −0.12 kW",
   "tune-crops": "Edible food reserve +2.1 kg · water reserve −3.6 L · available power −0.24 kW · condition index +1",
-  harvest: "Edible food reserve +2.9 kg · water reserve −3.6 L · feedstock yield +1 kg",
+  harvest: "Edible food reserve +2.9 kg · water reserve −3.6 L · feedstock yield +1 unit",
   service: "Raises the weakest healthy system's condition index by 10 points",
   diagnostics: "Checks active faults and identifies the weakest healthy system",
-  "fallback-solar": "BASIC · no optional systems · dust coverage −7 points · up to 70 kJ recovered per 10 simulated seconds while below target output",
+  "fallback-solar": "BASIC · no optional systems · dust coverage −7 points · about 1.7 kJ restored per 10 simulated seconds at Foundation 0/2 while below target output",
   "fallback-battery": "Enables load shedding and reduces parasitic draw; stored energy is conserved, not created",
   "fallback-grid": "Manual breaker isolation reduces demand; available power margin improves by about 0.12 kW",
   "fallback-habitat": "Emergency seal patch · habitat integrity index +1.5 · condition index +3",
@@ -158,7 +158,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   "fallback-science": "Re-zeros the bench instruments · condition index +1, no specimen consumed",
   "fallback-agriculture": "Harvests 0.42 kg of ready edible biomass without the complete water loop",
   "fallback-maintenance": "Manual walk-around service · condition index +2 on the weakest healthy module",
-  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust coverage −32 points · up to 450 kJ recovered per 10 simulated seconds while below target output",
+  "solar-autonomous-clean": "SPECIALIST · rover + maintenance + navigation · dust coverage −32 points · about 7.8 kJ restored per 10 simulated seconds at Foundation 0/2 while below target output",
   "battery-thermal-recondition": "Thermal conditioning improves battery health and recovers additional stored energy at a measured power cost",
   "oxygen-electrolyser-burst": "Electrolyses reclaimed water into extra oxygen · water and electrical energy consumed",
   "water-distillate-recovery": "Recovers more condensate using waste heat · water yield improves with an electrical cost",
@@ -553,7 +553,7 @@ function getActionBlockers(
   if (actionId === "analyze" && node && stage !== "DELIVERED") blockers.push("Return the sealed specimen to the habitat laboratory first");
 
   if (rule.minPower !== undefined && context.metrics.power < rule.minPower) blockers.push(`Requires ${physicalThreshold("power", rule.minPower)}`);
-  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Requires ${physicalThreshold("battery", rule.minBattery)}`);
+  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Requires ${physicalThreshold("battery", rule.minBattery, context.selected, context.buildings)}`);
   return [...new Set(blockers)];
 }
 
@@ -606,15 +606,15 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
 function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, condition = 100, dust = 0): { label: string; value: string } {
   const performance = systemPerformanceMultiplier(tier, upgradeLevel);
   const outputs: Record<string, { label: string; base: number; unit: string; digits?: number }> = {
-    solar: { label: "Array energy delivered", base: 220, unit: "kJ / 10 sim s", digits: 0 },
+    solar: { label: "Array energy delivered at nominal sunlight", base: 28.8, unit: "kJ / 10 sim s", digits: 1 },
     battery: { label: "Usable stored energy", base: 12, unit: "kWh", digits: 1 },
     oxygen: { label: "Oxygen production", base: 0.84, unit: "kg O₂ / crew-day", digits: 2 },
     water: { label: "Water recovery", base: 96, unit: "L / day", digits: 1 },
     co2: { label: "CO₂ removal capacity", base: 3.6, unit: "kg / crew-day", digits: 2 },
     thermal: { label: "Thermal control capacity", base: 4.5, unit: "kW thermal", digits: 2 },
     comms: { label: "Data-link throughput", base: 2.4, unit: "Mbit/s", digits: 2 },
-    habitat: { label: "Cabin operating pressure", base: 70, unit: "kPa", digits: 1 },
-    radiation: { label: "Shelter dose-rate target", base: 0.18, unit: "mSv / day", digits: 2 },
+    habitat: { label: "Pressure-regulation tolerance", base: 2.0, unit: "kPa band (lower is better)", digits: 2 },
+    radiation: { label: "Shelter residual dose rate", base: 0.18, unit: "mSv / day (lower is better)", digits: 3 },
     grid: { label: "Power distribution capacity", base: 8, unit: "kW", digits: 2 },
     science: { label: "Sample analyses", base: 3, unit: "samples / day", digits: 1 },
     navigation: { label: "Position uncertainty", base: 1.5, unit: "m (lower is better)", digits: 2 },
@@ -627,8 +627,20 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   };
   const output = outputs[systemId] ?? { label: "Nominal system throughput", base: 1, unit: "units / day", digits: 2 };
   const healthFactor = Math.max(0.25, condition / 100);
-  let value = systemId === "navigation" ? output.base / performance / healthFactor : output.base * performance * healthFactor;
-  if (systemId === "solar") value *= Math.max(0.15, 1 - Math.max(0, Math.min(100, dust)) / 100 * 0.85);
+  const limitedUpgrade = Math.max(0, Math.min(2, upgradeLevel));
+  let value: number;
+  if (systemId === "solar") {
+    // 1 normalized generation point is 0.12 kW; over 10 simulated seconds that is 1.2 kJ.
+    // This matches the actual solar-generation equation rather than inventing a larger display rate.
+    const generationPoints = 24 + tierLevel(tier) * 7.5 + limitedUpgrade * 2.5;
+    const solarHealth = Math.max(0, Math.min(1, condition / 100));
+    const dustFactor = Math.max(0.15, 1 - Math.max(0, Math.min(100, dust)) / 100 * 0.85);
+    value = generationPoints * 1.2 * solarHealth * dustFactor;
+  } else if (systemId === "navigation" || systemId === "radiation" || systemId === "habitat") {
+    value = output.base / performance / healthFactor;
+  } else {
+    value = output.base * performance * healthFactor;
+  }
   return { label: output.label, value: value.toFixed(output.digits ?? 2) + " " + output.unit };
 }
 
@@ -682,16 +694,24 @@ function clamp(value: number, min = 0, max = 100): number {
 // declared physical quantities, not fictitious percentages of power, energy, gas or water.
 const RESOURCE_CAPACITIES = {
   availablePowerKW: 12,
-  storedEnergyKWh: 48,
+  storedEnergyKWh: 12,
   oxygenReserveKg: 24,
   waterReserveL: 180,
   foodReserveKg: 42,
 } as const;
 
-function physicalResourceTelemetry(metrics: MissionMetrics) {
+function physicalResourceTelemetry(
+  metrics: MissionMetrics,
+  selected: Record<string, Tier> = {},
+  buildings: Record<string, BuildingRuntime> = {},
+) {
+  const batteryCondition = Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
+  const batteryCapacityKWh = RESOURCE_CAPACITIES.storedEnergyKWh
+    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
+    * batteryCondition;
   return {
     power: `${(metrics.power / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(1)} kW`,
-    battery: `${(metrics.battery / 100 * RESOURCE_CAPACITIES.storedEnergyKWh).toFixed(1)} kWh`,
+    battery: `${(metrics.battery / 100 * batteryCapacityKWh).toFixed(2)} kWh`,
     oxygen: `${(metrics.oxygen / 100 * RESOURCE_CAPACITIES.oxygenReserveKg).toFixed(1)} kg O₂`,
     water: `${Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL)} L`,
     food: `${(metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1)} kg food`,
@@ -701,10 +721,19 @@ function physicalResourceTelemetry(metrics: MissionMetrics) {
   };
 }
 
-function physicalThreshold(resource: "power" | "battery", points: number): string {
-  return resource === "power"
-    ? `${(points / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(2)} kW available power`
-    : `${(points / 100 * RESOURCE_CAPACITIES.storedEnergyKWh).toFixed(2)} kWh stored energy`;
+function physicalThreshold(
+  resource: "power" | "battery",
+  points: number,
+  selected: Record<string, Tier> = {},
+  buildings: Record<string, BuildingRuntime> = {},
+): string {
+  if (resource === "power") {
+    return `${(points / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(2)} kW available power`;
+  }
+  const capacity = RESOURCE_CAPACITIES.storedEnergyKWh
+    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
+    * Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
+  return `${(points / 100 * capacity).toFixed(2)} kWh stored energy`;
 }
 
 function buildingStatus(condition: number): string {
@@ -1497,7 +1526,7 @@ function BuildingInspector({
               </span>
               <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
             </button>
-            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2)}.</p>}
+            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2, pending?.selected ?? {}, buildings)}.</p>}
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Integrated repair methods</span>
@@ -1616,7 +1645,7 @@ function BuildingInspector({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
-              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 0.96 kW available-power margin + 2.40 kWh stored energy upfront · takes about 18–26 seconds. Output and wear benefits begin only when installation completes.</p>
+              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 0.96 kW available-power margin + 0.60 kWh stored energy at Foundation 0/2 upfront · takes about 18–26 seconds. Output and wear benefits begin only when installation completes.</p>
             </div>
             <button
               type="button"
@@ -1628,7 +1657,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, pending?.selected ?? {}, buildings)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -1892,7 +1921,7 @@ export function MissionSimulation() {
       : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
-  const physicalTelemetry = physicalResourceTelemetry(metrics);
+  const physicalTelemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
 
   const finishOperation = useCallback((operation: MissionOperation) => {
     const node = RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((item) => item.id === operation.targetId);
@@ -1950,10 +1979,15 @@ export function MissionSimulation() {
         break;
       case "SYSTEM_ACTION": {
         const actionId = operation.actionId ?? "inspect";
+        const integrated = decodeActionVariant(operation.targetId, actionId);
+        const displayedActionId = integrated?.baseActionId ?? actionId;
         applyBuildingActionRef.current(operation.targetId, actionId);
         const track = technologyTracks.find((item) => item.id === operation.targetId);
-        const outcome = SYSTEM_ACTION_EFFECTS[actionId];
-        message = `ACTION COMPLETE · ${track?.category ?? operation.targetId} · ${actionId}. ${outcome ? `Recorded outcome: ${outcome}.` : "The completed work has been applied to the colony."}`;
+        const outcome = SYSTEM_ACTION_EFFECTS[displayedActionId];
+        const supports = integrated?.supportSystems.length
+          ? ` Integrated with ${integrated.supportSystems.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id).join(" + ")}.`
+          : "";
+        message = `ACTION COMPLETE · ${track?.category ?? operation.targetId} · ${displayedActionId}.${supports} ${outcome ? `Baseline outcome: ${outcome}. Higher-tier / retrofit efficiency is reflected in the actual result.` : "The completed work has been applied to the colony."}`;
         break;
       }
       case "UPGRADE": {
@@ -2933,7 +2967,7 @@ export function MissionSimulation() {
     if (action === "sample" && stage === "SURVEYED") {
       const duration = Math.max(16, (hasExtraction ? 20 : 27) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance));
       if (metrics.power < 7 || metrics.battery < 3) {
-        setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3)}. Restore the energy margin first.`);
+        setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3, pending?.selected ?? {}, buildings)}. Restore the energy margin first.`);
         return;
       }
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
@@ -3002,7 +3036,7 @@ export function MissionSimulation() {
     const roverOnFieldJob = pending.selected.rover !== undefined && Object.values(activeOperationsRef.current).some((operation) =>
       operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover") || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "solar" && operation.actionId === "clean") || (operation.kind === "REPAIR" && roverTask.startsWith("REPAIRING ")),
     );
-    if (roverOnFieldJob && (trackId === "rover" || action === "survey" || action === "return" || (action === "clean" && pending.selected.rover))) {
+    if (roverOnFieldJob && (trackId === "rover" || baseActionId === "survey" || baseActionId === "return" || (baseActionId === "clean" && integratedHelpers.includes("rover"))) ) {
       setOperationResult("ROVER UNAVAILABLE · The rover is already committed to field work. Finish that job or return it to base before dispatching it elsewhere.");
       return;
     }
@@ -3305,7 +3339,7 @@ export function MissionSimulation() {
         break;
       case "request-earth-report": {
         const openFaults = Object.values(activeFaults);
-        const telemetry = physicalResourceTelemetry(metrics);
+        const telemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
         const weakest = [
           {label:"AVAILABLE POWER", value:metrics.power, display:telemetry.power},
           {label:"STORED ENERGY", value:metrics.battery, display:telemetry.battery},
@@ -3582,7 +3616,7 @@ export function MissionSimulation() {
   applyBuildingActionRef.current = applyBuildingAction;
 
   const askMissionAi = () => {
-    const telemetry = physicalResourceTelemetry(metrics);
+    const telemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
     const weakest = [
       { label: "stored energy", value: metrics.battery, display: telemetry.battery },
       { label: "oxygen reserve", value: metrics.oxygen, display: telemetry.oxygen },
