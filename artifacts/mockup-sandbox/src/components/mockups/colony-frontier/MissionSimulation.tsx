@@ -57,11 +57,15 @@ const EVENT_TIMES = [0.10, 0.21, 0.32, 0.44, 0.55, 0.67, 0.79, 0.91].map((fracti
 const STARTING_REPAIR_PARTS_KG = 60; // On-site spares; game-balance assumption, no launch-mass change.
 
 const REPAIR_GAP_PREFIX = "Unrestored fault gap · ";
+const REPAIR_GAP_INITIAL_PREFIX = "Initial fault gap · ";
 function getPrimaryRepairMetric(systemId: string): string | null {
   return getRepairOptions(systemId)[0]?.metric ?? null;
 }
 function repairGapKey(metric: string): string {
   return `${REPAIR_GAP_PREFIX}${metric}`;
+}
+function repairInitialGapKey(metric: string): string {
+  return `${REPAIR_GAP_INITIAL_PREFIX}${metric}`;
 }
 function getStandardRepairGap(systemId: string, selected: Record<string, Tier>): number {
   const metric = getPrimaryRepairMetric(systemId);
@@ -423,8 +427,18 @@ type ActionRequirementContext = {
   resourceYield: number;
 };
 
+function hasPartialRepairProgress(systemId: string, context: ActionRequirementContext): boolean {
+  const metric = getPrimaryRepairMetric(systemId);
+  if (!metric) return false;
+  const readings = context.buildings[systemId]?.repairMetrics;
+  const remaining = readings?.[repairGapKey(metric)];
+  const initial = readings?.[repairInitialGapKey(metric)];
+  return typeof remaining === "number" && typeof initial === "number" && initial > 0 && remaining < initial - 0.0001;
+}
+
 function systemIsOperational(systemId: string, context: ActionRequirementContext, visiting = new Set<string>()): boolean {
-  if (!context.selected[systemId] || Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId)) return false;
+  const activeFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
+  if (!context.selected[systemId] || (activeFault && !hasPartialRepairProgress(systemId, context))) return false;
   if ((context.buildings[systemId]?.condition ?? 100) < 25) return false;
   if (visiting.has(systemId)) return false;
   const nextVisiting = new Set(visiting);
@@ -1458,7 +1472,6 @@ function BuildingInspector({
   const [showRepairMethods, setShowRepairMethods] = useState(true);
   const [repairCategory, setRepairCategory] = useState<"Standalone" | "Enhanced" | "Dual" | "Integrated">("Standalone");
   const repairOptions = getRepairOptions(track.id);
-  const standaloneOption = repairOptions.find((option) => option.category === "Standalone");
   useEffect(() => {
     if (!activeFault) return;
     setShowRepairMethods(true);
@@ -1504,7 +1517,7 @@ function BuildingInspector({
               <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics).value}</span>
             </div>
             <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes only this rated capability. It does not restore condition, remove dust, clear faults or refill stored resources; the next tier is a separate rating state.</p>
-            {runtime.repairMetrics && Object.keys(runtime.repairMetrics).some((metric) => !metric.startsWith(REPAIR_GAP_PREFIX)) && <div className="mt-2 border-t border-[#284542] pt-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#87aaa2]">Last measured repair / calibration outputs</p>{Object.entries(runtime.repairMetrics).filter(([metric]) => !metric.startsWith(REPAIR_GAP_PREFIX)).map(([metric, amount]) => <p key={metric} className="mt-1 text-[8px] leading-4 text-[#a8c6ba]">{metric}: <span className="font-mono text-[#d9f3e1]">{formatRating(amount)}</span></p>)}</div>}
+            {runtime.repairMetrics && Object.keys(runtime.repairMetrics).some((metric) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)) && <div className="mt-2 border-t border-[#284542] pt-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#87aaa2]">Last measured repair / calibration outputs</p>{Object.entries(runtime.repairMetrics).filter(([metric]) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)).map(([metric, amount]) => <p key={metric} className="mt-1 text-[8px] leading-4 text-[#a8c6ba]">{metric}: <span className="font-mono text-[#d9f3e1]">{formatRating(amount)}</span></p>)}</div>}
           </div>
           <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
             <div>
@@ -2172,6 +2185,7 @@ export function MissionSimulation() {
             if (remainingGapAfter !== null && primaryMetric) {
               repairMetrics[repairGapKey(primaryMetric)] = remainingGapAfter;
             }
+            if (faultResolved && primaryMetric) delete repairMetrics[repairInitialGapKey(primaryMetric)];
           }
           const repaired = { ...current, [repairTarget]: { ...previous, repairMetrics, status: buildingStatus(previous.condition) } };
           if (option && /dust removed from (existing deposit|array surface)/i.test(option.metric)) {
@@ -2349,6 +2363,7 @@ export function MissionSimulation() {
                   repairMetrics: {
                     ...(target.repairMetrics ?? {}),
                     [repairGapKey(primaryMetric)]: getStandardRepairGap(targetId, pending.selected),
+                    [repairInitialGapKey(primaryMetric)]: getStandardRepairGap(targetId, pending.selected),
                   },
                 };
               }
@@ -3028,6 +3043,7 @@ export function MissionSimulation() {
           nextTarget.repairMetrics = {
             ...(previous.repairMetrics ?? {}),
             [repairGapKey(primaryMetric)]: getStandardRepairGap(targetTrackId, pending.selected),
+            [repairInitialGapKey(primaryMetric)]: getStandardRepairGap(targetTrackId, pending.selected),
           };
         }
         return { ...current, [targetTrackId]: nextTarget };
