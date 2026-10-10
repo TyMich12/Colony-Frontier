@@ -2284,6 +2284,9 @@ export function MissionSimulation() {
         const radiationTier = tierLevel(pending.selected.radiation ?? "Foundation");
         const habitatTier = tierLevel(pending.selected.habitat ?? "Foundation");
         const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
+        const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
+        const missionFraction = clamp(elapsed / TOTAL_MISSION_SECONDS, 0, 1);
+        const missionDay = Math.min(14, Math.max(0, elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
         const solarDust = buildings.solar?.dust ?? 0;
         const solarUpgrade = buildings.solar?.upgradeLevel ?? 0;
         const batteryUpgrade = buildings.battery?.upgradeLevel ?? 0;
@@ -2293,57 +2296,59 @@ export function MissionSimulation() {
         const thermalUpgrade = buildings.thermal?.upgradeLevel ?? 0;
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const gridUpgrade = buildings.grid?.upgradeLevel ?? 0;
-        const co2Upgrade = buildings.co2?.upgradeLevel ?? 0;
         const radiationUpgrade = buildings.radiation?.upgradeLevel ?? 0;
-        const maintenanceTier = tierLevel(pending.selected.maintenance ?? "Foundation");
-        const maintenanceUpgrade = buildings.maintenance?.upgradeLevel ?? 0;
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
-        // Fourteen simulated days are compressed into this mission clock. Blackout missions
-        // include a long low-irradiance window; Mars begins with less sunlight margin.
+        const lunarProfile = pending.campaign === "moon" ? interpolateSolarProfile(missionDay) : null;
         const solarAvailability = blackoutMission
-          ? (elapsed < 55 ? 0.42 : elapsed < 285 ? 0.14 : 0.28)
+          ? (missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
           : pending.campaign === "mars"
-            ? 0.82 + Math.sin(elapsed / 29) * 0.06
-            : 0.96;
-        const solarConditionFactor = clamp((buildings.solar?.condition ?? 100) / 100, 0, 1);
-        const solarGeneration = solarOnline ? (24 + solarTier * 7.5 + solarUpgrade * 2.5) * solarAvailability * solarConditionFactor : 0;
-        const gridTier = tierLevel(pending.selected.grid ?? "Foundation");
-        // A live grid carries generation and distributes it. Without the grid, stored energy can
-        // support only a reduced local bus; without either source, colony power margin collapses.
-        const powerSupply = solarOnline && gridOnline
-          ? 48 + solarGeneration + gridTier * 4 + gridUpgrade * 1.25
-          : batteryOnline && gridOnline
-            ? 24 + batteryTier * 2 + batteryUpgrade * 0.6 + gridTier * 2 + gridUpgrade * 0.65
-            : solarOnline && batteryOnline
-              ? 22 + solarGeneration * 0.55 + batteryTier * 0.7 + batteryUpgrade * 0.2
-              : batteryOnline
-                ? 10 + batteryTier * 1.5 + batteryUpgrade * 0.45
-                : 0;
-        const powerBase = Math.max(0, powerSupply - solarDust * 0.4 - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
-        // Stored energy can stabilise the bus during a solar outage, but it drains while discharging.
-        const batteryDelta = !batteryOnline
-          ? -0.035 * stagePressure
-          : solarOnline && gridOnline
-            ? ((current.power > 86 ? 0.008 : current.power > 77 ? 0.002 : current.power > 67 ? -0.007 : current.power > 57 ? -0.017 : -0.028) + batteryTier * 0.0025 + batteryUpgrade * 0.0009) * stagePressure * (emergencyPowerMode ? 0.78 : 1)
-            : -0.018 * stagePressure * (emergencyPowerMode ? 0.78 : 1);
-        const oxygenDrain = (oxygenOnline
-          ? Math.max(0.003, 0.0145 - oxygenTier * 0.0027 - co2Tier * 0.0018 - oxygenUpgrade * 0.0012 - co2Upgrade * 0.0008)
-          : pending.selected.oxygen ? 0.028 : 0.036) * stagePressure * (emergencyPowerMode ? 1.02 : 1);
-        const waterDrain = (waterOnline
-          ? Math.max(0.003, 0.0135 - waterTier * 0.0024 - waterUpgrade * 0.0011)
-          : pending.selected.water ? 0.026 : 0.034) * stagePressure;
-        const agricultureTier = pending.selected.agriculture ? tierLevel(pending.selected.agriculture) : 0;
-        const hasAgriculture = pending.selected.agriculture !== undefined;
-        const foodDrain = (agricultureOnline
-          ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0011)
-          : hasAgriculture ? 0.028 : 0.035) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
-        const hasThermalControl = thermalOnline;
+            ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
+            : (lunarProfile?.sunlightGeometry ?? 0);
+        const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
+        const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
+        const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
+        const solarRatedKW = solarOnline ? getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade) : 0;
+        const solarGeneration = solarOnline
+          ? Math.min(solarRatedKW, solarRatedKW * solarAvailability * (1 - cellTemperatureLoss) * dustTransmission(solarDust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)))
+          : 0;
+        const batteryCapacityKWh = ratedBatteryCapacityKWh(pending.selected, buildings);
+        const storedEnergyKWh = batteryOnline ? batteryCapacityKWh * current.battery / 100 : 0;
+        const batteryDischargeLimitKW = batteryOnline ? getAdditionalRating("battery", "continuous discharge power", pending.selected.battery ?? "Foundation", batteryUpgrade) : 0;
+        const gridTransferLimitKW = gridOnline ? getBaselineRating("grid", pending.selected.grid ?? "Foundation", gridUpgrade) : Number.POSITIVE_INFINITY;
+        const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
+        const baseLoadKW = (emergencyPowerMode ? 4.0 : 5.0) + optionalCount * (emergencyPowerMode ? 0.15 : 0.35);
+        const solarNetKW = solarGeneration - baseLoadKW;
+        const batteryFlowKW = solarNetKW >= 0
+          ? (batteryOnline && gridOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW) : 0)
+          : Math.min(-solarNetKW, batteryDischargeLimitKW, dt > 0 ? storedEnergyKWh / (dt / 3600) : 0);
+        const deliveredSourceKW = solarGeneration + Math.max(0, batteryFlowKW);
+        const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
+        const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
+        const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * dt / 3600 : 0;
+        const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
+        const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-dt / 7200));
+        const powerPathAvailable = deliveredPowerKW >= 2 && current.power >= 8;
+        const oxygenProductionKgDay = oxygenOnline && powerPathAvailable ? getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade) : 0;
+        const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+        const oxygenDelta = oxygenBalanceKg / 24 * 100;
+        const waterRecoveryPct = getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade);
+        const waterThroughputLDay = getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade);
+        const circulatingWaterLDay = 20; // Four-crew loop-flow assumption; recovery reduces net make-up loss.
+        const recycledWaterLDay = waterOnline && powerPathAvailable ? Math.min(circulatingWaterLDay, waterThroughputLDay) * waterRecoveryPct / 100 : 0;
+        const netWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
+        const waterDelta = -netWaterLossLDay * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 180 * 100;
+        const foodProductionKgDay = agricultureOnline && powerPathAvailable ? getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade) : 0;
+        const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
+        const foodDelta = (foodProductionKgDay - foodDemandKgDay) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 42 * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
-        const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
-        const thermalCorrection = hasThermalControl
-          ? (0.009 + thermalTier * 0.0045 + thermalUpgrade * 0.0021)
-          : 0.0022;
-        const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
+        const thermalRatedKW = thermalOnline ? getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade) : 0;
+        const thermalNeedKW = 0.7 + Math.abs(ambientTemperature - 21) * 0.15;
+        const thermalCoverage = Math.min(1, thermalRatedKW / Math.max(0.1, thermalNeedKW));
+        const thermalTarget = thermalOnline ? 21 + (ambientTemperature - 21) * (1 - thermalCoverage) : ambientTemperature;
+        const thermalResponse = thermalOnline ? 1 - Math.exp(-dt / (7200 / Math.max(0.25, thermalCoverage))) : 1 - Math.exp(-dt / 28800);
+        const radiationAvoidedPct = getBaselineRating("radiation", pending.selected.radiation ?? "Foundation", radiationUpgrade);
+        const radiationDelta = 0.8 * (1 - radiationAvoidedPct / 100) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+        const habitatDelta = -(0.05 + (getBaselineRating("habitat", pending.selected.habitat ?? "Foundation", habitatUpgrade) / 8) * 0.05) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
           const isBeingRepaired = activeOperationsRef.current[fault.targetTrackId]?.kind === "REPAIR";
           const amount = (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * fault.severity * (isBeingRepaired ? 0.25 : 1);
@@ -2373,18 +2378,16 @@ export function MissionSimulation() {
           }
           return impact;
         }, { power: 0, battery: 0, oxygen: 0, water: 0, food: 0, habitat: 0, radiation: 0, temperature: 0 });
-
-        const powerRecovery = (powerBase - current.power) * 0.035 * dt;
         return {
-          // Electrical margin recovers over time as generation catches up with demand; faults can keep pulling it down.
           power: clamp(current.power + powerRecovery - faultImpact.power),
-          battery: clamp(current.battery + batteryDelta * speed - faultImpact.battery),
-          oxygen: clamp(current.oxygen - oxygenDrain * speed - faultImpact.oxygen),
-          water: clamp(current.water - waterDrain * speed - faultImpact.water),
-          food: clamp(current.food - foodDrain * speed - faultImpact.food),
-          temperature: clamp(current.temperature + (thermalTarget - current.temperature) * thermalCorrection * speed * stagePressure + Math.sign(current.temperature - 21 || 1) * faultImpact.temperature, 16, 28),
-          radiation: clamp(current.radiation + (radiationOnline ? Math.max(0.0006, 0.003 - radiationTier * 0.00065 - radiationUpgrade * 0.0003) : 0.0065) * speed + faultImpact.radiation),
-          habitat: clamp(current.habitat - Math.max(0.001, 0.0045 - habitatTier * 0.0006 - habitatUpgrade * 0.00025) * speed * (maintenanceOnline ? Math.max(0.45, 0.68 - maintenanceTier * 0.045 - maintenanceUpgrade * 0.02) : 1) - faultImpact.habitat + (habitatOnline ? 0 : -0.002 * speed)),
+          battery: clamp(current.battery + batteryDelta - faultImpact.battery),
+          oxygen: clamp(current.oxygen + oxygenDelta - faultImpact.oxygen),
+          water: clamp(current.water + waterDelta - faultImpact.water),
+          food: clamp(current.food + foodDelta - faultImpact.food),
+          temperature: clamp(current.temperature + (thermalTarget - current.temperature) * thermalResponse + Math.sign(current.temperature - thermalTarget || 1) * faultImpact.temperature, 16, 28),
+          radiation: clamp(current.radiation + radiationDelta + faultImpact.radiation),
+          habitat: clamp(current.habitat + habitatDelta - faultImpact.habitat),
+        };
         };
       });
 
