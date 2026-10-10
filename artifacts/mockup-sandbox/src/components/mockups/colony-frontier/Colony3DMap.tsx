@@ -1083,10 +1083,12 @@ function Rover({
   const isReturning = ["RETURNING", "REPAIR VERIFIED", "SAMPLE DELIVERED"].includes(task);
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
-  const destination: [number, number] = isTransferring || isReturning
-    ? position
-    : target && (targetNodeId || isCollecting || isSurveying || task.startsWith("AT SITE "))
-      ? nodeWorldPosition(target)
+  const destination: [number, number] = isTransferring
+    ? POSITIONS.habitat
+    : isReturning
+      ? position
+      : target && (targetNodeId || isCollecting || isSurveying || task.startsWith("AT SITE "))
+        ? nodeWorldPosition(target)
       : isCleaning
         ? POSITIONS.solar
         : repairTarget && POSITIONS[repairTarget]
