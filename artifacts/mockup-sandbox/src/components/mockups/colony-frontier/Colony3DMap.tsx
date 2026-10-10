@@ -93,10 +93,10 @@ type RoverRockObstacle = {
 };
 
 const ROVER_ROUTE_ROCKS: RoverRockObstacle[] = [
-  { id: "central-boulder", label: "CENTRAL BOULDER", x: 1, z: -13, radius: 1.9, rerouteRoll: 0.64 },
-  { id: "eastern-ridge", label: "EASTERN BOULDER RIDGE", x: 30, z: -5, radius: 1.8, rerouteRoll: 0.76 },
-  { id: "southern-scree", label: "SOUTHERN SCREE", x: 26, z: -28, radius: 1.55, rerouteRoll: 0.85 },
-  { id: "western-scree", label: "WESTERN SCREE", x: -29, z: 14, radius: 2.0, rerouteRoll: 0.93 },
+  { id: "central-boulder", label: "CENTRAL BOULDER", x: 1, z: -20, radius: 1.9, rerouteRoll: 0.64 },
+  { id: "eastern-ridge", label: "EASTERN BOULDER RIDGE", x: 29, z: 7, radius: 1.8, rerouteRoll: 0.76 },
+  { id: "southern-scree", label: "SOUTHERN SCREE", x: 27, z: -26, radius: 1.55, rerouteRoll: 0.85 },
+  { id: "western-scree", label: "WESTERN SCREE", x: -18, z: 14, radius: 2.0, rerouteRoll: 0.92 },
 ];
 
 const SITE_ROUTE_CHALLENGES: Record<string, string> = {
@@ -113,6 +113,7 @@ function findRoverPath(
   start: [number, number],
   goal: [number, number],
   ignoredRockId?: string | null,
+  ignoreAllRocks = false,
 ): [number, number][] {
   const step = 2;
   const limit = 18; // ±36 world units; includes the remote science / extraction sites.
@@ -134,7 +135,7 @@ function findRoverPath(
       const radius = id === "habitat" ? 5.1 : id === "solar" ? 3.9 : 3.25;
       return Math.hypot(wx - bx, wz - bz) < radius;
     });
-    const nearRock = ROVER_ROUTE_ROCKS.some((rock) =>
+    const nearRock = !ignoreAllRocks && ROVER_ROUTE_ROCKS.some((rock) =>
       rock.id !== ignoredRockId && Math.hypot(wx - rock.x, wz - rock.z) < rock.radius + 0.8,
     );
     return nearBuilding || nearRock;
@@ -189,6 +190,24 @@ function findRoverPath(
   path.reverse();
   path.push(goal);
   return path;
+}
+
+function planRoverPath(start: [number, number], goal: [number, number], ignoredRockId?: string | null): [number, number][] {
+  const planned = findRoverPath(start, goal, ignoredRockId);
+  if (planned.length) return planned;
+
+  // Second pass relaxes boulder avoidance only; buildings still block the path.
+  const rockFallback = findRoverPath(start, goal, null, true);
+  if (rockFallback.length) return rockFallback;
+
+  // A final bounded perimeter route ensures a destination never leaves the rover silently still.
+  const edgeX = goal[0] < start[0] ? -33 : 33;
+  const edgeZ = goal[1] < start[1] ? -33 : 33;
+  const route: [number, number][] = [[start[0], edgeZ], [edgeX, edgeZ], [edgeX, goal[1]], goal];
+  return route.filter((point, index) => {
+    const previous = index === 0 ? start : route[index - 1];
+    return Math.hypot(point[0] - previous[0], point[1] - previous[1]) > 0.4;
+  });
 }
 
 function rockApproachPoint(start: [number, number], rock: RoverRockObstacle): [number, number] {
@@ -1146,7 +1165,7 @@ function Rover({
         );
         if (siteChallenge && rock) {
           const approach = rockApproachPoint(start, rock);
-          const firstLeg = findRoverPath(start, approach, rock.id);
+          const firstLeg = planRoverPath(start, approach, rock.id)
           if (firstLeg.length) {
             routeRef.current = firstLeg;
             reroutePlanRef.current = {
@@ -1157,10 +1176,10 @@ function Rover({
               resumeAt: 0,
             };
           } else {
-            routeRef.current = findRoverPath(start, destination);
+            routeRef.current = planRoverPath(start, destination);
           }
         } else {
-          routeRef.current = findRoverPath(start, destination);
+          routeRef.current = planRoverPath(start, destination);
         }
       }
     }
@@ -1172,11 +1191,16 @@ function Rover({
         return;
       }
       // Re-plan around the actual boulder field after the vehicle has stopped at the near side.
-      routeRef.current = findRoverPath(start, reroutePlan.destination);
+      routeRef.current = planRoverPath(start, reroutePlan.destination);
       routeCursorRef.current = 0;
       encounteredRouteRef.current = commandKey;
       reroutePlanRef.current = null;
       setRerouteNotice(null);
+    }
+
+    if (hasDestination && routeRef.current.length === 0 && Math.hypot(destination[0] - current.x, destination[1] - current.z) >= 1.2) {
+      routeRef.current = planRoverPath(start, destination);
+      routeCursorRef.current = 0;
     }
 
     if (hasDestination && routeRef.current.length) {
@@ -1190,7 +1214,7 @@ function Rover({
       const activeReroute = reroutePlanRef.current;
       if (activeReroute && activeReroute.phase === "APPROACH" && routeCursorRef.current >= path.length) {
         activeReroute.phase = "HOLD";
-        activeReroute.resumeAt = clock.getElapsedTime() + 1.25;
+        activeReroute.resumeAt = clock.getElapsedTime() + 2.0;
         const rock = ROVER_ROUTE_ROCKS.find((item) => item.id === activeReroute.rockId);
         setRerouteNotice(`REROUTING · ${rock?.label ?? "ROCK AHEAD"}`);
         current.y = terrainHeight(current.x, current.z) + 0.47;
