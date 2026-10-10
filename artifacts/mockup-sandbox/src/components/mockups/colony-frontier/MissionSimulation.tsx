@@ -586,12 +586,17 @@ function describeRepairOutcome(
   const systemLabel = SYSTEM_LABELS[systemId] ?? systemId;
   const amount = formatRating(value);
 
-  if (/dust removed from existing deposit/i.test(metric)) {
+  if (/dust removed from (existing deposit|array surface)/i.test(metric)) {
+    const before = Math.max(0, currentDust);
     if (/of current dust/i.test(unit)) {
-      const before = Math.max(0, currentDust);
       const removed = before * Math.min(100, Math.max(0, value)) / 100;
       const after = Math.max(0, before - removed);
       return `Solar dust: ${formatRating(before)} → ${formatRating(after)} (−${formatRating(removed)} points; removes ${amount}% of current dust)`;
+    }
+    if (/dust-index points/i.test(unit)) {
+      const removed = Math.min(before, Math.max(0, value));
+      const after = Math.max(0, before - removed);
+      return `Solar dust: ${formatRating(before)} → ${formatRating(after)} (−${formatRating(removed)} points)`;
     }
     return `Solar dust: −${amount} ${unit}`;
   }
@@ -2103,16 +2108,21 @@ export function MissionSimulation() {
             if (option.tertiary && tertiaryValue !== null) repairMetrics[option.tertiary.metric] = tertiaryValue;
           }
           const repaired = { ...current, [repairTarget]: { ...previous, repairMetrics, status: buildingStatus(previous.condition) } };
-          if (option && /dust removed from existing deposit/i.test(option.metric) && /% of current dust/i.test(option.unit)) {
+          if (option && /dust removed from (existing deposit|array surface)/i.test(option.metric)) {
             const currentSolar = repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
-            repaired.solar = { ...currentSolar, dust: clamp(currentSolar.dust * (1 - outcome / 100)) };
+            const nextDust = /of current dust/i.test(option.unit)
+              ? currentSolar.dust * (1 - outcome / 100)
+              : currentSolar.dust - Math.max(0, outcome);
+            repaired.solar = { ...currentSolar, dust: clamp(nextDust, 0, 100) };
           }
           return repaired;
         });
         setScore((value) => clamp(value + 6));
         const effectLines = option ? [
-          /dust removed from existing deposit/i.test(option.metric) && /% of current dust/i.test(option.unit)
-            ? `Solar dust: removed ${formatRating(outcome)}% of the deposit present when the repair finished`
+          /dust removed from (existing deposit|array surface)/i.test(option.metric)
+            ? (/of current dust/i.test(option.unit)
+                ? `Solar dust: removed ${formatRating(outcome)}% of the deposit present when the repair finished`
+                : `Solar dust: −up to ${formatRating(outcome)} points (the dust index cannot fall below zero)`)
             : describeRepairOutcome(repairTarget, option.metric, option.unit, outcome),
           ...(option.secondary && secondaryValue !== null
             ? [describeRepairOutcome(repairTarget, option.secondary.metric, option.secondary.unit, secondaryValue)]
