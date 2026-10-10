@@ -1,4 +1,5 @@
 import type { Tier } from "./_shared/gameData";
+import { dustRemainingFraction } from "./solar-surface/state";
 
 export const TIER_ORDER: Tier[] = ["Foundation", "Frontier", "Apex", "Research"];
 type Triple = [number, number, number];
@@ -210,7 +211,7 @@ export function getSolarEnvironment(elapsedSeconds:number,totalMissionSeconds:nu
 export function getSolarActualOutputKW(args:{tier:Tier;retrofitLevel:number;elapsedSeconds:number;totalMissionSeconds:number;isLevelOneArrival:boolean;condition:number;dust:number;alignmentErrorDegrees?:number;solarStringLossPct?:number}) {
  const env=getSolarEnvironment(args.elapsedSeconds,args.totalMissionSeconds,args.isLevelOneArrival);
  const rating=getSystemOutput("solar",args.tier,args.retrofitLevel).numeric;
- const dustTransmission=Math.exp(-Math.log(12.5)*Math.max(0,Math.min(100,args.dust))/100);
+ const dustTransmission=dustRemainingFraction(args.isLevelOneArrival ? "moon" : "mars",args.dust);
  const pointing=Math.max(0,Math.cos(Math.max(0,Math.min(89,args.alignmentErrorDegrees??0))*Math.PI/180));
  const stringFraction=Math.max(0,1-Math.max(0,Math.min(100,args.solarStringLossPct??0))/100);
  const actualKW=rating*env.sunlightFraction*env.panelTemperatureFactor*Math.max(0,Math.min(1,args.condition/100))*dustTransmission*pointing*stringFraction;
