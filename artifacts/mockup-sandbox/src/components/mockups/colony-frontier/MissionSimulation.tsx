@@ -276,46 +276,6 @@ const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
 };
 
 // Standalone repairs are always available. Optional integrations never require essential Solar or Habitat as support.
-const REPAIR_SUPPORT_PROFILES: Record<string, [string, string, string]> = {
-  solar: ["maintenance", "rover", "navigation"],
-  battery: ["thermal", "grid", "maintenance"],
-  grid: ["battery", "maintenance", "comms"],
-  habitat: ["maintenance", "thermal", "isru"],
-  water: ["thermal", "co2", "maintenance"],
-  oxygen: ["water", "co2", "thermal"],
-  co2: ["oxygen", "agriculture", "maintenance"],
-  thermal: ["grid", "battery", "maintenance"],
-  comms: ["navigation", "maintenance", "grid"],
-  radiation: ["thermal", "battery", "maintenance"],
-  science: ["navigation", "comms", "thermal"],
-  navigation: ["comms", "maintenance", "grid"],
-  rover: ["navigation", "comms", "maintenance"],
-  extraction: ["rover", "navigation", "maintenance"],
-  isru: ["water", "thermal", "science"],
-  agriculture: ["water", "co2", "thermal"],
-  maintenance: ["comms", "navigation", "grid"],
-};
-
-const REPAIR_METHOD_NAMES: Record<string, string> = {
-  solar: "Robotic dry-brush array recovery",
-  battery: "Thermal-managed cell reconditioning",
-  grid: "Redundant power-bus stabilisation",
-  habitat: "Thermally cured composite seal patch",
-  water: "Heat-assisted water-loop recovery",
-  oxygen: "Closed-loop oxygen regeneration",
-  co2: "Regenerative sorbent-bed service",
-  thermal: "Waste-heat balanced loop recovery",
-  comms: "Navigation-guided antenna alignment",
-  radiation: "Shelter and shielding restoration",
-  science: "Reference-calibrated instrument recovery",
-  navigation: "Inertial-reference recalibration",
-  rover: "Guided wheel and traction service",
-  extraction: "Aligned drill-torque recovery",
-  isru: "Feed-line purge and pressure recovery",
-  agriculture: "Closed-loop crop-module recovery",
-  maintenance: "Telemetry-guided multi-system service",
-};
-
 const SUPPORT_SHORT_LABELS: Record<string, string> = {
   solar: "Solar", battery: "Battery", grid: "Power grid", habitat: "Habitat",
   water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
@@ -338,14 +298,6 @@ function decodeActionVariant(systemId: string, actionId: string): DecodedActionV
   };
 }
 
-function decodeRepairVariant(systemId: string, actionId: string): string[] | null {
-  const match = /^repair-variant:([^:]+):([0-7])$/.exec(actionId);
-  const helpers = REPAIR_SUPPORT_PROFILES[systemId];
-  if (!match || match[1] !== systemId || !helpers) return null;
-  const mask = Number(match[2]);
-  return helpers.filter((_, bit) => (mask & (1 << bit)) !== 0);
-}
-
 function buildSystemActionChoices(systemId: string, actions: EventChoice[]): EventChoice[] {
   const profile = ACTION_VARIANT_PROFILES[systemId];
   if (!profile) return actions;
@@ -361,22 +313,6 @@ function buildSystemActionChoices(systemId: string, actions: EventChoice[]): Eve
     };
   });
   return actions.flatMap((action) => action.id === profile.actionId ? generated : [action]);
-}
-
-function operationPerformanceMultiplier(
-  systemId: string,
-  selected: Record<string, Tier>,
-  buildings: Record<string, BuildingRuntime>,
-  supportSystems: string[] = [],
-): number {
-  const primary = systemPerformanceMultiplier(selected[systemId] ?? "Foundation", buildings[systemId]?.upgradeLevel ?? 0);
-  // A helper adds 4% base integration and 4% of its own tier/retrofit improvement.
-  // A tier jump (+18%) remains larger than both same-system retrofits (+10%).
-  const supportFactor = 1 + supportSystems.reduce((sum, helperId) => {
-    const helper = systemPerformanceMultiplier(selected[helperId] ?? "Foundation", buildings[helperId]?.upgradeLevel ?? 0);
-    return sum + 0.04 + (helper - 1) * 0.04;
-  }, 0);
-  return primary * supportFactor;
 }
 
 const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
@@ -618,10 +554,6 @@ function tierLevel(tier: Tier): number {
 }
 
 // Tier jumps always beat two field retrofits: +18% per technology tier versus +5% per retrofit.
-function systemPerformanceMultiplier(tier: Tier | undefined, upgradeLevel: number): number {
-  return 1 + tierLevel(tier ?? "Foundation") * 0.18 + Math.max(0, Math.min(2, upgradeLevel)) * 0.05;
-}
-
 function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
   return selected.battery ? getBaselineRating("battery", selected.battery, buildings.battery?.upgradeLevel ?? 0) : RESOURCE_CAPACITIES.storedEnergyKWh;
 }
@@ -691,11 +623,6 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
     default: break;
   }
   return { label, value };
-}
-
-function combinedPerformanceMultiplier(...values: number[]): number {
-  if (values.length === 0) return 1;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 const LOCAL_FALLBACK_ACTIONS = new Set([
@@ -3154,12 +3081,6 @@ export function MissionSimulation() {
       process: "Process local feedstock", purge: "Purge ISRU line", "tune-crops": "Tune greenhouse controls", harvest: "Harvest crop output",
       service: "Run maintenance service", diagnostics: "Run predictive diagnostics", "request-earth-report": "Request Earth Mission Control report",
     };
-    const actionPerformance = operationPerformanceMultiplier(
-      trackId,
-      pending.selected,
-      buildings,
-      integratedHelpers,
-    );
     if (baseActionId === "survey") {
       const nodes = RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"];
       const nextNode = nodes.find((node) => !surveyedNodes.includes(node.id)) ?? nodes[0];
@@ -3175,7 +3096,7 @@ export function MissionSimulation() {
     const baseDuration = baseActionId === "request-earth-report"
       ? earthReportDelaySeconds(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0)
       : (actionDurations[baseActionId] ?? 6);
-    const duration = baseDuration === 0 ? 0 : Math.max(3, Math.round(baseDuration / actionPerformance));
+    const duration = baseDuration;
     const supportsLabel = integratedHelpers.length
       ? ` · integrated with ${integratedHelpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id).join(" + ")}`
       : "";
@@ -3199,14 +3120,12 @@ export function MissionSimulation() {
     const integratedVariant = decodeActionVariant(trackId, action);
     const baseActionId = integratedVariant?.baseActionId ?? action;
     const integratedHelpers = integratedVariant?.supportSystems ?? [];
-    const actionPerformance = operationPerformanceMultiplier(trackId, pending.selected, buildings, integratedHelpers);
-    const gain = (amount: number) => amount * actionPerformance;
-    const cost = (amount: number) => amount / actionPerformance;
+    const gain = (amount: number) => amount;
+    const cost = (amount: number) => amount;
     const conditionBoost = (amount: number) => {
       setBuildings((current) => {
         const previous = current[trackId] ?? { condition: 100, dust: 0, status: "ONLINE" };
-        const scaledAmount = amount >= 0 ? gain(amount) : -Math.abs(amount) / actionPerformance;
-        const condition = clamp(previous.condition + scaledAmount);
+        const condition = clamp(previous.condition + amount);
         return { ...current, [trackId]: { ...previous, condition, status: buildingStatus(condition) } };
       });
     };
@@ -3264,7 +3183,7 @@ export function MissionSimulation() {
         setAiMessage("PASSIVE SORBENT CARTRIDGE SWAP · Basic CO₂ removal restored without the full powered recovery chain.");
         break;
       case "fallback-thermal":
-        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.12 * actionPerformance, 16, 28) }));
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.12, 16, 28) }));
         conditionBoost(0.5);
         setAiMessage("PASSIVE THERMAL SHUTTERS · Insulation reduces temperature drift without drawing heater power; it cannot actively control temperature.");
         break;
@@ -3349,7 +3268,7 @@ export function MissionSimulation() {
         setAiMessage("GREENHOUSE CARBON EXCHANGE · Captured CO₂ was routed into the controlled crop loop. Crop metabolism and lighting remain dependent on water, oxygen and power.");
         break;
       case "thermal-waste-heat-recovery":
-        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * Math.min(0.75, 0.45 * actionPerformance), 16, 28), battery: clamp(current.battery + gain(1)), power: clamp(current.power - cost(1)) }));
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.45, 16, 28), battery: clamp(current.battery + gain(1)), power: clamp(current.power - cost(1)) }));
         conditionBoost(1);
         setAiMessage("WASTE-HEAT RECOVERY · Recoverable thermal energy was redirected to the habitat, reducing temperature drift with a small control load.");
         break;
@@ -3445,7 +3364,7 @@ export function MissionSimulation() {
         break;
       }
       case "clean": {
-        const recovery = (pending.selected.rover ? 24 : 16) * actionPerformance;
+        const recovery = pending.selected.rover ? 24 : 16;
         setBuildings((current) => ({
           ...current,
           solar: {
@@ -3503,14 +3422,14 @@ export function MissionSimulation() {
       case "dump": {
         setMetrics((current) => ({
           ...current,
-          temperature: clamp(current.temperature + (21 - current.temperature) * Math.min(0.8, 0.36 * actionPerformance), 16, 28),
+          temperature: clamp(current.temperature + (21 - current.temperature) * 0.36, 16, 28),
           power: clamp(current.power - cost(2)),
         }));
         setAiMessage("Thermal loop was opened to dump stored heat and pull the habitat back toward its target temperature.");
         break;
       }
       case "insulate":
-        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * Math.min(0.7, 0.22 * actionPerformance), 16, 28), power: clamp(current.power - cost(1)) }));
+        setMetrics((current) => ({ ...current, temperature: clamp(current.temperature + (21 - current.temperature) * 0.22, 16, 28), power: clamp(current.power - cost(1)) }));
         conditionBoost(1);
         setAiMessage("Thermal protection mode engaged. Temperature drift has been reduced.");
         break;
@@ -3525,7 +3444,7 @@ export function MissionSimulation() {
         setAiMessage("LINK TEST PASSED · Communications tracking is stable and the antenna condition check is logged.");
         break;
       case "repair": {
-        const amount = (pending.selected.maintenance ? 28 : 14) * actionPerformance;
+        const amount = pending.selected.maintenance ? 28 : 14;
         const next = clamp((buildings.habitat?.condition ?? 100) + amount);
         setBuildings((current) => ({ ...current, habitat: { ...(current.habitat ?? { condition: 100, dust: 0, status: "ONLINE" }), condition: next, status: buildingStatus(next) } }));
         setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + gain(5)), battery: clamp(current.battery - cost(2)) }));
@@ -4041,14 +3960,6 @@ export function MissionSimulation() {
             hasRover={pending.selected.rover !== undefined}
             hasExtraction={pending.selected.extraction !== undefined}
             hasScience={pending.selected.science !== undefined}
-            roverTier={tierLevel(pending.selected.rover ?? "Foundation")}
-            extractionTier={tierLevel(pending.selected.extraction ?? "Foundation")}
-            scienceTier={tierLevel(pending.selected.science ?? "Foundation")}
-            navigationTier={tierLevel(pending.selected.navigation ?? "Foundation")}
-            roverPerformance={systemPerformanceMultiplier(pending.selected.rover ?? "Foundation", buildings.rover?.upgradeLevel ?? 0)}
-            extractionPerformance={systemPerformanceMultiplier(pending.selected.extraction ?? "Foundation", buildings.extraction?.upgradeLevel ?? 0)}
-            sciencePerformance={systemPerformanceMultiplier(pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0)}
-            navigationPerformance={systemPerformanceMultiplier(pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0)}
             operation={activeOperations[selectedResource.id] ?? activeOperations.rover ?? activeOperations.science ?? Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) ?? null}
             actionBusy={Boolean(activeOperations[selectedResource.id] || activeOperations.rover || activeOperations.science || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)))}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
