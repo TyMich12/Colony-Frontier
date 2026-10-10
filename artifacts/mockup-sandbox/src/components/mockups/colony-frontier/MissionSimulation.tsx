@@ -2371,7 +2371,8 @@ export function MissionSimulation() {
             setBuildings((current) => {
               const previous = current[targetId];
               if (!previous) return current;
-              const damage = Math.min(18, (5 + eventIndex * 0.65) * shock);
+              const solarProtection = targetId === "solar" ? solarFaultProtection(current.solar?.repairMetrics) : 0;
+              const damage = Math.min(18, (5 + eventIndex * 0.65) * shock) * (1 - solarProtection);
               const condition = clamp(previous.condition - damage);
               const nextBuildings = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
               if (event.id === "solar-dust" || event.id === "regional-dust-front") {
@@ -2571,9 +2572,10 @@ export function MissionSimulation() {
         for (const [trackId, state] of Object.entries(next)) {
           const wear = (trackId === "solar" ? 0.013 : 0.0075) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
+          const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
             .filter((fault) => fault.targetTrackId === trackId)
-            .reduce((sum, fault) => sum + 0.26 * fault.severity * (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * (repairingTrack ? 0.25 : 1), 0);
+            .reduce((sum, fault) => sum + 0.26 * fault.severity * (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * (repairingTrack ? 0.25 : 1) * (1 - solarProtection), 0);
           next[trackId] = {
             ...state,
             condition: clamp(state.condition - Math.max(0.00025, wear) * (dt / GAME_TIME_ACCELERATION) - faultWear),
