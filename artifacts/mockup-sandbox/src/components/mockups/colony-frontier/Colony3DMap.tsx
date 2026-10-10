@@ -1205,8 +1205,10 @@ function Rover({
           const finalWaypoint = routeCursorRef.current >= path.length - 1;
           const arriveRadius = finalWaypoint ? (isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28) : 0.08;
           if (distance > arriveRadius) {
-            const baseSpeed = isCollecting ? 1.2 : isTransferring || isReturning ? 5.2 : 6.3;
-            const move = Math.min(Math.max(0, delta) * baseSpeed * Math.max(0.9, performanceMultiplier), distance - arriveRadius);
+            // The route must finish before the timed field task does. Simulation speed and rover tier both affect travel time.
+            const baseSpeed = isTransferring || isReturning ? 9.5 : 9.0;
+            const simRate = Math.min(4, Math.max(0.5, simulationSpeed));
+            const move = Math.min(Math.max(0, delta) * baseSpeed * simRate * Math.max(0.9, performanceMultiplier), distance - arriveRadius);
             current.x += (dx / distance) * move;
             current.z += (dz / distance) * move;
             travelled = move;
@@ -1225,7 +1227,7 @@ function Rover({
   });
 
   const wheelZ = [-0.55, 0, 0.55];
-  const basePosition: [number, number, number] = [position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]];
+  const basePosition = useMemo<[number, number, number]>(() => [position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]], [position[0], position[1]]);
   return (
     <group ref={ref} position={basePosition} frustumCulled={false}>
       <mesh
