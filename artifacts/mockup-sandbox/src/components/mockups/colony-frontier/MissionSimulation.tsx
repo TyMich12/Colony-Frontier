@@ -591,39 +591,39 @@ function describeRepairOutcome(
       const before = Math.max(0, currentDust);
       const removed = before * Math.min(100, Math.max(0, value)) / 100;
       const after = Math.max(0, before - removed);
-      return \`Solar dust: \${formatRating(before)} → \${formatRating(after)} (−\${formatRating(removed)} points; removes \${amount}% of current dust)\`;
+      return `Solar dust: ${formatRating(before)} → ${formatRating(after)} (−${formatRating(removed)} points; removes ${amount}% of current dust)`;
     }
-    return \`Solar dust: −\${amount} \${unit}\`;
+    return `Solar dust: −${amount} ${unit}`;
   }
 
   if (/failed array strings restored to service/i.test(metric)) {
-    return \`Solar array: +\${amount} failed string(s) restored\`;
+    return `Solar array: +${amount} failed string(s) restored`;
   }
   if (/residual array pointing error after recalibration/i.test(metric)) {
-    return \`Solar pointing error: \${amount}° residual after recalibration\`;
+    return `Solar pointing error: ${amount}° residual after recalibration`;
   }
   if (/pressure-loss rate reduced/i.test(metric)) {
-    return \`Habitat pressure-loss rate: −\${amount} kPa/sol\`;
+    return `Habitat pressure-loss rate: −${amount} kPa/sol`;
   }
   if (/horizontal position error removed/i.test(metric)) {
-    return \`Navigation position error: −\${amount} m\`;
+    return `Navigation position error: −${amount} m`;
   }
   if (/dose avoided after repair/i.test(metric)) {
-    return \`Radiation: +\${amount} \${unit} of reference-event dose avoided\`;
+    return `Radiation: +${amount} ${unit} of reference-event dose avoided`;
   }
   if (/condition points restored/i.test(metric)) {
-    return \`Maintenance recovery: +\${amount} condition points\`;
+    return `Maintenance recovery: +${amount} condition points`;
   }
   if (/hotspot-fault diagnosis coverage/i.test(metric)) {
-    return \`Solar hot-spot faults detected: \${amount}%\`;
+    return `Solar hot-spot faults detected: ${amount}%`;
   }
   if (/faults protected/i.test(metric)) {
-    return \`Fault propagation prevented for \${amount} \${unit}\`;
+    return `Fault propagation prevented for ${amount} ${unit}`;
   }
   if (/restored|recovered|available|capacity|throughput|yield|production rate|output/i.test(metric)) {
-    return \`\${systemLabel}: +\${amount} \${unit} restored (absolute amount; capped by the fault gap and rated capability)\`;
+    return `${systemLabel}: +${amount} ${unit} restored (absolute amount; capped by the fault gap and rated capability)`;
   }
-  return \`\${systemLabel}: \${amount} \${unit} — \${metric}\`;
+  return `${systemLabel}: ${amount} ${unit} — ${metric}`;
 }
 
 function describeRepairOptionOutcome(
@@ -1538,7 +1538,23 @@ function BuildingInspector({
             >
               <span>
                 <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-white">Standalone isolate · repair · verify</span>
-                <span className="mt-1 block text-[9px] leading-4 text-[#f0c8cc]">{standaloneOption?.name ?? "Standalone repair"} · no optional support system required.</span>
+                <span className="mt-1 block text-[9px] leading-4 text-[#f0c8cc]">
+                  {standaloneOption?.name ?? "Standalone repair"}
+                  {standaloneOption && <>
+                    {" · "}
+                    {describeRepairOutcome(
+                      track.id,
+                      standaloneOption.metric,
+                      standaloneOption.unit,
+                      getRepairEffectValue(standaloneOption, effectiveRepairTierIndex(tier, standaloneOption.requiredSystems, selected)),
+                      runtime.dust,
+                    )}
+                    {" · "}{standaloneOption.durationsMinutes[effectiveRepairTierIndex(tier, standaloneOption.requiredSystems, selected)]} game min
+                    {" · "}{standaloneOption.energyKWh} kWh
+                    {" · "}{standaloneOption.partsMassKg} kg parts
+                  </>}
+                  {" · no optional support system required."}
+                </span>
               </span>
               <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
             </button>
@@ -1560,10 +1576,10 @@ function BuildingInspector({
                       type="button"
                       onClick={() => setRepairCategory(category)}
                       aria-pressed={repairCategory === category}
-                      className={\`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] transition \${repairCategory === category ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519] text-[#aab8b9] hover:border-[#e8c568]"}\`}
+                      className={`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] transition ${repairCategory === category ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519] text-[#aab8b9] hover:border-[#e8c568]"}`}
                     >
                       <span className="block">{label}</span>
-                      <span className={\`mt-0.5 block font-mono text-[7px] \${repairCategory === category ? "text-[#403a24]" : "text-[#759391]"}\`}>
+                      <span className={`mt-0.5 block font-mono text-[7px] ${repairCategory === category ? "text-[#403a24]" : "text-[#759391]"}`}>
                         {count} {count === 1 ? "option" : "options"}
                       </span>
                     </button>
@@ -1582,7 +1598,7 @@ function BuildingInspector({
                 </p>
               </div>
               {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
-                const blockers = getBlockers(track.id, \`repair:\${option.id}\`);
+                const blockers = getBlockers(track.id, `repair:${option.id}`);
                 const tierIndex = effectiveRepairTierIndex(tier, option.requiredSystems, selected);
                 const outcomeLines = describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
                 const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
@@ -1590,7 +1606,7 @@ function BuildingInspector({
                   <button
                     key={option.id}
                     type="button"
-                    onClick={() => onAction(\`repair:\${option.id}\`)}
+                    onClick={() => onAction(`repair:${option.id}`)}
                     disabled={actionBusy || Boolean(operation) || blockers.length > 0}
                     className="rounded-xl border border-[#354f59] bg-[#0d1c22] px-3 py-3 text-left transition hover:border-[#e8c568] hover:bg-[#12262b] disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -1604,7 +1620,7 @@ function BuildingInspector({
                     <span className="mt-2 block text-[8px] font-bold text-[#c4d9d6]">Requires: {supportLabels}</span>
                     <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.08em] text-[#a9dbb7]">Expected numerical effect</span>
                     {outcomeLines.map((line, index) => (
-                      <span key={\`\${option.id}-effect-\${index}\`} className="mt-1 block text-[9px] font-semibold leading-4 text-[#d7f0df]">
+                      <span key={`${option.id}-effect-${index}`} className="mt-1 block text-[9px] font-semibold leading-4 text-[#d7f0df]">
                         {line}
                       </span>
                     ))}
@@ -1614,8 +1630,8 @@ function BuildingInspector({
                     <span className="mt-1 block text-[8px] leading-4 text-[#8fa7ab]">
                       {option.tradeoff}
                     </span>
-                    <span className={\`mt-1 block text-[8px] leading-4 \${blockers.length ? "text-[#ffadb5]" : "text-[#77b995]"}\`}>
-                      {blockers.length ? \`LOCKED: \${blockers.join(" · ")}\` : "Ready — select to start this procedure."}
+                    <span className={`mt-1 block text-[8px] leading-4 ${blockers.length ? "text-[#ffadb5]" : "text-[#77b995]"}`}>
+                      {blockers.length ? `LOCKED: ${blockers.join(" · ")}` : "Ready — select to start this procedure."}
                     </span>
                   </button>
                 );
