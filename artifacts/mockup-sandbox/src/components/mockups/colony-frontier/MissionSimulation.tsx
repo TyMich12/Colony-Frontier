@@ -2267,24 +2267,21 @@ export function MissionSimulation() {
           radiation: clamp(current.radiation + radiationDelta + faultImpact.radiation),
           habitat: clamp(current.habitat + habitatDelta - faultImpact.habitat),
         };
-        };
       });
 
       setBuildings((current) => {
         const next = { ...current };
         for (const [trackId, state] of Object.entries(next)) {
-          const tier = pending.selected[trackId];
-          const level = tier ? tierLevel(tier) : 0;
           const wear = (trackId === "solar" ? 0.013 : 0.0075) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const faultWear = Object.values(activeFaults)
             .filter((fault) => fault.targetTrackId === trackId)
-            .reduce((sum, fault) => sum + 0.26 * fault.severity * dt * (repairingTrack ? 0.25 : 1), 0);
+            .reduce((sum, fault) => sum + 0.26 * fault.severity * (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * (repairingTrack ? 0.25 : 1), 0);
           next[trackId] = {
             ...state,
-            condition: clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.0009) * speed - faultWear),
-            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear - level * 0.0022 - (state.upgradeLevel ?? 0) * 0.0009) * speed - faultWear)),
-            dust: trackId === "solar" ? clamp(state.dust + Math.max(0.003, 0.018 - level * 0.004 - (state.upgradeLevel ?? 0) * 0.0018) * speed * stagePressure) : state.dust,
+            condition: clamp(state.condition - Math.max(0.00025, wear) * (dt / GAME_TIME_ACCELERATION) - faultWear),
+            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear) * (dt / GAME_TIME_ACCELERATION) - faultWear)),
+            dust: trackId === "solar" ? clamp(state.dust + 0.018 * (dt / GAME_TIME_ACCELERATION) * stagePressure) : state.dust,
           };
         }
         return next;
