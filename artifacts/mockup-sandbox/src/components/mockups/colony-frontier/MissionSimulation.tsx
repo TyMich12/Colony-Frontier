@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LEVEL1_ENVIRONMENT, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile } from "./_shared/simulationBalance";
+import { LEVEL1_ENVIRONMENT, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile, type RepairOption } from "./_shared/simulationBalance";
 import {
   Activity,
   AlertTriangle,
@@ -574,6 +574,73 @@ function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
 
 function formatRating(value: number, digits = 2): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function describeRepairOutcome(
+  systemId: string,
+  metric: string,
+  unit: string,
+  value: number,
+  currentDust = 0,
+): string {
+  const systemLabel = SYSTEM_LABELS[systemId] ?? systemId;
+  const amount = formatRating(value);
+
+  if (/dust removed from existing deposit/i.test(metric)) {
+    if (/of current dust/i.test(unit)) {
+      const before = Math.max(0, currentDust);
+      const removed = before * Math.min(100, Math.max(0, value)) / 100;
+      const after = Math.max(0, before - removed);
+      return \`Solar dust: \${formatRating(before)} → \${formatRating(after)} (−\${formatRating(removed)} points; removes \${amount}% of current dust)\`;
+    }
+    return \`Solar dust: −\${amount} \${unit}\`;
+  }
+
+  if (/failed array strings restored to service/i.test(metric)) {
+    return \`Solar array: +\${amount} failed string(s) restored\`;
+  }
+  if (/residual array pointing error after recalibration/i.test(metric)) {
+    return \`Solar pointing error: \${amount}° residual after recalibration\`;
+  }
+  if (/pressure-loss rate reduced/i.test(metric)) {
+    return \`Habitat pressure-loss rate: −\${amount} kPa/sol\`;
+  }
+  if (/horizontal position error removed/i.test(metric)) {
+    return \`Navigation position error: −\${amount} m\`;
+  }
+  if (/dose avoided after repair/i.test(metric)) {
+    return \`Radiation: +\${amount} \${unit} of reference-event dose avoided\`;
+  }
+  if (/condition points restored/i.test(metric)) {
+    return \`Maintenance recovery: +\${amount} condition points\`;
+  }
+  if (/hotspot-fault diagnosis coverage/i.test(metric)) {
+    return \`Solar hot-spot faults detected: \${amount}%\`;
+  }
+  if (/faults protected/i.test(metric)) {
+    return \`Fault propagation prevented for \${amount} \${unit}\`;
+  }
+  if (/restored|recovered|available|capacity|throughput|yield|production rate|output/i.test(metric)) {
+    return \`\${systemLabel}: +\${amount} \${unit} restored (absolute amount; capped by the fault gap and rated capability)\`;
+  }
+  return \`\${systemLabel}: \${amount} \${unit} — \${metric}\`;
+}
+
+function describeRepairOptionOutcome(
+  systemId: string,
+  option: RepairOption,
+  tierIndex: number,
+  currentDust: number,
+): string[] {
+  const value = getRepairEffectValue(option, tierIndex);
+  const lines = [describeRepairOutcome(systemId, option.metric, option.unit, value, currentDust)];
+  if (option.secondary && typeof option.secondary.values[tierIndex] === "number") {
+    lines.push(describeRepairOutcome(systemId, option.secondary.metric, option.secondary.unit, option.secondary.values[tierIndex] as number, currentDust));
+  }
+  if (option.tertiary && typeof option.tertiary.values[tierIndex] === "number") {
+    lines.push(describeRepairOutcome(systemId, option.tertiary.metric, option.tertiary.unit, option.tertiary.values[tierIndex] as number, currentDust));
+  }
+  return lines;
 }
 
 function dustTransmission(dust: number): number {
@@ -1340,7 +1407,7 @@ function BuildingInspector({
   };
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
-  const [showRepairMethods, setShowRepairMethods] = useState(false);
+  const [showRepairMethods, setShowRepairMethods] = useState(true);
   const [repairCategory, setRepairCategory] = useState<"Standalone" | "Enhanced" | "Dual" | "Integrated">("Standalone");
   const repairOptions = getRepairOptions(track.id);
   const standaloneOption = repairOptions.find((option) => option.category === "Standalone");
@@ -1484,31 +1551,80 @@ function BuildingInspector({
             </button>
             {showRepairMethods && <div className="mt-2 grid gap-2">
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => (
-                  <button key={category} type="button" onClick={() => setRepairCategory(category)} className={`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] ${repairCategory === category ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519] text-[#aab8b9]"}`}>
-                    {category}
-                  </button>
-                ))}
+                {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => {
+                  const count = repairOptions.filter((option) => option.category === category).length;
+                  const label = category === "Dual" ? "Dual-System" : category === "Integrated" ? "Fully Integrated" : category;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setRepairCategory(category)}
+                      aria-pressed={repairCategory === category}
+                      className={\`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] transition \${repairCategory === category ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519] text-[#aab8b9] hover:border-[#e8c568]"}\`}
+                    >
+                      <span className="block">{label}</span>
+                      <span className={\`mt-0.5 block font-mono text-[7px] \${repairCategory === category ? "text-[#403a24]" : "text-[#759391]"}\`}>
+                        {count} {count === 1 ? "option" : "options"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="rounded-lg border border-[#2e4c51] bg-[#0a1a20] px-3 py-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#d5e9df]">
+                  {repairCategory === "Standalone" ? "Standalone · no optional support required" :
+                    repairCategory === "Enhanced" ? "Enhanced · one support system required" :
+                    repairCategory === "Dual" ? "Dual-system · both listed support systems required" :
+                    "Fully integrated · all three support systems required"}
+                </p>
+                <p className="mt-1 text-[8px] leading-4 text-[#86a6a1]">
+                  Values shown are limited by the lowest technology tier among the target and required support systems. Exact effects, costs, and blockers are shown on each procedure.
+                </p>
               </div>
               {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
-                const blockers = getBlockers(track.id, `repair:${option.id}`);
+                const blockers = getBlockers(track.id, \`repair:\${option.id}\`);
                 const tierIndex = effectiveRepairTierIndex(tier, option.requiredSystems, selected);
-                const outcome = getRepairEffectValue(option, tierIndex);
-                const secondary = option.secondary && typeof option.secondary.values[tierIndex] === "number" ? option.secondary.values[tierIndex] : null;
-                const tertiary = option.tertiary && typeof option.tertiary.values[tierIndex] === "number" ? option.tertiary.values[tierIndex] : null;
+                const outcomeLines = describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
                 const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
-                return <button key={option.id} type="button" onClick={() => onAction(`repair:${option.id}`)} disabled={actionBusy || Boolean(operation) || blockers.length > 0} className="rounded-xl border border-[#354f59] bg-[#0d1c22] px-3 py-3 text-left hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-40">
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="text-[9px] font-black text-[#e1eeee]">{option.name}</span>
-                    <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">{option.durationsMinutes[tierIndex]} min</span>
-                  </span>
-                  <span className="mt-1 block text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</span>
-                  <span className="mt-2 block text-[8px] font-bold text-[#c4d9d6]">Support: {supportLabels}</span>
-                  <span className="mt-1 block text-[8px] text-[#a8c4c0]">Result: {option.metric} → {formatRating(outcome)} {option.unit}{option.secondary && secondary !== null ? ` · ${option.secondary.metric}: ${formatRating(secondary)} ${option.secondary.unit}` : ""}{option.tertiary && tertiary !== null ? ` · ${option.tertiary.metric}: ${formatRating(tertiary)} ${option.tertiary.unit}` : ""}</span>
-                  <span className="mt-1 block text-[8px] text-[#d8c18a]">Cost: {option.energyKWh} kWh · {option.partsMassKg} kg · {option.kit}</span>
-                  <span className="mt-1 block text-[8px] leading-3 text-[#8fa7ab]">{option.tradeoff} {blockers.length ? `· LOCKED: ${blockers.join(" · ")}` : ""}</span>
-                </button>;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => onAction(\`repair:\${option.id}\`)}
+                    disabled={actionBusy || Boolean(operation) || blockers.length > 0}
+                    className="rounded-xl border border-[#354f59] bg-[#0d1c22] px-3 py-3 text-left transition hover:border-[#e8c568] hover:bg-[#12262b] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="text-[9px] font-black text-[#e1eeee]">{option.name}</span>
+                      <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">
+                        {option.durationsMinutes[tierIndex]} game min
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</span>
+                    <span className="mt-2 block text-[8px] font-bold text-[#c4d9d6]">Requires: {supportLabels}</span>
+                    <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.08em] text-[#a9dbb7]">Expected numerical effect</span>
+                    {outcomeLines.map((line, index) => (
+                      <span key={\`\${option.id}-effect-\${index}\`} className="mt-1 block text-[9px] font-semibold leading-4 text-[#d7f0df]">
+                        {line}
+                      </span>
+                    ))}
+                    <span className="mt-2 block text-[8px] leading-4 text-[#d8c18a]">
+                      Cost: {option.energyKWh} kWh · {option.partsMassKg} kg parts · {option.kit}
+                    </span>
+                    <span className="mt-1 block text-[8px] leading-4 text-[#8fa7ab]">
+                      {option.tradeoff}
+                    </span>
+                    <span className={\`mt-1 block text-[8px] leading-4 \${blockers.length ? "text-[#ffadb5]" : "text-[#77b995]"}\`}>
+                      {blockers.length ? \`LOCKED: \${blockers.join(" · ")}\` : "Ready — select to start this procedure."}
+                    </span>
+                  </button>
+                );
               })}
+              {repairOptions.filter((option) => option.category === repairCategory).length === 0 && (
+                <p className="rounded-lg border border-[#40565b] bg-[#0d1c22] p-3 text-[9px] text-[#aab8b9]">
+                  No procedures are defined for this category and system.
+                </p>
+              )}
             </div>}
           </section>
         )}
