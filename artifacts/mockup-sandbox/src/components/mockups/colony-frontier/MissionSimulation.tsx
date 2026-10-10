@@ -1235,6 +1235,7 @@ function BuildingInspector({
   elapsedSeconds,
   fallbackReadyAt,
   isLevelOneArrival,
+  environmentLabel,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1259,6 +1260,7 @@ function BuildingInspector({
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
   isLevelOneArrival: boolean;
+  environmentLabel: "MOON" | "MARS";
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1388,7 +1390,7 @@ function BuildingInspector({
   const canUpgrade = Boolean(nextRetrofit && power >= nextRetrofit.powerCost && battery >= nextRetrofit.batteryCost && !operation && getBlockers(track.id, "upgrade").length === 0);
   const solarReadings = track.id === "solar" ? getSolarActualOutputKW({
     tier, retrofitLevel: upgradeLevel, elapsedSeconds, totalMissionSeconds: TOTAL_MISSION_SECONDS,
-    isLevelOneArrival, condition: runtime.condition, dust: runtime.dust,
+    isLevelOneArrival, environmentLabel, condition: runtime.condition, dust: runtime.dust,
     alignmentErrorDegrees: runtime.alignmentErrorDegrees ?? 5,
     solarStringLossPct: runtime.solarStringLossPct ?? 0,
   }) : null;
@@ -4143,6 +4145,7 @@ export function MissionSimulation() {
             elapsedSeconds={elapsed}
             fallbackReadyAt={fallbackReadyAt}
             isLevelOneArrival={isLevelOneArrivalMission}
+            environmentLabel={environmentLabel}
           />
         )}
 
