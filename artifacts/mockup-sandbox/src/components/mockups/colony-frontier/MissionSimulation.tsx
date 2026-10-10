@@ -97,6 +97,24 @@ function mergeRepairReading(readings: Record<string, number>, metric: string, va
     ? Math.max(readings[metric] ?? 0, value)
     : value;
 }
+function repairCapabilityFraction(
+  systemId: string,
+  selected: Record<string, Tier>,
+  buildings: Record<string, BuildingRuntime>,
+): number {
+  const tier = selected[systemId];
+  if (!tier) return 0;
+  const rated = getBaselineRating(systemId, tier, buildings[systemId]?.upgradeLevel ?? 0);
+  const effective = repairAdjustedRating(systemId, rated, buildings[systemId]?.repairMetrics);
+  return rated > 0 ? clamp(effective / rated, 0, 1) : 1;
+}
+function solarFaultProtection(readings: Record<string, number> | undefined): number {
+  if (!readings) return 0;
+  const coverage = clamp(readings["Hotspot-fault diagnosis coverage"] ?? 0, 0, 100) / 100;
+  const protection = clamp(readings["Hotspot fault protection"] ?? 0, 0, 100) / 100;
+  const protectedStrings = clamp(readings["Faulted strings protected from propagation"] ?? 0, 0, 10) / 10;
+  return clamp(coverage * protection + protectedStrings, 0, 0.8);
+}
 
 const starterCategories = new Set([
   "solar",
@@ -613,7 +631,7 @@ function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Reco
 }
 
 function ratedPowerCapacityKW(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
-  if (selected.grid) return getBaselineRating("grid", selected.grid, buildings.grid?.upgradeLevel ?? 0);
+  if (selected.grid) return repairAdjustedRating("grid", getBaselineRating("grid", selected.grid, buildings.grid?.upgradeLevel ?? 0), buildings.grid?.repairMetrics);
   if (selected.solar) return getBaselineRating("solar", selected.solar, buildings.solar?.upgradeLevel ?? 0);
   if (selected.battery) return getAdditionalRating("battery", "continuous discharge power", selected.battery, buildings.battery?.upgradeLevel ?? 0);
   return RESOURCE_CAPACITIES.availablePowerKW;
@@ -722,7 +740,8 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
   const stateIndex = baselineStateIndex(tier, upgradeLevel);
-  const rating = baseline.values[stateIndex] ?? 0;
+  const ratedValue = baseline.values[stateIndex] ?? 0;
+  const rating = repairAdjustedRating(systemId, ratedValue, repairMetrics, systemId === "habitat" || systemId === "navigation");
   const extra = (needle: string) => {
     const metric = getAdditionalMetricRow(systemId, needle);
     const amount = metric?.values[stateIndex];
