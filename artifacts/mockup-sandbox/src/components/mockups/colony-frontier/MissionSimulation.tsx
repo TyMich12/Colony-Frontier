@@ -293,6 +293,26 @@ const REPAIR_SUPPORT_PROFILES: Record<string, [string, string, string]> = {
   maintenance: ["comms", "navigation", "grid"],
 };
 
+const REPAIR_METHOD_NAMES: Record<string, string> = {
+  solar: "Robotic dry-brush array recovery",
+  battery: "Thermal-managed cell reconditioning",
+  grid: "Redundant power-bus stabilisation",
+  habitat: "Thermally cured composite seal patch",
+  water: "Heat-assisted water-loop recovery",
+  oxygen: "Closed-loop oxygen regeneration",
+  co2: "Regenerative sorbent-bed service",
+  thermal: "Waste-heat balanced loop recovery",
+  comms: "Navigation-guided antenna alignment",
+  radiation: "Shelter and shielding restoration",
+  science: "Reference-calibrated instrument recovery",
+  navigation: "Inertial-reference recalibration",
+  rover: "Guided wheel and traction service",
+  extraction: "Aligned drill-torque recovery",
+  isru: "Feed-line purge and pressure recovery",
+  agriculture: "Closed-loop crop-module recovery",
+  maintenance: "Telemetry-guided multi-system service",
+};
+
 const SUPPORT_SHORT_LABELS: Record<string, string> = {
   solar: "Solar", battery: "Battery", grid: "Power grid", habitat: "Habitat",
   water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
@@ -1536,7 +1556,7 @@ function BuildingInspector({
                 const duration = Math.max(12, Math.round((27 + activeFault.severity * 7) / operationPerformanceMultiplier(track.id, selected, { [track.id]: runtime }, option.helpers)));
                 return <button key={option.id} type="button" onClick={() => onAction(option.id)} disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2 || blockers.length > 0} className="flex items-center justify-between gap-2 rounded-lg border border-[#354f59] bg-[#0d1c22] px-3 py-2 text-left hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-40">
                   <span className="min-w-0">
-                    <span className="block text-[9px] font-bold text-[#e1eeee]">{labels.join(" + ")}</span>
+                    <span className="block text-[9px] font-bold text-[#e1eeee]">{REPAIR_METHOD_NAMES[track.id] ?? "Integrated repair"} · {labels.join(" + ")}</span>
                     <span className="mt-0.5 block text-[8px] leading-3 text-[#91aaa9]">{blockers.length ? blockers.join(" · ") : "All support systems online"}</span>
                   </span>
                   <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">~{duration}s</span>
