@@ -122,8 +122,8 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   test: "Communications link health verified at rated Mbit/s throughput · condition index +1",
   repair: "Habitat condition index +14 (+28 with Maintenance) · integrity index +5 · stored energy −0.24 kWh",
   seal: "Habitat condition index +3 · integrity index +3 · stored energy −0.12 kWh",
-  shield: "Exposure-risk index −2 points · stored energy −0.12 kWh · condition index +1",
-  shelter: "Exposure-risk index −3 points · stored energy −0.24 kWh · available power −0.12 kW",
+  shield: "Dose rate −0.0012 mSv/h · stored energy −0.12 kWh · condition index +1",
+  shelter: "Dose rate −0.0018 mSv/h · stored energy −0.24 kWh · available power −0.12 kW",
   "balance-grid": "Available power +0.36 kW · stored energy +0.24 kWh · condition index +1",
   prioritize: "O₂ reserve +0.24 kg · water reserve +1.8 L · stored energy +0.36 kWh · available power −0.12 kW",
   calibrate: "Instrument condition index +1 · reference baseline verified",
@@ -149,7 +149,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   "fallback-oxygen": "Releases 0.24 kg O₂ from the built-in emergency buffer",
   "fallback-co2": "Passive sorbent swap · condition index +1 · cabin O₂ reserve margin improves",
   "fallback-thermal": "Closes passive insulation shutters, gently damping cabin temperature drift without a heater load",
-  "fallback-radiation": "Moves crew behind passive shielding, reducing the exposure-risk index by 0.5 points",
+  "fallback-radiation": "Moves crew behind passive shielding, reducing the modelled dose rate by up to 0.0003 mSv/h",
   "fallback-comms": "Resets the local low-rate beacon · condition index +1",
   "fallback-navigation": "Re-zeros inertial sensors for dead-reckoning · condition index +1",
   "fallback-rover": "Inspects wheel encoders and clears a local drive fault · condition index +2",
@@ -166,7 +166,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   "thermal-waste-heat-recovery": "Recovers usable waste heat from the power system to reduce cabin-temperature drift",
   "comms-priority-window": "Reserves a high-gain uplink window using navigation timing",
   "habitat-composite-patch": "Uses processed structural composite and thermal-controlled curing for a stronger seal repair",
-  "radiation-regolith-berm": "Uses excavated regolith mass to improve shielding and lower future exposure risk",
+  "radiation-regolith-berm": "Uses excavated regolith mass to reduce the modelled residual dose rate",
   "grid-black-start": "Restarts the distribution bus from stored battery energy and stable solar input",
   "science-fusion": "Fuses analysed specimen data with navigation / thermal telemetry for higher research yield",
   "request-earth-report": "Earth Mission Control report · up to 20 simulated seconds; Navigation Research at 2/2 caches guidance locally",
@@ -719,7 +719,7 @@ function physicalResourceTelemetry(
     water: `${Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL)} L`,
     food: `${(metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1)} kg food`,
     habitat: `Integrity index ${Math.round(metrics.habitat)}/100`,
-    radiation: `Exposure-risk index ${Math.round(metrics.radiation)}/100`,
+    radiation: `${(metrics.radiation / 100 * 0.06).toFixed(3)} mSv/h effective dose rate`,
     temperature: `${metrics.temperature.toFixed(1)} °C`,
   };
 }
@@ -772,7 +772,7 @@ function getMissionFailureReason(metrics: MissionMetrics): string | null {
   if (metrics.habitat <= 1) return "Habitat integrity fell below its simulated pressure-boundary limit.";
   if (metrics.power <= 0.5 && metrics.battery <= 0.5) return "Generation and stored power were both exhausted; life-support equipment could no longer run.";
   if (metrics.temperature <= 16.05 || metrics.temperature >= 27.95) return "Cabin temperature passed the simulated crew-safe operating envelope.";
-  if (metrics.radiation >= 90) return "Cumulative radiation exposure passed the mission's emergency dose limit.";
+  if (metrics.radiation >= 90) return "Modelled effective dose rate exceeded the emergency shelter threshold.";
   return null;
 }
 
@@ -1246,6 +1246,7 @@ function BuildingInspector({
   onEventChoice,
   power,
   battery,
+  batteryCapacityKWh,
   metrics,
   getBlockers,
   selected,
@@ -1268,6 +1269,7 @@ function BuildingInspector({
   onEventChoice: (choiceId: string) => void;
   power: number;
   battery: number;
+  batteryCapacityKWh: number;
   metrics: MissionMetrics;
   getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
   selected: Record<string, Tier>;
@@ -1519,7 +1521,7 @@ function BuildingInspector({
               </span>
               <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
             </button>
-            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2, pending?.selected ?? {}, buildings)}.</p>}
+            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2, batteryCapacityKWh)}.</p>}
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Integrated repair methods</span>
@@ -1650,7 +1652,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, pending?.selected ?? {}, buildings)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -2960,7 +2962,7 @@ export function MissionSimulation() {
     if (action === "sample" && stage === "SURVEYED") {
       const duration = Math.max(16, (hasExtraction ? 20 : 27) / combinedPerformanceMultiplier(hasRover ? roverPerformance : 1, hasExtraction ? extractionPerformance : 1, navigationPerformance));
       if (metrics.power < 7 || metrics.battery < 3) {
-        setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3, pending?.selected ?? {}, buildings)}. Restore the energy margin first.`);
+        setOperationResult(`COLLECTION HELD · Sampling requires at least ${physicalThreshold("power", 7)} and ${physicalThreshold("battery", 3, ratedBatteryCapacityKWh(pending.selected, buildings))}. Restore the energy margin first.`);
         return;
       }
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
@@ -3040,7 +3042,7 @@ export function MissionSimulation() {
         return;
       }
       if (metrics.power < 8 || metrics.battery < 5) {
-        setAiMessage(`Retrofit unavailable: reserve at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5)} before isolating this system.`);
+        setAiMessage(`Retrofit unavailable: reserve at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, ratedBatteryCapacityKWh(pending.selected, buildings))} before isolating this system.`);
         return;
       }
       const targetLevel = (current.upgradeLevel ?? 0) + 1;
@@ -3064,7 +3066,7 @@ export function MissionSimulation() {
         return;
       }
       if (metrics.power < 5 || metrics.battery < 2) {
-        setOperationResult(`REPAIR HELD · A controlled repair requires at least ${physicalThreshold("power", 5)} and ${physicalThreshold("battery", 2)} to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.`);
+        setOperationResult(`REPAIR HELD · A controlled repair requires at least ${physicalThreshold("power", 5)} and ${physicalThreshold("battery", 2, ratedBatteryCapacityKWh(pending.selected, buildings))} to isolate the equipment and verify it afterwards. Engage ECO POWER or stabilise generation first.`);
         setAiMessage("Repair held: isolation and the return-to-service test need a small electrical reserve.");
         return;
       }
@@ -4021,6 +4023,7 @@ export function MissionSimulation() {
             onEventChoice={handleEventChoice}
             power={metrics.power}
             battery={metrics.battery}
+            batteryCapacityKWh={ratedBatteryCapacityKWh(pending.selected, buildings)}
             metrics={metrics}
             getBlockers={checkActionPrerequisites}
             selected={pending.selected}
