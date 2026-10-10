@@ -94,9 +94,9 @@ type RoverRockObstacle = {
 
 const ROVER_ROUTE_ROCKS: RoverRockObstacle[] = [
   { id: "central-boulder", label: "CENTRAL BOULDER", x: 1, z: -13, radius: 1.9, rerouteRoll: 0.64 },
-  { id: "eastern-ridge", label: "EASTERN BOULDER RIDGE", x: 26, z: -10, radius: 1.8, rerouteRoll: 0.76 },
-  { id: "southern-scree", label: "SOUTHERN SCREE", x: 27, z: -25, radius: 1.55, rerouteRoll: 0.85 },
-  { id: "western-scree", label: "WESTERN SCREE", x: -18, z: 14, radius: 2.0, rerouteRoll: 0.93 },
+  { id: "eastern-ridge", label: "EASTERN BOULDER RIDGE", x: 30, z: -5, radius: 1.8, rerouteRoll: 0.76 },
+  { id: "southern-scree", label: "SOUTHERN SCREE", x: 26, z: -28, radius: 1.55, rerouteRoll: 0.85 },
+  { id: "western-scree", label: "WESTERN SCREE", x: -29, z: 14, radius: 2.0, rerouteRoll: 0.93 },
 ];
 
 const SITE_ROUTE_CHALLENGES: Record<string, string> = {
