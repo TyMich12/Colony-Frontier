@@ -589,7 +589,7 @@ function dustTransmission(dust: number): number {
   return points[points.length - 1].transmission;
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0): { label: string; value: string } {
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}): { label: string; value: string } {
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
   const stateIndex = baselineStateIndex(tier, upgradeLevel);
@@ -604,7 +604,8 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   switch (systemId) {
     case "solar": {
       const day7 = interpolateSolarProfile(7);
-      const actualKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust));
+      const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
+      const actualKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
       label = "Rated electrical output · Day 7 reference and current dust";
       value = formatRating(rating) + " kW rated · " + actualKW.toFixed(3) + " kW at Day 7 checkpoint · " + (actualKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5) + " kWh / 10 sim s";
       break;
@@ -1377,8 +1378,8 @@ function BuildingInspector({
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
             <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
             <div className="mt-1 flex items-baseline justify-between gap-3">
-              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust).label}</span>
-              <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust).value}</span>
+              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics).label}</span>
+              <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics).value}</span>
             </div>
             <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes this rated output. A higher technology tier is a larger improvement than both retrofit steps combined.</p>
           </div>
@@ -1462,26 +1463,6 @@ function BuildingInspector({
               </div>
             </div>
             <button
-              type="button"
-              onClick={() => onAction("repair-active")}
-              disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2}
-              className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-[#d16e72] bg-[#7b303c] px-3.5 py-3 text-left transition hover:border-[#ffd07a] hover:bg-[#8b3744] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span>
-                <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-white">Isolate · repair · verify</span>
-                <span className="mt-1 block text-[9px] leading-4 text-[#f0c8cc]">Power −4 · battery −2 · condition +12, plus recovery specific to this fault</span>
-              </span>
-              <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
-            </button>
-            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2, batteryCapacityKWh)}.</p>}
-            <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
-              <span>
-                <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Integrated repair methods</span>
-                <span className="mt-0.5 block text-[8px] text-[#8faeae]">Optional support speeds the job; standalone repair always remains available.</span>
-              </span>
-              <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "7 METHODS +"}</span>
-            </button>
-                        <button
               type="button"
               onClick={() => { if (standaloneOption) onAction(`repair:${standaloneOption.id}`); }}
               disabled={actionBusy || Boolean(operation) || !standaloneOption || getBlockers(track.id, `repair:${standaloneOption?.id ?? ""}`).length > 0}
@@ -1656,14 +1637,6 @@ function ResourceInspector({
   hasRover,
   hasExtraction,
   hasScience,
-  roverTier,
-  extractionTier,
-  scienceTier,
-  navigationTier,
-  roverPerformance,
-  extractionPerformance,
-  sciencePerformance,
-  navigationPerformance,
   operation,
   actionBusy,
   onAction,
@@ -1676,14 +1649,6 @@ function ResourceInspector({
   hasRover: boolean;
   hasExtraction: boolean;
   hasScience: boolean;
-  roverTier: number;
-  extractionTier: number;
-  scienceTier: number;
-  navigationTier: number;
-  roverPerformance: number;
-  extractionPerformance: number;
-  sciencePerformance: number;
-  navigationPerformance: number;
   operation: MissionOperation | null;
   actionBusy: boolean;
   onAction: (action: string) => void;
@@ -2230,7 +2195,7 @@ export function MissionSimulation() {
         const batteryDischargeLimitKW = batteryOnline ? getAdditionalRating("battery", "continuous discharge power", pending.selected.battery ?? "Foundation", batteryUpgrade) : 0;
         const gridTransferLimitKW = gridOnline ? getBaselineRating("grid", pending.selected.grid ?? "Foundation", gridUpgrade) : Number.POSITIVE_INFINITY;
         const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
-        const baseLoadKW = (emergencyPowerMode ? 4.0 : 5.0) + optionalCount * (emergencyPowerMode ? 0.15 : 0.35);
+        const baseLoadKW = (emergencyPowerMode ? 2.0 : 2.5) + optionalCount * (emergencyPowerMode ? 0.10 : 0.25); // Scaled essential electrical load, declared game-balance assumption.
         const solarNetKW = solarGeneration - baseLoadKW;
         const batteryFlowKW = solarNetKW >= 0
           ? (batteryOnline && gridOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW) : 0)
