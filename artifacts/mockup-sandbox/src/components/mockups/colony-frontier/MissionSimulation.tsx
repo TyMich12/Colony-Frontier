@@ -553,7 +553,7 @@ function getActionBlockers(
   if (actionId === "analyze" && node && stage !== "DELIVERED") blockers.push("Return the sealed specimen to the habitat laboratory first");
 
   if (rule.minPower !== undefined && context.metrics.power < rule.minPower) blockers.push(`Requires ${physicalThreshold("power", rule.minPower)}`);
-  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Requires ${physicalThreshold("battery", rule.minBattery, context.selected, context.buildings)}`);
+  if (rule.minBattery !== undefined && context.metrics.battery < rule.minBattery) blockers.push(`Requires ${physicalThreshold("battery", rule.minBattery, ratedBatteryCapacityKWh(context.selected, context.buildings))}`);
   return [...new Set(blockers)];
 }
 
@@ -594,6 +594,12 @@ function tierLevel(tier: Tier): number {
 // Tier jumps always beat two field retrofits: +18% per technology tier versus +5% per retrofit.
 function systemPerformanceMultiplier(tier: Tier | undefined, upgradeLevel: number): number {
   return 1 + tierLevel(tier ?? "Foundation") * 0.18 + Math.max(0, Math.min(2, upgradeLevel)) * 0.05;
+}
+
+function ratedBatteryCapacityKWh(selected: Record<string, Tier>, buildings: Record<string, BuildingRuntime>): number {
+  return RESOURCE_CAPACITIES.storedEnergyKWh
+    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
+    * Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
 }
 
 // This is a compressed command/processing queue, not the speed-of-light radio delay.
@@ -705,10 +711,7 @@ function physicalResourceTelemetry(
   selected: Record<string, Tier> = {},
   buildings: Record<string, BuildingRuntime> = {},
 ) {
-  const batteryCondition = Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
-  const batteryCapacityKWh = RESOURCE_CAPACITIES.storedEnergyKWh
-    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
-    * batteryCondition;
+  const batteryCapacityKWh = ratedBatteryCapacityKWh(selected, buildings);
   return {
     power: `${(metrics.power / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(1)} kW`,
     battery: `${(metrics.battery / 100 * batteryCapacityKWh).toFixed(2)} kWh`,
@@ -721,19 +724,9 @@ function physicalResourceTelemetry(
   };
 }
 
-function physicalThreshold(
-  resource: "power" | "battery",
-  points: number,
-  selected: Record<string, Tier> = {},
-  buildings: Record<string, BuildingRuntime> = {},
-): string {
-  if (resource === "power") {
-    return `${(points / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(2)} kW available power`;
-  }
-  const capacity = RESOURCE_CAPACITIES.storedEnergyKWh
-    * systemPerformanceMultiplier(selected.battery ?? "Foundation", buildings.battery?.upgradeLevel ?? 0)
-    * Math.max(0.25, Math.min(1, (buildings.battery?.condition ?? 100) / 100));
-  return `${(points / 100 * capacity).toFixed(2)} kWh stored energy`;
+function physicalThreshold(resource: "power" | "battery", points: number, batteryCapacityKWh = RESOURCE_CAPACITIES.storedEnergyKWh): string {
+  if (resource === "power") return `${(points / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(2)} kW available power`;
+  return `${(points / 100 * batteryCapacityKWh).toFixed(2)} kWh stored energy`;
 }
 
 function buildingStatus(condition: number): string {
