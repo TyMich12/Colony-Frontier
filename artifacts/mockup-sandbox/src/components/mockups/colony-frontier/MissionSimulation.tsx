@@ -1079,6 +1079,7 @@ function IsometricMap({
   roverTask,
   roverTargetNodeId,
   speed,
+  isLevelOneArrival,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
@@ -1088,6 +1089,7 @@ function IsometricMap({
   elapsed: number;
   environmentLabel: string;
   environmentTitle: string;
+  isLevelOneArrival: boolean;
   activeEventTrackId: string | null;
   selectedResourceId: string | null;
   surveyedNodes: string[];
@@ -1105,6 +1107,7 @@ function IsometricMap({
       elapsed={elapsed}
       environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
       environmentTitle={environmentTitle}
+      isLevelOneArrival={isLevelOneArrival}
       activeEventTrackId={activeEventTrackId}
       selectedResourceId={selectedResourceId}
       surveyedNodes={surveyedNodes}
@@ -3840,6 +3843,7 @@ export function MissionSimulation() {
           elapsed={elapsed}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
+          isLevelOneArrival={isLevelOneArrivalMission}
           activeEventTrackId={activeTargetTrackId}
           selectedResourceId={selectedResourceId}
           surveyedNodes={surveyedNodes}
