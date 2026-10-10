@@ -475,7 +475,7 @@ function collectSystemBlockers(systemId: string, context: ActionRequirementConte
     return;
   }
   const activeFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
-  if (activeFault) {
+  if (activeFault && !hasPartialRepairProgress(systemId, context)) {
     blockers.push(`Repair ${SYSTEM_LABELS[systemId] ?? systemId} first`);
     return;
   }
@@ -546,9 +546,10 @@ function getActionBlockers(
   if (systemId !== "field") {
     if (!context.selected[systemId]) blockers.push(`Install ${SYSTEM_LABELS[systemId] ?? systemId} first`);
     const ownFault = Object.values(context.activeFaults).some((fault) => fault.targetTrackId === systemId);
-    if (ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId)) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
-    if (!ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
-    if (!ownFault && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
+    const faultBlocksAction = ownFault && !hasPartialRepairProgress(systemId, context);
+    if (faultBlocksAction && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId)) blockers.push(`Repair the active ${SYSTEM_LABELS[systemId] ?? systemId} fault first`);
+    if (!faultBlocksAction && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && (context.buildings[systemId]?.condition ?? 100) < 25) blockers.push(`Service ${SYSTEM_LABELS[systemId] ?? systemId} above 25% condition`);
+    if (!faultBlocksAction && !isRepair && !LOCAL_FALLBACK_ACTIONS.has(actionId) && actionId !== "diagnostics" && actionId !== "service") collectSystemBlockers(systemId, context, blockers);
   }
 
   const rule = ACTION_REQUIREMENTS[actionId] ?? {};
