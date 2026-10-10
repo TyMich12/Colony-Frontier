@@ -3160,7 +3160,7 @@ export function MissionSimulation() {
       action,
       trackId,
       (trackId === "rover" && pending.selected.rover !== undefined) ||
-        (trackId === "solar" && baseActionId === "clean" && integratedHelpers.includes("rover"),
+        (trackId === "solar" && baseActionId === "clean" && integratedHelpers.includes("rover")),
     );
 
   };
