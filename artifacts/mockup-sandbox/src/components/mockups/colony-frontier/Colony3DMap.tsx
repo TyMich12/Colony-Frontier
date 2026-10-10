@@ -1229,13 +1229,17 @@ function Rover({
   const wheelZ = [-0.55, 0, 0.55];
   const basePosition = useMemo<[number, number, number]>(() => [position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]], [position[0], position[1]]);
   return (
-    <group ref={ref} position={basePosition} frustumCulled={false}>
+    <group
+      ref={ref}
+      position={basePosition}
+      frustumCulled={false}
+      onClick={(event) => { event.stopPropagation(); onClick(); }}
+      onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+      onPointerOut={() => { document.body.style.cursor = ""; }}
+    >
       <mesh
         castShadow
         position={[0, 0.01, 0]}
-        onClick={(event) => { event.stopPropagation(); onClick(); }}
-        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { document.body.style.cursor = ""; }}
       >
         <RoundedBox args={[1.72, 0.28, 1.12]} radius={0.12} smoothness={4}>
           <meshStandardMaterial color="#c8ab66" roughness={0.58} metalness={0.28} />
