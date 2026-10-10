@@ -1375,12 +1375,10 @@ function BuildingInspector({
     ],
   };
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
-  const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
   const [repairCategory, setRepairCategory] = useState<"Standalone Options" | "Enhanced Options" | "Dual-System Options" | "Fully Integrated">("Standalone Options");
   const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
-  const repairHelpers = REPAIR_SUPPORT_PROFILES[track.id] ?? ["maintenance", "navigation", "grid"];
   const repairOptions = Array.from({ length: 8 }, (_, mask) =>
-    getRepairOption(track.id, tier, upgradeLevel, mask, activeFault?.severity ?? 1),
+    getRepairOption(track.id, tier, runtime.upgradeLevel ?? 0, mask, activeFault?.severity ?? 1),
   );
   const actions = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return !variant || variant.mask === 0 || showIntegratedMethods; });
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
@@ -2241,7 +2239,10 @@ export function MissionSimulation() {
           sampleStages,
           resourceYield,
         };
-        const solarOnline = systemIsOperational("solar", dependencyContext);
+        const solarDustFaults = Object.values(activeFaults).filter((fault) => fault.targetTrackId === "solar");
+        const solarFaultLeavesArrayGenerating = solarDustFaults.length > 0 && solarDustFaults.every((fault) => ["solar-dust", "regional-dust-front"].includes(fault.eventId));
+        const solarOnline = systemIsOperational("solar", dependencyContext) ||
+          Boolean(isLevelOneArrivalMission && solarFaultLeavesArrayGenerating && pending.selected.solar && (buildings.solar?.condition ?? 100) >= 25);
         const batteryOnline = systemIsOperational("battery", dependencyContext);
         const gridOnline = systemIsOperational("grid", dependencyContext);
         const oxygenOnline = systemIsOperational("oxygen", dependencyContext);
@@ -2276,13 +2277,39 @@ export function MissionSimulation() {
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
         // Fourteen simulated days are compressed into this mission clock. Blackout missions
         // include a long low-irradiance window; Mars begins with less sunlight margin.
-        const solarAvailability = blackoutMission
-          ? (elapsed < 55 ? 0.42 : elapsed < 285 ? 0.14 : 0.28)
-          : pending.campaign === "mars"
-            ? 0.82 + Math.sin(elapsed / 29) * 0.06
-            : 0.96;
+        const lunarDayEnvironment = getSolarEnvironment(elapsed, TOTAL_MISSION_SECONDS, isLevelOneArrivalMission);
+        const solarAvailability = isLevelOneArrivalMission
+          ? lunarDayEnvironment.sunlightFraction
+          : blackoutMission
+            ? (elapsed < 55 ? 0.42 : elapsed < 285 ? 0.14 : 0.28)
+            : pending.campaign === "mars"
+              ? 0.82 + Math.sin(elapsed / 29) * 0.06
+              : 0.96;
         const solarConditionFactor = clamp((buildings.solar?.condition ?? 100) / 100, 0, 1);
-        const solarGeneration = solarOnline ? (24 + solarTier * 7.5 + solarUpgrade * 2.5) * solarAvailability * solarConditionFactor : 0;
+        const solarRuntime = buildings.solar;
+        const solarActual = getSolarActualOutputKW({
+          tier: pending.selected.solar ?? "Foundation",
+          retrofitLevel: solarUpgrade,
+          elapsedSeconds: elapsed,
+          totalMissionSeconds: TOTAL_MISSION_SECONDS,
+          isLevelOneArrival: isLevelOneArrivalMission,
+          condition: solarRuntime?.condition ?? 100,
+          dust: solarDust,
+          alignmentErrorDegrees: solarRuntime?.alignmentErrorDegrees ?? 5,
+          solarStringLossPct: solarRuntime?.solarStringLossPct ?? 0,
+        });
+        const solarDustTransmission = isLevelOneArrivalMission
+          ? solarActual.dustTransmission
+          : dustRemainingFraction(pending.campaign === "mars" ? "mars" : "moon", solarDust);
+        const solarPointingFactor = Math.max(0, Math.cos(((solarRuntime?.alignmentErrorDegrees ?? 5) * Math.PI) / 180));
+        const solarStringFactor = Math.max(0, 1 - (solarRuntime?.solarStringLossPct ?? 0) / 100);
+        // 3 power-reserve index points per available kW bridges the physical panel model to
+        // the existing reserve UI. Rated kW is never increased by a repair; repairs correct losses.
+        const solarGeneration = solarOnline
+          ? isLevelOneArrivalMission
+            ? solarActual.actualKW * 3
+            : (24 + solarTier * 7.5 + solarUpgrade * 2.5) * solarAvailability * solarConditionFactor * solarDustTransmission * solarPointingFactor * solarStringFactor
+          : 0;
         const gridTier = tierLevel(pending.selected.grid ?? "Foundation");
         // A live grid carries generation and distributes it. Without the grid, stored energy can
         // support only a reduced local bus; without either source, colony power margin collapses.
@@ -2295,7 +2322,7 @@ export function MissionSimulation() {
               : batteryOnline
                 ? 10 + batteryTier * 1.5 + batteryUpgrade * 0.45
                 : 0;
-        const powerBase = Math.max(0, powerSupply - solarDust * 0.4 - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
+        const powerBase = Math.max(0, powerSupply - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
         // Stored energy can stabilise the bus during a solar outage, but it drains while discharging.
         const batteryDelta = !batteryOnline
           ? -0.035 * stagePressure
@@ -2314,7 +2341,7 @@ export function MissionSimulation() {
           ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0011)
           : hasAgriculture ? 0.028 : 0.035) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
         const hasThermalControl = thermalOnline;
-        const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
+        const ambientTemperature = isLevelOneArrivalMission ? 8 + 28 * lunarDayEnvironment.sunlightFraction : blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
         const thermalCorrection = hasThermalControl
           ? (0.009 + thermalTier * 0.0045 + thermalUpgrade * 0.0021)
@@ -2325,7 +2352,7 @@ export function MissionSimulation() {
           const amount = dt * fault.severity * (isBeingRepaired ? 0.25 : 1);
           switch (fault.eventId) {
             case "solar-dust":
-            case "regional-dust-front": impact.power += 0.34 * amount; impact.battery += 0.08 * amount; break;
+            case "regional-dust-front": impact.battery += 0.08 * amount; break;
             case "battery-thermal": impact.battery += 0.31 * amount; impact.power += 0.16 * amount; break;
             case "oxygen-filter": impact.oxygen += 0.28 * amount; impact.habitat += 0.04 * amount; break;
             case "co2-scrubber-loading": impact.oxygen += 0.25 * amount; impact.habitat += 0.08 * amount; break;
