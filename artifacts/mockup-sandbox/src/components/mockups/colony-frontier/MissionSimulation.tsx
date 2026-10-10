@@ -1425,14 +1425,14 @@ function BuildingInspector({
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div><p className="text-[8px] text-[#819d98]">Actual output</p><p className="font-mono text-lg font-black text-[#f0cf69]">{solarReadings.actualKW.toFixed(2)} kW</p></div>
-              <div><p className="text-[8px] text-[#819d98]">Energy / 10 simulated seconds</p><p className="font-mono text-sm font-bold text-[#d6e9dd]">{solarReadings.energyKWhPer10SimulatedSeconds.toFixed(5)} kWh</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Energy / 10 simulated seconds (8 game h)</p><p className="font-mono text-sm font-bold text-[#d6e9dd]">{solarReadings.energyKWhPer10SimulatedSeconds.toFixed(2)} kWh</p></div>
               <div><p className="text-[8px] text-[#819d98]">Panel-plane irradiance</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.irradianceWm2.toFixed(0)} W/m²</p></div>
               <div><p className="text-[8px] text-[#819d98]">Sun elevation</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.sunElevationDegrees.toFixed(1)}°</p></div>
               <div><p className="text-[8px] text-[#819d98]">Panel temperature</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.panelTemperatureC.toFixed(1)}°C</p></div>
               <div><p className="text-[8px] text-[#819d98]">Surface temperature</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.regolithTemperatureC.toFixed(1)}°C</p></div>
               <div><p className="text-[8px] text-[#819d98]">Dust transmission</p><p className="font-mono text-[10px] text-[#d6e9dd]">{(solarReadings.dustTransmission*100).toFixed(1)}%</p></div>
             </div>
-            <p className="mt-2 text-[8px] leading-4 text-[#86a99b]">Rated kW is the clean-array capacity. Current kW changes with sunlight, panel temperature, condition, dust, pointing and weak cell strings. The sunlight profile peaks halfway through Day 1 Arrival's 14-day lunar day.</p>
+            <p className="mt-2 text-[8px] leading-4 text-[#86a99b]">Rated kW is the clean-array capacity. Current kW changes with sunlight, panel temperature, condition, dust, pointing and weak cell strings. Ten simulated seconds advance the 14-day mission clock by eight game hours; the solar profile peaks halfway through the lunar daylight mission.</p>
           </section>
         )}
         <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
@@ -2365,9 +2365,12 @@ export function MissionSimulation() {
               : batteryOnline
                 ? 10 + batteryTier * 1.5 + batteryUpgrade * 0.45
                 : 0;
-        const powerBase = Math.max(0, powerSupply - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) + (emergencyPowerMode ? 9 : 0));
+        const lunarThermalDemand = isLevelOneArrivalMission && hasThermalControl
+          ? Math.min(12, Math.abs(21 - lunarDayEnvironment.regolithTemperatureC) * 0.035)
+          : 0;
+        const powerBase = Math.max(0, powerSupply - optionalCount * (emergencyPowerMode ? 1.0 : 2.3) - lunarThermalDemand + (emergencyPowerMode ? 9 : 0));
         // Stored energy can stabilise the bus during a solar outage, but it drains while discharging.
-        const lunarSolarSurplusPoints = solarGeneration - 15 - optionalCount * 2;
+        const lunarSolarSurplusPoints = solarGeneration - 15 - optionalCount * 2 - lunarThermalDemand;
         const lunarBatteryDelta = lunarSolarSurplusPoints >= 6
           ? 0.003 + Math.min(0.009, lunarSolarSurplusPoints * 0.00035) + batteryTier * 0.0003 + batteryUpgrade * 0.00015
           : lunarSolarSurplusPoints >= 0
@@ -2392,7 +2395,7 @@ export function MissionSimulation() {
           ? Math.max(0.0035, 0.013 - agricultureTier * 0.0025 - foodUpgrade * 0.0011)
           : hasAgriculture ? 0.028 : 0.035) * stagePressure * (emergencyPowerMode && hasAgriculture ? 1.3 : 1);
         const hasThermalControl = thermalOnline;
-        const ambientTemperature = isLevelOneArrivalMission ? 8 + 28 * lunarDayEnvironment.sunlightFraction : blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
+        const ambientTemperature = isLevelOneArrivalMission ? lunarDayEnvironment.regolithTemperatureC : blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalTarget = hasThermalControl ? 21 : ambientTemperature;
         const thermalCorrection = hasThermalControl
           ? (0.009 + thermalTier * 0.0045 + thermalUpgrade * 0.0021)
