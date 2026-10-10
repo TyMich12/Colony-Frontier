@@ -1165,7 +1165,7 @@ function Rover({
         );
         if (siteChallenge && rock) {
           const approach = rockApproachPoint(start, rock);
-          const firstLeg = planRoverPath(start, approach, rock.id)
+          const firstLeg = planRoverPath(start, approach, rock.id);
           if (firstLeg.length) {
             routeRef.current = firstLeg;
             reroutePlanRef.current = {
