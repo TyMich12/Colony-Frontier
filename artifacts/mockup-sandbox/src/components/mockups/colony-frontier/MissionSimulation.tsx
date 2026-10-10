@@ -1175,6 +1175,15 @@ function MissionTaskRibbon({
               <span className={`shrink-0 text-[7px] font-mono font-bold ${task.done ? "text-[#7fe19f]" : "text-[#f2c960]"}`}>{task.value}</span>
             </div>
           ))}
+          <div className="mt-1 rounded-lg border border-[#3b5655] bg-[#0b191d] px-2 py-2">
+            <div className="flex items-center justify-between gap-2 text-[7px] font-black uppercase tracking-[0.1em] text-[#9ebdb2]">
+              <span>Game time</span><span className="font-mono text-[#f2c960]">{formatMissionTime(elapsed)} · 14 days</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[7px] font-black uppercase tracking-[0.1em] text-[#9ebdb2]">
+              <span>Simulated seconds</span><span className="font-mono text-[#9de8c0]">{elapsed.toFixed(1)} / {TOTAL_MISSION_SECONDS.toFixed(0)} s</span>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#20373a]"><div className="h-full bg-[#e2b84f]" style={{width: (elapsed / TOTAL_MISSION_SECONDS * 100) + "%"}} /></div>
+          </div>
           <div className="px-1 pt-0.5 text-[7px] uppercase tracking-[0.1em] text-[#728886]">
             {activeEvent ? `Target: ${activeEvent.trackId.toUpperCase()}` : roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
           </div>
@@ -1235,6 +1244,7 @@ function BuildingInspector({
   earthReportAtSeconds,
   elapsedSeconds,
   fallbackReadyAt,
+  isLevelOneArrival,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1258,6 +1268,7 @@ function BuildingInspector({
   earthReportAtSeconds: number;
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
+  isLevelOneArrival: boolean;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1365,14 +1376,12 @@ function BuildingInspector({
   };
   const allActions = buildSystemActionChoices(track.id, actionMap[track.id] ?? [{ id: "inspect", label: "Inspect system", detail: "Review current operating condition." }]);
   const [showIntegratedMethods, setShowIntegratedMethods] = useState(false);
-  const [showRepairMethods, setShowRepairMethods] = useState(false);
+  const [repairCategory, setRepairCategory] = useState<"Standalone Options" | "Enhanced Options" | "Dual-System Options" | "Fully Integrated">("Standalone Options");
   const integratedOptionCount = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return Boolean(variant && variant.mask !== 0); }).length;
   const repairHelpers = REPAIR_SUPPORT_PROFILES[track.id] ?? ["maintenance", "navigation", "grid"];
-  const repairOptions = Array.from({ length: 8 }, (_, mask) => ({
-    id: `repair-variant:${track.id}:${mask}`,
-    mask,
-    helpers: repairHelpers.filter((_, bit) => (mask & (1 << bit)) !== 0),
-  })).filter((option) => option.mask !== 0);
+  const repairOptions = Array.from({ length: 8 }, (_, mask) =>
+    getRepairOption(track.id, tier, upgradeLevel, mask, activeFault?.severity ?? 1),
+  );
   const actions = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return !variant || variant.mask === 0 || showIntegratedMethods; });
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
@@ -1385,7 +1394,14 @@ function BuildingInspector({
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
-  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0;
+  const nextRetrofit = upgradeLevel < 2 ? getRetrofitConfig(track.id, upgradeLevel + 1) : null;
+  const canUpgrade = Boolean(nextRetrofit && power >= nextRetrofit.powerCost && battery >= nextRetrofit.batteryCost && !operation && getBlockers(track.id, "upgrade").length === 0);
+  const solarReadings = track.id === "solar" ? getSolarActualOutputKW({
+    tier, retrofitLevel: upgradeLevel, elapsedSeconds, totalMissionSeconds: TOTAL_MISSION_SECONDS,
+    isLevelOneArrival, condition: runtime.condition, dust: runtime.dust,
+    alignmentErrorDegrees: runtime.alignmentErrorDegrees ?? 5,
+    solarStringLossPct: runtime.solarStringLossPct ?? 0,
+  }) : null;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -1404,14 +1420,31 @@ function BuildingInspector({
             <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3c5056] bg-[#0a1317] text-xl text-[#9fb0b3] transition hover:border-[#f0c964] hover:text-white" aria-label="Close building panel">×</button>
           </div>
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
-            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
+            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated system capability · current tier + retrofit</p>
             <div className="mt-1 flex items-baseline justify-between gap-3">
               <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust).label}</span>
               <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust).value}</span>
             </div>
-            <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes this rated output. A higher technology tier is a larger improvement than both retrofit steps combined.</p>
+            <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes rated capability. Actual operation is limited by condition, resources and the environment.</p>
           </div>
-          <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
+          {track.id === "solar" && solarReadings && isLevelOneArrival && (
+          <section className="mt-3 rounded-xl border border-[#4b685a] bg-[#0c211d] px-3 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#a2e6be]">Live lunar-day solar conditions</p>
+              <span className="font-mono text-[8px] text-[#9cd7c0]">14-DAY DAYLIGHT PROFILE</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div><p className="text-[8px] text-[#819d98]">Actual output</p><p className="font-mono text-lg font-black text-[#f0cf69]">{solarReadings.actualKW.toFixed(2)} kW</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Energy / 10 simulated seconds</p><p className="font-mono text-sm font-bold text-[#d6e9dd]">{solarReadings.energyKWhPer10SimulatedSeconds.toFixed(5)} kWh</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Panel-plane irradiance</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.irradianceWm2.toFixed(0)} W/m²</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Sun elevation</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.sunElevationDegrees.toFixed(1)}°</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Panel temperature</p><p className="font-mono text-[10px] text-[#d6e9dd]">{solarReadings.panelTemperatureC.toFixed(1)}°C</p></div>
+              <div><p className="text-[8px] text-[#819d98]">Dust transmission</p><p className="font-mono text-[10px] text-[#d6e9dd]">{(solarReadings.dustTransmission*100).toFixed(1)}%</p></div>
+            </div>
+            <p className="mt-2 text-[8px] leading-4 text-[#86a99b]">Rated kW is the clean-array capacity. Current kW changes with sunlight, panel temperature, condition, dust, pointing and weak cell strings. The sunlight profile peaks halfway through Day 1 Arrival's 14-day lunar day.</p>
+          </section>
+        )}
+        <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.16em]">
                 <span className="text-[#87999d]">Equipment condition index</span>
@@ -1487,46 +1520,51 @@ function BuildingInspector({
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff9aa2]">Unresolved equipment fault</p>
                 <h3 className="mt-1 text-[11px] font-black uppercase text-white">{activeFault.title}</h3>
-                <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)}× · {activeFault.remainingSeconds > 0 ? `${Math.ceil(activeFault.remainingSeconds)}s before the next escalation` : "escalation window expired"}. This fault remains until repair and verification finish.</p>
+                <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)} · {activeFault.remainingSeconds > 0 ? Math.ceil(activeFault.remainingSeconds) + " simulated seconds before the next escalation" : "escalation window expired"}. The fault continues to degrade the system until repair and verification finish.</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => onAction("repair-active")}
-              disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2}
-              className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-[#d16e72] bg-[#7b303c] px-3.5 py-3 text-left transition hover:border-[#ffd07a] hover:bg-[#8b3744] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span>
-                <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-white">Isolate · repair · verify</span>
-                <span className="mt-1 block text-[9px] leading-4 text-[#f0c8cc]">Power −4 · battery −2 · condition +12, plus recovery specific to this fault</span>
-              </span>
-              <span className="shrink-0 rounded-lg border border-[#ffbdad]/40 bg-[#351a20] px-2 py-1.5 font-mono text-[9px] font-black text-[#ffd8a6]">START</span>
-            </button>
-            {(power < 5 || battery < 2) && <p className="mt-2 text-[9px] text-[#ff9ca6]">Requires at least {physicalThreshold("power", 5)} and {physicalThreshold("battery", 2, batteryCapacityKWh)}.</p>}
-            <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
-              <span>
-                <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Integrated repair methods</span>
-                <span className="mt-0.5 block text-[8px] text-[#8faeae]">Optional support speeds the job; standalone repair always remains available.</span>
-              </span>
-              <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "7 METHODS +"}</span>
-            </button>
-            {showRepairMethods && <div className="mt-2 grid gap-1.5">
-              {repairOptions.map((option) => {
-                const labels = option.helpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id);
+            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.12em] text-[#e8d6b8]">Choose a repair category</p>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {(["Standalone Options", "Enhanced Options", "Dual-System Options", "Fully Integrated"] as const).map((category) => (
+                <button key={category} type="button" onClick={() => setRepairCategory(category)} aria-pressed={repairCategory === category}
+                  className={`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.05em] transition ${repairCategory === category ? "border-[#f0cc6a] bg-[#d8b553] text-[#19201d]" : "border-[#42565c] bg-[#102027] text-[#afc1c2] hover:border-[#bdc4a3]"}`}>
+                  {category}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 space-y-2">
+              {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
                 const blockers = getBlockers(track.id, option.id);
-                const duration = Math.max(12, Math.round((27 + activeFault.severity * 7) / operationPerformanceMultiplier(track.id, selected, { [track.id]: runtime }, option.helpers)));
-                return <button key={option.id} type="button" onClick={() => onAction(option.id)} disabled={actionBusy || Boolean(operation) || power < 5 || battery < 2 || blockers.length > 0} className="flex items-center justify-between gap-2 rounded-lg border border-[#354f59] bg-[#0d1c22] px-3 py-2 text-left hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-40">
-                  <span className="min-w-0">
-                    <span className="block text-[9px] font-bold text-[#e1eeee]">{REPAIR_METHOD_NAMES[track.id] ?? "Integrated repair"} · {labels.join(" + ")}</span>
-                    <span className="mt-0.5 block text-[8px] leading-3 text-[#91aaa9]">{blockers.length ? blockers.join(" · ") : "All support systems online"}</span>
-                  </span>
-                  <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">~{duration}s</span>
-                </button>;
+                const resourceBlockers = [
+                  ...(power < option.powerCost ? ["Insufficient power reserve"] : []),
+                  ...(battery < option.batteryCost ? ["Insufficient battery reserve"] : []),
+                ];
+                const allBlockers = [...blockers, ...resourceBlockers];
+                const supportNames = option.helpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id);
+                return (
+                  <button key={option.id} type="button" onClick={() => onAction(option.id)}
+                    disabled={actionBusy || Boolean(operation) || allBlockers.length > 0}
+                    className="w-full rounded-xl border border-[#354f59] bg-[#0d1c22] p-3 text-left transition hover:border-[#e8c568] disabled:cursor-not-allowed disabled:opacity-45">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[10px] font-black text-[#e1eeee]">{option.name}</span>
+                      <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">{option.durationSeconds}s</span>
+                    </div>
+                    {supportNames.length > 0 && <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.06em] text-[#89c9e8]">Requires: {supportNames.join(" + ")}</p>}
+                    <p className="mt-1.5 text-[9px] leading-4 text-[#a9c2c4]">{option.description}</p>
+                    <p className="mt-1.5 text-[9px] leading-4 text-[#c9d9cd]">{option.effectSummary.join(" · ")}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="rounded bg-[#102a2f] px-2 py-1 text-[8px] font-mono text-[#9cd7c0]">Power reserve −{option.powerCost} points</span>
+                      <span className="rounded bg-[#102a2f] px-2 py-1 text-[8px] font-mono text-[#9cd7c0]">Battery reserve −{option.batteryCost} points</span>
+                    </div>
+                    {allBlockers.length > 0
+                      ? <p className="mt-2 rounded-md border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">LOCKED · {allBlockers.join(" · ")}</p>
+                      : <p className="mt-2 text-[8px] font-black uppercase tracking-[0.08em] text-[#83dba7]">Prerequisites satisfied · select to begin repair</p>}
+                  </button>
+                );
               })}
-            </div>}
+            </div>
           </section>
         )}
-
         {activeEvent && eventChoices.length > 0 && (
           <section className="border-b border-[#733943] bg-[#21151b] p-4">
             <div className="flex items-center gap-2">
@@ -1871,6 +1909,8 @@ export function MissionSimulation() {
   const selectedTier = selectedTrack && pending ? pending.selected[selectedTrack.id] : undefined;
   const activeEventCandidate = activeEventId ? EVENT_DEFS.find((event) => event.id === activeEventId) ?? null : null;
   const missionEnvironmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
+  const missionNumberValue = Number.parseInt((pending?.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 0;
+  const isLevelOneArrivalMission = Boolean(pending?.campaign === "moon" && (missionNumberValue === 1 || pending?.missionTitle.toLowerCase().includes("arrival")));
   const storedEventIsInvalid = Boolean(
     activeEventId && pending && (!activeEventCandidate || !eventTargetIsDeployed(activeEventCandidate, pending.selected, missionEnvironmentLabel)),
   );
@@ -4013,6 +4053,7 @@ export function MissionSimulation() {
             earthReportAtSeconds={earthReportAtSeconds}
             elapsedSeconds={elapsed}
             fallbackReadyAt={fallbackReadyAt}
+            isLevelOneArrival={isLevelOneArrivalMission}
           />
         )}
 
