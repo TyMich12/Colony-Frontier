@@ -4402,7 +4402,7 @@ export function MissionSimulation() {
                   </section>
                 </div>
 
-
+                <div className="space-y-4">
                   {incidentRepairTrackId && (
                     <section className="rounded-2xl border border-[#d7b954]/50 bg-gradient-to-b from-[#17272a] to-[#0c171d] p-3 shadow-[0_0_26px_rgba(215,185,84,0.08)] sm:p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -4513,6 +4513,7 @@ export function MissionSimulation() {
                     })}
                   </div>
                 </section>
+                </div>
               </div>
             </section>
           </div>
