@@ -358,21 +358,11 @@ function decodeActionVariant(systemId: string, actionId: string): DecodedActionV
   };
 }
 
-function buildSystemActionChoices(systemId: string, actions: EventChoice[]): EventChoice[] {
-  const profile = ACTION_VARIANT_PROFILES[systemId];
-  if (!profile) return actions;
-  const generated: EventChoice[] = Array.from({ length: 8 }, (_, mask) => {
-    const supportSystems = profile.helpers.filter((_, bit) => (mask & (1 << bit)) !== 0);
-    const supportLabels = supportSystems.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id);
-    return {
-      id: `variant:${profile.actionId}:${mask}`,
-      label: supportLabels.length ? `${profile.label} · ${supportLabels.join(" + ")}` : `${profile.label} · Standard procedure`,
-      detail: supportLabels.length
-        ? `Integrated method using ${supportLabels.join(", ")}. Every listed system must be installed, connected, online, and above 25% condition. Each helper improves efficiency; helper technology tier improves the integration further.`
-        : `Baseline procedure using this system's own controls. No optional support systems are needed beyond essential power and safety links.`,
-    };
-  });
-  return actions.flatMap((action) => action.id === profile.actionId ? generated : [action]);
+function buildSystemActionChoices(_systemId: string, actions: EventChoice[]): EventChoice[] {
+  // Keep the action list concise. Repair support combinations are selected through the
+  // four numerical repair categories (Standalone, Enhanced, Dual-System, Fully Integrated),
+  // not exposed as seven stale, separately generated action buttons.
+  return actions;
 }
 
 const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
