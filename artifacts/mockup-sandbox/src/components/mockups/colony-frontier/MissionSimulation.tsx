@@ -2362,6 +2362,8 @@ export function MissionSimulation() {
     if (!pending || results || manualPaused || activeEventId) return;
 
     const timer = window.setInterval(() => {
+      // Resource systems use a gentler balance clock than the accelerated mission timeline.
+      const resourceDt = 0.25 * speed * GAME_TIME_ACCELERATION * 0.25;
       setElapsed((current) => {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed * GAME_TIME_ACCELERATION);
 
@@ -2384,7 +2386,7 @@ export function MissionSimulation() {
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
-            const shock = 1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0));
+            const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.45;
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
             const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
 
@@ -2621,7 +2623,7 @@ export function MissionSimulation() {
           next[trackId] = {
             ...state,
             condition: clamp(state.condition - Math.max(0.00025, wear) * (resourceDt / GAME_TIME_ACCELERATION) - faultWear),
-            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear) * (dt / GAME_TIME_ACCELERATION) - faultWear)),
+            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear) * (resourceDt / GAME_TIME_ACCELERATION) - faultWear)),
             dust: trackId === "solar" ? clamp(state.dust + 0.018 * (resourceDt / GAME_TIME_ACCELERATION) * stagePressure) : state.dust,
           };
         }
