@@ -1260,7 +1260,7 @@ function MissionTaskRibbon({
   activeEvent: MissionEvent | null;
   roverTask: string;
 }) {
-  const day = Math.min(14, Math.floor(elapsed / 30) + 1);
+  const day = Math.min(14, Math.floor(Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay) + 1);
   const eventGoal = EVENT_TIMES.length;
   const surveyedCount = Object.values(sampleStages).filter((stage) => stage !== "UNSURVEYED").length;
   const analysedCount = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
@@ -1273,6 +1273,7 @@ function MissionTaskRibbon({
   return (
     <div className="pointer-events-none absolute left-3 top-3 z-30 w-[min(88vw,270px)]">
       <div className="pointer-events-auto overflow-hidden rounded-xl border-2 border-[#d3a84a] bg-[#172026]/92 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+        <div className="border-b border-[#4d5050] bg-[#101b20] px-3 py-2"><p className="text-[7px] font-black uppercase tracking-[0.15em] text-[#92a6a4]">Simulated Seconds</p><p className="mt-0.5 font-mono text-[10px] font-bold text-[#e2f0e8]">{Math.floor(Math.max(0, elapsed)).toLocaleString()} s</p><p className="mt-1 text-[7px] font-black uppercase tracking-[0.15em] text-[#f2c960]">Game Time · Day {day} / 14</p></div>
         <div className="flex items-center gap-2 border-b border-[#4d5050] bg-[#27363a] px-3 py-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#e2b84f] text-[9px] font-black text-[#20261e]">★</span>
           <div className="min-w-0 flex-1">
