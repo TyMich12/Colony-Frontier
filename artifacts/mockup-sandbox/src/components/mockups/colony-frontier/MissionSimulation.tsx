@@ -173,7 +173,7 @@ const LEGACY_REPAIR_ACTIONS = new Set([
   "fallback-co2", "fallback-thermal", "fallback-radiation", "fallback-comms", "fallback-navigation", "fallback-rover",
   "fallback-extraction", "fallback-isru", "fallback-science", "fallback-agriculture", "fallback-maintenance",
   "clean", "tune", "balance", "reserve", "reset", "boost", "flush", "purify", "scrub", "recover", "dump", "insulate",
-  "repair", "seal", "shield", "shelter", "balance-grid", "prioritize", "nav-calibrate", "purge", "tune-crops", "service",
+  "repair", "seal", "shield", "shelter", "balance-grid", "prioritize", "nav-calibrate", "repoint", "calibrate", "purge", "tune-crops", "service",
   "solar-autonomous-clean", "battery-thermal-recondition", "oxygen-electrolyser-burst", "water-distillate-recovery",
   "co2-crop-loop", "thermal-waste-heat-recovery", "comms-priority-window", "habitat-composite-patch",
   "radiation-regolith-berm", "grid-black-start", "agriculture-closed-loop", "maintenance-overhaul",
@@ -1786,7 +1786,7 @@ function BuildingInspector({
                   <span className="flex flex-wrap items-center justify-between gap-1.5">
                     <span className="text-[10px] font-black uppercase tracking-[0.05em] text-white">{action.label}</span>
                     <span className={action.id.startsWith("fallback-") ? "mt-1 inline-flex rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] border border-[#477e65] bg-[#173426] text-[#9ce3b2]" : "mt-1 inline-flex rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] border border-[#526d88] bg-[#192c3e] text-[#9ed1f1]"}>
-                      {action.id.startsWith("fallback-") ? "Basic · no optional systems" : "Specialist method"}
+                      {action.id.startsWith("fallback-") ? "Emergency backup" : "System task"}
                     </span>
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${displayedActionDurationLabel}s`}</span>
                   </span>
