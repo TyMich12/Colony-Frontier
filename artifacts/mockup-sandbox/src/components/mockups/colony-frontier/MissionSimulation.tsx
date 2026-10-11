@@ -2495,7 +2495,7 @@ export function MissionSimulation() {
         // electrolysis, habitat controls and required avionics; optional facilities add their own draw.
         // Hot cells increase thermal-management demand. The power manager sheds noncritical loads
         // when the bus cannot sustain nominal demand, while retaining a 2 kW critical-load floor.
-        const essentialLoadKW = emergencyPowerMode ? 7.8 : 9.4;
+        const essentialLoadKW = emergencyPowerMode ? 3.8 : 9.4;
         const optionalSystemLoadKW: Record<string, number> = {
           co2: 1.4, thermal: 2.2, grid: 0.8, science: 0.9, rover: 1.2,
           extraction: 2.5, isru: 3.4, agriculture: 4.0, maintenance: 1.0,
