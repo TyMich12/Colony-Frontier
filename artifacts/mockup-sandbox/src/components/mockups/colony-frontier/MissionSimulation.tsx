@@ -519,7 +519,7 @@ function getActionBlockers(
   if (actionId.startsWith("repair:")) {
     const option = getRepairOption(systemId, actionId.slice("repair:".length));
     if (!option) return ["Unknown repair procedure in workbook data"];
-    const blockers = getActionBlockers(systemId, "repair-active", context, node);
+    const blockers = getActionBlockers(systemId, "repair-procedure", context, node);
     for (const helperId of option.requiredSystems) collectRepairSupportBlockers(helperId, context, blockers);
     if ((context.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG) < option.partsMassKg) blockers.push(`Requires ${option.partsMassKg.toFixed(2)} kg repair parts; ${(context.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG).toFixed(2)} kg available`);
     return [...new Set(blockers)];
@@ -532,7 +532,7 @@ function getActionBlockers(
   }
   if (actionId === "inspect") return [];
   const blockers: string[] = [];
-  const isRepair = actionId === "repair-active";
+  const isRepair = actionId === "repair-active" || actionId === "repair-procedure";
   const stage = node ? context.sampleStages[node.id] ?? (context.surveyedNodes.includes(node.id) ? "SURVEYED" : "UNSURVEYED") : undefined;
 
   if (systemId !== "field") {
