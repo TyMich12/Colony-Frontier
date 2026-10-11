@@ -1621,7 +1621,7 @@ function BuildingInspector({
                   <p className="mt-0.5 min-w-0 whitespace-normal break-words text-[10px] font-bold leading-4 text-white">{operation.label}</p>{operation.supportSystems?.length ? <p className="mt-1 text-[8px] font-semibold text-[#8fc8b0]">Systems: {[operation.targetId, ...operation.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</p> : null}
                 </div>
               </div>
-              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${formatWallClockCountdown(operation.remainingSeconds, speed)}s`}</span>
+              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{`${formatWallClockCountdown(operation.remainingSeconds, speed)}s`}</span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#233f3e]">
               <div className="h-full rounded-full bg-gradient-to-r from-[#31ce9b] to-[#f1d16a] transition-[width]" style={{ width: `${clamp(100 * (1 - operation.remainingSeconds / operation.totalSeconds))}%` }} />
@@ -1950,7 +1950,7 @@ function ResourceInspector({
             <div className="rounded-2xl border border-[#647d85] bg-[#13252c] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[#f0cf69]"><Clock className="h-4 w-4" /><p className="text-[10px] font-black uppercase tracking-[0.1em]">{operation.label}</p></div>
-                <p className="shrink-0 font-mono text-sm text-white">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${formatWallClockCountdown(operation.remainingSeconds, simulationSpeed)}s`}</p>
+                <p className="shrink-0 font-mono text-sm text-white">{`${formatWallClockCountdown(operation.remainingSeconds, simulationSpeed)}s`}</p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#263b41]"><div className="h-full rounded-full bg-[#e5bf5d] transition-[width]" style={{ width: `${progress}%` }} /></div>
               <p className="mt-2 text-[9px] leading-4 text-[#96b2b5]">The simulation continues while this operation runs. A serious incident can interrupt the work and pause this timer until the crew responds.</p>
