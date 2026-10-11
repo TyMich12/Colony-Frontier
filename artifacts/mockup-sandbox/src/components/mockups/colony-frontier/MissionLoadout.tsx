@@ -207,7 +207,7 @@ function CategoryHeader({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-full min-h-[54px] w-full items-center justify-between gap-1.5 border p-1.5 text-left transition ${
+      className={`flex h-auto min-h-[54px] self-start w-full items-center justify-between gap-1.5 border p-1.5 text-left transition ${
         essentialBlocked
           ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_22px_rgba(255,47,47,0.32)] hover:border-[#ff6666]"
           : categoryBlocked
