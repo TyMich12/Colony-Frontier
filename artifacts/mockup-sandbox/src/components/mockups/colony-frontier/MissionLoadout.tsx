@@ -207,7 +207,7 @@ function CategoryHeader({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center justify-between border p-4 text-left transition ${
+      className={`flex h-full min-h-[82px] w-full items-center justify-between gap-2 border p-2.5 text-left transition ${
         essentialBlocked
           ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_22px_rgba(255,47,47,0.32)] hover:border-[#ff6666]"
           : categoryBlocked
@@ -222,9 +222,9 @@ function CategoryHeader({
       }`}
       aria-expanded={open}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2">
         <div
-          className="grid h-10 w-10 shrink-0 place-items-center border bg-[#0a171e]"
+          className="grid h-8 w-8 shrink-0 place-items-center border bg-[#0a171e]"
           style={{ borderColor: categoryColor, color: categoryColor }}
         >
           <Icon className="h-4 w-4" />
@@ -232,21 +232,21 @@ function CategoryHeader({
 
         <div className="min-w-0">
           <p
-            className="text-[9px] font-bold uppercase tracking-[0.2em]"
+            className="hidden text-[8px] font-bold uppercase tracking-[0.12em] sm:block"
             style={{ color: categoryColor }}
           >
             Technology category
           </p>
 
           <h3
-            className="mt-1 text-sm font-semibold uppercase tracking-[0.12em]"
+            className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] sm:text-xs"
             style={{ color: categoryColor }}
           >
             {track.category}
           </h3>
 
           <p
-            className="mt-1 text-[9px] font-bold uppercase tracking-[0.13em]"
+            className="mt-0.5 line-clamp-2 text-[7px] font-bold uppercase tracking-[0.06em] sm:text-[8px]"
             style={{ color: categoryColor }}
           >
             {categoryStatus}
@@ -254,7 +254,7 @@ function CategoryHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-1">
         {selectedTier && (
           <span
             className="hidden border bg-[#0a171e] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] sm:inline"
@@ -917,7 +917,7 @@ export function MissionLoadout() {
             </span>
           </div>
 
-          <div className="space-y-3">
+          <div className={openCategory ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-3"}>
             {visibleTracks.map((track) => {
               const selectedTier = selected[track.id];
 
@@ -927,7 +927,7 @@ export function MissionLoadout() {
                   ref={(element) => {
                     categoryRefs.current[track.id] = element;
                   }}
-                  className="space-y-2 scroll-mt-6"
+                  className={`min-w-0 space-y-2 scroll-mt-6 ${openCategory === track.id ? "col-span-full" : ""}`}
                 >
                   <CategoryHeader
                     track={track}
@@ -950,7 +950,7 @@ export function MissionLoadout() {
                   />
 
                   {openCategory === track.id && (
-                    <div className="grid gap-2 border border-[#29434a] bg-[#09161d] p-2 md:grid-cols-2">
+                    <div className="grid gap-2 border border-[#29434a] bg-[#09161d] p-2 sm:grid-cols-2 xl:grid-cols-2">
                       {tierOrder.map((tier) => {
                         const previousTier = selected[track.id];
                         const previousCost = previousTier
