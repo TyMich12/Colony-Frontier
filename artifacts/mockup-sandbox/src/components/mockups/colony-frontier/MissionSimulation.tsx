@@ -168,6 +168,17 @@ const SYSTEM_ACTION_SECONDS: Record<string, number> = {
   "maintenance-overhaul": 18,
 };
 
+const LEGACY_REPAIR_ACTIONS = new Set([
+  "fallback-solar", "fallback-battery", "fallback-grid", "fallback-habitat", "fallback-water", "fallback-oxygen",
+  "fallback-co2", "fallback-thermal", "fallback-radiation", "fallback-comms", "fallback-navigation", "fallback-rover",
+  "fallback-extraction", "fallback-isru", "fallback-science", "fallback-agriculture", "fallback-maintenance",
+  "clean", "tune", "balance", "reserve", "reset", "boost", "flush", "purify", "scrub", "recover", "dump", "insulate",
+  "repair", "seal", "shield", "shelter", "balance-grid", "prioritize", "nav-calibrate", "purge", "tune-crops", "service",
+  "solar-autonomous-clean", "battery-thermal-recondition", "oxygen-electrolyser-burst", "water-distillate-recovery",
+  "co2-crop-loop", "thermal-waste-heat-recovery", "comms-priority-window", "habitat-composite-patch",
+  "radiation-regolith-berm", "grid-black-start", "agriculture-closed-loop", "maintenance-overhaul",
+]);
+
 const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   clean: "Dust-coverage estimate −16 points (−24 with rover) · about 3.9 kJ restored per 10 simulated seconds at Foundation 0/2 while below target output",
   tune: "Available electrical power +0.36 kW · array condition index +1",
@@ -1491,7 +1502,7 @@ function BuildingInspector({
   }, [activeFault?.eventId, track.id]);
   const primaryRepairMetric = getPrimaryRepairMetric(track.id);
   const remainingRepairGap = primaryRepairMetric ? runtime.repairMetrics?.[repairGapKey(primaryRepairMetric)] : undefined;
-  const actions = allActions.filter((action) => !/^variant:/.test(action.id));
+  const actions = allActions.filter((action) => !/^variant:/.test(action.id) && !LEGACY_REPAIR_ACTIONS.has(action.id));
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
@@ -1663,20 +1674,20 @@ function BuildingInspector({
                     className="rounded-xl border border-[#354f59] bg-[#0d1c22] px-3 py-3 text-left transition hover:border-[#e8c568] hover:bg-[#12262b] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <span className="flex items-start justify-between gap-2">
-                      <span className="text-[9px] font-black text-[#e1eeee]">{option.name}</span>
+                      <span className="min-w-0 flex-1 whitespace-normal break-words text-[9px] font-black leading-4 text-[#e1eeee]">{option.name}</span>
                       <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">
                         {option.durationsMinutes[tierIndex]} game min
                       </span>
                     </span>
-                    <span className="mt-1 block text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</span>
-                    <span className="mt-2 block text-[8px] font-bold text-[#c4d9d6]">Requires: {supportLabels}</span>
+                    <span className="mt-1 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</span>
+                    <span className="mt-2 block min-w-0 whitespace-normal break-words text-[8px] font-bold leading-4 text-[#c4d9d6]">Requires: {supportLabels}</span>
                     <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.08em] text-[#a9dbb7]">Expected numerical effect</span>
                     {outcomeLines.map((line, index) => (
                       <span key={`${option.id}-effect-${index}`} className="mt-1 block text-[9px] font-semibold leading-4 text-[#d7f0df]">
                         {line}
                       </span>
                     ))}
-                    <span className="mt-2 block text-[8px] leading-4 text-[#d8c18a]">
+                    <span className="mt-2 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#d8c18a]">
                       Cost: {option.energyKWh} kWh · {option.partsMassKg} kg parts · {option.kit}
                     </span>
                     <span className="mt-1 block text-[8px] leading-4 text-[#8fa7ab]">
@@ -1727,15 +1738,14 @@ function BuildingInspector({
           </section>
         )}
 
-        <section className="mx-4 mt-4 rounded-xl border border-[#304d53] bg-[#0c1b20] p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-[#3f8767] bg-[#15392b] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#a7efc1]">Basic fix</span>
-            <span className="text-[9px] font-bold text-[#d8e7de]">No optional support systems required</span>
-          </div>
-          <p className="mt-1.5 text-[9px] leading-4 text-[#91aaa8]">Every facility has a small fallback intervention. Specialist methods unlock when their required systems are deployed, connected, and healthy.</p>
-        </section>
-        <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3">
-          {actions.map((action, index) => {
+        {actions.length > 0 && (
+  <section className="mx-4 mt-4 rounded-xl border border-[#304d53] bg-[#0c1b20] p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h3 className="text-[9px] font-black uppercase tracking-[0.14em] text-[#dcebe4]">System operations</h3>
+      <span className="text-[8px] text-[#8faeae]">Non-repair tasks only · repairs are in the category catalogue above</span>
+    </div>
+    <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+{actions.map((action, index) => {
             const blockers = getBlockers(track.id, action.id);
             const emergencyOverride = action.id.startsWith("fallback-") && fallbackEmergencyOverride(action.id, track.id, metrics, Boolean(activeFault));
             const fallbackRemaining = action.id.startsWith("fallback-") && !emergencyOverride
@@ -1774,8 +1784,10 @@ function BuildingInspector({
             </button>
             );
           })}
-        </div>
-        <div className="mx-4 mb-4 rounded-2xl border border-[#40575b] bg-[#101f24] p-3">
+    </div>
+  </section>
+)}
+<div className="mx-4 mb-4 rounded-2xl border border-[#40575b] bg-[#101f24] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
@@ -2476,8 +2488,19 @@ export function MissionSimulation() {
             ? repairAdjustedRating("grid", getBaselineRating("grid", pending.selected.grid, gridUpgrade), buildings.grid?.repairMetrics)
             : 0
           : Number.POSITIVE_INFINITY;
-        const optionalCount = Object.keys(pending.selected).filter((id) => !starterCategories.has(id)).length;
-        const baseLoadKW = (emergencyPowerMode ? 2.0 : 2.5) + optionalCount * (emergencyPowerMode ? 0.10 : 0.25); // Scaled essential electrical load, declared game-balance assumption.
+        // Mission-average electrical load budget in kW. Essential loads include crew life support,
+        // oxygen generation, habitat controls and required avionics. Optional facilities contribute
+        // their own explicit steady/average draw; emergency mode sheds a declared fraction of those loads.
+        const essentialLoadKW = emergencyPowerMode ? 7.8 : 9.4;
+        const optionalSystemLoadKW: Record<string, number> = {
+          co2: 1.4, thermal: 2.2, grid: 0.8, science: 0.9, rover: 1.2,
+          extraction: 2.5, isru: 3.4, agriculture: 4.0, maintenance: 1.0,
+        };
+        const optionalLoadKW = Object.entries(optionalSystemLoadKW).reduce(
+          (sum, [systemId, loadKW]) => sum + (pending.selected[systemId] ? loadKW * (emergencyPowerMode ? 0.5 : 1) : 0),
+          0,
+        );
+        const baseLoadKW = essentialLoadKW + optionalLoadKW;
         const solarNetKW = solarGeneration - baseLoadKW;
         const batteryFlowKW = solarNetKW >= 0
           ? (batteryOnline && gridOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW) : 0)
@@ -3377,7 +3400,7 @@ export function MissionSimulation() {
     const commsQueueFactor = commsRatedThroughput > 0 ? clamp(commsRatedThroughput / Math.max(0.1, commsThroughput), 1, 5) : 1;
     const baseDuration = baseActionId === "request-earth-report"
       ? Math.ceil(navigationQueueDuration * commsQueueFactor)
-      : (actionDurations[baseActionId] ?? 6);
+      : (SYSTEM_ACTION_SECONDS[baseActionId] ?? 6);
     const duration = baseDuration;
     const supportsLabel = integratedHelpers.length
       ? ` · integrated with ${integratedHelpers.map((id) => SUPPORT_SHORT_LABELS[id] ?? SYSTEM_LABELS[id] ?? id).join(" + ")}`
