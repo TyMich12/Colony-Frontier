@@ -314,7 +314,7 @@ function TierOption({
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
-      className={`group relative w-full border p-4 text-left transition ${
+      className={`group relative w-full border p-2.5 text-left transition ${
         selected
           ? "border-[#efb658] bg-[#26332c] shadow-[inset_3px_0_0_#efb658]"
           : status === "available"
@@ -322,10 +322,10 @@ function TierOption({
             : "border-[#8b4545] bg-[#241719]"
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 gap-2">
           <div
-            className="grid h-9 w-9 shrink-0 place-items-center border bg-[#0a171e]"
+            className="grid h-7 w-7 shrink-0 place-items-center border bg-[#0a171e]"
             style={{
               borderColor: selected ? meta.color : "#3d5552",
               color: meta.color,
@@ -378,7 +378,7 @@ function TierOption({
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t border-[#2c4445] pt-3 text-[9px] uppercase tracking-[0.14em]">
+      <div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-[#2c4445] pt-2 text-[8px] uppercase tracking-[0.1em]">
         <span className="text-[#89a39e]">{equipment.efficiency}</span>
         <span className="text-[#89a39e]">
           {equipment.mass.toLocaleString()} kg
@@ -389,7 +389,7 @@ function TierOption({
       </div>
 
       <div
-        className={`mt-3 text-[8px] font-bold uppercase tracking-[0.13em] ${
+        className={`mt-1.5 text-[7px] font-bold uppercase tracking-[0.1em] ${
           selected || status === "available"
             ? "text-[#78bb92]"
             : "text-[#c46c6c]"
@@ -405,11 +405,11 @@ function TierOption({
           {tier} field brief
         </p>
 
-        <p className="mt-2 text-xs leading-5 text-[#c1d1bd]">
+        <p className="mt-1 text-[10px] leading-4 text-[#c1d1bd]">
           {equipment.description}
         </p>
 
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[9px] uppercase tracking-[0.12em] text-[#8da8a0]">
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[8px] uppercase tracking-[0.1em] text-[#8da8a0]">
           <span>{equipment.efficiency}</span>
           <span>{equipment.mass.toLocaleString()} kg</span>
           <span>{formatCredits(equipment.cost)}</span>
