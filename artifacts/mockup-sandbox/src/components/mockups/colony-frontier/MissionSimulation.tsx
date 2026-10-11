@@ -1349,6 +1349,7 @@ function BuildingInspector({
   earthReportAtSeconds,
   elapsedSeconds,
   fallbackReadyAt,
+  partsInventoryKg,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1372,6 +1373,7 @@ function BuildingInspector({
   earthReportAtSeconds: number;
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
+  partsInventoryKg: number;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -4280,6 +4282,7 @@ export function MissionSimulation() {
             earthReportAtSeconds={earthReportAtSeconds}
             elapsedSeconds={elapsed}
             fallbackReadyAt={fallbackReadyAt}
+            partsInventoryKg={partsInventoryKg}
           />
         )}
 
