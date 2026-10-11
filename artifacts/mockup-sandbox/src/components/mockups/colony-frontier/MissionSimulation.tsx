@@ -866,8 +866,7 @@ function buildingStatus(condition: number): string {
 }
 
 function formatWallClockCountdown(remainingSeconds: number, _simulationSpeed = 1): string {
-  const rounded = Math.round(Math.max(0, remainingSeconds) * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return String(Math.ceil(Math.max(0, remainingSeconds)));
 }
 
 function formatMissionTime(seconds: number): string {
@@ -2475,6 +2474,7 @@ export function MissionSimulation() {
         const radiationOnline = systemIsOperational("radiation", dependencyContext);
         const agricultureOnline = systemIsOperational("agriculture", dependencyContext);
         const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
+        const resourceDt = dt * 0.25;
         const missionFraction = clamp(elapsed / TOTAL_MISSION_SECONDS, 0, 1);
         const missionDay = Math.min(14, Math.max(0, elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
         const solarDust = buildings.solar?.dust ?? 0;
@@ -2529,31 +2529,31 @@ export function MissionSimulation() {
         const baseLoadKW = Math.max(2.0, nominalLoadKW);
         const solarNetKW = solarGeneration - baseLoadKW;
         const batteryFlowKW = solarNetKW >= 0
-          ? (batteryOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW, dt > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (dt / 3600) : 0) : 0)
-          : Math.min(-solarNetKW, batteryDischargeLimitKW, dt > 0 ? storedEnergyKWh / (dt / 3600) : 0);
+          ? (batteryOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW, resourceDt > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (resourceDt / 3600) : 0) : 0)
+          : Math.min(-solarNetKW, batteryDischargeLimitKW, resourceDt > 0 ? storedEnergyKWh / (resourceDt / 3600) : 0);
         const deliveredSourceKW = solarGeneration + Math.max(0, batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
         const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
-        const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * dt / 3600 : 0;
+        const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * resourceDt / 3600 : 0;
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
-        const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-dt / 7200));
+        const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-resourceDt / 7200));
         const powerPathAvailable = deliveredPowerKW >= 2 && current.power >= 8;
         const oxygenProductionKgDay = oxygenOnline && powerPathAvailable
           ? repairAdjustedRating("oxygen", getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade), buildings.oxygen?.repairMetrics)
           : 0;
-        const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+        const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
         const waterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
         const waterThroughputLDay = getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade);
         const circulatingWaterLDay = 20; // Four-crew loop-flow assumption; recovery reduces net make-up loss.
         const recycledWaterLDay = waterOnline && powerPathAvailable ? Math.min(circulatingWaterLDay, waterThroughputLDay) * waterRecoveryPct / 100 : 0;
         const netWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
-        const waterDelta = -netWaterLossLDay * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 180 * 100;
+        const waterDelta = -netWaterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 180 * 100;
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
           ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
-        const foodDelta = (foodProductionKgDay - foodDemandKgDay) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 42 * 100;
+        const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 42 * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalRatedKW = thermalOnline
           ? repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics)
@@ -2561,16 +2561,16 @@ export function MissionSimulation() {
         const thermalNeedKW = 0.7 + Math.abs(ambientTemperature - 21) * 0.15;
         const thermalCoverage = Math.min(1, thermalRatedKW / Math.max(0.1, thermalNeedKW));
         const thermalTarget = thermalOnline ? 21 + (ambientTemperature - 21) * (1 - thermalCoverage) : ambientTemperature;
-        const thermalResponse = thermalOnline ? 1 - Math.exp(-dt / (7200 / Math.max(0.25, thermalCoverage))) : 1 - Math.exp(-dt / 28800);
+        const thermalResponse = thermalOnline ? 1 - Math.exp(-resourceDt / (7200 / Math.max(0.25, thermalCoverage))) : 1 - Math.exp(-resourceDt / 28800);
         const radiationAvoidedPct = radiationOnline
           ? repairAdjustedRating("radiation", getBaselineRating("radiation", pending.selected.radiation ?? "Foundation", radiationUpgrade), buildings.radiation?.repairMetrics)
           : 0;
-        const radiationDelta = 0.8 * (1 - radiationAvoidedPct / 100) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+        const radiationDelta = 0.8 * (1 - radiationAvoidedPct / 100) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const habitatPressureLossRate = repairAdjustedRating("habitat", getBaselineRating("habitat", pending.selected.habitat ?? "Foundation", habitatUpgrade), buildings.habitat?.repairMetrics, true);
-        const habitatDelta = -(0.05 + (habitatPressureLossRate / 8) * 0.05) * dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+        const habitatDelta = -(0.05 + (habitatPressureLossRate / 8) * 0.05) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const faultImpact = Object.values(activeFaults).reduce((impact, fault) => {
           const isBeingRepaired = activeOperationsRef.current[fault.targetTrackId]?.kind === "REPAIR";
-          const amount = (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * fault.severity * (isBeingRepaired ? 0.25 : 1);
+          const amount = (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * fault.severity * (isBeingRepaired ? 0.25 : 1);
           switch (fault.eventId) {
             case "solar-dust":
             case "regional-dust-front": impact.power += 0.34 * amount; impact.battery += 0.08 * amount; break;
@@ -2617,12 +2617,12 @@ export function MissionSimulation() {
           const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
             .filter((fault) => fault.targetTrackId === trackId)
-            .reduce((sum, fault) => sum + 0.26 * fault.severity * (dt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * (repairingTrack ? 0.25 : 1) * (1 - solarProtection), 0);
+            .reduce((sum, fault) => sum + 0.26 * fault.severity * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * (repairingTrack ? 0.25 : 1) * (1 - solarProtection), 0);
           next[trackId] = {
             ...state,
-            condition: clamp(state.condition - Math.max(0.00025, wear) * (dt / GAME_TIME_ACCELERATION) - faultWear),
+            condition: clamp(state.condition - Math.max(0.00025, wear) * (resourceDt / GAME_TIME_ACCELERATION) - faultWear),
             status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear) * (dt / GAME_TIME_ACCELERATION) - faultWear)),
-            dust: trackId === "solar" ? clamp(state.dust + 0.018 * (dt / GAME_TIME_ACCELERATION) * stagePressure) : state.dust,
+            dust: trackId === "solar" ? clamp(state.dust + 0.018 * (resourceDt / GAME_TIME_ACCELERATION) * stagePressure) : state.dust,
           };
         }
         return next;
