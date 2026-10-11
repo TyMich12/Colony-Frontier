@@ -738,7 +738,7 @@ function dustTransmission(dust: number): number {
   return points[points.length - 1].transmission;
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}): { label: string; value: string } {
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}, elapsedSeconds = LEVEL1_ENVIRONMENT.secondsPerEarthDay * 6, campaign: "moon" | "mars" = "moon"): { label: string; value: string } {
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
   const stateIndex = baselineStateIndex(tier, upgradeLevel);
@@ -754,10 +754,15 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   switch (systemId) {
     case "solar": {
       const day7 = interpolateSolarProfile(7);
+      const liveDay = Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
+      const liveProfile = interpolateSolarProfile(liveDay);
+      const liveCellTemperatureLoss = liveProfile.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, liveProfile.cellTempC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
+      const liveSunlight = campaign === "mars" ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10) : liveProfile.sunlightGeometry;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
-      const actualKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
-      label = "Rated electrical output · Day 7 reference and current dust";
-      value = formatRating(rating) + " kW rated · " + actualKW.toFixed(3) + " kW at Day 7 checkpoint · " + (actualKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5) + " kWh / 10 sim s";
+      const checkpointKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
+      const currentKW = Math.min(rating, rating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
+      label = "Solar output · rated / Day 7 checkpoint / current live output";
+      value = `${formatRating(rating)} kW rated · ${checkpointKW.toFixed(3)} kW Day 7 · ${currentKW.toFixed(3)} kW current · ${(currentKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5)} kWh / 10 sim s`;
       break;
     }
     case "battery": value += extra("continuous discharge power"); break;
@@ -858,9 +863,8 @@ function buildingStatus(condition: number): string {
   return "ONLINE";
 }
 
-function formatWallClockCountdown(simulatedSeconds: number, simulationSpeed: number): string {
-  const seconds = Math.max(0, simulatedSeconds) / (GAME_TIME_ACCELERATION * Math.max(0.1, simulationSpeed));
-  const rounded = Math.round(seconds * 10) / 10;
+function formatWallClockCountdown(remainingSeconds: number, _simulationSpeed = 1): string {
+  const rounded = Math.round(Math.max(0, remainingSeconds) * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
@@ -1369,6 +1373,7 @@ function BuildingInspector({
   fallbackReadyAt,
   partsInventoryKg,
   simulationSpeed,
+  campaign,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1394,6 +1399,7 @@ function BuildingInspector({
   fallbackReadyAt: Record<string, number>;
   partsInventoryKg: number;
   simulationSpeed: number;
+  campaign: "moon" | "mars";
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1542,9 +1548,9 @@ function BuildingInspector({
           </div>
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
             <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
-            <div className="mt-1 flex items-baseline justify-between gap-3">
-              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics).label}</span>
-              <span className="shrink-0 font-mono text-[11px] font-black text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics).value}</span>
+            <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign).label}</span>
+              <span className="min-w-0 whitespace-normal break-words text-right font-mono text-[10px] font-black leading-5 text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign).value}</span>
             </div>
             <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes only this rated capability. It does not restore condition, remove dust, clear faults or refill stored resources; the next tier is a separate rating state.</p>
             {runtime.repairMetrics && Object.keys(runtime.repairMetrics).some((metric) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)) && <div className="mt-2 border-t border-[#284542] pt-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#87aaa2]">Last measured repair / calibration outputs</p>{Object.entries(runtime.repairMetrics).filter(([metric]) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)).map(([metric, amount]) => <p key={metric} className="mt-1 text-[8px] leading-4 text-[#a8c6ba]">{metric}: <span className="font-mono text-[#d9f3e1]">{formatRating(amount)}</span></p>)}</div>}
@@ -2238,14 +2244,6 @@ export function MissionSimulation() {
           }
           return repaired;
         });
-        if (option?.systemId === "battery") {
-          const batteryCapacity = ratedBatteryCapacityKWh(pending?.selected ?? {}, buildingsRef.current);
-          const energyRecoveredKWh = Math.max(0, outcome);
-          setMetrics((current) => ({
-            ...current,
-            battery: clamp(current.battery + (batteryCapacity > 0 ? energyRecoveredKWh / batteryCapacity * 100 : 0)),
-          }));
-        }
         setScore((value) => clamp(value + 6));
         const effectLines = option ? [
           /dust removed from (existing deposit|array surface)/i.test(option.metric)
@@ -2318,7 +2316,7 @@ export function MissionSimulation() {
         let changed = false;
         const next = { ...current };
         for (const [key, operation] of Object.entries(current)) {
-          const remaining = Math.max(0, operation.remainingSeconds - 0.25 * speed * GAME_TIME_ACCELERATION);
+          const remaining = Math.max(0, operation.remainingSeconds - 0.25);
           if (remaining <= 0) {
             if (!operationCompletionRef.current.has(operation.id)) {
               operationCompletionRef.current.add(operation.id);
@@ -2507,25 +2505,27 @@ export function MissionSimulation() {
         // electrolysis, habitat controls and required avionics; optional facilities add their own draw.
         // Hot cells increase thermal-management demand. The power manager sheds noncritical loads
         // when the bus cannot sustain nominal demand, while retaining a 2 kW critical-load floor.
-        const essentialLoadKW = emergencyPowerMode ? 3.8 : 9.4;
+        const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
+        const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive ? 3.8 : 9.4;
         const optionalSystemLoadKW: Record<string, number> = {
           co2: 1.4, thermal: 2.2, grid: 0.8, science: 0.9, rover: 1.2,
           extraction: 2.5, isru: 3.4, agriculture: 4.0, maintenance: 1.0,
         };
-        const optionalLoadKW = Object.entries(optionalSystemLoadKW).reduce(
+        const optionalLoadKW = batteryRecoveryActive ? 0 : Object.entries(optionalSystemLoadKW).reduce(
           (sum, [systemId, loadKW]) => sum + (pending.selected[systemId] ? loadKW * (emergencyPowerMode ? 0.5 : 1) : 0),
           0,
         );
         const solarThermalLoadKW = Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * 0.07;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
-        const baseLoadKW = Math.max(2.0, Math.min(nominalLoadKW, solarGeneration + 0.35));
+        // Keep true demand visible: capping it to solar output hid deficits and delayed battery discharge.
+        const baseLoadKW = Math.max(2.0, nominalLoadKW);
         const solarNetKW = solarGeneration - baseLoadKW;
         const batteryFlowKW = solarNetKW >= 0
-          ? (batteryOnline && gridOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW) : 0)
+          ? (batteryOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW, dt > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (dt / 3600) : 0) : 0)
           : Math.min(-solarNetKW, batteryDischargeLimitKW, dt > 0 ? storedEnergyKWh / (dt / 3600) : 0);
         const deliveredSourceKW = solarGeneration + Math.max(0, batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
-        const powerBase = clamp(50 + 50 * (solarGeneration - baseLoadKW) / Math.max(1, baseLoadKW));
+        const powerBase = clamp(50 + 50 * (deliveredSourceKW - baseLoadKW) / Math.max(1, baseLoadKW));
         const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * dt / 3600 : 0;
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-dt / 7200));
@@ -3177,8 +3177,8 @@ export function MissionSimulation() {
       kind,
       targetId,
       label,
-      totalSeconds: kind === "REPAIR" || kind === "UPGRADE" ? durationSeconds : durationSeconds * GAME_TIME_ACCELERATION,
-      remainingSeconds: kind === "REPAIR" || kind === "UPGRADE" ? durationSeconds : durationSeconds * GAME_TIME_ACCELERATION,
+      totalSeconds: durationSeconds,
+      remainingSeconds: durationSeconds,
       operationKey,
       ...(roverAssigned ? { roverAssigned: true } : {}),
       ...(supportSystems.length ? { supportSystems: [...supportSystems] } : {}),
@@ -3194,7 +3194,7 @@ export function MissionSimulation() {
     }
     setOperationResult(null);
     setManualActions((value) => value + 1);
-    setAiMessage(`${label} started. Estimated duration: ${kind === "REPAIR" || kind === "UPGRADE" ? `${(durationSeconds / 60).toFixed(1)} game minutes` : `${durationSeconds} task seconds at standard speed`}. Other systems remain available while this job runs.`);
+    setAiMessage(`${label} started. Estimated real-time duration: ${durationSeconds} seconds. Other systems remain available while this job runs.`);
   };
 
   const handleResourceAction = (nodeId: string, action: string) => {
@@ -3319,19 +3319,15 @@ export function MissionSimulation() {
       }
       const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
       const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
-      if (partsInventoryKg < installation.materialKg) {
-        setOperationResult(`RETROFIT LOCKED · ${installation.materialKg} kg of ${installation.kit} material is required; ${partsInventoryKg.toFixed(2)} kg is available. Use locally fabricated material or replenish the stock.`);
-        return;
-      }
       if (availableEnergyKWh < installation.energyKWh) {
         setOperationResult(`RETROFIT LOCKED · Requires ${installation.energyKWh} kWh commissioning energy; stored energy is ${availableEnergyKWh.toFixed(1)} kWh. Recharge the battery before installation.`);
         return;
       }
       const targetLevel = currentLevel + 1;
-      setPartsInventoryKg((value) => Math.max(0, value - installation.materialKg));
       setMetrics((value) => ({ ...value, battery: clamp(value.battery - installation.energyKWh / batteryCapacity * 100) }));
-      beginOperation("UPGRADE", trackId, `Installing ${installation.tier} retrofit ${installation.newProgress} · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, installation.durationMinutes * 60, targetLevel, undefined, "retrofit");
-      setAiMessage(`RETROFIT STARTED · ${installation.metric} ${installation.directGain}. Consuming ${installation.materialKg} kg material and ${installation.energyKWh} kWh; installation time ${installation.durationMinutes} simulated minutes. Rated capability will change only when commissioning completes; condition and faults are not repaired.`);
+      const installationSeconds = [12, 15, 18, 20][Math.min(3, currentLevel)];
+      beginOperation("UPGRADE", trackId, `Installing ${installation.tier} retrofit ${installation.newProgress} · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, installationSeconds, targetLevel, undefined, "retrofit");
+      setAiMessage(`RETROFIT STARTED · ${installation.metric} ${installation.directGain}. Credits and materials cost: 0. Consuming ${installation.energyKWh} kWh commissioning energy; estimated real-time installation ${installationSeconds} seconds. Rated capability changes when commissioning completes; condition and faults are not repaired.`);
       return;
     }
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
@@ -3352,7 +3348,7 @@ export function MissionSimulation() {
         return;
       }
       const tierIndex = effectiveRepairTierIndex(pending.selected[repairTargetId] ?? "Foundation", selectedRepair.requiredSystems, pending.selected);
-      const durationMinutes = selectedRepair.durationsMinutes[tierIndex] ?? selectedRepair.durationsMinutes[0] ?? 30;
+      const durationSeconds = selectedRepair.category === "Standalone" ? [8, 9, 10, 12][tierIndex] : selectedRepair.category === "Enhanced" ? [15, 16, 18, 20][tierIndex] : selectedRepair.category === "Dual" ? [22, 24, 27, 30][tierIndex] : [30, 33, 36, 40][tierIndex];
       const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
       const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
       if (availableEnergyKWh < selectedRepair.energyKWh) {
@@ -3372,7 +3368,7 @@ export function MissionSimulation() {
         "REPAIR",
         repairTargetId,
         `Repair · ${selectedRepair.name}`,
-        durationMinutes * 60,
+        durationSeconds,
         undefined,
         undefined,
         `repair:${selectedRepair.id}`,
@@ -3380,7 +3376,7 @@ export function MissionSimulation() {
         roverCanAssist,
         repairSupports,
       );
-      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Tier-limited result: ${durationMinutes} simulated minutes, ${selectedRepair.energyKWh} kWh, and ${selectedRepair.partsMassKg} kg of parts. Support requirements are limited to: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}.`);
+      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Consumes ${selectedRepair.energyKWh} kWh and ${selectedRepair.partsMassKg} kg of parts. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. Battery recovery pauses non-essential loads; any charge comes only from live solar surplus.`);
       return;
     }
 
@@ -4306,6 +4302,7 @@ export function MissionSimulation() {
             onClose={() => setSelectedResourceId(null)}
             getBlockers={checkActionPrerequisites}
             simulationSpeed={speed}
+            campaign={pending.campaign}
           />
         )}
 
