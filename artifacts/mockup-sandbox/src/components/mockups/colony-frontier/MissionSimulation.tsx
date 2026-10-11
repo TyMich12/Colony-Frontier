@@ -1362,6 +1362,7 @@ function BuildingInspector({
   elapsedSeconds,
   fallbackReadyAt,
   partsInventoryKg,
+  simulationSpeed,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1386,6 +1387,7 @@ function BuildingInspector({
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
   partsInventoryKg: number;
+  simulationSpeed: number;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1601,7 +1603,7 @@ function BuildingInspector({
                   <p className="mt-0.5 min-w-0 whitespace-normal break-words text-[10px] font-bold leading-4 text-white">{operation.label}</p>{operation.supportSystems?.length ? <p className="mt-1 text-[8px] font-semibold text-[#8fc8b0]">Systems: {[operation.targetId, ...operation.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</p> : null}
                 </div>
               </div>
-              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / GAME_TIME_ACCELERATION)}s`}</span>
+              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / (GAME_TIME_ACCELERATION * Math.max(0.1, speed)))}s`}</span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#233f3e]">
               <div className="h-full rounded-full bg-gradient-to-r from-[#31ce9b] to-[#f1d16a] transition-[width]" style={{ width: `${clamp(100 * (1 - operation.remainingSeconds / operation.totalSeconds))}%` }} />
@@ -1758,10 +1760,12 @@ function BuildingInspector({
             const lockMessage = blockers.length > 0
               ? blockers.join(" · ")
               : fallbackRemaining > 0
-                ? `Emergency backup recharge · ${Math.ceil(fallbackRemaining / GAME_TIME_ACCELERATION)} seconds`
+                ? `Emergency backup recharge · ${Math.ceil(fallbackRemaining / (GAME_TIME_ACCELERATION * Math.max(0.1, simulationSpeed)))} seconds`
                 : "";
             const variant = decodeActionVariant(track.id, action.id);
             const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[variant?.baseActionId ?? action.id] ?? 6);
+            const displayedActionDuration = actionDuration / Math.max(0.1, simulationSpeed);
+            const displayedActionDurationLabel = Number.isInteger(displayedActionDuration) ? displayedActionDuration.toFixed(0) : displayedActionDuration.toFixed(1);
                       return (
             <button
               key={action.id}
@@ -1778,9 +1782,9 @@ function BuildingInspector({
                     <span className={action.id.startsWith("fallback-") ? "mt-1 inline-flex rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] border border-[#477e65] bg-[#173426] text-[#9ce3b2]" : "mt-1 inline-flex rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] border border-[#526d88] bg-[#192c3e] text-[#9ed1f1]"}>
                       {action.id.startsWith("fallback-") ? "Basic · no optional systems" : "Specialist method"}
                     </span>
-                    <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
+                    <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${displayedActionDurationLabel}s`}</span>
                   </span>
-                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
+                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${displayedActionDurationLabel}s at current simulation speed`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Standalone operation ready" : "Prerequisites satisfied"}</span>}
                 </span>
               </span>
@@ -1830,6 +1834,7 @@ function ResourceInspector({
   onAction,
   onClose,
   getBlockers,
+  simulationSpeed,
 }: {
   node: ResourceNode;
   stage: SampleStage;
@@ -1842,6 +1847,7 @@ function ResourceInspector({
   onAction: (action: string) => void;
   onClose: () => void;
   getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
+  simulationSpeed: number;
 }) {
   const flow: { id: SampleStage; title: string; detail: string }[] = [
     { id: "UNSURVEYED", title: "1 · Survey & classify", detail: "Map the site, estimate terrain hazards, and record a baseline spectral signature." },
@@ -1926,7 +1932,7 @@ function ResourceInspector({
             <div className="rounded-2xl border border-[#647d85] bg-[#13252c] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[#f0cf69]"><Clock className="h-4 w-4" /><p className="text-[10px] font-black uppercase tracking-[0.1em]">{operation.label}</p></div>
-                <p className="shrink-0 font-mono text-sm text-white">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / GAME_TIME_ACCELERATION)}s`}</p>
+                <p className="shrink-0 font-mono text-sm text-white">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / (GAME_TIME_ACCELERATION * Math.max(0.1, simulationSpeed)))}s`}</p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#263b41]"><div className="h-full rounded-full bg-[#e5bf5d] transition-[width]" style={{ width: `${progress}%` }} /></div>
               <p className="mt-2 text-[9px] leading-4 text-[#96b2b5]">The simulation continues while this operation runs. A serious incident can interrupt the work and pause this timer until the crew responds.</p>
@@ -1953,7 +1959,7 @@ function ResourceInspector({
           )}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#263f3e] pt-3 text-[9px]">
             <span className="text-[#7e9a92]">Rover: {hasRover ? "deployed" : "missing"} · Core drill: {hasExtraction ? "deployed" : "required for ICE/MINERAL"} · Science lab: {hasScience ? "deployed" : "required for analysis"}</span>
-            {operation && <span className="font-bold uppercase tracking-[0.12em] text-[#a9f2c8]">Working · {(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / GAME_TIME_ACCELERATION)}s`}</span>}
+            {operation && <span className="font-bold uppercase tracking-[0.12em] text-[#a9f2c8]">Working · {(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / (GAME_TIME_ACCELERATION * Math.max(0.1, simulationSpeed)))}s`}</span>}
           </div>
         </div>
       </div>
@@ -3113,7 +3119,7 @@ export function MissionSimulation() {
           default: return { ...current, power: clamp(current.power - cascadeHit * 0.45), battery: clamp(current.battery - cascadeHit * 0.35) };
         }
       });
-      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. ${targetTrackId.toUpperCase()} is now cascading at ${severity.toFixed(1)}× severity. The response window is ${Math.ceil(remainingSeconds / GAME_TIME_ACCELERATION)} seconds; inspect that facility and run a timed repair before the fault spreads further.`);
+      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. ${targetTrackId.toUpperCase()} is now cascading at ${severity.toFixed(1)}× severity. The response window is ${Math.ceil(remainingSeconds / (GAME_TIME_ACCELERATION * Math.max(0.1, speed)))} seconds; inspect that facility and run a timed repair before the fault spreads further.`);
       setOperationResult(`FAULT NOT ISOLATED · You chose to continue. ${targetTrackId.toUpperCase()} has taken additional damage and will keep degrading other colony reserves. The fault register now contains this incident until a repair operation finishes.`);
     } else {
       setActiveFaults((current) => {
@@ -3281,7 +3287,7 @@ export function MissionSimulation() {
     const emergencyOverride = action.startsWith("fallback-") && fallbackEmergencyOverride(action, trackId, metrics, hasOwnActiveFault);
     const fallbackRemaining = (fallbackReadyAt[fallbackKey] ?? 0) - elapsed;
     if (action.startsWith("fallback-") && fallbackRemaining > 0 && !emergencyOverride) {
-      setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${Math.ceil(fallbackRemaining / GAME_TIME_ACCELERATION)} seconds.`);
+      setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${Math.ceil(fallbackRemaining / (GAME_TIME_ACCELERATION * Math.max(0.1, speed)))} seconds.`);
       return;
     }
     const blockers = checkActionPrerequisites(trackId, action);
@@ -4255,7 +4261,7 @@ export function MissionSimulation() {
                           className="w-full rounded-xl border border-[#713b44] bg-[#26161d] p-2.5 text-left transition hover:border-[#e7c567] hover:bg-[#302027]"
                           title={`Open ${fault.targetTrackId} to inspect repair options`}
                         >
-                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{fault.remainingSeconds > 0 ? `${Math.ceil(fault.remainingSeconds / GAME_TIME_ACCELERATION)}s` : "OVERDUE"}</span></div>
+                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{fault.remainingSeconds > 0 ? `${Math.ceil(fault.remainingSeconds / (GAME_TIME_ACCELERATION * Math.max(0.1, speed)))}s` : "OVERDUE"}</span></div>
                           <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#d59097]">Degrading {fault.targetTrackId.toUpperCase()} · severity {fault.severity.toFixed(1)}×</p>
                           <p className="mt-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#e8c568]">Inspect system → start timed repair</p>
                         </button>
@@ -4293,6 +4299,7 @@ export function MissionSimulation() {
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
             onClose={() => setSelectedResourceId(null)}
             getBlockers={checkActionPrerequisites}
+            simulationSpeed={speed}
           />
         )}
 
@@ -4321,6 +4328,7 @@ export function MissionSimulation() {
             elapsedSeconds={elapsed}
             fallbackReadyAt={fallbackReadyAt}
             partsInventoryKg={partsInventoryKg}
+            simulationSpeed={speed}
           />
         )}
 
