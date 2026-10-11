@@ -2010,7 +2010,6 @@ export function MissionSimulation() {
   const [earthReportAtSeconds, setEarthReportAtSeconds] = useState(runtime?.earthReportAtSeconds ?? 0);
   const [fallbackReadyAt, setFallbackReadyAt] = useState<Record<string, number>>(() => runtime?.fallbackReadyAt ?? {});
   const [activeFaults, setActiveFaults] = useState<Record<string, ActiveFault>>(() => runtime?.activeFaults ?? {});
-  const [incidentRepairCategory, setIncidentRepairCategory] = useState<"Standalone" | "Enhanced" | "Dual" | "Integrated">("Standalone");
   const [queuedIncidentRepair, setQueuedIncidentRepair] = useState<{ eventId: string; targetTrackId: string; optionId: string } | null>(null);
   const activeFaultsRef = useRef(activeFaults);
   useEffect(() => { activeFaultsRef.current = activeFaults; }, [activeFaults]);
@@ -2054,9 +2053,6 @@ export function MissionSimulation() {
   const activeTargetTrackId = activeEvent?.trackId === "power"
     ? (pending?.selected.grid ? "grid" : pending?.selected.battery ? "battery" : pending?.selected.solar ? "solar" : null)
     : activeEvent?.trackId ?? null;
-  const incidentFault = activeEvent ? activeFaults[activeEvent.id] ?? null : null;
-  const incidentRepairTrackId = incidentFault?.targetTrackId ?? activeTargetTrackId;
-  const incidentRepairOptions = incidentRepairTrackId ? getRepairOptions(incidentRepairTrackId) : [];
   const selectedResource = selectedResourceId
     ? RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === selectedResourceId)
     : undefined;
@@ -3893,42 +3889,6 @@ export function MissionSimulation() {
     return [...new Set(blockers)];
   };
 
-  const queueIncidentRepair = (optionId: string) => {
-    if (!activeEvent || !pending || !incidentRepairTrackId) return;
-    const option = getRepairOption(incidentRepairTrackId, optionId);
-    if (!option) {
-      setOperationResult("REPAIR LOCKED · This procedure could not be found in the current repair catalogue.");
-      return;
-    }
-    const blockers = getRepairBlockers(incidentRepairTrackId, "repair:" + option.id);
-    if (blockers.length > 0) {
-      setOperationResult("REPAIR LOCKED · " + blockers.join(" · "));
-      setAiMessage("REPAIR LOCKED · " + blockers.join(" · "));
-      return;
-    }
-    setDecisions((current) => [...current, {
-      eventId: activeEvent.id,
-      choiceId: "repair:" + option.id,
-      label: "Start repair: " + option.name,
-    }]);
-    setResolvedEventIds((current) => current.includes(activeEvent.id) ? current : [...current, activeEvent.id]);
-    eventResponseRef.current = activeEvent.id;
-    setQueuedIncidentRepair({ eventId: activeEvent.id, targetTrackId: incidentRepairTrackId, optionId: option.id });
-    setSelectedResourceId(null);
-    setSelectedBuildingId(incidentRepairTrackId);
-    setDashboardOpen(false);
-    setOperationResult("DIRECT REPAIR SELECTED · Starting " + option.name + " as a timed work order.");
-    setAiMessage("DIRECT FAULT REPAIR · " + option.name + " selected for " + incidentRepairTrackId.toUpperCase() + ". The fault stays active until the procedure and its verification complete.");
-    setActiveEventId(null);
-  };
-
-  useEffect(() => {
-    if (!queuedIncidentRepair || activeEventId) return;
-    const queued = queuedIncidentRepair;
-    setQueuedIncidentRepair(null);
-    handleBuildingAction(queued.targetTrackId, "repair:" + queued.optionId);
-  }, [activeEventId, queuedIncidentRepair, handleBuildingAction]);
-
   const askMissionAi = () => {
     const telemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
     const weakest = [
@@ -4403,85 +4363,6 @@ export function MissionSimulation() {
                 </div>
 
                 <div className="space-y-4">
-                  {incidentRepairTrackId && (
-                    <section className="rounded-2xl border border-[#d7b954]/50 bg-gradient-to-b from-[#17272a] to-[#0c171d] p-3 shadow-[0_0_26px_rgba(215,185,84,0.08)] sm:p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#f0ce71]">Live repair catalogue</p>
-                          <h2 className="mt-1 text-sm font-black uppercase tracking-[0.06em] text-white">
-                            {SYSTEM_LABELS[incidentRepairTrackId] ?? incidentRepairTrackId} recovery
-                          </h2>
-                          <p className="mt-1 text-[9px] leading-4 text-[#a7bfba]">Choose a procedure now. It starts a timed work order in this mission and keeps the fault active until verification completes.</p>
-                        </div>
-                        <span className="rounded-full border border-[#62766b] bg-[#12211d] px-2.5 py-1 font-mono text-[8px] font-black text-[#b8e7bf]">
-                          {incidentRepairOptions.length} PROCEDURES
-                        </span>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                        {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => {
-                          const count = incidentRepairOptions.filter((option) => option.category === category).length;
-                          const label = category === "Dual" ? "Dual-System" : category === "Integrated" ? "Fully Integrated" : category;
-                          return (
-                            <button
-                              key={category}
-                              type="button"
-                              onClick={() => setIncidentRepairCategory(category)}
-                              aria-pressed={incidentRepairCategory === category}
-                              className={"rounded-lg border px-2 py-2 text-left transition " + (incidentRepairCategory === category
-                                ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]"
-                                : "border-[#40565b] bg-[#0b1519] text-[#aab8b9] hover:border-[#e8c568]")}
-                            >
-                              <span className="block text-[8px] font-black uppercase tracking-[0.05em]">{label}</span>
-                              <span className={"mt-0.5 block font-mono text-[7px] " + (incidentRepairCategory === category ? "text-[#403a24]" : "text-[#759391]")}>
-                                {count} {count === 1 ? "option" : "options"}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-3 max-h-[44vh] space-y-2 overflow-y-auto pr-1">
-                        {incidentRepairOptions.filter((option) => option.category === incidentRepairCategory).map((option) => {
-                          const blockers = getRepairBlockers(incidentRepairTrackId, "repair:" + option.id);
-                          const tierIndex = effectiveRepairTierIndex(pending.selected[incidentRepairTrackId] ?? "Foundation", option.requiredSystems, pending.selected);
-                          const outcomeLines = describeRepairOptionOutcome(incidentRepairTrackId, option, tierIndex, buildings[incidentRepairTrackId]?.dust ?? 0);
-                          const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
-                          return (
-                            <div key={option.id} className="rounded-xl border border-[#354f59] bg-[#0b171d] p-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <h3 className="text-[9px] font-black text-[#e1eeee]">{option.name}</h3>
-                                <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">
-                                  {option.durationsMinutes[tierIndex]} game min
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</p>
-                              <p className="mt-2 text-[8px] font-bold text-[#c4d9d6]">Requires: {supportLabels}</p>
-                              <p className="mt-2 text-[8px] font-black uppercase tracking-[0.08em] text-[#a9dbb7]">Expected numerical effect</p>
-                              {outcomeLines.map((line, index) => (
-                                <p key={option.id + "-incident-effect-" + index} className="mt-1 text-[9px] font-semibold leading-4 text-[#d7f0df]">{line}</p>
-                              ))}
-                              <p className="mt-2 text-[8px] leading-4 text-[#d8c18a]">Cost: {option.energyKWh} kWh · {option.partsMassKg} kg parts · {option.kit}</p>
-                              <p className="mt-1 text-[8px] leading-4 text-[#8fa7ab]">Trade-off: {option.tradeoff}</p>
-                              <p className={"mt-2 text-[8px] leading-4 " + (blockers.length ? "text-[#ffadb5]" : "text-[#77b995]")}>
-                                {blockers.length ? "LOCKED: " + blockers.join(" · ") : "READY · Start this timed repair procedure."}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => queueIncidentRepair(option.id)}
-                                disabled={blockers.length > 0 || Boolean(activeOperations[incidentRepairTrackId])}
-                                className="mt-2 w-full rounded-lg border border-[#c4ab58] bg-[#d3b457] px-3 py-2 text-[8px] font-black uppercase tracking-[0.1em] text-[#1b211b] transition hover:bg-[#f0d276] disabled:cursor-not-allowed disabled:border-[#3b4c4f] disabled:bg-[#182326] disabled:text-[#708582]"
-                              >
-                                {blockers.length ? "Procedure locked" : "Start repair work order →"}
-                              </button>
-                            </div>
-                          );
-                        })}
-                        {incidentRepairOptions.filter((option) => option.category === incidentRepairCategory).length === 0 && (
-                          <p className="rounded-lg border border-[#40565b] bg-[#0d1c22] p-3 text-[9px] text-[#aab8b9]">No procedures are defined for this category and system.</p>
-                        )}
-                      </div>
-                    </section>
-                  )}
-
                 <section>
                   <div className="mb-3 flex items-end justify-between gap-3">
                     <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#ff868e]">Response console</p><h2 className="mt-1 text-base font-black uppercase tracking-[0.07em] text-white">Choose your action</h2></div>
