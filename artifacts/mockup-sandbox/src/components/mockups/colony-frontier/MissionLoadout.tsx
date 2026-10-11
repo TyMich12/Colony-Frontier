@@ -207,7 +207,7 @@ function CategoryHeader({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-auto min-h-[54px] self-start w-full items-center justify-between gap-1.5 border p-1.5 text-left transition ${
+      className={`flex h-auto min-h-[96px] self-start w-full items-center justify-between gap-2 border p-3 text-left transition ${
         essentialBlocked
           ? "border-[#ff2f2f] bg-[#3a0b0b] shadow-[0_0_22px_rgba(255,47,47,0.32)] hover:border-[#ff6666]"
           : categoryBlocked
@@ -222,31 +222,31 @@ function CategoryHeader({
       }`}
       aria-expanded={open}
     >
-      <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-2.5">
         <div
-          className="grid h-6 w-6 shrink-0 place-items-center border bg-[#0a171e]"
+          className="grid h-8 w-8 shrink-0 place-items-center border bg-[#0a171e]"
           style={{ borderColor: categoryColor, color: categoryColor }}
         >
-          <Icon className="h-3.5 w-3.5" />
+          <Icon className="h-4 w-4" />
         </div>
 
         <div className="min-w-0">
           <p
-            className="hidden text-[7px] font-bold uppercase tracking-[0.08em] sm:block"
+            className="hidden text-[8px] font-bold uppercase tracking-[0.1em] sm:block"
             style={{ color: categoryColor }}
           >
             Technology category
           </p>
 
           <h3
-            className="text-[9px] font-semibold uppercase tracking-[0.04em] sm:text-[10px]"
+            className="text-[11px] font-semibold uppercase tracking-[0.05em] sm:text-xs"
             style={{ color: categoryColor }}
           >
             {track.category}
           </h3>
 
           <p
-            className="mt-px line-clamp-1 text-[6px] font-bold uppercase tracking-[0.04em] sm:text-[7px]"
+            className="mt-0.5 line-clamp-1 text-[7px] font-bold uppercase tracking-[0.05em] sm:text-[8px]"
             style={{ color: categoryColor }}
           >
             {categoryStatus}
@@ -254,10 +254,10 @@ function CategoryHeader({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-1">
         {selectedTier && (
           <span
-            className="hidden border bg-[#0a171e] px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.08em] sm:inline"
+            className="hidden border bg-[#0a171e] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.12em] sm:inline"
             style={{ borderColor: categoryColor, color: categoryColor }}
           >
             {selectedTier}
@@ -265,9 +265,9 @@ function CategoryHeader({
         )}
 
         {open ? (
-          <ChevronDown className="h-3 w-3 text-[#efb658]" />
+          <ChevronDown className="h-4 w-4 text-[#efb658]" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-[#67817e]" />
+          <ChevronRight className="h-4 w-4 text-[#67817e]" />
         )}
       </div>
     </button>
