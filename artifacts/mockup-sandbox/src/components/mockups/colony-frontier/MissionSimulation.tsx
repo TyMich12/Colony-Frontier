@@ -738,7 +738,7 @@ function dustTransmission(dust: number): number {
   return points[points.length - 1].transmission;
 }
 
-function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}, elapsedSeconds = LEVEL1_ENVIRONMENT.secondsPerEarthDay * 6, campaign: "moon" | "mars" = "moon"): { label: string; value: string } {
+function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}, elapsedSeconds = LEVEL1_ENVIRONMENT.secondsPerEarthDay * 6, campaign: "moon" | "mars" = "moon", missionTitle = "", missionNumber = ""): { label: string; value: string } {
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
   const stateIndex = baselineStateIndex(tier, upgradeLevel);
@@ -757,10 +757,12 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
       const liveDay = Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
       const liveProfile = interpolateSolarProfile(liveDay);
       const liveCellTemperatureLoss = liveProfile.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, liveProfile.cellTempC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
-      const liveSunlight = campaign === "mars" ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10) : liveProfile.sunlightGeometry;
+      const missionFraction = clamp(elapsedSeconds / TOTAL_MISSION_SECONDS, 0, 1);
+      const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || missionNumber === "02");
+      const liveSunlight = blackoutMission ? (missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28) : campaign === "mars" ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10) : liveProfile.sunlightGeometry;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
       const checkpointKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
-      const currentKW = Math.min(rating, rating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
+      const currentKW = _condition < 28 ? 0 : Math.min(rating, rating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
       label = "Solar output · rated / Day 7 checkpoint / current live output";
       value = `${formatRating(rating)} kW rated · ${checkpointKW.toFixed(3)} kW Day 7 · ${currentKW.toFixed(3)} kW current · ${(currentKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5)} kWh / 10 sim s`;
       break;
@@ -1374,6 +1376,8 @@ function BuildingInspector({
   partsInventoryKg,
   simulationSpeed,
   campaign,
+  missionTitle,
+  missionNumber,
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1400,6 +1404,8 @@ function BuildingInspector({
   partsInventoryKg: number;
   simulationSpeed: number;
   campaign: "moon" | "mars";
+  missionTitle: string;
+  missionNumber: string;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1549,8 +1555,8 @@ function BuildingInspector({
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
             <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
             <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign).label}</span>
-              <span className="min-w-0 whitespace-normal break-words text-right font-mono text-[10px] font-black leading-5 text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign).value}</span>
+              <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).label}</span>
+              <span className="min-w-0 whitespace-normal break-words text-right font-mono text-[10px] font-black leading-5 text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value}</span>
             </div>
             <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes only this rated capability. It does not restore condition, remove dust, clear faults or refill stored resources; the next tier is a separate rating state.</p>
             {runtime.repairMetrics && Object.keys(runtime.repairMetrics).some((metric) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)) && <div className="mt-2 border-t border-[#284542] pt-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#87aaa2]">Last measured repair / calibration outputs</p>{Object.entries(runtime.repairMetrics).filter(([metric]) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)).map(([metric, amount]) => <p key={metric} className="mt-1 text-[8px] leading-4 text-[#a8c6ba]">{metric}: <span className="font-mono text-[#d9f3e1]">{formatRating(amount)}</span></p>)}</div>}
@@ -1796,7 +1802,7 @@ function BuildingInspector({
                     </span>
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${displayedActionDurationLabel}s`}</span>
                   </span>
-                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${displayedActionDurationLabel}s at current simulation speed`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
+                  <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${displayedActionDurationLabel}s real time`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Standalone operation ready" : "Prerequisites satisfied"}</span>}
                 </span>
               </span>
@@ -2527,7 +2533,7 @@ export function MissionSimulation() {
           : Math.min(-solarNetKW, batteryDischargeLimitKW, dt > 0 ? storedEnergyKWh / (dt / 3600) : 0);
         const deliveredSourceKW = solarGeneration + Math.max(0, batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
-        const powerBase = clamp(50 + 50 * (deliveredSourceKW - baseLoadKW) / Math.max(1, baseLoadKW));
+        const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
         const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * dt / 3600 : 0;
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-dt / 7200));
@@ -4305,6 +4311,8 @@ export function MissionSimulation() {
             getBlockers={checkActionPrerequisites}
             simulationSpeed={speed}
             campaign={pending.campaign}
+            missionTitle={pending.missionTitle}
+            missionNumber={pending.missionNumber}
           />
         )}
 
