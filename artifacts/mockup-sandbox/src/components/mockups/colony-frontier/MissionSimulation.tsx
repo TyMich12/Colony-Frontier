@@ -3241,7 +3241,7 @@ export function MissionSimulation() {
     }
   };
   const handleBuildingAction = (trackId: string, action: string) => {
-    if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || activeEventId || results) return;
+    if (!pending?.selected[trackId] || activeOperationsRef.current[trackId] || Object.values(activeOperationsRef.current).some((job) => job.supportSystems?.includes(trackId)) || activeEventId || results) return;
     const repairOption = action.startsWith("repair:") ? getRepairOption(trackId, action.slice("repair:".length)) : action === "repair-active" ? getRepairOptions(trackId).find((option) => option.category === "Standalone") : undefined;
     const integratedVariant = decodeActionVariant(trackId, action);
     const baseActionId = integratedVariant?.baseActionId ?? action;
@@ -4276,9 +4276,9 @@ export function MissionSimulation() {
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => setSelectedBuildingId(null)}
             hasMaintenance={pending.selected.maintenance !== undefined}
-            operation={activeOperations[selectedTrack.id] ?? null}
+            operation={activeOperations[selectedTrack.id] ?? Object.values(activeOperations).find((job) => job.supportSystems?.includes(selectedTrack.id)) ?? null}
             activeFault={Object.values(activeFaults).find((fault) => fault.targetTrackId === selectedTrack.id) ?? null}
-            actionBusy={Boolean(activeOperations[selectedTrack.id])}
+            actionBusy={Boolean(activeOperations[selectedTrack.id] || Object.values(activeOperations).some((job) => job.supportSystems?.includes(selectedTrack.id)))}
             activeEvent={activeEvent && selectedBuildingId === activeTargetTrackId ? activeEvent : null}
             eventChoices={activeEvent && selectedBuildingId === activeTargetTrackId ? getEventChoices(activeEvent, pending.selected) : []}
             onEventChoice={handleEventChoice}
