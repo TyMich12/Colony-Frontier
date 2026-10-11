@@ -1677,7 +1677,7 @@ function BuildingInspector({
               {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
                 const blockers = getBlockers(track.id, `repair:${option.id}`);
                 const tierIndex = effectiveRepairTierIndex(tier, option.requiredSystems, selected);
-                const outcomeLines = describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
+                const outcomeLines = option.systemId === "battery" ? ["Battery recovery pauses non-essential loads; charge increases only from available solar surplus during the operation. No energy is created."] : describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
                 const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
                 return (
                   <button
@@ -1690,7 +1690,7 @@ function BuildingInspector({
                     <span className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1 whitespace-normal break-words text-[9px] font-black leading-4 text-[#e1eeee]">{option.name}</span>
                       <span className="shrink-0 rounded-md border border-[#526d88] bg-[#192c3e] px-2 py-1 font-mono text-[8px] font-black text-[#a9d8ff]">
-                        {option.durationsMinutes[tierIndex]} game min
+                        {(option.category === "Standalone" ? [8, 9, 10, 12][tierIndex] : option.category === "Enhanced" ? [15, 16, 18, 20][tierIndex] : option.category === "Dual" ? [22, 24, 27, 30][tierIndex] : [30, 33, 36, 40][tierIndex])} s
                       </span>
                     </span>
                     <span className="mt-1 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#91aaa9]">{option.mechanism}</span>
@@ -1776,7 +1776,7 @@ function BuildingInspector({
                 : "";
             const variant = decodeActionVariant(track.id, action.id);
             const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[variant?.baseActionId ?? action.id] ?? 6);
-            const displayedActionDuration = actionDuration / Math.max(0.1, simulationSpeed);
+            const displayedActionDuration = actionDuration;
             const displayedActionDurationLabel = Number.isInteger(displayedActionDuration) ? displayedActionDuration.toFixed(0) : displayedActionDuration.toFixed(1);
                       return (
             <button
@@ -2250,7 +2250,9 @@ export function MissionSimulation() {
             ? (/of current dust/i.test(option.unit)
                 ? `Solar dust: removed ${formatRating(outcome)}% of the deposit present when the repair finished`
                 : `Solar dust: −up to ${formatRating(outcome)} points (the dust index cannot fall below zero)`)
-            : describeRepairOutcome(repairTarget, option.metric, option.unit, outcome),
+            : option.systemId === "battery"
+              ? "Battery recovery pauses non-essential loads; stored charge changes only through the live generation/load balance during the operation. No charge is added automatically."
+              : describeRepairOutcome(repairTarget, option.metric, option.unit, outcome),
           ...(option.secondary && secondaryValue !== null
             ? [describeRepairOutcome(repairTarget, option.secondary.metric, option.secondary.unit, secondaryValue)]
             : []),
@@ -3376,7 +3378,7 @@ export function MissionSimulation() {
         roverCanAssist,
         repairSupports,
       );
-      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Consumes ${selectedRepair.energyKWh} kWh and ${selectedRepair.partsMassKg} kg of parts. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. Battery recovery pauses non-essential loads; any charge comes only from live solar surplus.`);
+      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Consumes ${selectedRepair.energyKWh} kWh and ${selectedRepair.partsMassKg} kg of parts. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
       return;
     }
 
