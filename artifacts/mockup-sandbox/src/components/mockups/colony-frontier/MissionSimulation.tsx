@@ -1490,7 +1490,7 @@ function BuildingInspector({
   }, [activeFault?.eventId, track.id]);
   const primaryRepairMetric = getPrimaryRepairMetric(track.id);
   const remainingRepairGap = primaryRepairMetric ? runtime.repairMetrics?.[repairGapKey(primaryRepairMetric)] : undefined;
-  const actions = allActions.filter((action) => { const variant = decodeActionVariant(track.id, action.id); return !variant || variant.mask === 0; });
+  const actions = allActions.filter((action) => !/^variant:/.test(action.id));
   const Icon = categoryIcons[track.category as keyof typeof categoryIcons] ?? Factory;
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
@@ -1627,7 +1627,7 @@ function BuildingInspector({
                       type="button"
                       onClick={() => setRepairCategory(category)}
                       aria-pressed={repairCategory === category}
-                      className={`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] transition ${repairCategory === category ? "border-[#f0ca63] bg-[#e1b952] text-[#1e211c]" : "border-[#40565b] bg-[#0b1519] text-[#aab8b9] hover:border-[#e8c568]"}`}
+                      className={`rounded-lg border px-2 py-2 text-[8px] font-black uppercase tracking-[0.08em] transition ${category === "Standalone" ? (repairCategory === category ? "border-[#79d9a1] bg-[#286b49] text-white" : "border-[#32674b] bg-[#0b1519] text-[#9bdcb4] hover:border-[#79d9a1]") : category === "Enhanced" ? (repairCategory === category ? "border-[#72c8ff] bg-[#245b80] text-white" : "border-[#2c5b77] bg-[#0b1519] text-[#91d4ff] hover:border-[#72c8ff]") : category === "Dual" ? (repairCategory === category ? "border-[#c49bff] bg-[#5b3b86] text-white" : "border-[#5b4378] bg-[#0b1519] text-[#c6a7f4] hover:border-[#c49bff]") : (repairCategory === category ? "border-[#f0ca63] bg-[#9a7421] text-white" : "border-[#705b2b] bg-[#0b1519] text-[#e6c96f] hover:border-[#f0ca63]")}`}
                     >
                       <span className="block">{label}</span>
                       <span className={`mt-0.5 block font-mono text-[7px] ${repairCategory === category ? "text-[#403a24]" : "text-[#759391]"}`}>
@@ -1961,7 +1961,11 @@ export function MissionSimulation() {
   const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
   const runtime = pending ? loadMissionRuntime(pending.missionId) : null;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
-  const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
+  const [elapsed, setElapsed] = useState(() => {
+    const savedElapsed = runtime?.elapsedSeconds ?? 0;
+    // A completed/stale snapshot must not reopen a fresh mission at Day 14.
+    return savedElapsed >= TOTAL_MISSION_SECONDS ? 0 : Math.max(0, savedElapsed);
+  });
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
@@ -2164,7 +2168,7 @@ export function MissionSimulation() {
           ? dustAfter <= 0.0001
           : remainingGapAfter !== null
             ? remainingGapAfter <= 0.0001
-            : true);
+            : false);
         setActiveFaults((current) => {
           if (faultResolved) return Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget));
           return Object.fromEntries(Object.entries(current).map(([key, fault]) => [
@@ -3125,6 +3129,7 @@ export function MissionSimulation() {
     actionId?: string,
     operationKey = targetId,
     roverAssigned = false,
+    supportSystems: string[] = [],
   ) => {
     if (!pending || activeOperationsRef.current[operationKey] || activeEventId || results) return;
     const operation: MissionOperation = {
@@ -3136,6 +3141,7 @@ export function MissionSimulation() {
       remainingSeconds: kind === "REPAIR" || kind === "UPGRADE" ? durationSeconds : durationSeconds * GAME_TIME_ACCELERATION,
       operationKey,
       ...(roverAssigned ? { roverAssigned: true } : {}),
+      ...(supportSystems.length ? { supportSystems: [...supportSystems] } : {}),
       ...(targetLevel !== undefined ? { targetLevel } : {}),
       ...(specimenQuality !== undefined ? { sampleQuality: specimenQuality } : {}),
       ...(actionId !== undefined ? { actionId } : {}),
@@ -3291,8 +3297,9 @@ export function MissionSimulation() {
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
       fault.targetTrackId === trackId && effectiveAction === "repair-active",
     );
-    if (matchingFaults.length > 0) {
-      const repairTargetId = trackId === "maintenance"
+    // Workbook repair procedures are also preventive maintenance: they can run without an active fault.
+    if (repairOption || matchingFaults.length > 0) {
+      const repairTargetId = trackId === "maintenance" && matchingFaults.length > 0 && !repairOption
         ? [...matchingFaults].sort((a, b) => b.severity - a.severity)[0].targetTrackId
         : trackId;
       if (activeOperationsRef.current[repairTargetId]) {
@@ -3331,6 +3338,7 @@ export function MissionSimulation() {
         `repair:${selectedRepair.id}`,
         repairTargetId,
         roverCanAssist,
+        repairSupports,
       );
       setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Tier-limited result: ${durationMinutes} simulated minutes, ${selectedRepair.energyKWh} kWh, and ${selectedRepair.partsMassKg} kg of parts. Support requirements are limited to: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}.`);
       return;
@@ -3866,6 +3874,8 @@ export function MissionSimulation() {
     }
     const runningOperation = activeOperationsRef.current[systemId];
     if (runningOperation) blockers.push(`Target system already has an active work order: ${runningOperation.label}.`);
+    const supportWork = Object.values(activeOperationsRef.current).find((job) => job.supportSystems?.includes(systemId));
+    if (supportWork) blockers.push(`${SYSTEM_LABELS[systemId] ?? systemId} is supporting the active repair “${supportWork.label}”.`);
     return [...new Set(blockers)];
   };
 
@@ -4191,7 +4201,7 @@ export function MissionSimulation() {
                           setSelectedBuildingId(fieldNode ? null : job.targetId);
                           setDashboardOpen(false);
                         }} className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#2a5a4a] bg-[#0c211d] px-2.5 py-2 text-left hover:border-[#76dda8]">
-                          <span className="min-w-0 truncate text-[9px] font-bold text-[#e2f4e9]">{job.label}</span>
+                          <span className="min-w-0 flex-1 text-left"><span className="block truncate text-[9px] font-bold text-[#e2f4e9]">{job.label}</span>{job.supportSystems?.length ? <span className="mt-0.5 block text-[8px] text-[#8fc8b0]">Systems: {[job.targetId, ...job.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</span> : null}<span className="mt-0.5 block text-[8px] font-mono text-[#b2d9c1]">{Math.ceil(job.remainingSeconds / 60)} game min remaining</span></span>
                           <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-[#93e8b6]">Open system →</span>
                         </button>
                       ))}
