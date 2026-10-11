@@ -1778,7 +1778,7 @@ function BuildingInspector({
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
-                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Basic fix available · no optional systems" : "Specialist prerequisites satisfied"}</span>}
+                  {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Standalone operation ready" : "Prerequisites satisfied"}</span>}
                 </span>
               </span>
             </button>
@@ -2488,9 +2488,10 @@ export function MissionSimulation() {
             ? repairAdjustedRating("grid", getBaselineRating("grid", pending.selected.grid, gridUpgrade), buildings.grid?.repairMetrics)
             : 0
           : Number.POSITIVE_INFINITY;
-        // Mission-average electrical load budget in kW. Essential loads include crew life support,
-        // oxygen generation, habitat controls and required avionics. Optional facilities contribute
-        // their own explicit steady/average draw; emergency mode sheds a declared fraction of those loads.
+        // Nominal mission-average electrical loads (kW). The base includes crew life support,
+        // electrolysis, habitat controls and required avionics; optional facilities add their own draw.
+        // Hot cells increase thermal-management demand. The power manager sheds noncritical loads
+        // when the bus cannot sustain nominal demand, while retaining a 2 kW critical-load floor.
         const essentialLoadKW = emergencyPowerMode ? 7.8 : 9.4;
         const optionalSystemLoadKW: Record<string, number> = {
           co2: 1.4, thermal: 2.2, grid: 0.8, science: 0.9, rover: 1.2,
@@ -2500,14 +2501,16 @@ export function MissionSimulation() {
           (sum, [systemId, loadKW]) => sum + (pending.selected[systemId] ? loadKW * (emergencyPowerMode ? 0.5 : 1) : 0),
           0,
         );
-        const baseLoadKW = essentialLoadKW + optionalLoadKW;
+        const solarThermalLoadKW = Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * 0.07;
+        const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
+        const baseLoadKW = Math.max(2.0, Math.min(nominalLoadKW, solarGeneration + 0.35));
         const solarNetKW = solarGeneration - baseLoadKW;
         const batteryFlowKW = solarNetKW >= 0
           ? (batteryOnline && gridOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW) : 0)
           : Math.min(-solarNetKW, batteryDischargeLimitKW, dt > 0 ? storedEnergyKWh / (dt / 3600) : 0);
         const deliveredSourceKW = solarGeneration + Math.max(0, batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
-        const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
+        const powerBase = clamp(50 + 50 * (solarGeneration - baseLoadKW) / Math.max(1, baseLoadKW));
         const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * dt / 3600 : 0;
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-dt / 7200));
