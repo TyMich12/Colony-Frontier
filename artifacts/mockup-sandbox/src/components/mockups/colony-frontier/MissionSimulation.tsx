@@ -1977,7 +1977,7 @@ function ResourceInspector({
           )}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#263f3e] pt-3 text-[9px]">
             <span className="text-[#7e9a92]">Rover: {hasRover ? "deployed" : "missing"} · Core drill: {hasExtraction ? "deployed" : "required for ICE/MINERAL"} · Science lab: {hasScience ? "deployed" : "required for analysis"}</span>
-            {operation && <span className="font-bold uppercase tracking-[0.12em] text-[#a9f2c8]">Working · {(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${formatWallClockCountdown(operation.remainingSeconds, simulationSpeed)}s`}</span>}
+            {operation && <span className="font-bold uppercase tracking-[0.12em] text-[#a9f2c8]">Working · {formatWallClockCountdown(operation.remainingSeconds, simulationSpeed)}s</span>}
           </div>
         </div>
       </div>
@@ -4245,7 +4245,7 @@ export function MissionSimulation() {
                           setSelectedBuildingId(fieldNode ? null : job.targetId);
                           setDashboardOpen(false);
                         }} className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#2a5a4a] bg-[#0c211d] px-2.5 py-2 text-left hover:border-[#76dda8]">
-                          <span className="min-w-0 flex-1 text-left"><span className="block truncate text-[9px] font-bold text-[#e2f4e9]">{job.label}</span>{job.supportSystems?.length ? <span className="mt-0.5 block text-[8px] text-[#8fc8b0]">Systems: {[job.targetId, ...job.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</span> : null}<span className="mt-0.5 block text-[8px] font-mono text-[#b2d9c1]">{Math.ceil(job.remainingSeconds / 60)} game min remaining</span></span>
+                          <span className="min-w-0 flex-1 text-left"><span className="block truncate text-[9px] font-bold text-[#e2f4e9]">{job.label}</span>{job.supportSystems?.length ? <span className="mt-0.5 block text-[8px] text-[#8fc8b0]">Systems: {[job.targetId, ...job.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</span> : null}<span className="mt-0.5 block text-[8px] font-mono text-[#b2d9c1]">{formatWallClockCountdown(job.remainingSeconds, speed)}s remaining</span></span>
                           <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-[#93e8b6]">Open system →</span>
                         </button>
                       ))}
