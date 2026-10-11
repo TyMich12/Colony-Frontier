@@ -336,13 +336,7 @@ const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
 };
 
 // Standalone repairs are always available. Optional integrations never require essential Solar or Habitat as support.
-const SUPPORT_SHORT_LABELS: Record<string, string> = {
-  solar: "Solar", battery: "Battery", grid: "Power grid", habitat: "Habitat",
-  water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
-  radiation: "Shielding", comms: "Comms relay", navigation: "Navigation", rover: "Rover",
-  extraction: "Core drill", isru: "ISRU processor", science: "Science lab",
-  agriculture: "Greenhouse", maintenance: "Maintenance bay",
-};
+
 
 type DecodedActionVariant = { baseActionId: string; mask: number; supportSystems: string[] };
 
@@ -1763,7 +1757,6 @@ function BuildingInspector({
                     <span className="rounded-md border border-[#45636a] bg-[#0b171b] px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#9de8c0]">{actionDuration === 0 ? "INSTANT" : `~${actionDuration}s`}</span>
                   </span>
                   <span className="mt-1.5 block text-[9px] leading-4 text-[#a9c2c4]">{action.id === "request-earth-report" ? `Earth Mission Control report · ${actionDuration === 0 ? "instant local predictive cache" : `${actionDuration}s simulated processing queue`}` : `${SYSTEM_ACTION_EFFECTS[action.id] ?? action.detail}`}</span>
-          <span className="mt-1 block text-[7px] leading-3 text-[#779891]">Shown at Foundation 0/2. Higher technology tiers improve the base result more than both retrofit steps combined.</span>
                   {locked ? <span className="mt-2 block rounded-lg border border-[#74424b] bg-[#2b1b20] px-2 py-1.5 text-[8px] font-bold leading-4 text-[#ffabb2]">{fallbackRemaining > 0 ? "BACKUP RECHARGING" : emergencyOverride ? "EMERGENCY OVERRIDE READY" : "LOCKED"} · {lockMessage}</span> : <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.1em] text-[#83dba7]">{action.id.startsWith("fallback-") ? "Basic fix available · no optional systems" : "Specialist prerequisites satisfied"}</span>}
                 </span>
               </span>
