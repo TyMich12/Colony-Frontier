@@ -1586,7 +1586,7 @@ function BuildingInspector({
                 <Activity className="h-4 w-4 shrink-0 animate-pulse" />
                 <div className="min-w-0">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em]">Work in progress</p>
-                  <p className="mt-0.5 truncate text-[10px] font-bold text-white">{operation.label}</p>
+                  <p className="mt-0.5 truncate text-[10px] font-bold text-white">{operation.label}</p>{operation.supportSystems?.length ? <p className="mt-1 text-[8px] font-semibold text-[#8fc8b0]">Systems: {[operation.targetId, ...operation.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</p> : null}
                 </div>
               </div>
               <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{(operation.kind === "REPAIR" || operation.kind === "UPGRADE") ? `${Math.ceil(operation.remainingSeconds / 60)} game min` : `${Math.ceil(operation.remainingSeconds / GAME_TIME_ACCELERATION)}s`}</span>
