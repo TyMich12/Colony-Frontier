@@ -1621,7 +1621,7 @@ function BuildingInspector({
                   <p className="mt-0.5 min-w-0 whitespace-normal break-words text-[10px] font-bold leading-4 text-white">{operation.label}</p>{operation.supportSystems?.length ? <p className="mt-1 text-[8px] font-semibold text-[#8fc8b0]">Systems: {[operation.targetId, ...operation.supportSystems].map((id) => SYSTEM_LABELS[id] ?? id).join(" + ")}</p> : null}
                 </div>
               </div>
-              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{`${formatWallClockCountdown(operation.remainingSeconds, speed)}s`}</span>
+              <span className="shrink-0 rounded-lg border border-[#7dd6ad]/40 bg-[#071c19]/80 px-2.5 py-1.5 font-mono text-sm font-black text-[#b0ffd0]">{`${formatWallClockCountdown(operation.remainingSeconds, simulationSpeed)}s`}</span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#233f3e]">
               <div className="h-full rounded-full bg-gradient-to-r from-[#31ce9b] to-[#f1d16a] transition-[width]" style={{ width: `${clamp(100 * (1 - operation.remainingSeconds / operation.totalSeconds))}%` }} />
