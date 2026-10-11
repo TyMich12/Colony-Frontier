@@ -1959,13 +1959,11 @@ export function MissionSimulation() {
   // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
   const missionStage = pending ? Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1) : 1;
   const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
-  const runtime = pending ? loadMissionRuntime(pending.missionId) : null;
+  const savedRuntime = pending ? loadMissionRuntime(pending.missionId) : null;
+  // Never hydrate a completed 14-day snapshot into a fresh active mission.
+  const runtime = savedRuntime && savedRuntime.elapsedSeconds < TOTAL_MISSION_SECONDS ? savedRuntime : null;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
-  const [elapsed, setElapsed] = useState(() => {
-    const savedElapsed = runtime?.elapsedSeconds ?? 0;
-    // A completed/stale snapshot must not reopen a fresh mission at Day 14.
-    return savedElapsed >= TOTAL_MISSION_SECONDS ? 0 : Math.max(0, savedElapsed);
-  });
+  const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
