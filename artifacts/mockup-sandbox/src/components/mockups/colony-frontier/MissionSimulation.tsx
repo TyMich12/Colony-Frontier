@@ -338,6 +338,14 @@ const ACTION_VARIANT_PROFILES: Record<string, ActionVariantProfile> = {
 // Standalone repairs are always available. Optional integrations never require essential Solar or Habitat as support.
 
 
+const SUPPORT_SHORT_LABELS: Record<string, string> = {
+  solar: "Solar", battery: "Battery", grid: "Power grid", habitat: "Habitat",
+  water: "Water recovery", co2: "CO₂ scrubber", oxygen: "Oxygen loop", thermal: "Thermal control",
+  radiation: "Shielding", comms: "Comms relay", navigation: "Navigation", rover: "Rover",
+  extraction: "Core drill", isru: "ISRU processor", science: "Science lab",
+  agriculture: "Greenhouse", maintenance: "Maintenance bay",
+};
+
 type DecodedActionVariant = { baseActionId: string; mask: number; supportSystems: string[] };
 
 function decodeActionVariant(systemId: string, actionId: string): DecodedActionVariant | null {
