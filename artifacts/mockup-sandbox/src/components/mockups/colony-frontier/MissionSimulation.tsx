@@ -4100,12 +4100,16 @@ export function MissionSimulation() {
         setScore((value) => clamp(value + gain(7)));
         setAiMessage("Extraction sample collected. Resource yield increased, but the operation consumed colony power.");
         break;
-      case "process":
-        setResourceYield((value) => value + gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current));
+      case "process": {
+        const processedMaterialKg = gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current);
+        setResourceYield((value) => value + processedMaterialKg);
+        // Processed ISRU feed is the local source of retrofit / repair material stock.
+        setPartsInventoryKg((value) => value + processedMaterialKg);
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
         setScore((value) => clamp(value + gain(5)));
-        setAiMessage("ISRU feed processed. Local material was converted into a useful colony stockpile.");
+        setAiMessage(`ISRU feed processed. Produced ${processedMaterialKg.toFixed(1)} kg of local material; available retrofit / repair stock is now ${(partsInventoryKg + processedMaterialKg).toFixed(1)} kg. Processing consumes power and battery energy.`);
         break;
+      }
       case "purge":
         conditionBoost(2);
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(1)) }));
