@@ -2009,7 +2009,8 @@ export function MissionSimulation() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
-  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, consumptionKW: 2.55, batteryFlowKW: 0, enduranceHours: null as number | null });
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, consumptionKW: 2.55, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
+  const [pulseExpandedMetric, setPulseExpandedMetric] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
   buildingsRef.current = buildings;
@@ -2566,10 +2567,28 @@ export function MissionSimulation() {
         // The POWER gauge tracks generation margin, not battery state of charge. Solar output can
         // recover immediately while surplus electricity simultaneously charges the battery.
         const powerBase = clamp(50 + 50 * (solarGeneration - baseLoadKW) / Math.max(1, baseLoadKW));
+        const generationSources = [
+          ...(solarGeneration > 0.001 ? [{ label: "Solar array", kw: solarGeneration }] : []),
+          ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW }] : []),
+        ];
+        const optionalDemandSources = Object.entries(optionalSystemLoadKW)
+          .filter(([systemId]) => Boolean(pending.selected[systemId]))
+          .map(([systemId, requestedKW]) => ({
+            label: SYSTEM_LABELS[systemId] ?? systemId,
+            kw: requestedOptionalLoadKW > 0 ? requestedKW * (emergencyPowerMode ? 0.5 : 1) * (optionalLoadKW / Math.max(0.001, requestedOptionalLoadKW)) : 0,
+          }))
+          .filter((source) => source.kw > 0.001);
+        const demandSources = [
+          { label: "Core life support and habitat", kw: essentialLoadKW },
+          ...(solarThermalLoadKW > 0.001 ? [{ label: "Solar-array thermal management", kw: solarThermalLoadKW }] : []),
+          ...optionalDemandSources,
+        ];
         setElectricalReadings({
-          generationKW: solarGeneration,
+          generationKW: solarGeneration + Math.max(0, batteryFlowKW),
           consumptionKW: nominalLoadKW,
           batteryFlowKW,
+          generationSources,
+          demandSources,
           // Estimate time until the protected SOC floor using the actual current deficit.
           // A tiny deficit should correctly show a long endurance; do not force needless discharge.
           enduranceHours: batteryFlowKW > 0.01
@@ -4110,29 +4129,65 @@ export function MissionSimulation() {
         />
 
         {!activeEvent && !dashboardOpen && (
-          <div className="pointer-events-none absolute right-3 top-[58px] z-20 w-[min(90vw,470px)]">
-            <div className="overflow-hidden rounded-xl border border-[#41696a] bg-[#08171b]/[0.92] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.38)] backdrop-blur-xl">
+          <div className="pointer-events-none absolute right-3 top-[58px] z-20 w-[min(92vw,500px)]">
+            <div className="pointer-events-auto overflow-hidden rounded-xl border border-[#41696a] bg-[#08171b]/[0.94] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.38)] backdrop-blur-xl">
               <div className="mb-1 flex items-center justify-between gap-2 px-0.5">
                 <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
                 <span className="font-mono text-[8px] font-bold text-[#f0cf69]">STABILITY {Math.round(performance.colonyHealth)}/100</span>
               </div>
               <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                 {[
-                  { label: "GEN", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(1)} kW`, icon: <Sun className="h-3 w-3" /> },
-                  { label: "LOAD", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
-                  { label: "BATTERY", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
-                  { label: "FLOW", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `+${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charge` : `-${electricalReadings.batteryFlowKW.toFixed(2)} kW · ${electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h left` : "discharging"}`, icon: <BatteryCharging className="h-3 w-3" /> },
+                  { id: "generation", label: "Generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
+                  { id: "demand", label: "Power demand", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
+                  { id: "battery", label: "Battery reserve", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
+                  { id: "batteryFlow", label: "Charging / discharging", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charging` : `${electricalReadings.batteryFlowKW.toFixed(2)} kW discharging`, icon: <BatteryCharging className="h-3 w-3" /> },
                 ].map((metric) => (
-                  <div key={metric.label} className={`min-w-0 rounded-lg border px-1.5 py-1 transition-colors ${metric.value < 28 ? "border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
-                    <div className="flex items-center gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.08em]">{metric.label}</span></div>
+                  <button key={metric.id} type="button" aria-expanded={pulseExpandedMetric === metric.id} onClick={() => setPulseExpandedMetric((current) => current === metric.id ? null : metric.id)} className={`min-w-0 rounded-lg border px-1.5 py-1 text-left transition-colors hover:border-[#d7bd6b] ${metric.value < 28 ? "border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
+                    <div className="flex items-center gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.04em]">{metric.label}</span><span className="ml-auto text-[8px]">{pulseExpandedMetric === metric.id ? "−" : "+"}</span></div>
                     <div className="mt-0.5 truncate font-mono text-[10px] font-black leading-4" style={{ color: resourceColor(metric.value) }}>{metric.display}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
-              {(metrics.oxygen < 28 || metrics.water < 28) && (
-                <div className="mt-1 rounded-md border border-[#d75d69] bg-[#321a21] px-2 py-1 text-[8px] font-bold text-[#ffb3b6]">
-                  LIFE SUPPORT WARNING · {metrics.oxygen < 28 ? "O₂ reserve low" : ""}{metrics.oxygen < 28 && metrics.water < 28 ? " · " : ""}{metrics.water < 28 ? "Water reserve low" : ""}
+              {pulseExpandedMetric && (
+                <div className="mt-1.5 rounded-lg border border-[#2d4a4e] bg-[#0b2024] p-2">
+                  {pulseExpandedMetric === "generation" && (
+                    <>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Power sources · share of total generation</p>
+                      {electricalReadings.generationSources.length ? electricalReadings.generationSources.map((source) => (
+                        <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.generationKW > 0 ? (source.kw / electricalReadings.generationKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
+                      )) : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
+                      <p className="mt-1 text-[8px] text-[#789a96]">Only active sources are listed. This mission currently has no nuclear generator.</p>
+                    </>
+                  )}
+                  {pulseExpandedMetric === "demand" && (
+                    <>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Power demand · share of total demand</p>
+                      {electricalReadings.demandSources.map((source) => (
+                        <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.consumptionKW > 0 ? (source.kw / electricalReadings.consumptionKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
+                      ))}
+                      <p className="mt-1 text-[8px] text-[#789a96]">Demand uses the same live load calculation as the simulation; optional loads can be shed in low-battery mode.</p>
+                    </>
+                  )}
+                  {pulseExpandedMetric === "battery" && (
+                    <>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Stored electrical energy</p>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Battery bank</span><span className="font-mono text-[#f0cf69]">{physicalTelemetry.battery} · {metrics.battery.toFixed(1)}% charge</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Protected reserve floor</span><span className="font-mono text-[#f0cf69]">{LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent}% charge</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Battery capacity</span><span className="font-mono text-[#f0cf69]">{ratedBatteryCapacityKWh(pending?.selected ?? {}, buildings).toFixed(0)} kWh</span></div>
+                    </>
+                  )}
+                  {pulseExpandedMetric === "batteryFlow" && (
+                    <>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Live battery power rate</p>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Battery charging rate" : electricalReadings.batteryFlowKW > 0.01 ? "Battery discharging rate" : "Battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Power demand</span><span className="font-mono text-[#f0cf69]">{electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
+                    </>
+                  )}
                 </div>
+              )}
+              {(metrics.oxygen < 28 || metrics.water < 28) && (
+                <div className="mt-1 rounded-md border border-[#d75d69] bg-[#321a21] px-2 py-1 text-[8px] font-bold text-[#ffb3b6]">LIFE SUPPORT WARNING · {metrics.oxygen < 28 ? "O₂ reserve low" : ""}{metrics.oxygen < 28 && metrics.water < 28 ? " · " : ""}{metrics.water < 28 ? "Water reserve low" : ""}</div>
               )}
               {Object.values(activeOperations).length > 0 && <p className="mt-1 text-right text-[7px] font-black uppercase tracking-[0.1em] text-[#92e7b7]">{Object.values(activeOperations).length} active job(s)</p>}
             </div>
@@ -4233,7 +4288,8 @@ export function MissionSimulation() {
 
                 <div className="grid grid-cols-2 gap-2 p-3">
                   {[
-                    { label: "Available electrical power", value: metrics.power, display: (metrics.power / 100 * 12).toFixed(1) + " kW", inverse: false },
+                    { label: "Power demand", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: electricalReadings.consumptionKW.toFixed(2) + " kW", inverse: false },
+                    { label: "Battery charging / discharging rate", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : 50, display: Math.abs(electricalReadings.batteryFlowKW).toFixed(2) + " kW " + (electricalReadings.batteryFlowKW < -0.01 ? "charging" : electricalReadings.batteryFlowKW > 0.01 ? "discharging" : "idle"), inverse: false },
                     { label: "Stored energy", value: metrics.battery, display: physicalTelemetry.battery, inverse: false },
                     { label: "O₂ reserve", value: metrics.oxygen, display: (metrics.oxygen / 100 * 24).toFixed(1) + " kg O₂", inverse: false },
                     { label: "Water reserve", value: metrics.water, display: Math.round(metrics.water / 100 * 180) + " L", inverse: false },
