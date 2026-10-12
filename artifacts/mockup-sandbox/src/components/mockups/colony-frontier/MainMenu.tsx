@@ -68,10 +68,28 @@ export function MainMenu() {
   }, []);
 
   const confirmReset = () => {
+    // Remove all Colony-Frontier save data, including mission snapshots, loadouts,
+    // campaign progress, and any persisted simulation runtime. Keep unrelated app data.
+    for (const storage of [window.localStorage, window.sessionStorage]) {
+      const keysToRemove: string[] = [];
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key && /colony[-_ ]?frontier/i.test(key)) keysToRemove.push(key);
+      }
+      keysToRemove.forEach((key) => storage.removeItem(key));
+    }
     resetGameState();
-    saveGameState(STARTING_GAME_STATE);
+    saveGameState({ ...STARTING_GAME_STATE });
+    setDevCredits(String(STARTING_GAME_STATE.credits));
+    setDevXp(String(STARTING_GAME_STATE.xp));
+    setDevResearch(String(STARTING_GAME_STATE.researchTokens));
+    setDevCode("");
+    setDevMessage("");
+    setShowDevConsole(false);
+    setShowSettings(false);
     setShowResetConfirm(false);
     setResetComplete(true);
+    setShowStartingPopup(true);
   };
 
   return (
@@ -447,13 +465,14 @@ export function MainMenu() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-[#e8e9d9]">
-                    Reset campaign data
+                    Reset all game data
                   </h3>
 
                   <p className="mt-2 text-xs leading-5 text-[#9ca9a2]">
-                    Return Colony-Frontier to its original starting state.
-                    Your credits, XP, research, mission progress, and
-                    technology unlocks will be cleared.
+                    Completely restart as a new player. This clears campaign progress,
+                    mission and simulation saves, credits, XP, research, technology unlocks,
+                    and other persisted Colony-Frontier data. The new-player welcome message
+                    will appear again.
                   </p>
                 </div>
 
@@ -558,13 +577,13 @@ export function MainMenu() {
               id="reset-confirm-title"
               className="mt-7 text-xl font-semibold uppercase tracking-[0.1em] text-[#eff1dc]"
             >
-              Reset campaign data?
+              Reset everything and start as a new player?
             </h2>
 
             <p className="mt-4 text-sm leading-6 text-[#aabbb2]">
-              Are you sure you want to start over? This will permanently
-              clear your current credits, XP, research tokens, completed
-              missions, and technology unlocks.
+              Are you sure? This permanently clears all saved Colony-Frontier progress,
+              including credits, XP, research, completed missions, technology unlocks,
+              and saved mission/simulation states. The new-player welcome message will appear again.
             </p>
 
             <p className="mt-4 text-xs uppercase tracking-[0.14em] text-[#d09a6a]">
