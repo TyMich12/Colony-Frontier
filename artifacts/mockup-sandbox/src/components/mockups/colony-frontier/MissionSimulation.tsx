@@ -2629,7 +2629,8 @@ export function MissionSimulation() {
               : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
         const baseLoadKW = Math.max(2.0, nominalLoadKW);
-        const solarNetKW = solarGeneration - baseLoadKW;
+        const solarToBusKW = Math.min(solarGeneration, gridTransferLimitKW);
+        const solarNetKW = solarToBusKW - baseLoadKW;
         const batteryChargeLimitKW = batteryOnline
           ? Math.min(LEVEL1_ENVIRONMENT.batteryMaximumChargePowerKW, getAdditionalRating("battery", "continuous charge power", pending.selected.battery ?? "Foundation", batteryUpgrade))
           : 0;
@@ -2637,18 +2638,26 @@ export function MissionSimulation() {
         const dischargeEfficiency = LEVEL1_ENVIRONMENT.batteryDischargeEfficiency;
         const minimumStoredEnergyKWh = batteryCapacityKWh * LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent / 100;
         const availableStoredEnergyKWh = Math.max(0, storedEnergyKWh - minimumStoredEnergyKWh);
+        const tickHours = Math.max(0, resourceDt / 3600);
+        const energyLimitedDischargeKW = tickHours > 0 ? availableStoredEnergyKWh * dischargeEfficiency / tickHours : 0;
+        const energyLimitedChargeKW = tickHours > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (tickHours * chargeEfficiency) : 0;
+        // Positive flow is actual bus power delivered by the battery; negative flow is
+        // actual bus power diverted into charging. Respect the real deficit/surplus, rated
+        // power, remaining stored energy/capacity, and grid transfer headroom.
+        const gridHeadroomForBatteryKW = Math.max(0, gridTransferLimitKW - solarToBusKW);
         const batteryFlowKW = solarNetKW >= 0
-          ? (batteryOnline ? -Math.min(solarNetKW, batteryChargeLimitKW, resourceDt > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (resourceDt / 3600 * chargeEfficiency) : 0) : 0)
-          : Math.min(-solarNetKW, batteryDischargeLimitKW, resourceDt > 0 ? availableStoredEnergyKWh * dischargeEfficiency / (resourceDt / 3600) : 0);
-        // Positive battery flow means discharge to the bus; negative flow means charging from it.
-        const deliveredSourceKW = Math.max(0, solarGeneration + batteryFlowKW);
+          ? (batteryOnline ? -Math.min(solarNetKW, batteryChargeLimitKW, energyLimitedChargeKW) : 0)
+          : Math.min(-solarNetKW, batteryDischargeLimitKW, energyLimitedDischargeKW, gridHeadroomForBatteryKW);
+        const deliveredSourceKW = Math.max(0, solarToBusKW + batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
-        // The POWER gauge tracks generation margin, not battery state of charge. Solar output can
-        // recover immediately while surplus electricity simultaneously charges the battery.
-        const powerBase = clamp(50 + 50 * (solarGeneration - baseLoadKW) / Math.max(1, baseLoadKW));
+        // Power health follows electricity actually reaching the bus, including battery
+        // discharge and any grid transfer limit—not solar output alone.
+        const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
+        const rawSourceKW = solarToBusKW + Math.max(0, batteryFlowKW);
+        const sourceScale = rawSourceKW > 0 ? deliveredPowerKW / rawSourceKW : 0;
         const generationSources = [
-          ...(solarGeneration > 0.001 ? [{ label: "Solar array", kw: solarGeneration }] : []),
-          ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW }] : []),
+          ...(solarToBusKW * sourceScale > 0.001 ? [{ label: "Solar array", kw: solarToBusKW * sourceScale }] : []),
+          ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW * sourceScale }] : []),
         ];
         const optionalDemandSources = requestedLoads
           .map((source) => ({
@@ -2658,14 +2667,16 @@ export function MissionSimulation() {
               : 0,
           }))
           .filter((source) => source.kw > 0.001);
+        const batteryChargingLoadKW = Math.max(0, -batteryFlowKW);
         const demandSources = [
           { label: "Core life support, electrolysis and habitat controls", kw: essentialLoadKW },
           ...(solarThermalLoadKW > 0.001 ? [{ label: "Solar-array thermal management", kw: solarThermalLoadKW }] : []),
           ...optionalDemandSources,
+          ...(batteryChargingLoadKW > 0.001 ? [{ label: "Battery charging (power diverted to storage)", kw: batteryChargingLoadKW }] : []),
         ];
         setElectricalReadings({
-          generationKW: solarGeneration + Math.max(0, batteryFlowKW),
-          consumptionKW: nominalLoadKW,
+          generationKW: deliveredPowerKW,
+          consumptionKW: nominalLoadKW + batteryChargingLoadKW,
           batteryFlowKW,
           generationSources,
           demandSources,
