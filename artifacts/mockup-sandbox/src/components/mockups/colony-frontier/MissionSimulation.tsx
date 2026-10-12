@@ -4292,7 +4292,7 @@ export function MissionSimulation() {
                       {electricalReadings.demandSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.consumptionKW > 0 ? (source.kw / electricalReadings.consumptionKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
                       ))}
-                      <p className="mt-1 text-[8px] text-[#789a96]">Demand is the sum of active electrical loads plus battery charging when applicable. The bar scales against a 16 kW reference; solar generation and battery discharge are not demand. Passive radiation shielding draws no electricity; active monitoring is counted.</p>
+                      <p className="mt-1 text-[8px] text-[#789a96]">Demand is the sum of active colony electrical loads only. Battery charging is shown separately in the power-balance panel, not added to system demand. Passive radiation shielding draws no electricity; active monitoring is counted. NASA reference loads are scaled estimates for this game's four-crew habitat, not universal hardware ratings.</p>
                     </>
                   )}
                   {pulseExpandedMetric === "battery" && (
