@@ -763,7 +763,7 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
         ? (liveDay >= 14 ? 0 : missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
         : campaign === "mars"
           ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
-          : liveDay < 14 ? (liveDay === 0 ? 0.22 : liveProfile.sunlightGeometry) : 0;
+          : liveDay < 14 ? (liveDay < 1 ? 0.22 : liveProfile.sunlightGeometry) : 0;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
       const checkpointKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
       const currentKW = _condition < 28 ? 0 : Math.min(rating, rating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
@@ -2500,7 +2500,7 @@ export function MissionSimulation() {
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
             : missionDay < 14
-              ? (missionDay === 0 ? 0.22 : lunarProfile?.sunlightGeometry ?? 0)
+              ? (missionDay < 1 ? 0.22 : lunarProfile?.sunlightGeometry ?? 0)
               : 0;
         const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
         const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
