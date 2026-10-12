@@ -1,6 +1,6 @@
 # Colony-Frontier — Master System Performance & Upgrade Table
 
-**Status: design baseline for review; not yet wired into live gameplay.** These are explicit game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating. Before implementation, reconcile these targets with retrofit installation recipes, power draw, inventory, and the current simulation.
+**Status: shared live balance table updated; secondary retrofit effects still require implementation.** Research-tier values below supersede the earlier Research column and create a much larger generation jump. These are explicit game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating. Before implementation, reconcile these targets with retrofit installation recipes, power draw, inventory, and the current simulation.
 
 ## How to read the table
 
@@ -162,3 +162,32 @@ These are **provisional balance rules**, not yet code. Applying one generic draw
 ### Implementation gate
 
 Before these secondary numerical effects are wired into gameplay, check each one against the existing simulation state and UI. Where the game has no variable yet (for example jam rate, sensor drift, or diagnostic sensitivity), add an explicit variable and visible feedback or omit that secondary effect from the first implementation pass. Do not display an effect as working until the simulation actually applies it.
+
+
+## Research-tier jump revision (supersedes earlier Research-column values)
+
+Research must feel like a new experimental generation, not a small Apex upgrade. Research **0/2** now exceeds Apex **2/2** by a clear margin for every primary metric; Research retrofits then add to that new baseline. The simulation never upgrades a tier in-place: unlock and choose a tier in **Technology Lab**, select it in **Loadout**, then deploy. Inside the simulation, players can install system retrofits only (0/2 → 1/2 → 2/2).
+
+| System | Research 0/2 → 1/2 → 2/2 |
+|---|---:|
+| Solar Power | 60 → 75 → 90 kW |
+| Energy Storage | 5,000 → 6,500 → 8,000 kWh |
+| Oxygen | 8 → 10 → 12 kg O₂/day |
+| Water | 98 → 99 → 99.5% recovery |
+| CO₂ Control | 9 → 12 → 15 kg CO₂/day |
+| Thermal Control | 20 → 25 → 30 kW heat |
+| Communications | 200 → 300 → 400 Mbps |
+| Habitat | 0.30 → 0.20 → 0.10 kPa/24 h loss |
+| Radiation | 50 → 60 → 70% reference-event dose avoided |
+| Rovers | 12 → 16 → 20 km/h safe reference-terrain speed |
+| Resource Extraction | 1,500 → 2,200 → 3,000 kg/day |
+| ISRU | 40 → 60 → 80 kg product/day |
+| Agriculture | 8 → 12 → 16 kg dry-food-equivalent/day |
+| Maintenance | 60 → 80 → 100 condition points/job |
+| Power Grid | 120 → 180 → 250 kW |
+| Science | 60 → 90 → 120 assays/day |
+| Navigation | 0.20 → 0.10 → 0.05 m position error |
+
+Research additional metrics also jump where physically meaningful: battery continuous charge/discharge power **200 → 250 → 300 kW**; water treatment **2,500 → 3,500 → 5,000 L/day**; rover range **100 → 150 → 200 km/charge**. Purity, efficiency, availability, and accuracy remain bounded at 100% and use diminishing returns.
+
+**Interface contract:** Technology Lab displays the shared tier/retrofit ratings; Loadout shows each selected tier's 0/2 deployment baseline; Simulation reads the same shared table for system output and permits retrofits, not tier changes. Do not add tier-upgrade controls to Simulation.
