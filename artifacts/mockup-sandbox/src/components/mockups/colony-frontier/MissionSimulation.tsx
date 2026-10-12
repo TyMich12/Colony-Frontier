@@ -1748,7 +1748,7 @@ function BuildingInspector({
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Repair catalogue · select a recovery category</span>
-                <span className="mt-0.5 block text-[8px] text-[#8faeae]">{isFirstMission ? "Mission 1: repairs and retrofits do not consume spare parts." : `Stock: ${partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.`}</span>
+                <span className="mt-0.5 block text-[8px] text-[#8faeae]">{isFirstMission ? "Mission 1: inspect numerical effects, activation energy and repair duration." : `Stock: ${partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.`}</span>
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
             </button>
