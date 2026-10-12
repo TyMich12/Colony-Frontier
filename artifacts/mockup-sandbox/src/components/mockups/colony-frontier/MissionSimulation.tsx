@@ -2114,7 +2114,7 @@ export function MissionSimulation() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
-  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, consumptionKW: 2.55, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: 2.55, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
   const [pulseExpandedMetric, setPulseExpandedMetric] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
@@ -2694,8 +2694,10 @@ export function MissionSimulation() {
         // Below 25%, retain only the emergency floor plus a small research load if the lab is deployed.
         const preliminaryLoadKW = essentialLoadKW + requestedOptionalLoadKW + solarThermalLoadKW;
         // Compare with full requested load and retain the previous mode inside a deadband.
-        if (solarGeneration < preliminaryLoadKW - 0.75) powerDeficitRef.current = true;
-        else if (solarGeneration > preliminaryLoadKW + 0.75) powerDeficitRef.current = false;
+        // A wider hysteresis band prevents optional systems rapidly switching on/off
+        // when solar output is close to the requested colony load.
+        if (solarGeneration < preliminaryLoadKW - 2.0) powerDeficitRef.current = true;
+        else if (solarGeneration > preliminaryLoadKW + 2.0) powerDeficitRef.current = false;
         const deficitExpected = powerDeficitRef.current;
         const optionalLoadKW = batteryRecoveryActive ? 0
           : deficitExpected && current.battery <= 24
@@ -2757,6 +2759,7 @@ export function MissionSimulation() {
           // Generation is new solar power. System demand excludes charging; the battery
           // flow is tracked separately so the power balance can be displayed consistently.
           generationKW: solarToBusKW,
+          actualSupplyKW: deliveredPowerKW,
           consumptionKW: nominalLoadKW,
           batteryFlowKW,
           generationSources,
@@ -4370,7 +4373,7 @@ export function MissionSimulation() {
                       <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Solar power reaching the bus</span><span className="font-mono text-[#f0cf69]">{electricalReadings.generationKW.toFixed(2)} kW</span></div>
                       <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Power diverted to charge battery" : electricalReadings.batteryFlowKW > 0.01 ? "Power added by battery discharge" : "Battery contribution"}</span><span className="font-mono text-[#f0cf69]">{electricalReadings.batteryFlowKW < -0.01 ? "− " : electricalReadings.batteryFlowKW > 0.01 ? "+ " : ""}{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
                       <div className="my-1 border-t border-[#30484c]" />
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">Power actually reaching colony loads</span><span className="font-mono font-bold text-[#f0cf69]">{Math.max(0, electricalReadings.generationKW + Math.max(0, electricalReadings.batteryFlowKW) - Math.max(0, -electricalReadings.batteryFlowKW)).toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">Power actually reaching colony loads</span><span className="font-mono font-bold text-[#f0cf69]">{electricalReadings.actualSupplyKW.toFixed(2)} kW</span></div>
                       <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Colony demand (active loads)</span><span className="font-mono text-[#f0cf69]">{electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
                       <p className="mt-1 text-[8px] text-[#789a96]">Solar runs the colony first. If solar makes more than the colony needs, the extra can charge the battery. A positive battery rate means the battery is supplying extra power; a negative rate means it is storing power. The battery's rated kW is a limit, not a fixed rate.</p>
                       <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
