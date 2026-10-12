@@ -639,6 +639,33 @@ function ratedPowerCapacityKW(selected: Record<string, Tier>, buildings: Record<
   return RESOURCE_CAPACITIES.availablePowerKW;
 }
 
+function retrofitSecondaryPreview(systemId: string, tier: Tier, nextLevel: number): string {
+  const rated = (metric: string, unit: string) => {
+    const value = getAdditionalRating(systemId, metric, tier, nextLevel);
+    return value > 0 ? `${metric}: ${formatRating(value)} ${unit}` : "";
+  };
+  switch (systemId) {
+    case "solar": return nextLevel === 1 ? "Applied on completion: solar dust index −15 points" : "Applied on completion: solar dust index −10 more points; residual array pointing error −2°";
+    case "battery": return `Rated charge limit ${formatRating(getAdditionalRating("battery", "continuous charge power", tier, nextLevel))} kW; rated discharge limit ${formatRating(getAdditionalRating("battery", "continuous discharge power", tier, nextLevel))} kW. Actual flow follows the live power balance.`;
+    case "oxygen": return rated("purity", "%") || "Higher rated oxygen production; power and life-support demand still apply";
+    case "water": return `${formatRating(getAdditionalRating("water", "throughput", tier, nextLevel))} L/day wastewater throughput; recovery efficiency is shown separately`;
+    case "comms": return rated("link availability", "%") || "Improves rated link throughput";
+    case "grid": return rated("conversion efficiency", "%") || "Improves rated power-transfer capacity";
+    case "rover": return rated("safe range", "km") || "Improves rated safe traverse speed";
+    case "isru": return `${formatRating(getAdditionalRating("isru", "purity", tier, nextLevel))}% product purity; ${formatRating(getAdditionalRating("isru", "product recovery", tier, nextLevel))}% target-feedstock recovery`;
+    case "science": return rated("accuracy", "%") || "Improves rated assay throughput";
+    case "agriculture": return rated("water consumed", "L/kg dry food") || "Improves rated edible-food yield";
+    case "habitat": return "Lower rated pressure loss for the standardised seal-fault case";
+    case "radiation": return "Higher fraction of the defined reference-event dose avoided";
+    case "co2": return "Higher rated CO₂ removal capacity; actual removal still depends on power and system availability";
+    case "thermal": return "Higher rated heat-rejection capacity; cabin response still depends on operating conditions";
+    case "extraction": return "Higher rated regolith extraction throughput; site, power and feedstock limits still apply";
+    case "maintenance": return "More condition points restored by a completed maintenance job";
+    case "navigation": return "Lower rated horizontal position error; terrain and reference geometry still matter";
+    default: return "The rated capability shown above increases when commissioning completes";
+  }
+}
+
 // This is a compressed command/processing queue, not the speed-of-light radio delay.
 // At Research 2/2, local predictive caching can provide the report without waiting for Earth.
 function earthReportDelaySeconds(tier: Tier, upgradeLevel: number): number {
@@ -1538,6 +1565,8 @@ function BuildingInspector({
   const condition = Math.round(runtime.condition);
   const dust = Math.round(runtime.dust);
   const upgradeLevel = runtime.upgradeLevel ?? 0;
+  const nextInstallation = getRetrofitInstallation(track.id, tier, upgradeLevel);
+  const nextInstallationSeconds = [12, 15, 18, 20][Math.min(3, upgradeLevel)];
   const connection = SYSTEM_CONNECTIONS[track.id] ?? {};
   const downstream = Object.entries(SYSTEM_CONNECTIONS).filter(([id, links]) => links.outputs?.includes(track.id) || (id === "maintenance" && track.id !== "maintenance" && links.outputs?.includes("all systems"))).map(([id]) => id);
   const connectionText = [
@@ -1545,7 +1574,7 @@ function BuildingInspector({
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
-  const canUpgrade = upgradeLevel < 2 && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0;
+  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0 && partsInventoryKg >= (nextInstallation?.materialKg ?? Number.POSITIVE_INFINITY);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -1888,8 +1917,14 @@ function BuildingInspector({
 <div className="mx-4 mb-4 rounded-2xl border border-[#40575b] bg-[#101f24] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module upgrade</p>
-              <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Field retrofit {upgradeLevel}/2 · 0.96 kW available-power margin + 0.60 kWh stored energy at Foundation 0/2 upfront · takes about 18–26 seconds. Output and wear benefits begin only when installation completes.</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module retrofit · {upgradeLevel}/2</p>
+              {nextInstallation ? <>
+                <p className="mt-1 text-[9px] font-bold leading-4 text-[#dcebe4]">{nextInstallation.currentProgress} → {nextInstallation.newProgress} · {nextInstallation.metric}: {nextInstallation.directGain}</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">Cost: {nextInstallation.materialKg.toFixed(1)} kg on-site parts/material + {nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · {nextInstallationSeconds} simulated seconds at 1× (faster at higher speed)</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{nextInstallation.kit}. {nextInstallation.missionEffect}</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#9ce3b2]">Additional effect: {retrofitSecondaryPreview(track.id, tier, upgradeLevel + 1)}</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">Stock available: {partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.</p>
+              </> : <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Both retrofit stages are complete for this selected tier.</p>}
             </div>
             <button
               type="button"
@@ -1901,7 +1936,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{partsInventoryKg < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${partsInventoryKg.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -2245,10 +2280,17 @@ export function MissionSimulation() {
         const installation = getRetrofitInstallation(operation.targetId, pending?.selected[operation.targetId], level - 1);
         setBuildings((current) => {
           const previous = current[operation.targetId] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 };
-          return { ...current, [operation.targetId]: { ...previous, upgradeLevel: Math.max(previous.upgradeLevel ?? 0, level) } };
+          const repairMetrics = { ...(previous.repairMetrics ?? {}) };
+          let dust = previous.dust;
+          if (operation.targetId === "solar") {
+            dust = clamp(dust - (level === 1 ? 15 : 10));
+            const pointingKey = "Residual array pointing error after recalibration";
+            repairMetrics[pointingKey] = Math.max(0, (repairMetrics[pointingKey] ?? 15) - 2);
+          }
+          return { ...current, [operation.targetId]: { ...previous, dust, repairMetrics, upgradeLevel: Math.max(previous.upgradeLevel ?? 0, level) } };
         });
         setScore((value) => clamp(value + 4));
-        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} is now at ${level}/2. ${installation ? `${installation.metric}: ${installation.directGain}. ` : ""}The selected rating now comes directly from the workbook. Installation did not heal damage, remove dust, clear faults, or change launch mass.`;
+        message = `RETROFIT COMPLETE · ${track?.category ?? operation.targetId} is now at ${level}/2. ${installation ? `${installation.metric}: ${installation.directGain}. ` : ""}${operation.targetId === "solar" ? `Applied secondary effect: dust reduced by ${level === 1 ? 15 : 10} points and residual pointing error reduced by 2°. ` : ""}The selected rated capability now comes directly from the workbook. Installation does not repair unrelated damage or clear faults.`;
         break;
       }
             case "REPAIR": {
@@ -3522,6 +3564,10 @@ export function MissionSimulation() {
         setAiMessage(`${trackId.toUpperCase()} is already at 2/2 retrofit progress for its selected technology tier.`);
         return;
       }
+      if (partsInventoryKg + 1e-6 < installation.materialKg) {
+        setOperationResult(`RETROFIT LOCKED · ${installation.kit} requires ${installation.materialKg.toFixed(1)} kg material; only ${partsInventoryKg.toFixed(1)} kg is available.`);
+        return;
+      }
       const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
       const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
       if (availableEnergyKWh < installation.energyKWh) {
@@ -3529,10 +3575,11 @@ export function MissionSimulation() {
         return;
       }
       const targetLevel = currentLevel + 1;
+      setPartsInventoryKg((stock) => Math.max(0, stock - installation.materialKg));
       setMetrics((value) => ({ ...value, battery: clamp(value.battery - installation.energyKWh / batteryCapacity * 100) }));
       const installationSeconds = [12, 15, 18, 20][Math.min(3, currentLevel)];
       beginOperation("UPGRADE", trackId, `Installing ${installation.tier} retrofit ${installation.newProgress} · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, installationSeconds, targetLevel, undefined, "retrofit");
-      setAiMessage(`RETROFIT STARTED · ${installation.metric} ${installation.directGain}. Credits and materials cost: 0. Consuming ${installation.energyKWh} kWh commissioning energy; estimated real-time installation ${installationSeconds} seconds. Rated capability changes when commissioning completes; condition and faults are not repaired.`);
+      setAiMessage(`RETROFIT STARTED · ${installation.metric}: ${installation.directGain}. Cost paid: ${installation.materialKg.toFixed(1)} kg on-site material and ${installation.energyKWh.toFixed(2)} kWh commissioning energy. Additional effect: ${retrofitSecondaryPreview(trackId, installation.tier, targetLevel)}. Installation takes ${installationSeconds} simulated seconds at 1× and scales with simulation speed.`);
       return;
     }
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
