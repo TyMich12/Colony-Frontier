@@ -37,6 +37,7 @@ import {
   type TechnologyTrack,
   type Tier,
 } from "./_shared/gameData";
+import { getBaselineRow, baselineStateIndex } from "./_shared/simulationBalance";
 import { loadGameState, saveGameState } from "./gameState";
 import { clearMissionRuntime, clearPendingMission, loadPendingMission, savePendingMission } from "./missionRuntime";
 import { marsMissions, moonMissions } from "./CampaignMapRefresh";
@@ -292,6 +293,8 @@ function TierOption({
   const equipment = track.tiers[tier];
   const meta = tierMeta[tier];
   const requirement = tierUnlockRequirements[tier];
+  const baseline = getBaselineRow(track.id);
+  const baselineValue = baseline?.values[baselineStateIndex(tier, 0)];
 
   const disabled = status === "locked" || status === "mass";
 
@@ -387,6 +390,14 @@ function TierOption({
           {formatCredits(equipment.cost)}
         </span>
       </div>
+
+      {baseline && typeof baselineValue === "number" && (
+        <div className="mt-2 border-t border-[#2c4445] pt-2 text-[9px] leading-4 text-[#c4d7cb]">
+          <span className="font-bold uppercase tracking-[0.12em] text-[#efb658]">Rated at deployment (0/2): </span>
+          <span className="font-mono">{baselineValue.toLocaleString()} {baseline.unit}</span>
+          <p className="mt-1 text-[8px] text-[#779390]">Tier changes happen in Technology Lab. Choose the tier here before deployment; inside simulation you can install retrofits only.</p>
+        </div>
+      )}
 
       <div
         className={`mt-1.5 text-[7px] font-bold uppercase tracking-[0.1em] ${
