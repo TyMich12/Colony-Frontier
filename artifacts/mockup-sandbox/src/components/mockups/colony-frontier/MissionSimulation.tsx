@@ -1446,6 +1446,8 @@ function BuildingInspector({
   missionTitle: string;
   missionNumber?: string;
 }) {
+  const missionStage = Math.max(1, Number.parseInt((missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
+  const isFirstMission = missionStage === 1;
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
       { id: "fallback-solar", label: "Manual panel brush", detail: "Small dust removal and a tiny generation recovery; needs no grid, battery, or rover." },
@@ -1747,7 +1749,7 @@ function BuildingInspector({
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Repair catalogue · select a recovery category</span>
-                <span className="mt-0.5 block text-[8px] text-[#8faeae]">{missionStage === 1 ? "Mission 1: no spare-parts cost. Later missions use the on-site stock." : `Stock: ${partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.`}</span>
+                <span className="mt-0.5 block text-[8px] text-[#8faeae]">{isFirstMission ? "Mission 1: repairs and retrofits do not consume spare parts." : `Stock: ${partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.`}</span>
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
             </button>
@@ -4369,15 +4371,13 @@ export function MissionSimulation() {
                   )}
                   {pulseExpandedMetric === "batteryFlow" && (
                     <>
-                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Live power balance · same simulation tick</p>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Solar power reaching the bus</span><span className="font-mono text-[#f0cf69]">{electricalReadings.generationKW.toFixed(2)} kW</span></div>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Power diverted to charge battery" : electricalReadings.batteryFlowKW > 0.01 ? "Power added by battery discharge" : "Battery contribution"}</span><span className="font-mono text-[#f0cf69]">{electricalReadings.batteryFlowKW < -0.01 ? "− " : electricalReadings.batteryFlowKW > 0.01 ? "+ " : ""}{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Power balance</p>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Solar power available</span><span className="font-mono text-[#f0cf69]">{electricalReadings.generationKW.toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Colony power demand</span><span className="font-mono text-[#f0cf69]">− {electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
                       <div className="my-1 border-t border-[#30484c]" />
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">Power actually reaching colony loads</span><span className="font-mono font-bold text-[#f0cf69]">{electricalReadings.actualSupplyKW.toFixed(2)} kW</span></div>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Colony demand (active loads)</span><span className="font-mono text-[#f0cf69]">{electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
-                      <p className="mt-1 text-[8px] text-[#789a96]">Solar runs the colony first. If solar makes more than the colony needs, the extra can charge the battery. A positive battery rate means the battery is supplying extra power; a negative rate means it is storing power. The battery's rated kW is a limit, not a fixed rate.</p>
-                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
-                    </>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">Net power (solar − demand)</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW - electricalReadings.consumptionKW) > 0.01 ? "+" : ""}{(electricalReadings.generationKW - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
+                      {electricalReadings.generationKW - electricalReadings.consumptionKW > 0.01 ? <p className="mt-1 text-[8px] leading-4 text-[#9ce3b2]">Surplus: solar makes more power than the colony needs. The battery is actually charging at {Math.max(0, -electricalReadings.batteryFlowKW).toFixed(2)} kW (limited by its charge rating and remaining capacity).</p> : electricalReadings.generationKW - electricalReadings.consumptionKW < -0.01 ? <p className="mt-1 text-[8px] leading-4 text-[#ffcb8d]">Shortfall: solar cannot meet demand. The battery is actually supplying {Math.max(0, electricalReadings.batteryFlowKW).toFixed(2)} kW; if that is less than the shortfall, some loads may be underpowered.</p> : <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">Balanced: solar output is approximately equal to demand, so the battery is not meaningfully charging or discharging.</p>}
+                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time until battery reaches protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${electricalReadings.enduranceHours.toFixed(2)} simulated h · ${Math.ceil(electricalReadings.enduranceHours * 3600 / Math.max(0.01, speed * GAME_TIME_ACCELERATION))} real s` : electricalReadings.batteryFlowKW < -0.01 ? "Charging — reserve is not being depleted" : "Not currently discharging"}</span></div></>
                   )}
                 </div>
               )}
