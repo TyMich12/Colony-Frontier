@@ -532,7 +532,6 @@ function getActionBlockers(
     if (!option) return ["Unknown repair procedure in workbook data"];
     const blockers = getActionBlockers(systemId, "repair-procedure", context, node);
     for (const helperId of option.requiredSystems) collectRepairSupportBlockers(helperId, context, blockers);
-    if ((context.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG) < option.partsMassKg) blockers.push(`Requires ${option.partsMassKg.toFixed(2)} kg repair parts; ${(context.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG).toFixed(2)} kg available`);
     return [...new Set(blockers)];
   }
   const variant = decodeActionVariant(systemId, actionId);
@@ -1813,7 +1812,9 @@ function BuildingInspector({
                       </span>
                     ))}
                     <span className="mt-2 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#d8c18a]">
-                      Cost: {option.energyKWh} kWh · {missionStage === 1 ? "no parts required (Mission 1)" : `${option.partsMassKg} kg parts`} · {option.kit}
+                      {missionStage === 1
+                        ? `Activation cost: ${option.energyKWh} kWh`
+                        : `Activation cost: ${option.energyKWh} kWh · ${option.partsMassKg} kg parts · ${option.kit}`}
                     </span>
                     <span className="mt-1 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#8fa7ab]">
                       {option.tradeoff}
@@ -1923,10 +1924,10 @@ function BuildingInspector({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module retrofit · {upgradeLevel}/2</p>
               {nextInstallation ? <>
                 <p className="mt-1 text-[9px] font-bold leading-4 text-[#dcebe4]">{nextInstallation.currentProgress} → {nextInstallation.newProgress} · {nextInstallation.metric}: {nextInstallation.directGain}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">Cost: {(missionNumber ?? "").replace(/[^0-9]/g, "") === "1" ? "no spare parts required in Mission 1" : `${nextInstallation.materialKg.toFixed(1)} kg on-site parts/material`} + {nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · {nextInstallationSeconds} simulated seconds at 1× (faster at higher speed)</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{nextInstallation.kit}. {nextInstallation.missionEffect}</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">{(missionNumber ?? "").replace(/[^0-9]/g, "") === "1" ? `Activation cost: ${nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · ${nextInstallationSeconds} simulated seconds at 1×` : `Activation cost: ${nextInstallation.materialKg.toFixed(1)} kg on-site material + ${nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · ${nextInstallationSeconds} simulated seconds at 1×`}</p>
+                {(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" && <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{nextInstallation.kit}. {nextInstallation.missionEffect}</p>}
                 <p className="mt-1 text-[8px] leading-4 text-[#9ce3b2]">Secondary rating / effect: {retrofitSecondaryPreview(track.id, tier, upgradeLevel + 1)}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{(missionNumber ?? "").replace(/[^0-9]/g, "") === "1" ? "Mission 1 is exempt from spare-part costs; later missions use the displayed on-site stock." : `Stock available: ${partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.`}</p>
+                {(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" && <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">Stock available: {partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.</p>}
               </> : <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Both retrofit stages are complete for this selected tier.</p>}
             </div>
             <button
