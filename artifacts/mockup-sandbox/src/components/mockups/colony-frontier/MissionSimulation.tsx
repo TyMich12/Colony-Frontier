@@ -2106,7 +2106,7 @@ function getAiAnalysis(metrics: MissionMetrics, score: number): string {
 export function MissionSimulation() {
   const pending = useMemo<PendingMission | null>(() => loadPendingMission(), []);
   // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
-  const missionStage = pending ? Math.max(1, Number.parseInt(pending.(missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1) : 1;
+  const missionStage = pending ? Math.max(1, Number.parseInt((pending.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1) : 1;
   const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
   const savedRuntime = pending ? loadMissionRuntime(pending.missionId) : null;
   // Never hydrate a completed 14-day snapshot into a fresh active mission.
@@ -2488,7 +2488,7 @@ export function MissionSimulation() {
       setElapsed((current) => {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed * GAME_TIME_ACCELERATION);
 
-        const missionStage = Math.max(1, Number.parseInt(pending.(missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
+        const missionStage = Math.max(1, Number.parseInt((pending.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
         const scheduleShift = Math.min(TOTAL_MISSION_SECONDS * 0.04, (missionStage - 1) * TOTAL_MISSION_SECONDS * 0.003) + (pending.campaign === "mars" ? TOTAL_MISSION_SECONDS * 0.01 : 0);
         const nextEventAt = Math.max(TOTAL_MISSION_SECONDS * 0.01, EVENT_TIMES[eventPointerRef.current] - scheduleShift);
         if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= nextEventAt) {
@@ -3335,7 +3335,7 @@ export function MissionSimulation() {
     const unsafeChoices = new Set(["ignore", "continue", "defer", "force", "push", "hold", "maintain"]);
     if (unsafeChoices.has(choiceId)) {
       const targetTrackId = activeTargetTrackId ?? activeEvent.trackId;
-      const missionStage = Math.max(1, Number.parseInt(pending.(missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
+      const missionStage = Math.max(1, Number.parseInt((pending.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
       const severity = 1.5 + Math.min(1.7, (missionStage - 1) * 0.12 + eventPointerRef.current * 0.075) + (pending.campaign === "mars" ? 0.15 : 0);
       const remainingSeconds = Math.max(14, 29 - missionStage * 0.8 - eventPointerRef.current * 1.1) * GAME_TIME_ACCELERATION;
       setActiveFaults((current) => ({
