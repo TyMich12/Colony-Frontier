@@ -1444,7 +1444,7 @@ function BuildingInspector({
   simulationSpeed: number;
   campaign: "moon" | "mars";
   missionTitle: string;
-  missionNumber: string;
+  missionNumber?: string;
 }) {
   const actionMap: Record<string, EventChoice[]> = {
     solar: [
@@ -1575,7 +1575,7 @@ function BuildingInspector({
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
-  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0 && (missionNumber.replace(/[^0-9]/g, "") === "1" || partsInventoryKg >= (nextInstallation?.materialKg ?? Number.POSITIVE_INFINITY));
+  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0 && ((missionNumber ?? "").replace(/[^0-9]/g, "") === "1" || partsInventoryKg >= (nextInstallation?.materialKg ?? Number.POSITIVE_INFINITY));
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -1921,10 +1921,10 @@ function BuildingInspector({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module retrofit · {upgradeLevel}/2</p>
               {nextInstallation ? <>
                 <p className="mt-1 text-[9px] font-bold leading-4 text-[#dcebe4]">{nextInstallation.currentProgress} → {nextInstallation.newProgress} · {nextInstallation.metric}: {nextInstallation.directGain}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">Cost: {missionNumber.replace(/[^0-9]/g, "") === "1" ? "no spare parts required in Mission 1" : `${nextInstallation.materialKg.toFixed(1)} kg on-site parts/material`} + {nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · {nextInstallationSeconds} simulated seconds at 1× (faster at higher speed)</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">Cost: {(missionNumber ?? "").replace(/[^0-9]/g, "") === "1" ? "no spare parts required in Mission 1" : `${nextInstallation.materialKg.toFixed(1)} kg on-site parts/material`} + {nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · {nextInstallationSeconds} simulated seconds at 1× (faster at higher speed)</p>
                 <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{nextInstallation.kit}. {nextInstallation.missionEffect}</p>
                 <p className="mt-1 text-[8px] leading-4 text-[#9ce3b2]">Secondary rating / effect: {retrofitSecondaryPreview(track.id, tier, upgradeLevel + 1)}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{missionNumber.replace(/[^0-9]/g, "") === "1" ? "Mission 1 is exempt from spare-part costs; later missions use the displayed on-site stock." : `Stock available: ${partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.`}</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{(missionNumber ?? "").replace(/[^0-9]/g, "") === "1" ? "Mission 1 is exempt from spare-part costs; later missions use the displayed on-site stock." : `Stock available: ${partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.`}</p>
               </> : <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Both retrofit stages are complete for this selected tier.</p>}
             </div>
             <button
@@ -1937,7 +1937,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{missionNumber.replace(/[^0-9]/g, "") !== "1" && partsInventoryKg < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${partsInventoryKg.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" && partsInventoryKg < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${partsInventoryKg.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -2106,7 +2106,7 @@ function getAiAnalysis(metrics: MissionMetrics, score: number): string {
 export function MissionSimulation() {
   const pending = useMemo<PendingMission | null>(() => loadPendingMission(), []);
   // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
-  const missionStage = pending ? Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1) : 1;
+  const missionStage = pending ? Math.max(1, Number.parseInt(pending.(missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1) : 1;
   const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
   const savedRuntime = pending ? loadMissionRuntime(pending.missionId) : null;
   // Never hydrate a completed 14-day snapshot into a fresh active mission.
@@ -2488,7 +2488,7 @@ export function MissionSimulation() {
       setElapsed((current) => {
         const next = Math.min(TOTAL_MISSION_SECONDS, current + 0.25 * speed * GAME_TIME_ACCELERATION);
 
-        const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
+        const missionStage = Math.max(1, Number.parseInt(pending.(missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
         const scheduleShift = Math.min(TOTAL_MISSION_SECONDS * 0.04, (missionStage - 1) * TOTAL_MISSION_SECONDS * 0.003) + (pending.campaign === "mars" ? TOTAL_MISSION_SECONDS * 0.01 : 0);
         const nextEventAt = Math.max(TOTAL_MISSION_SECONDS * 0.01, EVENT_TIMES[eventPointerRef.current] - scheduleShift);
         if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= nextEventAt) {
@@ -3335,7 +3335,7 @@ export function MissionSimulation() {
     const unsafeChoices = new Set(["ignore", "continue", "defer", "force", "push", "hold", "maintain"]);
     if (unsafeChoices.has(choiceId)) {
       const targetTrackId = activeTargetTrackId ?? activeEvent.trackId;
-      const missionStage = Math.max(1, Number.parseInt(pending.missionNumber.replace(/[^0-9]/g, ""), 10) || 1);
+      const missionStage = Math.max(1, Number.parseInt(pending.(missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
       const severity = 1.5 + Math.min(1.7, (missionStage - 1) * 0.12 + eventPointerRef.current * 0.075) + (pending.campaign === "mars" ? 0.15 : 0);
       const remainingSeconds = Math.max(14, 29 - missionStage * 0.8 - eventPointerRef.current * 1.1) * GAME_TIME_ACCELERATION;
       setActiveFaults((current) => ({
@@ -4367,12 +4367,14 @@ export function MissionSimulation() {
                   {pulseExpandedMetric === "batteryFlow" && (
                     <>
                       <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Live power balance · same simulation tick</p>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Power supplied to colony (solar + battery, net of charging)</span><span className="font-mono text-[#f0cf69]">{(electricalReadings.generationKW + electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">− Power demand (colony loads)</span><span className="font-mono text-[#f0cf69]">− {electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Solar power reaching the bus</span><span className="font-mono text-[#f0cf69]">{electricalReadings.generationKW.toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Power diverted to charge battery" : electricalReadings.batteryFlowKW > 0.01 ? "Power added by battery discharge" : "Battery contribution"}</span><span className="font-mono text-[#f0cf69]">{electricalReadings.batteryFlowKW < -0.01 ? "− " : electricalReadings.batteryFlowKW > 0.01 ? "+ " : ""}{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
                       <div className="my-1 border-t border-[#30484c]" />
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">= Net surplus / (shortfall) after battery</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW + electricalReadings.batteryFlowKW - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
-                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Actual battery charging (power drawn from bus)" : electricalReadings.batteryFlowKW > 0.01 ? "Actual battery discharging (power supplied to bus)" : "Actual battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
-                      <p className="mt-1 text-[8px] text-[#789a96]">Battery flow is signed: positive means discharge added to supply; negative means charging power diverted from solar. The net surplus is calculated from actual supply after that battery flow, minus colony demand. The Foundation battery's 10 kW charge/discharge ratings are limits, not constant flow.</p>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">Actual power available to colony</span><span className="font-mono font-bold text-[#f0cf69]">{Math.max(0, electricalReadings.generationKW + electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Colony demand (active loads)</span><span className="font-mono text-[#f0cf69]">{electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
+                      <div className="my-1 border-t border-[#30484c]" />
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">{electricalReadings.generationKW + electricalReadings.batteryFlowKW >= electricalReadings.consumptionKW ? "Power left over" : "Power shortfall"}</span><span className="font-mono font-bold text-[#f0cf69]">{Math.abs(Math.max(0, electricalReadings.generationKW + electricalReadings.batteryFlowKW) - electricalReadings.consumptionKW).toFixed(2)} kW {electricalReadings.generationKW + electricalReadings.batteryFlowKW >= electricalReadings.consumptionKW ? "surplus" : "shortfall"}</span></div>
+                      <p className="mt-1 text-[8px] text-[#789a96]">How to read this: solar supplies power first. A negative battery contribution means some solar is being stored, so that amount is not available to the colony right now. A positive contribution means the battery is helping run the colony. Compare actual power available with colony demand; the difference is the surplus or shortfall. The battery's 10 kW rating is a maximum, not a constant charging rate.</p>
                       <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
                     </>
                   )}
@@ -4641,6 +4643,9 @@ export function MissionSimulation() {
             fallbackReadyAt={fallbackReadyAt}
             partsInventoryKg={partsInventoryKg}
             simulationSpeed={speed}
+            campaign={pending.campaign}
+            missionTitle={pending.missionTitle}
+            missionNumber={pending.missionNumber}
           />
         )}
 
