@@ -2127,6 +2127,8 @@ export function MissionSimulation() {
   const [manualActions, setManualActions] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
+  // Hysteresis prevents optional loads switching rapidly near the solar-demand threshold.
+  const powerDeficitRef = useRef(false);
   const [results, setResults] = useState(false);
   const [missionFailed, setMissionFailed] = useState(false);
   const [missionFailureReason, setMissionFailureReason] = useState<string | null>(null);
@@ -2399,7 +2401,7 @@ export function MissionSimulation() {
         let changed = false;
         const next = { ...current };
         for (const [key, operation] of Object.entries(current)) {
-          const remaining = Math.max(0, operation.remainingSeconds - 0.25);
+          const remaining = Math.max(0, operation.remainingSeconds - 0.25 * Math.max(0, speed));
           if (remaining <= 0) {
             if (!operationCompletionRef.current.has(operation.id)) {
               operationCompletionRef.current.add(operation.id);
@@ -2648,11 +2650,14 @@ export function MissionSimulation() {
         // Shed noncritical loads automatically when generation cannot meet demand and battery SOC is low.
         // Below 25%, retain only the emergency floor plus a small research load if the lab is deployed.
         const preliminaryLoadKW = essentialLoadKW + requestedOptionalLoadKW + solarThermalLoadKW;
-        const deficitExpected = solarGeneration < preliminaryLoadKW;
+        // Compare with full requested load and retain the previous mode inside a deadband.
+        if (solarGeneration < preliminaryLoadKW - 0.75) powerDeficitRef.current = true;
+        else if (solarGeneration > preliminaryLoadKW + 0.75) powerDeficitRef.current = false;
+        const deficitExpected = powerDeficitRef.current;
         const optionalLoadKW = batteryRecoveryActive ? 0
-          : deficitExpected && current.battery <= 25
+          : deficitExpected && current.battery <= 24
             ? (pending.selected.science ? 0.25 : 0)
-            : deficitExpected && current.battery <= 35
+            : deficitExpected && current.battery <= 34
               ? requestedOptionalLoadKW * 0.25
               : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
@@ -4309,9 +4314,9 @@ export function MissionSimulation() {
                       <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Power supplied (solar + battery discharge)</span><span className="font-mono text-[#f0cf69]">{(electricalReadings.generationKW + Math.max(0, electricalReadings.batteryFlowKW)).toFixed(2)} kW</span></div>
                       <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">− Power demand (colony loads)</span><span className="font-mono text-[#f0cf69]">− {electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
                       <div className="my-1 border-t border-[#30484c]" />
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">= Surplus / (shortfall)</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW + Math.max(0, electricalReadings.batteryFlowKW) - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
-                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Battery charging rate (bus input)" : electricalReadings.batteryFlowKW > 0.01 ? "Battery discharging rate (bus output)" : "Battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
-                      {electricalReadings.batteryFlowKW < -0.01 && <p className="mt-1 text-[8px] text-[#789a96]">Charging is limited by the battery's charge-power rating, remaining capacity, and efficiency. If any limit applies, surplus can exceed the charging rate.</p>}
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">= Surplus before charging / (shortfall)</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW + Math.max(0, electricalReadings.batteryFlowKW) - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
+                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Actual battery charging (power drawn from bus)" : electricalReadings.batteryFlowKW > 0.01 ? "Actual battery discharging (power supplied to bus)" : "Actual battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
+                      <p className="mt-1 text-[8px] text-[#789a96]">The Foundation battery is rated for up to 10 kW charge and 10 kW discharge; that is a maximum, not a constant flow. Actual flow depends on the current surplus/shortfall, state of charge, efficiency and hardware rating.</p>
                       <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
                     </>
                   )}
