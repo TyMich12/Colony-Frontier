@@ -1575,7 +1575,7 @@ function BuildingInspector({
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
-  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0 && partsInventoryKg >= (nextInstallation?.materialKg ?? Number.POSITIVE_INFINITY);
+  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0 && (missionNumber.replace(/[^0-9]/g, "") === "1" || partsInventoryKg >= (nextInstallation?.materialKg ?? Number.POSITIVE_INFINITY));
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -1747,7 +1747,7 @@ function BuildingInspector({
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Repair catalogue · select a recovery category</span>
-                <span className="mt-0.5 block text-[8px] text-[#8faeae]">Stock: {partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.</span>
+                <span className="mt-0.5 block text-[8px] text-[#8faeae]">{missionStage === 1 ? "Mission 1: no spare-parts cost. Later missions use the on-site stock." : `Stock: ${partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.`}</span>
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
             </button>
@@ -1921,10 +1921,10 @@ function BuildingInspector({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module retrofit · {upgradeLevel}/2</p>
               {nextInstallation ? <>
                 <p className="mt-1 text-[9px] font-bold leading-4 text-[#dcebe4]">{nextInstallation.currentProgress} → {nextInstallation.newProgress} · {nextInstallation.metric}: {nextInstallation.directGain}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">Cost: {nextInstallation.materialKg.toFixed(1)} kg on-site parts/material + {nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · {nextInstallationSeconds} simulated seconds at 1× (faster at higher speed)</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">Cost: {missionNumber.replace(/[^0-9]/g, "") === "1" ? "no spare parts required in Mission 1" : `${nextInstallation.materialKg.toFixed(1)} kg on-site parts/material`} + {nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · {nextInstallationSeconds} simulated seconds at 1× (faster at higher speed)</p>
                 <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{nextInstallation.kit}. {nextInstallation.missionEffect}</p>
                 <p className="mt-1 text-[8px] leading-4 text-[#9ce3b2]">Secondary rating / effect: {retrofitSecondaryPreview(track.id, tier, upgradeLevel + 1)}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">Stock available: {partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.</p>
+                <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{missionNumber.replace(/[^0-9]/g, "") === "1" ? "Mission 1 is exempt from spare-part costs; later missions use the displayed on-site stock." : `Stock available: ${partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.`}</p>
               </> : <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Both retrofit stages are complete for this selected tier.</p>}
             </div>
             <button
@@ -1937,7 +1937,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{partsInventoryKg < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${partsInventoryKg.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{missionNumber.replace(/[^0-9]/g, "") !== "1" && partsInventoryKg < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${partsInventoryKg.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -3405,7 +3405,7 @@ export function MissionSimulation() {
         surveyedNodes,
         sampleStages,
         resourceYield,
-        partsInventoryKg,
+        partsInventoryKg: missionStage === 1 ? Number.POSITIVE_INFINITY : partsInventoryKg,
       },
       node,
     );
@@ -3569,7 +3569,7 @@ export function MissionSimulation() {
         setAiMessage(`${trackId.toUpperCase()} is already at 2/2 retrofit progress for its selected technology tier.`);
         return;
       }
-      if (partsInventoryKg + 1e-6 < installation.materialKg) {
+      if (missionStage !== 1 && partsInventoryKg + 1e-6 < installation.materialKg) {
         setOperationResult(`RETROFIT LOCKED · ${installation.kit} requires ${installation.materialKg.toFixed(1)} kg material; only ${partsInventoryKg.toFixed(1)} kg is available.`);
         return;
       }
@@ -3580,7 +3580,7 @@ export function MissionSimulation() {
         return;
       }
       const targetLevel = currentLevel + 1;
-      setPartsInventoryKg((stock) => Math.max(0, stock - installation.materialKg));
+      if (missionStage !== 1) setPartsInventoryKg((stock) => Math.max(0, stock - installation.materialKg));
       setMetrics((value) => ({ ...value, battery: clamp(value.battery - installation.energyKWh / batteryCapacity * 100) }));
       const installationSeconds = [12, 15, 18, 20][Math.min(3, currentLevel)];
       beginOperation("UPGRADE", trackId, `Installing ${installation.tier} retrofit ${installation.newProgress} · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, installationSeconds, targetLevel, undefined, "retrofit");
@@ -3612,12 +3612,12 @@ export function MissionSimulation() {
         setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.energyKWh} kWh; stored energy is ${availableEnergyKWh.toFixed(2)} kWh.`);
         return;
       }
-      if (partsInventoryKg < selectedRepair.partsMassKg) {
+      if (missionStage !== 1 && partsInventoryKg < selectedRepair.partsMassKg) {
         setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.partsMassKg} kg parts; ${partsInventoryKg.toFixed(2)} kg is available.`);
         return;
       }
       setMetrics((current) => ({ ...current, battery: clamp(current.battery - selectedRepair.energyKWh / batteryCapacity * 100) }));
-      setPartsInventoryKg((current) => Math.max(0, current - selectedRepair.partsMassKg));
+      if (missionStage !== 1) setPartsInventoryKg((current) => Math.max(0, current - selectedRepair.partsMassKg));
       const repairSupports = selectedRepair.requiredSystems;
       const roverCanAssist = pending.selected.rover !== undefined && repairSupports.includes("rover") && !roverOnFieldJob;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
@@ -4166,7 +4166,7 @@ export function MissionSimulation() {
     if (availableEnergyKWh + 1e-6 < option.energyKWh) {
       blockers.push(`Insufficient stored energy: needs ${option.energyKWh} kWh; available ${availableEnergyKWh.toFixed(2)} kWh.`);
     }
-    if (partsInventoryKg + 1e-6 < option.partsMassKg) {
+    if (missionStage !== 1 && partsInventoryKg + 1e-6 < option.partsMassKg) {
       blockers.push(`Insufficient parts: needs ${option.partsMassKg} kg; stock is ${partsInventoryKg.toFixed(2)} kg.`);
     }
     const runningOperation = activeOperationsRef.current[systemId];
@@ -4367,12 +4367,12 @@ export function MissionSimulation() {
                   {pulseExpandedMetric === "batteryFlow" && (
                     <>
                       <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Live power balance · same simulation tick</p>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Solar power actually delivered to bus</span><span className="font-mono text-[#f0cf69]">{electricalReadings.generationKW.toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Power supplied to colony (solar + battery, net of charging)</span><span className="font-mono text-[#f0cf69]">{(electricalReadings.generationKW + electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
                       <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">− Power demand (colony loads)</span><span className="font-mono text-[#f0cf69]">− {electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
                       <div className="my-1 border-t border-[#30484c]" />
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">= Solar surplus / (shortfall before battery)</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">= Net surplus / (shortfall) after battery</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW + electricalReadings.batteryFlowKW - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
                       <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Actual battery charging (power drawn from bus)" : electricalReadings.batteryFlowKW > 0.01 ? "Actual battery discharging (power supplied to bus)" : "Actual battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
-                      <p className="mt-1 text-[8px] text-[#789a96]">This balance compares solar power against colony demand before the battery responds. Positive battery flow below supplies the shortfall; negative flow diverts surplus into charging. Therefore solar delivered + battery discharge − colony demand should be approximately 0 when the battery can cover the deficit. The Foundation battery's 10 kW charge/discharge ratings are limits, not constant flow.</p>
+                      <p className="mt-1 text-[8px] text-[#789a96]">Battery flow is signed: positive means discharge added to supply; negative means charging power diverted from solar. The net surplus is calculated from actual supply after that battery flow, minus colony demand. The Foundation battery's 10 kW charge/discharge ratings are limits, not constant flow.</p>
                       <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
                     </>
                   )}
