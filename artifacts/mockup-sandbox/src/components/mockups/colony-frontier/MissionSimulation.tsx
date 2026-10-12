@@ -1593,6 +1593,52 @@ function BuildingInspector({
           <p className="mt-1 text-[9px] leading-4 text-[#6fa294]">Feeds: {downstream.length ? downstream.map((id) => SYSTEM_LABELS[id] ?? id).join(" · ") : "No direct downstream consumer"}</p>
         </section>
 
+        {track.id === "water" && (
+          <section className="mx-4 mt-3 rounded-xl border border-[#2c6670] bg-gradient-to-br from-[#0c2931] to-[#0b1b23] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#8dd9eb]">Potable-water storage</p><p className="mt-1 text-[8px] leading-4 text-[#83aeb8]">Four independent reserve tanks · 45 L nominal per tank</p></div>
+              <div className="text-right"><p className="font-mono text-sm font-black text-[#b9f0ff]">{Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL)} L</p><p className="text-[8px] text-[#83aeb8]">of {RESOURCE_CAPACITIES.waterReserveL} L</p></div>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {[0, 1, 2, 3].map((tank) => {
+                const tankFill = clamp(metrics.water / 100 * 4 - tank) * 100;
+                return <div key={tank} className="flex flex-col items-center gap-1">
+                  <div className="relative h-16 w-9 overflow-hidden rounded-t-[13px] rounded-b-[8px] border-2 border-[#4c8995] bg-[#07161c] shadow-inner">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#167ea2] to-[#65d8ee] transition-[height]" style={{ height: `${tankFill}%` }} />
+                    <div className="absolute inset-y-1 left-1 w-1 rounded-full bg-white/20" />
+                    <div className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#8cd9e7]/35" />
+                  </div>
+                  <span className="text-[7px] font-bold uppercase tracking-[0.08em] text-[#85b9c3]">Tank {tank + 1}</span>
+                  <span className="font-mono text-[8px] text-[#c6f2fb]">{Math.round(tankFill / 100 * 45)} L</span>
+                </div>;
+              })}
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-[#24505a] pt-2 text-[8px]"><span className="text-[#83aeb8]">Water recovery status</span><span className={`font-black ${metrics.water < 28 ? "text-[#ff9aa2]" : "text-[#91e6c1]"}`}>{metrics.water < 28 ? "LOW RESERVE" : runtime.condition < 30 ? "RESTRICTED" : "TRACKING RESERVE"}</span></div>
+          </section>
+        )}
+        {track.id === "agriculture" && (
+          <section className="mx-4 mt-3 rounded-xl border border-[#4e7147] bg-gradient-to-br from-[#172a1b] to-[#101e18] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#b3e78c]">Edible food stores</p><p className="mt-1 text-[8px] leading-4 text-[#8eb28a]">Six sealed food containers · 7 kg nominal per container</p></div>
+              <div className="text-right"><p className="font-mono text-sm font-black text-[#d6f7ad]">{(metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1)} kg</p><p className="text-[8px] text-[#8eb28a]">of {RESOURCE_CAPACITIES.foodReserveKg} kg</p></div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[0, 1, 2, 3, 4, 5].map((crate) => {
+                const crateFill = clamp(metrics.food / 100 * 6 - crate) * 100;
+                return <div key={crate} className="relative overflow-hidden rounded-md border border-[#657b48] bg-[#0b1711] p-1.5">
+                  <div className="relative h-7 overflow-hidden rounded-sm border border-[#6e8650] bg-[#17271a]">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#497b2d] to-[#b6df68] transition-[height]" style={{ height: `${crateFill}%` }} />
+                    <div className="absolute inset-y-0 left-1/2 w-px bg-[#d5f2a2]/35" />
+                    <div className="absolute inset-x-0 top-1/2 h-px bg-[#d5f2a2]/35" />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-1"><span className="text-[7px] font-bold uppercase text-[#a8c68e]">Crate {crate + 1}</span><span className="font-mono text-[7px] text-[#d6f7ad]">{(crateFill / 100 * 7).toFixed(1)} kg</span></div>
+                </div>;
+              })}
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-[#344c31] pt-2 text-[8px]"><span className="text-[#8eb28a]">Crop production / crew use</span><span className={`font-black ${metrics.food < 28 ? "text-[#ff9aa2]" : "text-[#bdeca0]"}`}>{metrics.food < 28 ? "LOW RESERVE" : "STORAGE TRACKING"}</span></div>
+            <p className="mt-2 text-[8px] leading-4 text-[#789776]">Crates represent the colony's stored edible dry-food equivalent. Crop output is added to this reserve; crew consumption removes food every simulated day.</p>
+          </section>
+        )}
         {track.id === "navigation" && (
           <section className="mx-4 mt-3 rounded-xl border border-[#435b73] bg-gradient-to-br from-[#101d2c] to-[#111b22] p-3">
             <div className="flex items-center justify-between gap-2">
@@ -2529,14 +2575,19 @@ export function MissionSimulation() {
         const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive || criticalReserveMode ? 2.0 : 2.55;
         // Mission-average electrical loads in kW. The 2.0 kW emergency floor keeps
         // life support and minimum thermal control alive; installed systems add their own demand.
+        // Mission-average electrical loads by active subsystem (kW). These are explicit
+        // game-design estimates, not claimed flight-hardware measurements. The essential 2.55 kW
+        // already includes crew life support, electrolysis, habitat controls and required avionics.
+        // Passive radiation shielding draws no power; active radiation monitoring/control does.
         const optionalSystemLoadKW: Record<string, number> = {
-          co2: 0.15, grid: 0.05, science: 0.5, rover: 0.8,
-          extraction: 0.6, isru: 0.4, agriculture: 0.6, maintenance: 0.15, oxygen: 0.1,
+          water: 0.18, co2: 0.15, grid: 0.05, science: 0.5, rover: 0.8,
+          extraction: 0.6, isru: 0.4, agriculture: 1.0, maintenance: 0.15,
+          radiation: 0.08, comms: 0.12, navigation: 0.08, thermal: 0.25,
         };
-        const requestedOptionalLoadKW = batteryRecoveryActive ? 0 : Object.entries(optionalSystemLoadKW).reduce(
-          (sum, [systemId, loadKW]) => sum + (pending.selected[systemId] ? loadKW * (emergencyPowerMode ? 0.5 : 1) : 0),
-          0,
-        );
+        const requestedLoads = Object.entries(optionalSystemLoadKW)
+          .filter(([systemId]) => Boolean(pending.selected[systemId]) && systemIsOperational(systemId, dependencyContext))
+          .map(([systemId, loadKW]) => ({ systemId, label: SYSTEM_LABELS[systemId] ?? systemId, kw: loadKW * (emergencyPowerMode ? 0.5 : 1) }));
+        const requestedOptionalLoadKW = batteryRecoveryActive ? 0 : requestedLoads.reduce((sum, source) => sum + source.kw, 0);
         const solarThermalLoadKW = Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * 0.07;
         // Shed noncritical loads automatically when generation cannot meet demand and battery SOC is low.
         // Below 25%, retain only the emergency floor plus a small research load if the lab is deployed.
@@ -2571,15 +2622,16 @@ export function MissionSimulation() {
           ...(solarGeneration > 0.001 ? [{ label: "Solar array", kw: solarGeneration }] : []),
           ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW }] : []),
         ];
-        const optionalDemandSources = Object.entries(optionalSystemLoadKW)
-          .filter(([systemId]) => Boolean(pending.selected[systemId]))
-          .map(([systemId, requestedKW]) => ({
-            label: SYSTEM_LABELS[systemId] ?? systemId,
-            kw: requestedOptionalLoadKW > 0 ? requestedKW * (optionalLoadKW / Math.max(0.001, requestedOptionalLoadKW)) : 0,
+        const optionalDemandSources = requestedLoads
+          .map((source) => ({
+            label: source.label,
+            kw: !batteryRecoveryActive && requestedOptionalLoadKW > 0
+              ? source.kw * (optionalLoadKW / requestedOptionalLoadKW)
+              : 0,
           }))
           .filter((source) => source.kw > 0.001);
         const demandSources = [
-          { label: "Core life support and habitat", kw: essentialLoadKW },
+          { label: "Core life support, electrolysis and habitat controls", kw: essentialLoadKW },
           ...(solarThermalLoadKW > 0.001 ? [{ label: "Solar-array thermal management", kw: solarThermalLoadKW }] : []),
           ...optionalDemandSources,
         ];
@@ -2611,14 +2663,21 @@ export function MissionSimulation() {
         const waterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
         const waterThroughputLDay = getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade);
         const circulatingWaterLDay = 20; // Four-crew loop-flow assumption; recovery reduces net make-up loss.
-        const recycledWaterLDay = waterOnline && powerPathAvailable ? Math.min(circulatingWaterLDay, waterThroughputLDay) * waterRecoveryPct / 100 : 0;
-        const netWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
-        const waterDelta = -netWaterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 180 * 100;
+        const effectiveWaterRecoveryPct = waterOnline && powerPathAvailable ? waterRecoveryPct : 0;
+        const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
+        const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
           ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
-        const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / 42 * 100;
+        const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
+        const grossCropWaterLDay = foodProductionKgDay * cropWaterUseLPerKg;
+        // The humidity/recovery loop returns a share of crop transpiration to the clean-water tank.
+        // When water recovery or its power path is offline, that returned fraction is zero.
+        const netCropWaterLossLDay = grossCropWaterLDay * (1 - effectiveWaterRecoveryPct / 100);
+        const netWaterLossLDay = crewWaterLossLDay + netCropWaterLossLDay;
+        const waterDelta = -netWaterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
+        const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalRatedKW = thermalOnline
           ? repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics)
@@ -4165,7 +4224,7 @@ export function MissionSimulation() {
                       {electricalReadings.demandSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.consumptionKW > 0 ? (source.kw / electricalReadings.consumptionKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
                       ))}
-                      <p className="mt-1 text-[8px] text-[#789a96]">Demand uses the same live load calculation as the simulation; optional loads can be shed in low-battery mode.</p>
+                      <p className="mt-1 text-[8px] text-[#789a96]">Includes every installed, operational electrical subsystem. Passive radiation shielding draws no electricity; active monitoring is counted.</p>
                     </>
                   )}
                   {pulseExpandedMetric === "battery" && (
