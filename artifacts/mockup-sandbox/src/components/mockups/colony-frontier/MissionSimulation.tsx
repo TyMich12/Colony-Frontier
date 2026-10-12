@@ -2704,7 +2704,11 @@ export function MissionSimulation() {
               : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
         const baseLoadKW = Math.max(2.0, nominalLoadKW);
-        const solarToBusKW = Math.min(solarGeneration, gridTransferLimitKW);
+        // Grid conversion efficiency is an active retrofit metric, not display-only telemetry.
+        const gridConversionEfficiency = pending.selected.grid && gridOnline
+          ? clamp(getAdditionalRating("grid", "conversion efficiency", pending.selected.grid, gridUpgrade) / 100, 0, 1)
+          : 1;
+        const solarToBusKW = Math.min(solarGeneration * gridConversionEfficiency, gridTransferLimitKW);
         const solarNetKW = solarToBusKW - baseLoadKW;
         const batteryChargeLimitKW = batteryOnline
           ? Math.min(LEVEL1_ENVIRONMENT.batteryMaximumChargePowerKW, getAdditionalRating("battery", "continuous charge power", pending.selected.battery ?? "Foundation", batteryUpgrade))
