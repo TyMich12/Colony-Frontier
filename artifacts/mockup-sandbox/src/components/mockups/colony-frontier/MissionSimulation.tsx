@@ -2566,28 +2566,55 @@ export function MissionSimulation() {
             ? repairAdjustedRating("grid", getBaselineRating("grid", pending.selected.grid, gridUpgrade), buildings.grid?.repairMetrics)
             : 0
           : Number.POSITIVE_INFINITY;
-        // Nominal mission-average electrical loads (kW). The base includes crew life support,
-        // electrolysis, habitat controls and required avionics; optional facilities add their own draw.
-        // Hot cells increase thermal-management demand. The power manager sheds noncritical loads
-        // when the bus cannot sustain nominal demand, while retaining a 2 kW critical-load floor.
+        // Electrical load model (kW): reference-grounded where public NASA concept data
+        // gives a comparable subsystem, with explicit game-design assumptions for smaller
+        // electronics/control loads. These are not claimed to be measured flight-hardware values.
+        // NASA TM / NTRS 20200001622 Table 8 gives a 6-crew ECLSS reference:
+        // air revitalization + O2 generation 5.85 kW, water processing 1.29 kW,
+        // biomass production 6.10 kW, and thermal control 1.03 kW.
+        // Scale those four loads linearly to this game's 4-crew habitat (×4/6).
+        // NASA NTRS 20050161948 gives a 2-kW unpressurized lunar rover reference;
+        // NASA CR-2020-220368 gives 0.3–1.0 kW per communications transmitter and
+        // 2–10 kW for support equipment. ISRU/extraction are modelled as pilot equipment
+        // inside those broad ranges; actual values depend heavily on process and duty cycle.
+        // The 2.55 kW core is a separate game-design allowance for fixed habitat controls,
+        // lighting, avionics and miscellaneous loads; it does NOT include the modeled ECLSS
+        // loads below. Passive radiation shielding uses no electricity.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
         const criticalReserveMode = current.battery <= 25 && solarGeneration < 2.55;
         const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive || criticalReserveMode ? 2.0 : 2.55;
-        // Mission-average electrical loads in kW. The 2.0 kW emergency floor keeps
-        // life support and minimum thermal control alive; installed systems add their own demand.
-        // Mission-average electrical loads by active subsystem (kW). These are explicit
-        // game-design estimates, not claimed flight-hardware measurements. The essential 2.55 kW
-        // already includes crew life support, electrolysis, habitat controls and required avionics.
-        // Passive radiation shielding draws no power; active radiation monitoring/control does.
         const optionalSystemLoadKW: Record<string, number> = {
-          solar: 0.04, battery: 0.03, water: 0.18, co2: 0.15, grid: 0.05,
-          science: 0.5, rover: 0.8, extraction: 0.6, isru: 0.4,
-          agriculture: 1.0, maintenance: 0.15, radiation: 0.08,
-          comms: 0.12, navigation: 0.08, thermal: 0.25,
+          solar: 0.04,       // Array controller / sensors; game-design estimate.
+          battery: 0.03,     // Battery management standby; game-design estimate.
+          water: 0.86,       // 1.29 kW × 4/6 crew, NASA ECLSS reference.
+          grid: 0.05,        // Distribution controller standby; game-design estimate.
+          science: 0.5,      // Instrument workload; depends on the selected experiment.
+          rover: 2.0,        // NASA conceptual 2-kW unpressurized lunar rover, while operating.
+          extraction: 2.0,   // Lower end of NASA 2–10 kW support-equipment range; pilot drill assumption.
+          isru: 5.0,         // Within NASA 2–10 kW support-equipment range; pilot processing assumption.
+          agriculture: 4.07, // 6.10 kW × 4/6 crew, NASA biomass-production reference.
+          maintenance: 0.15, // Standby diagnostic electronics; game-design estimate.
+          radiation: 0.02,   // Active monitor electronics only; game-design estimate.
+          comms: 0.3,        // Low end of NASA 0.3–1.0 kW per transmitter range.
+          navigation: 0.08,  // Avionics workload; game-design estimate.
+          thermal: 0.69,    // 1.03 kW × 4/6 crew, NASA ECLSS thermal-control reference.
         };
         const requestedLoads = Object.entries(optionalSystemLoadKW)
           .filter(([systemId]) => Boolean(pending.selected[systemId]) && systemIsOperational(systemId, dependencyContext))
           .map(([systemId, loadKW]) => ({ systemId, label: SYSTEM_LABELS[systemId] ?? systemId, kw: loadKW * (emergencyPowerMode ? 0.5 : 1) }));
+        // NASA's reference reports CO₂ removal and oxygen generation as one combined 5.85-kW
+        // air-system load, not separately. Count that combined load once whenever either
+        // operational module is installed, rather than inventing an unsupported split.
+        const airRevitalizationOnline =
+          (Boolean(pending.selected.co2) && systemIsOperational("co2", dependencyContext)) ||
+          (Boolean(pending.selected.oxygen) && systemIsOperational("oxygen", dependencyContext));
+        if (airRevitalizationOnline) {
+          requestedLoads.push({
+            systemId: "air-revitalization",
+            label: "Air revitalization (CO₂ removal + O₂ generation)",
+            kw: 3.9 * (emergencyPowerMode ? 0.5 : 1), // 5.85 kW × 4/6 crew.
+          });
+        }
         const requestedOptionalLoadKW = batteryRecoveryActive ? 0 : requestedLoads.reduce((sum, source) => sum + source.kw, 0);
         const solarThermalLoadKW = Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * 0.07;
         // Shed noncritical loads automatically when generation cannot meet demand and battery SOC is low.
