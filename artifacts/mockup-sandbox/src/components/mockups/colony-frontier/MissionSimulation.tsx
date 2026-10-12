@@ -4110,29 +4110,31 @@ export function MissionSimulation() {
         />
 
         {!activeEvent && !dashboardOpen && (
-          <div className="pointer-events-none absolute right-3 top-[58px] z-20 w-[min(68vw,390px)]">
-            <div className="overflow-hidden rounded-2xl border border-[#41696a] bg-[#08171b]/[0.94] p-2 shadow-[0_10px_34px_rgba(0,0,0,0.48)] backdrop-blur-xl">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
-                <span className="font-mono text-[9px] font-black text-[#f0cf69]">STABILITY INDEX {Math.round(performance.colonyHealth)}/100</span>
+          <div className="pointer-events-none absolute right-3 top-[58px] z-20 w-[min(90vw,470px)]">
+            <div className="overflow-hidden rounded-xl border border-[#41696a] bg-[#08171b]/[0.92] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.38)] backdrop-blur-xl">
+              <div className="mb-1 flex items-center justify-between gap-2 px-0.5">
+                <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
+                <span className="font-mono text-[8px] font-bold text-[#f0cf69]">STABILITY {Math.round(performance.colonyHealth)}/100</span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                 {[
-                  { label: "GENERATION", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(1)} kW solar`, icon: <Sun className="h-3 w-3" /> },
-                  { label: "CONSUMPTION", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW used`, icon: <Zap className="h-3 w-3" /> },
+                  { label: "GEN", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(1)} kW`, icon: <Sun className="h-3 w-3" /> },
+                  { label: "LOAD", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
                   { label: "BATTERY", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
-                  { label: "BATTERY FLOW", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `Charging ${(-electricalReadings.batteryFlowKW).toFixed(2)} kW` : `Discharging ${electricalReadings.batteryFlowKW.toFixed(2)} kW · ${electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? (electricalReadings.enduranceHours >= 100 ? `${Math.round(electricalReadings.enduranceHours)} h to reserve` : `${electricalReadings.enduranceHours.toFixed(1)} h to reserve`) : "reserve"}`, icon: <BatteryCharging className="h-3 w-3" /> },
-                  { label: "O₂", value: metrics.oxygen, display: physicalTelemetry.oxygen, icon: <Wind className="h-3 w-3" /> },
-                  { label: "WATER", value: metrics.water, display: physicalTelemetry.water, icon: <Droplets className="h-3 w-3" /> },
+                  { label: "FLOW", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `+${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charge` : `-${electricalReadings.batteryFlowKW.toFixed(2)} kW · ${electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h left` : "discharging"}`, icon: <BatteryCharging className="h-3 w-3" /> },
                 ].map((metric) => (
-                  <div key={metric.label} className={`rounded-xl border p-2 transition-colors ${metric.value < 28 ? "animate-pulse border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
-                    <div className="flex items-center justify-between gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.08em]">{metric.label}</span></div>
-                    <div className="mt-1 font-mono text-sm font-black" style={{ color: resourceColor(metric.value) }}>{metric.display}</div>
-                    <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#20373a]"><div className="h-full rounded-full transition-[width]" style={{ width: `${clamp(metric.value)}%`, background: resourceColor(metric.value) }} /></div>
+                  <div key={metric.label} className={`min-w-0 rounded-lg border px-1.5 py-1 transition-colors ${metric.value < 28 ? "border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
+                    <div className="flex items-center gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.08em]">{metric.label}</span></div>
+                    <div className="mt-0.5 truncate font-mono text-[10px] font-black leading-4" style={{ color: resourceColor(metric.value) }}>{metric.display}</div>
                   </div>
                 ))}
               </div>
-              {Object.values(activeOperations).length > 0 && <p className="mt-2 text-right text-[7px] font-black uppercase tracking-[0.1em] text-[#92e7b7]">{Object.values(activeOperations).length} work order(s) · open system to view timer</p>}
+              {(metrics.oxygen < 28 || metrics.water < 28) && (
+                <div className="mt-1 rounded-md border border-[#d75d69] bg-[#321a21] px-2 py-1 text-[8px] font-bold text-[#ffb3b6]">
+                  LIFE SUPPORT WARNING · {metrics.oxygen < 28 ? "O₂ reserve low" : ""}{metrics.oxygen < 28 && metrics.water < 28 ? " · " : ""}{metrics.water < 28 ? "Water reserve low" : ""}
+                </div>
+              )}
+              {Object.values(activeOperations).length > 0 && <p className="mt-1 text-right text-[7px] font-black uppercase tracking-[0.1em] text-[#92e7b7]">{Object.values(activeOperations).length} active job(s)</p>}
             </div>
           </div>
         )}
