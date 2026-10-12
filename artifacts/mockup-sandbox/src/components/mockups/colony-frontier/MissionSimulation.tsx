@@ -890,8 +890,9 @@ function initialMetrics(_selected: Record<string, Tier>): MissionMetrics {
 function getMissionFailureReason(metrics: MissionMetrics): string | null {
   if (metrics.oxygen <= 1.5) return "Cabin oxygen reserve fell below the minimum safe operating margin.";
   if (metrics.water <= 1) return "The usable water reserve was exhausted before recovery could be restored.";
+  if (metrics.food <= 1.5) return "Usable food reserves were exhausted before sustainable production or resupply could be restored.";
   if (metrics.habitat <= 1) return "Habitat integrity fell below its simulated pressure-boundary limit.";
-  if (metrics.power <= 0.5 && metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5) return "Generation is unavailable and the battery has reached its protected 20% reserve; critical life-support power can no longer be sustained.";
+  if (metrics.power <= 5 && metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5) return "Generation cannot sustain the colony and the battery has reached its protected 20% reserve; critical electrical demand is no longer being met.";
   if (metrics.temperature <= 16.05 || metrics.temperature >= 27.95) return "Cabin temperature passed the simulated crew-safe operating envelope.";
   if (metrics.radiation >= 90) return "Modelled effective dose rate exceeded the emergency shelter threshold.";
   return null;
@@ -2008,7 +2009,7 @@ export function MissionSimulation() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
-  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, consumptionKW: 2.55, batteryFlowKW: 0 });
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, consumptionKW: 2.55, batteryFlowKW: 0, enduranceHours: null as number | null });
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
   buildingsRef.current = buildings;
@@ -2565,7 +2566,16 @@ export function MissionSimulation() {
         // The POWER gauge tracks generation margin, not battery state of charge. Solar output can
         // recover immediately while surplus electricity simultaneously charges the battery.
         const powerBase = clamp(50 + 50 * (solarGeneration - baseLoadKW) / Math.max(1, baseLoadKW));
-        setElectricalReadings({ generationKW: solarGeneration, consumptionKW: nominalLoadKW, batteryFlowKW });
+        setElectricalReadings({
+          generationKW: solarGeneration,
+          consumptionKW: nominalLoadKW,
+          batteryFlowKW,
+          // Estimate time until the protected SOC floor using the actual current deficit.
+          // A tiny deficit should correctly show a long endurance; do not force needless discharge.
+          enduranceHours: batteryFlowKW > 0.01
+            ? availableStoredEnergyKWh * dischargeEfficiency / batteryFlowKW
+            : null,
+        });
         const batteryDeltaKWh = batteryOnline
           ? (batteryFlowKW >= 0
             ? -(batteryFlowKW / LEVEL1_ENVIRONMENT.batteryDischargeEfficiency) * resourceDt / 3600
@@ -4111,7 +4121,7 @@ export function MissionSimulation() {
                   { label: "GENERATION", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(1)} kW solar`, icon: <Sun className="h-3 w-3" /> },
                   { label: "CONSUMPTION", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW used`, icon: <Zap className="h-3 w-3" /> },
                   { label: "BATTERY", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
-                  { label: "BATTERY FLOW", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? "Idle" : electricalReadings.batteryFlowKW < 0 ? `Charging ${(-electricalReadings.batteryFlowKW).toFixed(2)} kW` : `Discharging ${electricalReadings.batteryFlowKW.toFixed(2)} kW`, icon: <BatteryCharging className="h-3 w-3" /> },
+                  { label: "BATTERY FLOW", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `Charging ${(-electricalReadings.batteryFlowKW).toFixed(2)} kW` : `Discharging ${electricalReadings.batteryFlowKW.toFixed(2)} kW · ${electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? (electricalReadings.enduranceHours >= 100 ? `${Math.round(electricalReadings.enduranceHours)} h to reserve` : `${electricalReadings.enduranceHours.toFixed(1)} h to reserve`) : "reserve"}`, icon: <BatteryCharging className="h-3 w-3" /> },
                   { label: "O₂", value: metrics.oxygen, display: physicalTelemetry.oxygen, icon: <Wind className="h-3 w-3" /> },
                   { label: "WATER", value: metrics.water, display: physicalTelemetry.water, icon: <Droplets className="h-3 w-3" /> },
                 ].map((metric) => (
