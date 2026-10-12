@@ -109,3 +109,56 @@ A retrofit must be an actual installed component or adjustment. It consumes loca
 3. Update the shared balance source once, with tests/checks for all 28 metrics and 12 states per metric.
 4. Wire system inspectors, simulation behavior, and power draw to the shared source without double-counting.
 5. Run a build and scenario checks for Foundation/Frontier/Apex/Research, all retrofit levels, and power-starved conditions.
+
+
+## Numerical retrofit effects — exact intended changes
+
+**Important:** the effects below define what each installed kit *does*. The primary-metric changes match the proposed 0/2 → 1/2 → 2/2 ratings above. Secondary effects are additional proposed simulation behaviours; they must be implemented as distinct metrics and must not be added twice through both the table and an old `directGain`.
+
+For compactness, tier abbreviations are **F = Foundation, Fr = Frontier, A = Apex, R = Research**. Each pair is **first retrofit (0/2 → 1/2) / second retrofit (1/2 → 2/2)**. “pp” means percentage points, not percent multiplicatively.
+
+| System | Primary metric change per retrofit: F / Fr / A / R | Additional numerical effect of first retrofit | Additional numerical effect of second retrofit |
+|---|---|---|---|
+| Solar Power | Rated output: **+0.4 / +0.6 / +1 / +2 kW** per step | Solar-dust index **−15 points** on the array; this separately improves live output through the dust-transmission curve | Dust index **−10 more points**; improve pointing error by **2°** through actuator calibration |
+| Energy Storage | Nominal capacity: **+40 / +60 / +100 / +200 kWh** per step | Maximum continuous charge and discharge power: **+0.2 / +1 / +2 / +5 kW** | Add the same tier-specific charge/discharge power gain again; battery protection trips **2 percentage points** less often under the same reference load |
+| Oxygen | Production: **+0.1 / +0.1 / +0.2 / +0.2 kg O₂/day** per step | Delivered purity: **+1 / +0.2 / +0.1 / +0.005 pp** | Delivered purity: **+1 / +0.2 / +0.1 / +0.004 pp**; clamp purity to **100% maximum** |
+| Water | Recovery: **+1 / +1 / +1 / +0.2 pp** per step | Wastewater throughput: **+3 / +10 / +20 / +50 L per 24 h sim day** | Same tier-specific throughput gain again; reduce the reference leak/bypass loss by **0.5 L per 24 h sim day** |
+| CO₂ Control | Removal: **+0.1 / +0.1 / +0.2 / +0.2 kg CO₂/day** per step | Increase sorbent usable capacity by **5 / 5 / 8 / 10 kg CO₂** before regeneration is required | Reduce regeneration downtime by **2 / 2 / 3 / 4 minutes per cycle** |
+| Thermal Control | Heat rejection: **+0.1 / +0.2 / +0.4 / +0.5 kW heat** per step | Improve coolant flow by **3 / 4 / 5 / 6%** from its tier's unretrofitted flow | Reduce pump/valve control lag by **1 / 1 / 2 / 3 seconds** |
+| Communications | Throughput: **+0.1 / +0.5 / +2 / +10 Mbps** per step | Clear-path link availability: **+1 / +0.5 / +0.2 / +0.02 pp** | Clear-path link availability: **+1 / +0.5 / +0.2 / +0.02 pp**; cap at **100%** |
+| Habitat | Standard-fault pressure loss: **−0.2 / −0.1 / −0.05 / −0.02 kPa per 24 h** per step | Pressure sensor error reduced by **0.5 kPa** | Pressure sensor error reduced by **0.25 kPa**; the retrofit does not automatically restore cabin pressure or heal an active fault |
+| Radiation | Reference-event dose avoided: **+0.5 / +0.5 / +1 / +1 percentage point** per step | Improve shield coverage of the designated occupied zone by **5 percentage points** | Improve coverage by **3 additional percentage points**; never exceed **100% coverage** and do not treat event protection as universal radiation immunity |
+| Rovers | Safe speed: **+0.1 / +0.1 / +0.2 / +0.3 km/h** per step | Safe range per charge: **+0.2 / +0.5 / +2 / +5 km** | Safe range per charge: **+0.2 / +0.5 / +2 / +5 km**; speed remains capped by the terrain's safe-speed limit |
+| Resource Extraction | Regolith throughput: **+5 / +10 / +20 / +50 kg per 24 h sim day** per step | Reduce cutter jams from **10 to 8 per 100 reference operating hours** | Reduce jams from **8 to 6 per 100 reference operating hours**; jam counts are a game event rate, not a real universal hardware statistic |
+| ISRU | Product output: **+0.1 / +0.2 / +0.5 / +2 kg per 24 h sim day** per step | Product recovery: **+1 / +1 / +1 / +1 pp** | Product purity: **+1 / +0.5 / +0.1 / +0.02 pp**; purity and recovery are separate and recipe-specific |
+| Agriculture | Dry-food-equivalent yield: **+0.02 / +0.05 / +0.1 / +0.2 kg/day** per step | Freshwater use: **−1 / −0.5 / −0.3 / −0.1 L per kg dry-food-equivalent** | Freshwater use: **−1 / −0.5 / −0.3 / −0.1 L/kg** again; water use cannot fall below **0 L/kg** |
+| Maintenance | Condition restored: **+0.5 / +0.5 / +1 / +2 condition points/job** per step | Standard diagnostic scan detects faults at **80 / 85 / 90 / 95%** sensitivity | Detection sensitivity rises another **5 / 4 / 3 / 2 pp**, capped at **100%**; this does not itself restore condition |
+| Power Grid | Transfer capacity: **+0.3 / +1 / +2 / +5 kW** per step | Conversion efficiency: **+1 / +0.5 / +0.2 / +0.1 pp** | Conversion efficiency: **+1 / +0.5 / +0.2 / +0.1 pp**; cap at **100%** and calculate losses from the actual transferred power |
+| Science | Assay throughput: **+0.1 / +0.3 / +1 / +3 assays per 24 h sim day** per step | Valid-result accuracy: **+1 / +0.5 / +0.2 / +0.02 pp** | Valid-result accuracy: **+1 / +0.5 / +0.2 / +0.02 pp**, capped at **100%**; throughput must not bypass sample-processing timers |
+| Navigation | Horizontal position error: **−2 / −0.5 / −0.2 / −0.02 m** per step | Sensor calibration reduces drift by **10 / 5 / 2 / 0.2 m per 24 h** under the reference route | Sensor fusion reduces drift by a further **10 / 5 / 2 / 0.2 m per 24 h**; error cannot fall below the tier's defined sensor/terrain floor |
+
+### Tier upgrades also need explicit numerical effects
+
+A tier upgrade is a **new equipment package**, not a free retrofit. When a system is changed to the next tier, replace the old tier's rating with the new tier's **0/2** rating, then apply only the retrofits installed for that new tier. Do not carry the old tier's retrofit bonuses forward.
+
+In addition to the rating changes in the master table, the following are proposed tier-level trade-offs to make upgrades tangible:
+
+| Tier change | Equipment / gameplay change |
+|---|---|
+| Foundation → Frontier | Installed unit mass **+15%**; purchase cost **+35%**; power draw for powered equipment **+5%** unless the higher tier's efficiency metric explicitly offsets it |
+| Frontier → Apex | Installed unit mass **+20%**; purchase cost **+50%**; powered-equipment draw **+10%** unless efficiency offsets it |
+| Apex → Research | Installed unit mass **+25%**; purchase cost **+75%**; powered-equipment draw **+15%** unless efficiency offsets it |
+
+These are **provisional balance rules**, not yet code. Applying one generic draw multiplier to every system would be too crude: solar arrays, habitats, passive shielding, batteries, and powered machinery do not share one electrical-load behaviour. Before implementation, define tier-specific operating draw in **kW for each powered system** and leave passive systems' draw unchanged unless they have powered subsystems.
+
+### Worked example: Solar Power
+
+- **Foundation 0/2:** rated output **12.0 kW**, solar-dust index **D** as measured by the environment.
+- **Foundation 1/2:** rated output **12.4 kW**; retrofit also reduces dust index by **15 points**.
+- **Foundation 2/2:** rated output **12.8 kW**; dust index is reduced by **25 points total** from the 0/2 state; pointing calibration improves error by **2°**.
+- **Frontier 0/2:** the tier change replaces the Foundation array with a **20.0 kW** rated array; Foundation retrofit gains do not carry over.
+- Live solar generation is calculated from rated output and the existing illumination, temperature, dust, pointing, and condition factors. The **+0.4 kW rating change and dust reduction are distinct effects**, but the dust reduction must be applied only once.
+
+### Implementation gate
+
+Before these secondary numerical effects are wired into gameplay, check each one against the existing simulation state and UI. Where the game has no variable yet (for example jam rate, sensor drift, or diagnostic sensitivity), add an explicit variable and visible feedback or omit that secondary effect from the first implementation pass. Do not display an effect as working until the simulation actually applies it.
