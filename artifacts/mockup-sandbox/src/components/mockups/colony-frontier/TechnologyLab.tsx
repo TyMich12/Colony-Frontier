@@ -256,7 +256,7 @@ export function TechnologyLab() {
         <aside className="border border-[#29434a] bg-[#0b1a21] p-4">
           <SectionLabel>Technology tracks</SectionLabel>
           <p className="mb-4 text-xs leading-5 text-[#829d99]">
-            Loadout uses the tier you own for each system. Earn mission XP to open Frontier and Apex hardware; Research equipment also needs the token cost listed for that system.
+            Loadout uses the tier you own for each system. Earn mission XP to unlock Frontier and Apex hardware; Research requires the per-system Research Token cost. Research is a major next-generation jump, not a small Apex upgrade. Tier selection happens here and in Loadout—not inside a running simulation.
           </p>
           <div className="space-y-1.5">
             {technologyTracks.map((track) => {
@@ -354,7 +354,7 @@ export function TechnologyLab() {
               Earn better hardware.
             </h2>
             <p className="mt-3 text-sm leading-6 text-[#b6b19d]">
-              Mission rewards increase XP and Research Tokens. Eligible Frontier and Apex equipment becomes available with progress; Research hardware has an extra per-system token cost. Select the new tier on a future deployment to install its more advanced model and improved production.
+              Mission rewards increase XP and Research Tokens. Eligible Frontier and Apex equipment becomes available with progress; Research hardware has an extra per-system token cost. Unlock and select the new tier here, then choose it in Loadout before deployment. The running simulation never changes a system's technology tier; it supports only the 0/2 → 1/2 → 2/2 field retrofits.
             </p>
             <div className="mt-5 space-y-4 border-t border-[#514635] pt-4">
               <div className="flex justify-between text-[10px] uppercase tracking-[0.16em]">
