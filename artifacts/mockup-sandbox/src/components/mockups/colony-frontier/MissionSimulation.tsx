@@ -701,6 +701,18 @@ function describeRepairOutcome(
     return `Solar dust: −${amount} ${unit}`;
   }
 
+  if (/usable energy restored/i.test(metric)) {
+    return `Battery usable energy: +${amount} kWh restored (bounded by available capacity)`;
+  }
+  if (/safe cell-temperature operating window restored/i.test(metric)) {
+    return `Battery thermal operating margin: +${amount} ${unit}`;
+  }
+  if (/charge\/discharge path availability restored/i.test(metric)) {
+    return `Battery bidirectional power path: +${amount} ${unit}`;
+  }
+  if (/high-resistance cell connections isolated/i.test(metric)) {
+    return `Battery suspect connections verified and isolated: ${amount} ${unit}`;
+  }
   if (/failed array strings restored to service/i.test(metric)) {
     return `Solar array: +${amount} failed string(s) restored`;
   }
@@ -1787,7 +1799,7 @@ function BuildingInspector({
               {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
                 const blockers = getBlockers(track.id, `repair:${option.id}`);
                 const tierIndex = effectiveRepairTierIndex(tier, option.requiredSystems, selected);
-                const outcomeLines = option.systemId === "battery" ? ["Battery recovery pauses non-essential loads; charge increases only from available solar surplus during the operation. No energy is created."] : describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
+                const outcomeLines = describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
                 const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
                 return (
                   <button
@@ -2323,6 +2335,15 @@ export function MissionSimulation() {
               ? currentDust * (1 - Math.min(100, Math.max(0, outcome)) / 100)
               : currentDust - Math.max(0, outcome), 0, 100)
           : currentDust;
+        if (option && /usable energy restored/i.test(option.metric)) {
+          const batteryCapacity = ratedBatteryCapacityKWh(pending?.selected ?? {}, buildingsRef.current);
+          if (batteryCapacity > 0) {
+            setMetrics((current) => ({
+              ...current,
+              battery: clamp(current.battery + (Math.max(0, outcome) / batteryCapacity) * 100),
+            }));
+          }
+        }
         const dustFault = repairTarget === "solar" && faults.some((fault) => fault.eventId === "solar-dust" || fault.eventId === "regional-dust-front");
         const batteryEnergyRepair = repairTarget === "battery" && Boolean(option);
         const faultResolved = faults.length === 0 || batteryEnergyRepair || (dustFault
@@ -2379,9 +2400,7 @@ export function MissionSimulation() {
             ? (/of current dust/i.test(option.unit)
                 ? `Solar dust: removed ${formatRating(outcome)}% of the deposit present when the repair finished`
                 : `Solar dust: −up to ${formatRating(outcome)} points (the dust index cannot fall below zero)`)
-            : option.systemId === "battery"
-              ? "Battery recovery pauses non-essential loads; stored charge changes only through the live generation/load balance during the operation. No charge is added automatically."
-              : describeRepairOutcome(repairTarget, option.metric, option.unit, outcome),
+            : describeRepairOutcome(repairTarget, option.metric, option.unit, outcome),
           ...(option.secondary && secondaryValue !== null
             ? [describeRepairOutcome(repairTarget, option.secondary.metric, option.secondary.unit, secondaryValue)]
             : []),
