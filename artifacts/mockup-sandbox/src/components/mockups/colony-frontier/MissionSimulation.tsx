@@ -2575,7 +2575,7 @@ export function MissionSimulation() {
           .filter(([systemId]) => Boolean(pending.selected[systemId]))
           .map(([systemId, requestedKW]) => ({
             label: SYSTEM_LABELS[systemId] ?? systemId,
-            kw: requestedOptionalLoadKW > 0 ? requestedKW * (emergencyPowerMode ? 0.5 : 1) * (optionalLoadKW / Math.max(0.001, requestedOptionalLoadKW)) : 0,
+            kw: requestedOptionalLoadKW > 0 ? requestedKW * (optionalLoadKW / Math.max(0.001, requestedOptionalLoadKW)) : 0,
           }))
           .filter((source) => source.kw > 0.001);
         const demandSources = [
