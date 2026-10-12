@@ -2694,17 +2694,18 @@ export function MissionSimulation() {
               : 0,
           }))
           .filter((source) => source.kw > 0.001);
-        const batteryChargingLoadKW = Math.max(0, -batteryFlowKW);
+        // System demand is the load consumed by colony systems. Battery charging is
+        // a separate destination for surplus power, not part of the load being compared
+        // against generation; including it here made demand rise in lockstep with charging.
         const demandSources = [
           { label: "Core life support, electrolysis and habitat controls", kw: essentialLoadKW },
           ...optionalDemandSources,
-          ...(batteryChargingLoadKW > 0.001 ? [{ label: "Battery charging (power diverted to storage)", kw: batteryChargingLoadKW }] : []),
         ];
         setElectricalReadings({
-          // Report solar generation only. Battery discharge is storage output and
-          // is shown separately, so it cannot inflate the generation reading.
+          // Generation is new solar power. System demand excludes charging; the battery
+          // flow is tracked separately so the power balance can be displayed consistently.
           generationKW: solarToBusKW,
-          consumptionKW: nominalLoadKW + batteryChargingLoadKW,
+          consumptionKW: nominalLoadKW,
           batteryFlowKW,
           generationSources,
           demandSources,
@@ -4304,10 +4305,14 @@ export function MissionSimulation() {
                   )}
                   {pulseExpandedMetric === "batteryFlow" && (
                     <>
-                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Live battery power rate</p>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Battery charging rate" : electricalReadings.batteryFlowKW > 0.01 ? "Battery discharging rate" : "Battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Power demand</span><span className="font-mono text-[#f0cf69]">{electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
-                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Live power balance · same simulation tick</p>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Power supplied (solar + battery discharge)</span><span className="font-mono text-[#f0cf69]">{(electricalReadings.generationKW + Math.max(0, electricalReadings.batteryFlowKW)).toFixed(2)} kW</span></div>
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">− Power demand (colony loads)</span><span className="font-mono text-[#f0cf69]">− {electricalReadings.consumptionKW.toFixed(2)} kW</span></div>
+                      <div className="my-1 border-t border-[#30484c]" />
+                      <div className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="font-bold text-[#b5c9c4]">= Surplus / (shortfall)</span><span className="font-mono font-bold text-[#f0cf69]">{(electricalReadings.generationKW + Math.max(0, electricalReadings.batteryFlowKW) - electricalReadings.consumptionKW).toFixed(2)} kW</span></div>
+                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{electricalReadings.batteryFlowKW < -0.01 ? "Battery charging rate (bus input)" : electricalReadings.batteryFlowKW > 0.01 ? "Battery discharging rate (bus output)" : "Battery power transfer"}</span><span className="font-mono text-[#f0cf69]">{Math.abs(electricalReadings.batteryFlowKW).toFixed(2)} kW</span></div>
+                      {electricalReadings.batteryFlowKW < -0.01 && <p className="mt-1 text-[8px] text-[#789a96]">Charging is limited by the battery's charge-power rating, remaining capacity, and efficiency. If any limit applies, surplus can exceed the charging rate.</p>}
+                      <div className="mt-1 flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">Time to protected reserve</span><span className="font-mono text-[#f0cf69]">{electricalReadings.enduranceHours !== null && Number.isFinite(electricalReadings.enduranceHours) ? `${Math.round(electricalReadings.enduranceHours).toLocaleString()} h` : electricalReadings.batteryFlowKW < -0.01 ? "Charging" : "Not discharging"}</span></div>
                     </>
                   )}
                 </div>
