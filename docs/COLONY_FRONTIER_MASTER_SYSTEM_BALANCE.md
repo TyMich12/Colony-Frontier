@@ -38,17 +38,17 @@
 
 | System | Additional metric | Unit / direction | Foundation 0/2 → 1/2 → 2/2 | Frontier 0/2 → 1/2 → 2/2 | Apex 0/2 → 1/2 → 2/2 | Research 0/2 → 1/2 → 2/2 |
 |---|---|---|---:|---:|---:|---:|
-| Energy Storage | Maximum continuous discharge power | kW, higher | 10 → 10.2 → 10.4 | 22 → 23 → 24 | 45 → 47 → 49 | 100 → 105 → 110 |
-| Energy Storage | Maximum continuous charge power | kW, higher | 10 → 10.2 → 10.4 | 22 → 23 → 24 | 45 → 47 → 49 | 100 → 105 → 110 |
-| Water | Wastewater treatment throughput | L/24 h sim day, higher | 100 → 103 → 106 | 250 → 260 → 270 | 600 → 620 → 640 | 1,500 → 1,550 → 1,600 |
+| Energy Storage | Maximum continuous discharge power | kW, higher | 10 → 10.2 → 10.4 | 22 → 23 → 24 | 45 → 47 → 49 | 200 → 250 → 300 |
+| Energy Storage | Maximum continuous charge power | kW, higher | 10 → 10.2 → 10.4 | 22 → 23 → 24 | 45 → 47 → 49 | 200 → 250 → 300 |
+| Water | Wastewater treatment throughput | L/24 h sim day, higher | 100 → 103 → 106 | 250 → 260 → 270 | 600 → 620 → 640 | 2,500 → 3,500 → 5,000 |
 | Oxygen | Delivered oxygen purity | %, higher | 90 → 91 → 92 | 98 → 98.2 → 98.4 | 99.5 → 99.6 → 99.7 | 99.99 → 99.995 → 99.999 |
-| Communications | Link availability on a clear reference path | %, higher | 80 → 81 → 82 | 94 → 94.5 → 95 | 98.5 → 98.7 → 98.9 | 99.9 → 99.92 → 99.94 |
-| Power Grid | Power-conversion efficiency | %, higher | 85 → 86 → 87 | 94 → 94.5 → 95 | 98 → 98.2 → 98.4 | 99.5 → 99.6 → 99.7 |
-| Rovers | Safe traverse range per charge | km, higher | 5.0 → 5.2 → 5.4 | 18 → 18.5 → 19 | 40 → 42 → 44 | 100 → 105 → 110 |
-| ISRU | Product purity after processing | %, higher | 80 → 81 → 82 | 94 → 94.5 → 95 | 99 → 99.1 → 99.2 | 99.9 → 99.92 → 99.94 |
-| Science | Valid-result accuracy on reference standards | %, higher | 85 → 86 → 87 | 95 → 95.5 → 96 | 99 → 99.2 → 99.4 | 99.9 → 99.92 → 99.94 |
-| Agriculture | Freshwater consumed per kg dry-food-equivalent | L/kg, lower | 30 → 29 → 28 | 18 → 17.5 → 17 | 9.0 → 8.7 → 8.4 | 4.0 → 3.9 → 3.8 |
-| ISRU | Product recovery from target feedstock | % theoretical yield, higher | 15 → 16 → 17 | 42 → 43 → 44 | 72 → 73 → 74 | 95 → 96 → 97 |
+| Communications | Link availability on a clear reference path | %, higher | 80 → 81 → 82 | 94 → 94.5 → 95 | 98.5 → 98.7 → 98.9 | 99.9 → 99.95 → 99.99 |
+| Power Grid | Power-conversion efficiency | %, higher | 85 → 86 → 87 | 94 → 94.5 → 95 | 98 → 98.2 → 98.4 | 99.5 → 99.7 → 99.9 |
+| Rovers | Safe traverse range per charge | km, higher | 5.0 → 5.2 → 5.4 | 18 → 18.5 → 19 | 40 → 42 → 44 | 100 → 150 → 200 |
+| ISRU | Product purity after processing | %, higher | 80 → 81 → 82 | 94 → 94.5 → 95 | 99 → 99.1 → 99.2 | 99.9 → 99.95 → 99.99 |
+| Science | Valid-result accuracy on reference standards | %, higher | 85 → 86 → 87 | 95 → 95.5 → 96 | 99 → 99.2 → 99.4 | 99.9 → 99.95 → 99.99 |
+| Agriculture | Freshwater consumed per kg dry-food-equivalent | L/kg, lower | 30 → 29 → 28 | 18 → 17.5 → 17 | 9.0 → 8.7 → 8.4 | 4.0 → 3.0 → 2.5 |
+| ISRU | Product recovery from target feedstock | % theoretical yield, higher | 15 → 16 → 17 | 42 → 43 → 44 | 72 → 73 → 74 | 95 → 97 → 99 |
 
 ## What each tier means
 
