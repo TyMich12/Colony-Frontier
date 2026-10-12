@@ -771,7 +771,12 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
       value = `${formatRating(rating)} kW rated · ${checkpointKW.toFixed(3)} kW Day 7 · ${currentKW.toFixed(3)} kW current · ${(currentKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5)} kWh / 10 sim s`;
       break;
     }
-    case "battery": value += extra("continuous discharge power"); break;
+    case "battery": {
+      const maxDischargeKW = getAdditionalRating("battery", "continuous discharge power", tier, upgradeLevel);
+      label = "Nominal stored energy capacity · rated maximum discharge";
+      value = formatRating(rating) + " kWh nominal · " + formatRating(maxDischargeKW) + " kW max";
+      break;
+    }
     case "water": value = formatRating(rating) + "% recovery" + extra("throughput"); break;
     case "oxygen": value += extra("purity"); break;
     case "comms": value += extra("link availability"); break;
@@ -1370,6 +1375,7 @@ function BuildingInspector({
   power,
   battery,
   batteryCapacityKWh,
+  batteryFlowKW,
   metrics,
   getBlockers,
   selected,
@@ -1398,6 +1404,7 @@ function BuildingInspector({
   power: number;
   battery: number;
   batteryCapacityKWh: number;
+  batteryFlowKW: number;
   metrics: MissionMetrics;
   getBlockers: (systemId: string, actionId: string, nodeId?: string) => string[];
   selected: Record<string, Tier>;
@@ -1565,6 +1572,22 @@ function BuildingInspector({
             <p className="mt-1 text-[8px] leading-4 text-[#799994]">Retrofit {upgradeLevel}/2 changes only this rated capability. It does not restore condition, remove dust, clear faults or refill stored resources; the next tier is a separate rating state.</p>
             {runtime.repairMetrics && Object.keys(runtime.repairMetrics).some((metric) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)) && <div className="mt-2 border-t border-[#284542] pt-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#87aaa2]">Last measured repair / calibration outputs</p>{Object.entries(runtime.repairMetrics).filter(([metric]) => !metric.startsWith(REPAIR_GAP_PREFIX) && !metric.startsWith(REPAIR_GAP_INITIAL_PREFIX)).map(([metric, amount]) => <p key={metric} className="mt-1 text-[8px] leading-4 text-[#a8c6ba]">{metric}: <span className="font-mono text-[#d9f3e1]">{formatRating(amount)}</span></p>)}</div>}
           </div>
+          {track.id === "battery" && (
+            <div className="mt-3 rounded-xl border border-[#3a5b65] bg-[#0b1b22] px-3 py-2.5">
+              <p className="text-[8px] font-black uppercase tracking-[0.15em] text-[#8fc9d8]">Live battery telemetry</p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <span className="text-[9px] text-[#a9c4c9]">Actual bus power transfer</span>
+                <span className="font-mono text-[10px] font-black text-[#b9f0ff]">
+                  {Math.abs(batteryFlowKW) < 0.01 ? "0.00 kW · idle" : Math.abs(batteryFlowKW).toFixed(2) + " kW · " + (batteryFlowKW > 0 ? "discharging" : "charging")}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <span className="text-[9px] text-[#a9c4c9]">Stored energy</span>
+                <span className="font-mono text-[10px] text-[#b9f0ff]">{(battery / 100 * batteryCapacityKWh).toFixed(1)} / {batteryCapacityKWh.toFixed(0)} kWh</span>
+              </div>
+              <p className="mt-1 text-[8px] leading-4 text-[#7fa6b0]">Rated maximum is a hardware limit, not the current output. Actual flow follows the live power deficit/surplus and stops at the protected 20% reserve.</p>
+            </div>
+          )}
           <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.16em]">
@@ -2653,11 +2676,9 @@ export function MissionSimulation() {
         // Power health follows electricity actually reaching the bus, including battery
         // discharge and any grid transfer limit—not solar output alone.
         const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
-        const rawSourceKW = solarToBusKW + Math.max(0, batteryFlowKW);
-        const sourceScale = rawSourceKW > 0 ? deliveredPowerKW / rawSourceKW : 0;
         const generationSources = [
-          ...(solarToBusKW * sourceScale > 0.001 ? [{ label: "Solar array", kw: solarToBusKW * sourceScale }] : []),
-          ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW * sourceScale }] : []),
+          ...(solarToBusKW > 0.001 ? [{ label: "Solar array", kw: solarToBusKW }] : []),
+          ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW }] : []),
         ];
         const optionalDemandSources = requestedLoads
           .map((source) => ({
@@ -2675,7 +2696,7 @@ export function MissionSimulation() {
           ...(batteryChargingLoadKW > 0.001 ? [{ label: "Battery charging (power diverted to storage)", kw: batteryChargingLoadKW }] : []),
         ];
         setElectricalReadings({
-          generationKW: deliveredPowerKW,
+          generationKW: solarToBusKW + Math.max(0, batteryFlowKW),
           consumptionKW: nominalLoadKW + batteryChargingLoadKW,
           batteryFlowKW,
           generationSources,
@@ -4537,6 +4558,7 @@ export function MissionSimulation() {
             power={metrics.power}
             battery={metrics.battery}
             batteryCapacityKWh={ratedBatteryCapacityKWh(pending.selected, buildings)}
+            batteryFlowKW={electricalReadings.batteryFlowKW}
             metrics={metrics}
             getBlockers={getRepairBlockers}
             selected={pending.selected}
