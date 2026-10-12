@@ -2580,9 +2580,10 @@ export function MissionSimulation() {
         // already includes crew life support, electrolysis, habitat controls and required avionics.
         // Passive radiation shielding draws no power; active radiation monitoring/control does.
         const optionalSystemLoadKW: Record<string, number> = {
-          water: 0.18, co2: 0.15, grid: 0.05, science: 0.5, rover: 0.8,
-          extraction: 0.6, isru: 0.4, agriculture: 1.0, maintenance: 0.15,
-          radiation: 0.08, comms: 0.12, navigation: 0.08, thermal: 0.25,
+          solar: 0.04, battery: 0.03, water: 0.18, co2: 0.15, grid: 0.05,
+          science: 0.5, rover: 0.8, extraction: 0.6, isru: 0.4,
+          agriculture: 1.0, maintenance: 0.15, radiation: 0.08,
+          comms: 0.12, navigation: 0.08, thermal: 0.25,
         };
         const requestedLoads = Object.entries(optionalSystemLoadKW)
           .filter(([systemId]) => Boolean(pending.selected[systemId]) && systemIsOperational(systemId, dependencyContext))
