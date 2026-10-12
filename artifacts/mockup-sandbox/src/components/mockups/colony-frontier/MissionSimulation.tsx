@@ -1811,7 +1811,7 @@ function BuildingInspector({
                       </span>
                     ))}
                     <span className="mt-2 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#d8c18a]">
-                      Cost: {option.energyKWh} kWh · {option.partsMassKg} kg parts · {option.kit}
+                      Cost: {option.energyKWh} kWh · {missionStage === 1 ? "no parts required (Mission 1)" : `${option.partsMassKg} kg parts`} · {option.kit}
                     </span>
                     <span className="mt-1 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#8fa7ab]">
                       {option.tradeoff}
@@ -3633,7 +3633,7 @@ export function MissionSimulation() {
         roverCanAssist,
         repairSupports,
       );
-      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Consumes ${selectedRepair.energyKWh} kWh and ${selectedRepair.partsMassKg} kg of parts. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
+      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Consumes ${selectedRepair.energyKWh} kWh and ${missionStage === 1 ? "no spare parts (Mission 1 exemption)" : `${selectedRepair.partsMassKg} kg of parts`}. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
       return;
     }
 
