@@ -54,7 +54,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Helios-1 Array", 850, 3, "Reliable normal-sun output", "Basic solar generation; reliable during normal sunlight."),
       Frontier: tier("Helios-X Array", 1250, 6.5, "Improved low-angle performance", "Higher output and improved low-angle sunlight performance."),
       Apex: tier("Helios-XR Array", 1750, 12, "Automated tracking + dust tolerance", "Very high output with automated tracking and improved dust tolerance."),
-      Research: tier("Helios-Nova Array", 1600, 15, "Extreme output in difficult light", "Extreme generation with autonomous tracking and strong dust resistance.", 5)
+      Research: tier("Helios-Nova Array", 1600, 15, "Extreme output in difficult light", "Research-generation array: 60 kW rated output at 0/2, with a major capacity jump over Apex, autonomous tracking, and strong dust resistance.", 5)
     },
   },
   {
@@ -66,7 +66,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Atlas Battery Pack", 700, 2.5, "Baseline emergency storage", "Stores excess electricity for nighttime and emergencies."),
       Frontier: tier("Atlas-L Battery Pack", 1050, 5, "Larger capacity + faster charging", "Larger capacity and faster charging."),
       Apex: tier("Atlas-V Battery Bank", 1500, 9.5, "Very high capacity + power management", "Very large capacity with advanced power management."),
-      Research: tier("Atlas-Sovereign Storage Core", 1300, 14, "Massive density + rapid redistribution", "Massive energy density and highly efficient emergency storage.", 5)
+      Research: tier("Atlas-Sovereign Storage Core", 1300, 14, "Massive density + rapid redistribution", "Research-generation storage: 5,000 kWh nominal at 0/2, with a major capacity jump over Apex and high-rate power electronics.", 5)
     },
   },
   {
@@ -78,7 +78,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("AeroLife-1", 420, 2, "90-day rated oxygen loop", "Produces and regulates breathable oxygen."),
       Frontier: tier("AeroLife-2", 650, 4.5, "Higher production + recycling", "Higher production and more efficient oxygen recycling."),
       Apex: tier("AeroLife-X", 950, 8, "Automated atmospheric management", "High-output production with automated atmospheric management."),
-      Research: tier("AeroLife-Aegis", 800, 13, "Emergency atmospheric balancing", "Extremely efficient production and recycling with automatic emergency balancing.", 1)
+      Research: tier("AeroLife-Aegis", 800, 13, "Emergency atmospheric balancing", "Research-generation oxygen loop: 8 kg O₂/day at 0/2, with a major production jump and automatic emergency balancing.", 1)
     },
   },
   {
@@ -90,7 +90,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("AquaLoop-1", 380, 1.8, "96% recovery", "Basic water recycling."),
       Frontier: tier("AquaLoop-2", 600, 3.8, "Waste + humidity recovery", "Recovers more water from waste and humidity."),
       Apex: tier("AquaLoop-X", 900, 7, "High-efficiency purification", "Very high-efficiency recycling and purification."),
-      Research: tier("AquaLoop-Eternis", 750, 12, "Near-total recovery", "Near-total recovery of usable water streams; dramatically reduces external requirements.", 5)
+      Research: tier("AquaLoop-Eternis", 750, 12, "Near-total recovery", "Research-generation water loop: 98% recovery at 0/2, with a major step in recovery and wastewater throughput.", 5)
     },
   },
   {
@@ -102,7 +102,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Carbon-1 Scrubber", 300, 1.5, "Basic CO₂ removal", "Removes CO₂ from habitat air."),
       Frontier: tier("Carbon-2 Scrubber", 470, 3.2, "Lower power consumption", "Higher removal rate and lower power consumption."),
       Apex: tier("Carbon-X Scrubber", 700, 6, "Partial resource recovery", "Highly efficient CO₂ removal with partial resource recovery."),
-      Research: tier("Carbon-Synthesis Cor", 600, 10, "Useful carbon compound recovery", "Removes CO₂ while recovering useful carbon compounds for colony processes.", 1)
+      Research: tier("Carbon-Synthesis Cor", 600, 10, "Useful carbon compound recovery", "Research-generation CO₂ system: 9 kg/day removal at 0/2, with a major capacity jump and useful carbon-compound recovery.", 1)
     },
   },
   {
@@ -114,7 +114,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Thermo-1", 500, 2, "Basic heating + cooling", "Basic heating and cooling."),
       Frontier: tier("Thermo-L", 750, 4.5, "Better insulation + redistribution", "Better insulation and heat redistribution."),
       Apex: tier("Thermo-X", 1100, 8.5, "Advanced thermal recovery", "Advanced thermal regulation and heat recovery."),
-      Research: tier("Thermo-Aegis", 900, 13, "Highly efficient heat recovery", "Highly efficient heat redistribution, storage, and recovery.", 1)
+      Research: tier("Thermo-Aegis", 900, 13, "Highly efficient heat recovery", "Research-generation thermal system: 20 kW heat rejection at 0/2, with a major radiator/loop-capacity jump.", 1)
     },
   },
   {
@@ -126,7 +126,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Relay-1", 180, 1.2, "Basic Earth communications", "Basic settlement-to-Earth communications."),
       Frontier: tier("Relay-X", 300, 2.8, "Greater range + reliability", "Greater range and reliability."),
       Apex: tier("DeepLink-XR", 480, 5.5, "High-bandwidth redundancy", "High-bandwidth deep-space communications with redundancy."),
-      Research: tier("DeepLink-Quantum", 400, 10, "Autonomous intelligent routing", "Ultra-high reliability autonomous communications with extreme redundancy.", 1)
+      Research: tier("DeepLink-Quantum", 400, 10, "Autonomous intelligent routing", "Research-generation communications: 200 Mbps at 0/2, with a major bandwidth jump and autonomous redundant routing.", 1)
     },
   },
   {
@@ -138,7 +138,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Haven-1 Module", 2400, 8, "Basic pressurized living", "Basic pressurized living space."),
       Frontier: tier("Haven-L Module", 3400, 14, "Larger + better insulated", "Larger, better insulated, and more efficient habitat."),
       Apex: tier("Haven-X Module", 4800, 24, "Integrated life support + protection", "Advanced life-support integration and stronger structural protection."),
-      Research: tier("Haven-Genesis Module", 4200, 35, "Resilient automated isolation", "Highly resilient habitat with automated emergency isolation.", 10)
+      Research: tier("Haven-Genesis Module", 4200, 35, "Resilient automated isolation", "Research-generation habitat: 0.30 kPa/24 h standard-fault pressure loss at 0/2, with a major leak-resilience jump and automated isolation.", 10)
     },
   },
   {
@@ -150,7 +150,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Shield-1", 450, 1.5, "Basic radiation protection", "Basic radiation protection."),
       Frontier: tier("Shield-L", 850, 4, "Improved shielding", "Improved shielding and greater protection."),
       Apex: tier("Shield-X", 1400, 8.5, "Advanced radiation shielding", "Advanced radiation shielding."),
-      Research: tier("Shield-Aegis", 1200, 14, "Active monitoring + shelter control", "Extremely high protection with active monitoring and automatic shelter management.", 1)
+      Research: tier("Shield-Aegis", 1200, 14, "Active monitoring + shelter control", "Research-generation shielding: 50% reference-event dose avoided at 0/2, with a major protected-zone jump and active shelter management.", 1)
     },
   },
   {
@@ -162,7 +162,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Grid-1", 220, 1, "Basic system distribution", "Distributes power between systems."),
       Frontier: tier("Grid-L", 400, 2.5, "Load balancing + redundancy", "Better load balancing and redundancy."),
       Apex: tier("Grid-X", 650, 5, "Critical-system prioritization", "Automatically prioritizes critical systems."),
-      Research: tier("Grid-Nexus", 550, 9, "Adaptive cascade response", "Fully adaptive colony-wide power management during cascading failures.", 10)
+      Research: tier("Grid-Nexus", 550, 9, "Adaptive cascade response", "Research-generation grid: 120 kW transfer at 0/2, with a major transfer-capacity jump and adaptive cascade response.", 10)
     },
   },
   {
@@ -174,7 +174,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Lab-1", 300, 1.5, "Basic experiments", "Basic scientific experiments."),
       Frontier: tier("Lab-L", 550, 3.5, "Advanced experiments + analysis", "More advanced experiments and analysis."),
       Apex: tier("Lab-X", 900, 7, "Automated scientific analysis", "High-level automated scientific analysis."),
-      Research: tier("Lab-Omnis", 750, 12, "Multi-system analysis", "Analyzes resources, environmental conditions, and biological systems simultaneously.", 1)
+      Research: tier("Lab-Omnis", 750, 12, "Multi-system analysis", "Research-generation laboratory: 60 assays/day at 0/2, with a major throughput jump and parallel multi-system analysis.", 1)
     },
   },
   {
@@ -186,7 +186,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Nav-1", 100, 0.6, "Basic positioning", "Basic navigation and positioning."),
       Frontier: tier("Nav-L", 180, 1.5, "Precision + autonomous routing", "Improved precision and autonomous routing."),
       Apex: tier("Nav-X", 300, 3, "Advanced autonomous navigation", "Advanced autonomous navigation."),
-      Research: tier("Nav-Sovereig", 250, 7, "Colony-wide autonomous routing", "Colony-wide autonomous navigation with minimal dependence on Earth.", 1)
+      Research: tier("Nav-Sovereig", 250, 7, "Colony-wide autonomous routing", "Research-generation navigation: 0.20 m reference position error at 0/2, with a major precision jump and colony-wide autonomous routing.", 1)
     },
   },
   {
@@ -198,7 +198,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Scout-1 Rover", 180, 1, "Basic transport + exploration", "Basic transport and exploration."),
       Frontier: tier("Pathfinder-L Rover", 350, 2.5, "Greater range + payload", "Greater range, payload, and navigation capability."),
       Apex: tier("Odyssey-X Rover", 650, 5.5, "Autonomous resource operations", "Highly autonomous exploration and resource operations."),
-      Research: tier("Odyssey-Titan Rover", 550, 9, "Extreme range + repair assistance", "Extreme range, autonomous navigation, resource collection, and repair assistance.", 1)
+      Research: tier("Odyssey-Titan Rover", 550, 9, "Extreme range + repair assistance", "Research-generation rover: 12 km/h safe rough-terrain speed at 0/2, with a major speed/range jump and repair assistance.", 1)
     },
   },
   {
@@ -210,7 +210,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Drill-1", 450, 2, "Accessible resource extraction", "Extracts accessible subsurface resources."),
       Frontier: tier("CryoDrill-L", 750, 4.5, "Deeper + colder deposits", "Reaches deeper and colder deposits more efficiently."),
       Apex: tier("CryoDrill-X", 1200, 8.5, "High-output autonomous extraction", "High-output autonomous extraction."),
-      Research: tier("CryoForge-X", 1050, 14, "Deep extraction + separation", "Deep extraction combined with advanced processing and resource separation.", 1)
+      Research: tier("CryoForge-X", 1050, 14, "Deep extraction + separation", "Research-generation extraction: 1,500 kg regolith/day at 0/2, with a major throughput jump and integrated separation.", 1)
     },
   },
   {
@@ -222,7 +222,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Forge-1", 650, 3, "Basic local processing", "Processes local materials into basic usable resources."),
       Frontier: tier("Forge-L", 1100, 6.5, "Higher material efficiency", "Produces more materials with greater efficiency."),
       Apex: tier("Forge-X", 1700, 12, "Industrial products + supplies", "Produces construction materials, processed resources, and industrial products."),
-      Research: tier("Forge-Genesis", 1500, 20, "Wide-spectrum resource conversion", "Turns a wide range of local resources into critical colony supplies.", 1)
+      Research: tier("Forge-Genesis", 1500, 20, "Wide-spectrum resource conversion", "Research-generation ISRU: 40 kg product/day at 0/2, with a major production jump and wide-spectrum resource conversion.", 1)
     },
   },
   {
@@ -234,7 +234,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("GreenPod-1", 700, 3, "Small controlled crops", "Small controlled crop production."),
       Frontier: tier("AgriCore-L", 1100, 6, "Better water + light efficiency", "Larger production with improved water and light efficiency."),
       Apex: tier("AgriCore-X", 1700, 11, "Automated closed-loop growing", "Highly automated agriculture integrated with CO₂, water, and oxygen systems."),
-      Research: tier("AgriCore-Eden", 1450, 18, "Major food-production capacity", "Extremely efficient closed-loop agriculture for a major portion of colony food.", 1)
+      Research: tier("AgriCore-Eden", 1450, 18, "Major food-production capacity", "Research-generation agriculture: 8 kg dry-food-equivalent/day at 0/2, with a major yield jump and closed-loop resource recovery.", 1)
     },
   },
   {
@@ -246,7 +246,7 @@ export const technologyTracks: TechnologyTrack[] = [
       Foundation: tier("Service-1", 250, 1.5, "Manual maintenance", "Basic manual maintenance equipment."),
       Frontier: tier("Service-L", 450, 3.5, "Automated diagnostics", "Automated diagnostics and maintenance assistance."),
       Apex: tier("Service-X", 750, 6.5, "Autonomous system maintenance", "Autonomous maintenance of many colony systems."),
-      Research: tier("Service-Sentinel", 650, 11, "Predictive autonomous repair", "Detects, predicts, and responds to developing equipment failures.", 1)
+      Research: tier("Service-Sentinel", 650, 11, "Predictive autonomous repair", "Research-generation maintenance: restores 60 condition points/job at 0/2, with a major repair-throughput jump and predictive diagnostics.", 1)
     },
   },
 ];
