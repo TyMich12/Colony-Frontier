@@ -2607,8 +2607,8 @@ export function MissionSimulation() {
         const criticalReserveMode = current.battery <= 25 && solarGeneration < 2.55;
         const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive || criticalReserveMode ? 2.0 : 2.55;
         const optionalSystemLoadKW: Record<string, number> = {
-          solar: 0.04,       // Array controller / sensors; game-design estimate.
-          battery: 0.03,     // Battery management standby; game-design estimate.
+          solar: 0.04,       // Solar-array controller and sensor standby; game-design estimate.
+          battery: 0.03,     // Battery-management electronics standby; game-design estimate.
           water: 0.86,       // 1.29 kW × 4/6 crew, NASA ECLSS reference.
           grid: 0.05,        // Distribution controller standby; game-design estimate.
           science: 0.5,      // Instrument workload; depends on the selected experiment.
@@ -2639,7 +2639,12 @@ export function MissionSimulation() {
           });
         }
         const requestedOptionalLoadKW = batteryRecoveryActive ? 0 : requestedLoads.reduce((sum, source) => sum + source.kw, 0);
-        const solarThermalLoadKW = Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * 0.07;
+        // Do not convert solar-cell temperature directly into an extra electrical load:
+        // that made demand rise with sunlight and double-counted thermal control when
+        // the selected thermal-control subsystem was already included above. Array
+        // temperature affects PV efficiency; thermal-control power is counted only
+        // through the installed thermal subsystem's explicit load rating.
+        const solarThermalLoadKW = 0;
         // Shed noncritical loads automatically when generation cannot meet demand and battery SOC is low.
         // Below 25%, retain only the emergency floor plus a small research load if the lab is deployed.
         const preliminaryLoadKW = essentialLoadKW + requestedOptionalLoadKW + solarThermalLoadKW;
@@ -2683,7 +2688,7 @@ export function MissionSimulation() {
         ];
         const optionalDemandSources = requestedLoads
           .map((source) => ({
-            label: source.label,
+            label: source.systemId === "solar" ? "Solar-array controller / sensors" : source.systemId === "battery" ? "Battery-management electronics" : source.label,
             kw: !batteryRecoveryActive && requestedOptionalLoadKW > 0
               ? source.kw * (optionalLoadKW / requestedOptionalLoadKW)
               : 0,
@@ -2692,7 +2697,6 @@ export function MissionSimulation() {
         const batteryChargingLoadKW = Math.max(0, -batteryFlowKW);
         const demandSources = [
           { label: "Core life support, electrolysis and habitat controls", kw: essentialLoadKW },
-          ...(solarThermalLoadKW > 0.001 ? [{ label: "Solar-array thermal management", kw: solarThermalLoadKW }] : []),
           ...optionalDemandSources,
           ...(batteryChargingLoadKW > 0.001 ? [{ label: "Battery charging (power diverted to storage)", kw: batteryChargingLoadKW }] : []),
         ];
@@ -4260,7 +4264,7 @@ export function MissionSimulation() {
               <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                 {[
                   { id: "generation", label: "Generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
-                  { id: "demand", label: "Power demand", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
+                  { id: "demand", label: "Power demand", value: clamp(electricalReadings.consumptionKW / 16 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
                   { id: "battery", label: "Battery reserve", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
                   { id: "batteryFlow", label: "Charging / discharging", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charging` : `${electricalReadings.batteryFlowKW.toFixed(2)} kW discharging`, icon: <BatteryCharging className="h-3 w-3" /> },
                 ].map((metric) => (
@@ -4287,7 +4291,7 @@ export function MissionSimulation() {
                       {electricalReadings.demandSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.consumptionKW > 0 ? (source.kw / electricalReadings.consumptionKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
                       ))}
-                      <p className="mt-1 text-[8px] text-[#789a96]">Includes every installed, operational electrical subsystem. Passive radiation shielding draws no electricity; active monitoring is counted.</p>
+                      <p className="mt-1 text-[8px] text-[#789a96]">Demand is the sum of active electrical loads plus battery charging when applicable. The bar scales against a 16 kW reference; solar generation and battery discharge are not demand. Passive radiation shielding draws no electricity; active monitoring is counted.</p>
                     </>
                   )}
                   {pulseExpandedMetric === "battery" && (
@@ -4410,7 +4414,7 @@ export function MissionSimulation() {
 
                 <div className="grid grid-cols-2 gap-2 p-3">
                   {[
-                    { label: "Power demand", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: electricalReadings.consumptionKW.toFixed(2) + " kW", inverse: false },
+                    { label: "Power demand", value: clamp(electricalReadings.consumptionKW / 16 * 100), display: electricalReadings.consumptionKW.toFixed(2) + " kW", inverse: false },
                     { label: "Battery charging / discharging rate", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : 50, display: Math.abs(electricalReadings.batteryFlowKW).toFixed(2) + " kW " + (electricalReadings.batteryFlowKW < -0.01 ? "charging" : electricalReadings.batteryFlowKW > 0.01 ? "discharging" : "idle"), inverse: false },
                     { label: "Stored energy", value: metrics.battery, display: physicalTelemetry.battery, inverse: false },
                     { label: "O₂ reserve", value: metrics.oxygen, display: (metrics.oxygen / 100 * 24).toFixed(1) + " kg O₂", inverse: false },
