@@ -2008,6 +2008,7 @@ export function MissionSimulation() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, consumptionKW: 2.55, batteryFlowKW: 0 });
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
   buildingsRef.current = buildings;
@@ -2561,7 +2562,10 @@ export function MissionSimulation() {
         // Positive battery flow means discharge to the bus; negative flow means charging from it.
         const deliveredSourceKW = Math.max(0, solarGeneration + batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
-        const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
+        // The POWER gauge tracks generation margin, not battery state of charge. Solar output can
+        // recover immediately while surplus electricity simultaneously charges the battery.
+        const powerBase = clamp(50 + 50 * (solarGeneration - baseLoadKW) / Math.max(1, baseLoadKW));
+        setElectricalReadings({ generationKW: solarGeneration, consumptionKW: nominalLoadKW, batteryFlowKW });
         const batteryDeltaKWh = batteryOnline
           ? (batteryFlowKW >= 0
             ? -(batteryFlowKW / LEVEL1_ENVIRONMENT.batteryDischargeEfficiency) * resourceDt / 3600
@@ -2569,7 +2573,7 @@ export function MissionSimulation() {
           : 0;
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-resourceDt / 7200));
-        const powerPathAvailable = deliveredPowerKW >= 2 && current.power >= 8;
+        const powerPathAvailable = deliveredPowerKW >= 2;
         const oxygenProductionKgDay = oxygenOnline && powerPathAvailable
           ? repairAdjustedRating("oxygen", getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade), buildings.oxygen?.repairMetrics)
           : 0;
@@ -4102,10 +4106,12 @@ export function MissionSimulation() {
                 <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
                 <span className="font-mono text-[9px] font-black text-[#f0cf69]">STABILITY INDEX {Math.round(performance.colonyHealth)}/100</span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                 {[
-                  { label: "POWER", value: metrics.power, display: physicalTelemetry.power, icon: <Zap className="h-3 w-3" /> },
+                  { label: "GENERATION", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(1)} kW solar`, icon: <Sun className="h-3 w-3" /> },
+                  { label: "CONSUMPTION", value: 100 - clamp(electricalReadings.consumptionKW / 8 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW used`, icon: <Zap className="h-3 w-3" /> },
                   { label: "BATTERY", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
+                  { label: "BATTERY FLOW", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? "Idle" : electricalReadings.batteryFlowKW < 0 ? `Charging ${(-electricalReadings.batteryFlowKW).toFixed(2)} kW` : `Discharging ${electricalReadings.batteryFlowKW.toFixed(2)} kW`, icon: <BatteryCharging className="h-3 w-3" /> },
                   { label: "O₂", value: metrics.oxygen, display: physicalTelemetry.oxygen, icon: <Wind className="h-3 w-3" /> },
                   { label: "WATER", value: metrics.water, display: physicalTelemetry.water, icon: <Droplets className="h-3 w-3" /> },
                 ].map((metric) => (
