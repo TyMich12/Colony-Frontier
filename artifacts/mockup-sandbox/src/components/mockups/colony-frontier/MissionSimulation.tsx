@@ -4610,9 +4610,6 @@ export function MissionSimulation() {
             onClose={() => setSelectedResourceId(null)}
             getBlockers={checkActionPrerequisites}
             simulationSpeed={speed}
-            campaign={pending.campaign}
-            missionTitle={pending.missionTitle}
-            missionNumber={pending.missionNumber}
           />
         )}
 
