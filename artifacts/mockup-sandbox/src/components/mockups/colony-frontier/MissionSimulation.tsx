@@ -740,9 +740,8 @@ function describeRepairOutcome(
   if (/faults protected/i.test(metric)) {
     return `Fault propagation prevented for ${amount} ${unit}`;
   }
-  if (/restored|recovered|available|capacity|throughput|yield|production rate|output/i.test(metric)) {
-    return `${systemLabel}: +${amount} ${unit} restored (absolute amount; capped by the fault gap and rated capability)`;
-  }
+  // Keep every procedure tied to its workbook-defined metric. A broad "restored" matcher
+  // made unrelated repairs look like the same generic performance increase.
   return `${systemLabel}: ${amount} ${unit} — ${metric}`;
 }
 
