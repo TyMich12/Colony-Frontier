@@ -901,8 +901,9 @@ function buildingStatus(condition: number): string {
   return "ONLINE";
 }
 
-function formatWallClockCountdown(remainingSeconds: number, _simulationSpeed = 1): string {
-  return String(Math.ceil(Math.max(0, remainingSeconds)));
+function formatWallClockCountdown(remainingSeconds: number, simulationSpeed = 1, timeAcceleration = 1): string {
+  const effectiveSpeed = simulationSpeed > 0 ? simulationSpeed : 1;
+  return String(Math.ceil(Math.max(0, remainingSeconds) / (effectiveSpeed * Math.max(1, timeAcceleration))));
 }
 
 function formatMissionTime(seconds: number): string {
@@ -1880,7 +1881,7 @@ function BuildingInspector({
             const lockMessage = blockers.length > 0
               ? blockers.join(" · ")
               : fallbackRemaining > 0
-                ? `Emergency backup recharge · ${formatWallClockCountdown(fallbackRemaining, simulationSpeed)} seconds`
+                ? `Emergency backup recharge · ${formatWallClockCountdown(fallbackRemaining, simulationSpeed, GAME_TIME_ACCELERATION)} seconds`
                 : "";
             const variant = decodeActionVariant(track.id, action.id);
             const actionDuration = action.id === "request-earth-report" ? earthReportDelaySeconds(tier, upgradeLevel) : (SYSTEM_ACTION_SECONDS[variant?.baseActionId ?? action.id] ?? 6);
@@ -3376,7 +3377,7 @@ export function MissionSimulation() {
           default: return { ...current, power: clamp(current.power - cascadeHit * 0.45), battery: clamp(current.battery - cascadeHit * 0.35) };
         }
       });
-      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. ${targetTrackId.toUpperCase()} is now cascading at ${severity.toFixed(1)}× severity. The response window is ${formatWallClockCountdown(remainingSeconds, speed)} seconds; inspect that facility and run a timed repair before the fault spreads further.`);
+      setAiMessage(`UNRESOLVED FAULT · ${activeEvent.title}. ${targetTrackId.toUpperCase()} is now cascading at ${severity.toFixed(1)}× severity. The response window is ${formatWallClockCountdown(remainingSeconds, speed, GAME_TIME_ACCELERATION)} seconds; inspect that facility and run a timed repair before the fault spreads further.`);
       setOperationResult(`FAULT NOT ISOLATED · You chose to continue. ${targetTrackId.toUpperCase()} has taken additional damage and will keep degrading other colony reserves. The fault register now contains this incident until a repair operation finishes.`);
     } else {
       setActiveFaults((current) => {
@@ -3544,7 +3545,7 @@ export function MissionSimulation() {
     const emergencyOverride = action.startsWith("fallback-") && fallbackEmergencyOverride(action, trackId, metrics, hasOwnActiveFault);
     const fallbackRemaining = (fallbackReadyAt[fallbackKey] ?? 0) - elapsed;
     if (action.startsWith("fallback-") && fallbackRemaining > 0 && !emergencyOverride) {
-      setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${formatWallClockCountdown(fallbackRemaining, speed)} seconds.`);
+      setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${formatWallClockCountdown(fallbackRemaining, speed, GAME_TIME_ACCELERATION)} seconds.`);
       return;
     }
     const blockers = checkActionPrerequisites(trackId, action);
@@ -4564,7 +4565,7 @@ export function MissionSimulation() {
                           className="w-full rounded-xl border border-[#713b44] bg-[#26161d] p-2.5 text-left transition hover:border-[#e7c567] hover:bg-[#302027]"
                           title={`Open ${fault.targetTrackId} to inspect repair options`}
                         >
-                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{fault.remainingSeconds > 0 ? `${formatWallClockCountdown(fault.remainingSeconds, speed)}s` : "OVERDUE"}</span></div>
+                          <div className="flex items-start justify-between gap-2"><p className="text-[9px] font-bold text-[#fff0ec]">{fault.title}</p><span className="font-mono text-[9px] text-[#ff9aa3]">{fault.remainingSeconds > 0 ? `${formatWallClockCountdown(fault.remainingSeconds, speed, GAME_TIME_ACCELERATION)}s` : "OVERDUE"}</span></div>
                           <p className="mt-1 text-[8px] uppercase tracking-[0.1em] text-[#d59097]">Degrading {fault.targetTrackId.toUpperCase()} · severity {fault.severity.toFixed(1)}×</p>
                           <p className="mt-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#e8c568]">Inspect system → start timed repair</p>
                         </button>
