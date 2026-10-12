@@ -759,7 +759,11 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
       const liveCellTemperatureLoss = liveProfile.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, liveProfile.cellTempC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
       const missionFraction = clamp(elapsedSeconds / TOTAL_MISSION_SECONDS, 0, 1);
       const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || missionNumber === "02");
-      const liveSunlight = blackoutMission ? (missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28) : campaign === "mars" ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10) : liveProfile.sunlightGeometry;
+      const liveSunlight = blackoutMission
+        ? (liveDay >= 14 ? 0 : missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
+        : campaign === "mars"
+          ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
+          : liveDay < 14 ? Math.max(0.22, liveProfile.sunlightGeometry) : 0;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
       const checkpointKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
       const currentKW = _condition < 28 ? 0 : Math.min(rating, rating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
@@ -828,7 +832,7 @@ function clamp(value: number, min = 0, max = 100): number {
 // declared physical quantities, not fictitious percentages of power, energy, gas or water.
 const RESOURCE_CAPACITIES = {
   availablePowerKW: 8,
-  storedEnergyKWh: 120,
+  storedEnergyKWh: 1200,
   oxygenReserveKg: 24,
   waterReserveL: 180,
   foodReserveKg: 42,
@@ -880,14 +884,14 @@ function formatMissionTime(seconds: number): string {
 
 function initialMetrics(_selected: Record<string, Tier>): MissionMetrics {
   // Starting reserves are scenario conditions, never a hidden bonus for higher technology.
-  return { power: 72, battery: 68, oxygen: 88, water: 86, food: 84, temperature: 21, radiation: 10, habitat: 94 };
+  return { power: 72, battery: LEVEL1_ENVIRONMENT.batteryInitialSOCPercent, oxygen: 88, water: 86, food: 84, temperature: 21, radiation: 10, habitat: 94 };
 }
 
 function getMissionFailureReason(metrics: MissionMetrics): string | null {
   if (metrics.oxygen <= 1.5) return "Cabin oxygen reserve fell below the minimum safe operating margin.";
   if (metrics.water <= 1) return "The usable water reserve was exhausted before recovery could be restored.";
   if (metrics.habitat <= 1) return "Habitat integrity fell below its simulated pressure-boundary limit.";
-  if (metrics.power <= 0.5 && metrics.battery <= 0.5) return "Generation and stored power were both exhausted; life-support equipment could no longer run.";
+  if (metrics.power <= 0.5 && metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5) return "Generation is unavailable and the battery has reached its protected 20% reserve; critical life-support power can no longer be sustained.";
   if (metrics.temperature <= 16.05 || metrics.temperature >= 27.95) return "Cabin temperature passed the simulated crew-safe operating envelope.";
   if (metrics.radiation >= 90) return "Modelled effective dose rate exceeded the emergency shelter threshold.";
   return null;
@@ -2476,7 +2480,7 @@ export function MissionSimulation() {
         const radiationOnline = systemIsOperational("radiation", dependencyContext);
         const agricultureOnline = systemIsOperational("agriculture", dependencyContext);
         const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
-        const resourceDt = dt * 0.25;
+        const resourceDt = dt;
         const missionFraction = clamp(elapsed / TOTAL_MISSION_SECONDS, 0, 1);
         const missionDay = Math.min(14, Math.max(0, elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
         const solarDust = buildings.solar?.dust ?? 0;
@@ -2492,10 +2496,12 @@ export function MissionSimulation() {
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
         const lunarProfile = pending.campaign === "moon" ? interpolateSolarProfile(missionDay) : null;
         const solarAvailability = blackoutMission
-          ? (missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
+          ? (missionDay >= 14 ? 0 : missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
-            : (lunarProfile?.sunlightGeometry ?? 0);
+            : missionDay < 14
+              ? Math.max(0.22, lunarProfile?.sunlightGeometry ?? 0)
+              : 0;
         const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
         const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
         const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
@@ -2516,27 +2522,51 @@ export function MissionSimulation() {
         // Hot cells increase thermal-management demand. The power manager sheds noncritical loads
         // when the bus cannot sustain nominal demand, while retaining a 2 kW critical-load floor.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
-        const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive ? 3.8 : 9.4;
+        const criticalReserveMode = current.battery <= 25 && solarGeneration < 2.55;
+        const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive || criticalReserveMode ? 2.0 : 2.55;
+        // Mission-average electrical loads in kW. The 2.0 kW emergency floor keeps
+        // life support and minimum thermal control alive; installed systems add their own demand.
         const optionalSystemLoadKW: Record<string, number> = {
-          co2: 1.4, thermal: 2.2, grid: 0.8, science: 0.9, rover: 1.2,
-          extraction: 2.5, isru: 3.4, agriculture: 4.0, maintenance: 1.0,
+          co2: 0.4, thermal: 1.2, water: 0.4, grid: 0.1, science: 0.5, rover: 0.8,
+          extraction: 0.6, isru: 0.6, agriculture: 0.6, maintenance: 0.25, oxygen: 0.1,
         };
-        const optionalLoadKW = batteryRecoveryActive ? 0 : Object.entries(optionalSystemLoadKW).reduce(
+        const requestedOptionalLoadKW = batteryRecoveryActive ? 0 : Object.entries(optionalSystemLoadKW).reduce(
           (sum, [systemId, loadKW]) => sum + (pending.selected[systemId] ? loadKW * (emergencyPowerMode ? 0.5 : 1) : 0),
           0,
         );
         const solarThermalLoadKW = Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * 0.07;
+        // Shed noncritical loads automatically when generation cannot meet demand and battery SOC is low.
+        // Below 25%, retain only the emergency floor plus a small research load if the lab is deployed.
+        const preliminaryLoadKW = essentialLoadKW + requestedOptionalLoadKW + solarThermalLoadKW;
+        const deficitExpected = solarGeneration < preliminaryLoadKW;
+        const optionalLoadKW = batteryRecoveryActive ? 0
+          : deficitExpected && current.battery <= 25
+            ? (pending.selected.science ? 0.25 : 0)
+            : deficitExpected && current.battery <= 35
+              ? requestedOptionalLoadKW * 0.25
+              : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
-        // Keep true demand visible: capping it to solar output hid deficits and delayed battery discharge.
         const baseLoadKW = Math.max(2.0, nominalLoadKW);
         const solarNetKW = solarGeneration - baseLoadKW;
+        const batteryChargeLimitKW = batteryOnline
+          ? Math.min(LEVEL1_ENVIRONMENT.batteryMaximumChargePowerKW, getAdditionalRating("battery", "continuous charge power", pending.selected.battery ?? "Foundation", batteryUpgrade))
+          : 0;
+        const chargeEfficiency = LEVEL1_ENVIRONMENT.batteryChargeEfficiency;
+        const dischargeEfficiency = LEVEL1_ENVIRONMENT.batteryDischargeEfficiency;
+        const minimumStoredEnergyKWh = batteryCapacityKWh * LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent / 100;
+        const availableStoredEnergyKWh = Math.max(0, storedEnergyKWh - minimumStoredEnergyKWh);
         const batteryFlowKW = solarNetKW >= 0
-          ? (batteryOnline ? -Math.min(solarNetKW, batteryDischargeLimitKW, resourceDt > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (resourceDt / 3600) : 0) : 0)
-          : Math.min(-solarNetKW, batteryDischargeLimitKW, resourceDt > 0 ? storedEnergyKWh / (resourceDt / 3600) : 0);
-        const deliveredSourceKW = solarGeneration + Math.max(0, batteryFlowKW);
+          ? (batteryOnline ? -Math.min(solarNetKW, batteryChargeLimitKW, resourceDt > 0 ? Math.max(0, batteryCapacityKWh - storedEnergyKWh) / (resourceDt / 3600 * chargeEfficiency) : 0) : 0)
+          : Math.min(-solarNetKW, batteryDischargeLimitKW, resourceDt > 0 ? availableStoredEnergyKWh * dischargeEfficiency / (resourceDt / 3600) : 0);
+        // Positive battery flow means discharge to the bus; negative flow means charging from it.
+        const deliveredSourceKW = Math.max(0, solarGeneration + batteryFlowKW);
         const deliveredPowerKW = Math.min(deliveredSourceKW, gridTransferLimitKW);
         const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
-        const batteryDeltaKWh = batteryOnline ? -batteryFlowKW * resourceDt / 3600 : 0;
+        const batteryDeltaKWh = batteryOnline
+          ? (batteryFlowKW >= 0
+            ? -(batteryFlowKW / LEVEL1_ENVIRONMENT.batteryDischargeEfficiency) * resourceDt / 3600
+            : (-batteryFlowKW * LEVEL1_ENVIRONMENT.batteryChargeEfficiency) * resourceDt / 3600)
+          : 0;
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-resourceDt / 7200));
         const powerPathAvailable = deliveredPowerKW >= 2 && current.power >= 8;
@@ -2601,7 +2631,7 @@ export function MissionSimulation() {
         }, { power: 0, battery: 0, oxygen: 0, water: 0, food: 0, habitat: 0, radiation: 0, temperature: 0 });
         return {
           power: clamp(current.power + powerRecovery - faultImpact.power),
-          battery: clamp(current.battery + batteryDelta - faultImpact.battery),
+          battery: clamp(current.battery + batteryDelta - faultImpact.battery, LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent),
           oxygen: clamp(current.oxygen + oxygenDelta - faultImpact.oxygen),
           water: clamp(current.water + waterDelta - faultImpact.water),
           food: clamp(current.food + foodDelta - faultImpact.food),
