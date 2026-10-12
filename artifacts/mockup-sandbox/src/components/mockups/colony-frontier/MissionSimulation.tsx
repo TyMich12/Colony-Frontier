@@ -2676,9 +2676,10 @@ export function MissionSimulation() {
         // Power health follows electricity actually reaching the bus, including battery
         // discharge and any grid transfer limit—not solar output alone.
         const powerBase = clamp(50 + 50 * (deliveredPowerKW - baseLoadKW) / Math.max(1, baseLoadKW));
+        // "Generation" means newly generated electrical power, not energy released
+        // from storage. Keep battery discharge in its own live telemetry channel.
         const generationSources = [
           ...(solarToBusKW > 0.001 ? [{ label: "Solar array", kw: solarToBusKW }] : []),
-          ...(batteryFlowKW > 0.001 ? [{ label: "Battery bank (discharging)", kw: batteryFlowKW }] : []),
         ];
         const optionalDemandSources = requestedLoads
           .map((source) => ({
@@ -2696,7 +2697,9 @@ export function MissionSimulation() {
           ...(batteryChargingLoadKW > 0.001 ? [{ label: "Battery charging (power diverted to storage)", kw: batteryChargingLoadKW }] : []),
         ];
         setElectricalReadings({
-          generationKW: solarToBusKW + Math.max(0, batteryFlowKW),
+          // Report solar generation only. Battery discharge is storage output and
+          // is shown separately, so it cannot inflate the generation reading.
+          generationKW: solarToBusKW,
           consumptionKW: nominalLoadKW + batteryChargingLoadKW,
           batteryFlowKW,
           generationSources,
@@ -4271,11 +4274,11 @@ export function MissionSimulation() {
                 <div className="mt-1.5 rounded-lg border border-[#2d4a4e] bg-[#0b2024] p-2">
                   {pulseExpandedMetric === "generation" && (
                     <>
-                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Power sources · share of total generation</p>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Solar generation · share of generated power</p>
                       {electricalReadings.generationSources.length ? electricalReadings.generationSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.generationKW > 0 ? (source.kw / electricalReadings.generationKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
                       )) : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
-                      <p className="mt-1 text-[8px] text-[#789a96]">Only active sources are listed. This mission currently has no nuclear generator.</p>
+                      <p className="mt-1 text-[8px] text-[#789a96]">Battery discharge is shown separately under Charging / discharging because it uses stored energy; it is not new generation. This mission has no nuclear generator.</p>
                     </>
                   )}
                   {pulseExpandedMetric === "demand" && (
