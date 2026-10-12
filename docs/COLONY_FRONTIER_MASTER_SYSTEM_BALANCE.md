@@ -16,23 +16,23 @@
 
 | System | Primary metric | Unit / direction | Foundation 0/2 → 1/2 → 2/2 | Frontier 0/2 → 1/2 → 2/2 | Apex 0/2 → 1/2 → 2/2 | Research 0/2 → 1/2 → 2/2 |
 |---|---|---|---:|---:|---:|---:|
-| Solar Power | Rated electrical output at reference illumination | kW, higher | 12 → 12.4 → 12.8 | 20 → 20.6 → 21.2 | 32 → 33 → 34 | 50 → 52 → 54 |
-| Energy Storage | Nominal stored energy capacity | kWh, higher | 1,200 → 1,240 → 1,280 | 1,800 → 1,860 → 1,920 | 3,000 → 3,100 → 3,200 | 5,000 → 5,200 → 5,400 |
-| Oxygen | Oxygen production rate | kg O₂/day, higher | 3.0 → 3.1 → 3.2 | 4.2 → 4.3 → 4.4 | 5.8 → 6.0 → 6.2 | 8.0 → 8.2 → 8.4 |
-| Water | Potable-water recovery efficiency | %, higher; cap 100% | 60 → 61 → 62 | 72 → 73 → 74 | 88 → 89 → 90 | 98 → 98.2 → 98.4 |
-| CO₂ Control | Carbon-dioxide removal rate | kg CO₂/day, higher | 3.0 → 3.1 → 3.2 | 4.5 → 4.6 → 4.7 | 6.5 → 6.7 → 6.9 | 9.0 → 9.2 → 9.4 |
-| Thermal Control | Heat rejection capacity | kW heat, higher | 4.0 → 4.1 → 4.2 | 7.0 → 7.2 → 7.4 | 12.0 → 12.4 → 12.8 | 20.0 → 20.5 → 21.0 |
-| Communications | Usable data throughput | Mbps, higher | 2.0 → 2.1 → 2.2 | 12 → 12.5 → 13 | 50 → 52 → 54 | 200 → 210 → 220 |
-| Habitat | Pressure loss through standard small seal fault | kPa/24 h lost, lower | 8.0 → 7.8 → 7.6 | 4.0 → 3.9 → 3.8 | 1.5 → 1.45 → 1.4 | 0.30 → 0.28 → 0.26 |
-| Radiation | Dose avoided during defined reference solar-particle event | % of reference-event dose, higher | 10 → 10.5 → 11 | 18 → 18.5 → 19 | 30 → 31 → 32 | 50 → 51 → 52 |
-| Rovers | Safe speed on reference rough terrain | km/h, higher | 2.0 → 2.1 → 2.2 | 4.0 → 4.1 → 4.2 | 7.0 → 7.2 → 7.4 | 12.0 → 12.3 → 12.6 |
-| Resource Extraction | Regolith excavated under reference conditions | kg/24 h sim day, higher | 100 → 105 → 110 | 250 → 260 → 270 | 600 → 620 → 640 | 1,500 → 1,550 → 1,600 |
-| ISRU | Usable target product output under standard recipe | kg product/24 h sim day, higher | 1.0 → 1.1 → 1.2 | 5.0 → 5.2 → 5.4 | 15 → 15.5 → 16 | 40 → 42 → 44 |
-| Agriculture | Edible dry-food-equivalent yield | kg/day, higher | 0.50 → 0.52 → 0.54 | 1.8 → 1.85 → 1.9 | 4.0 → 4.1 → 4.2 | 8.0 → 8.2 → 8.4 |
-| Maintenance | Condition points restored by standard maintenance job | condition points/job, higher | 5.0 → 5.5 → 6.0 | 15 → 15.5 → 16 | 35 → 36 → 37 | 60 → 62 → 64 |
-| Power Grid | Continuous power-transfer capacity | kW, higher | 8.0 → 8.3 → 8.6 | 22 → 23 → 24 | 50 → 52 → 54 | 120 → 125 → 130 |
-| Science | Detailed sample assays completed | assays/24 h sim day, higher | 2.0 → 2.1 → 2.2 | 8.0 → 8.3 → 8.6 | 24 → 25 → 26 | 60 → 63 → 66 |
-| Navigation | Horizontal position error under reference terrain conditions | m error, lower | 50 → 48 → 46 | 15 → 14.5 → 14 | 3.0 → 2.8 → 2.6 | 0.20 → 0.18 → 0.16 |
+| Solar Power | Rated electrical output at reference illumination | kW, higher | 12 → 12.4 → 12.8 | 20 → 20.6 → 21.2 | 32 → 33 → 34 | 60 → 75 → 90 |
+| Energy Storage | Nominal stored energy capacity | kWh, higher | 1,200 → 1,240 → 1,280 | 1,800 → 1,860 → 1,920 | 3,000 → 3,100 → 3,200 | 5,000 → 6,500 → 8,000 |
+| Oxygen | Oxygen production rate | kg O₂/day, higher | 3.0 → 3.1 → 3.2 | 4.2 → 4.3 → 4.4 | 5.8 → 6.0 → 6.2 | 8.0 → 10.0 → 12.0 |
+| Water | Potable-water recovery efficiency | %, higher; cap 100% | 60 → 61 → 62 | 72 → 73 → 74 | 88 → 89 → 90 | 98 → 99 → 99.5 |
+| CO₂ Control | Carbon-dioxide removal rate | kg CO₂/day, higher | 3.0 → 3.1 → 3.2 | 4.5 → 4.6 → 4.7 | 6.5 → 6.7 → 6.9 | 9.0 → 12.0 → 15.0 |
+| Thermal Control | Heat rejection capacity | kW heat, higher | 4.0 → 4.1 → 4.2 | 7.0 → 7.2 → 7.4 | 12.0 → 12.4 → 12.8 | 20.0 → 25.0 → 30.0 |
+| Communications | Usable data throughput | Mbps, higher | 2.0 → 2.1 → 2.2 | 12 → 12.5 → 13 | 50 → 52 → 54 | 200 → 300 → 400 |
+| Habitat | Pressure loss through standard small seal fault | kPa/24 h lost, lower | 8.0 → 7.8 → 7.6 | 4.0 → 3.9 → 3.8 | 1.5 → 1.45 → 1.4 | 0.30 → 0.20 → 0.10 |
+| Radiation | Dose avoided during defined reference solar-particle event | % of reference-event dose, higher | 10 → 10.5 → 11 | 18 → 18.5 → 19 | 30 → 31 → 32 | 50 → 60 → 70 |
+| Rovers | Safe speed on reference rough terrain | km/h, higher | 2.0 → 2.1 → 2.2 | 4.0 → 4.1 → 4.2 | 7.0 → 7.2 → 7.4 | 12.0 → 16.0 → 20.0 |
+| Resource Extraction | Regolith excavated under reference conditions | kg/24 h sim day, higher | 100 → 105 → 110 | 250 → 260 → 270 | 600 → 620 → 640 | 1,500 → 2,200 → 3,000 |
+| ISRU | Usable target product output under standard recipe | kg product/24 h sim day, higher | 1.0 → 1.1 → 1.2 | 5.0 → 5.2 → 5.4 | 15 → 15.5 → 16 | 40 → 60 → 80 |
+| Agriculture | Edible dry-food-equivalent yield | kg/day, higher | 0.50 → 0.52 → 0.54 | 1.8 → 1.85 → 1.9 | 4.0 → 4.1 → 4.2 | 8.0 → 12.0 → 16.0 |
+| Maintenance | Condition points restored by standard maintenance job | condition points/job, higher | 5.0 → 5.5 → 6.0 | 15 → 15.5 → 16 | 35 → 36 → 37 | 60 → 80 → 100 |
+| Power Grid | Continuous power-transfer capacity | kW, higher | 8.0 → 8.3 → 8.6 | 22 → 23 → 24 | 50 → 52 → 54 | 120 → 180 → 250 |
+| Science | Detailed sample assays completed | assays/24 h sim day, higher | 2.0 → 2.1 → 2.2 | 8.0 → 8.3 → 8.6 | 24 → 25 → 26 | 60 → 90 → 120 |
+| Navigation | Horizontal position error under reference terrain conditions | m error, lower | 50 → 48 → 46 | 15 → 14.5 → 14 | 3.0 → 2.8 → 2.6 | 0.20 → 0.10 → 0.05 |
 
 ## Additional system metrics
 
