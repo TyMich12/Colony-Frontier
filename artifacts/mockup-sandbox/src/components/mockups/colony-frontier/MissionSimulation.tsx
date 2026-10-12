@@ -4328,7 +4328,7 @@ export function MissionSimulation() {
               </div>
               <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                 {[
-                  { id: "generation", label: "Generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
+                  { id: "generation", label: "Solar generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
                   { id: "demand", label: "Power demand", value: clamp(electricalReadings.consumptionKW / 16 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
                   { id: "battery", label: "Battery reserve", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
                   { id: "batteryFlow", label: "Charging / discharging", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charging` : `${electricalReadings.batteryFlowKW.toFixed(2)} kW discharging`, icon: <BatteryCharging className="h-3 w-3" /> },
