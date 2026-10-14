@@ -2129,7 +2129,7 @@ export function MissionSimulation() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
-  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: 2.55, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: 1.10, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
   const [pulseExpandedMetric, setPulseExpandedMetric] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
@@ -2788,7 +2788,7 @@ export function MissionSimulation() {
         // a separate destination for surplus power, not part of the load being compared
         // against generation; including it here made demand rise in lockstep with charging.
         const demandSources = [
-          { label: "Core life support, electrolysis and habitat controls", kw: essentialLoadKW },
+          { label: "Core habitat controls, lighting and avionics", kw: essentialLoadKW },
           ...optionalDemandSources,
         ];
         setElectricalReadings({
