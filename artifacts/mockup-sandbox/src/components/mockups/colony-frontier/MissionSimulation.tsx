@@ -2690,14 +2690,13 @@ export function MissionSimulation() {
           thermal: 0.69,    // 1.03 kW × 4/6 crew, NASA ECLSS thermal-control reference.
         };
         const requestedLoads = Object.entries(optionalSystemLoadKW)
-          .filter(([systemId]) => Boolean(pending.selected[systemId]) && systemIsOperational(systemId, dependencyContext))
+          .filter(([systemId]) => Boolean(pending.selected[systemId]))
           .map(([systemId, loadKW]) => ({ systemId, label: SYSTEM_LABELS[systemId] ?? systemId, kw: loadKW }));
         // NASA's reference reports CO₂ removal and oxygen generation as one combined 5.85-kW
         // air-system load, not separately. Count that combined load once whenever either
         // operational module is installed, rather than inventing an unsupported split.
         const airRevitalizationOnline =
-          (Boolean(pending.selected.co2) && systemIsOperational("co2", dependencyContext)) ||
-          (Boolean(pending.selected.oxygen) && systemIsOperational("oxygen", dependencyContext));
+          Boolean(pending.selected.co2) || Boolean(pending.selected.oxygen);
         if (airRevitalizationOnline) {
           requestedLoads.push({
             systemId: "air-revitalization",
@@ -2839,7 +2838,7 @@ export function MissionSimulation() {
         const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics)
+          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics) * (1.60 / 4.07)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
