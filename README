@@ -1,3 +1,13 @@
 Hello guys this is our project, go to codespaces, new codespace and run this command in terminal
 
-cd artifacts/mockup
+cd artifacts/mockup-sandbox
+
+and then this command:
+pnpm dev
+
+and then again:
+pnpm dev
+
+and then click localhost link in the terminal, after that go to url and then at the end add "/preview/CampainMapRefresh"
+
+scroll down and the click command to start the game
