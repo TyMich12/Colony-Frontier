@@ -2672,7 +2672,7 @@ export function MissionSimulation() {
         // loads below. Passive radiation shielding uses no electricity.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
         const criticalReserveMode = current.battery <= 25 && solarGeneration < 2.55;
-        const essentialLoadKW = emergencyPowerMode || batteryRecoveryActive || criticalReserveMode ? 2.0 : 2.55;
+        const essentialLoadKW = 2.55; // Fixed rated core load; emergency shedding changes delivered service, not the colony's requested-load rating.
         const optionalSystemLoadKW: Record<string, number> = {
           solar: 0.04,       // Solar-array controller and sensor standby; game-design estimate.
           battery: 0.03,     // Battery-management electronics standby; game-design estimate.
@@ -2682,7 +2682,7 @@ export function MissionSimulation() {
           rover: 2.0,        // NASA conceptual 2-kW unpressurized lunar rover, while operating.
           extraction: 2.0,   // Lower end of NASA 2–10 kW support-equipment range; pilot drill assumption.
           isru: 5.0,         // Within NASA 2–10 kW support-equipment range; pilot processing assumption.
-          agriculture: 4.07, // 6.10 kW × 4/6 crew, NASA biomass-production reference.
+          agriculture: 1.60, // Small controlled-environment LED crop module; supplemental food production, not a full bioregenerative farm.
           maintenance: 0.15, // Standby diagnostic electronics; game-design estimate.
           radiation: 0.02,   // Active monitor electronics only; game-design estimate.
           comms: 0.3,        // Low end of NASA 0.3–1.0 kW per transmitter range.
@@ -2691,7 +2691,7 @@ export function MissionSimulation() {
         };
         const requestedLoads = Object.entries(optionalSystemLoadKW)
           .filter(([systemId]) => Boolean(pending.selected[systemId]) && systemIsOperational(systemId, dependencyContext))
-          .map(([systemId, loadKW]) => ({ systemId, label: SYSTEM_LABELS[systemId] ?? systemId, kw: loadKW * (emergencyPowerMode ? 0.5 : 1) }));
+          .map(([systemId, loadKW]) => ({ systemId, label: SYSTEM_LABELS[systemId] ?? systemId, kw: loadKW }));
         // NASA's reference reports CO₂ removal and oxygen generation as one combined 5.85-kW
         // air-system load, not separately. Count that combined load once whenever either
         // operational module is installed, rather than inventing an unsupported split.
@@ -2702,10 +2702,39 @@ export function MissionSimulation() {
           requestedLoads.push({
             systemId: "air-revitalization",
             label: "Air revitalization (CO₂ removal + O₂ generation)",
-            kw: 3.9 * (emergencyPowerMode ? 0.5 : 1), // 5.85 kW × 4/6 crew.
+            kw: 3.9, // 5.85 kW × 4/6 crew; fixed rated load independent of emergency shedding.
           });
         }
-        const requestedOptionalLoadKW = batteryRecoveryActive ? 0 : requestedLoads.reduce((sum, source) => sum + source.kw, 0);
+        // Rated demand is deliberately stable: changing battery SOC, sunlight, emergency
+        // shedding, or repair timers must not make the displayed requested load flicker.
+        // Only a selected technology tier or installed retrofit changes these direct kW adders.
+        // Adders are explicit model assumptions for the extra capacity/control hardware.
+        const tierIndexByName: Record<string, number> = { Foundation: 0, Frontier: 1, Apex: 2, Research: 3 };
+        const tierDemandAdderKW: Record<string, number> = {
+          solar: 0.01, battery: 0.01, water: 0.08, grid: 0.02, science: 0.10,
+          rover: 0.15, extraction: 0.20, isru: 0.30, agriculture: 0.12,
+          maintenance: 0.02, radiation: 0.005, comms: 0.05, navigation: 0.01,
+          thermal: 0.05, oxygen: 0.08, co2: 0.08,
+        };
+        const retrofitDemandAdderKW: Record<string, number> = {
+          solar: 0.01, battery: 0.01, water: 0.04, grid: 0.01, science: 0.05,
+          rover: 0.08, extraction: 0.10, isru: 0.15, agriculture: 0.06,
+          maintenance: 0.01, radiation: 0.002, comms: 0.02, navigation: 0.005,
+          thermal: 0.025, oxygen: 0.04, co2: 0.04,
+        };
+        const ratedLoadFor = (systemId: string, baseKW: number) => {
+          const tier = pending.selected[systemId];
+          const tierSteps = tier ? tierIndexByName[tier] ?? 0 : 0;
+          const retrofitSteps = Math.max(0, Math.min(2, buildings[systemId]?.upgradeLevel ?? 0));
+          return baseKW
+            + tierSteps * (tierDemandAdderKW[systemId] ?? 0)
+            + retrofitSteps * (retrofitDemandAdderKW[systemId] ?? 0);
+        };
+        const ratedRequestedLoads = requestedLoads.map((source) => ({
+          ...source,
+          kw: ratedLoadFor(source.systemId, source.kw),
+        }));
+        const requestedOptionalLoadKW = ratedRequestedLoads.reduce((sum, source) => sum + source.kw, 0);
         // Do not convert solar-cell temperature directly into an extra electrical load:
         // that made demand rise with sunlight and double-counted thermal control when
         // the selected thermal-control subsystem was already included above. Array
@@ -2762,12 +2791,10 @@ export function MissionSimulation() {
         const generationSources = [
           ...(solarToBusKW > 0.001 ? [{ label: "Solar array", kw: solarToBusKW }] : []),
         ];
-        const optionalDemandSources = requestedLoads
+        const optionalDemandSources = ratedRequestedLoads
           .map((source) => ({
             label: source.systemId === "solar" ? "Solar-array controller / sensors" : source.systemId === "battery" ? "Battery-management electronics" : source.label,
-            kw: !batteryRecoveryActive && requestedOptionalLoadKW > 0
-              ? source.kw * (optionalLoadKW / requestedOptionalLoadKW)
-              : 0,
+            kw: source.kw,
           }))
           .filter((source) => source.kw > 0.001);
         // System demand is the load consumed by colony systems. Battery charging is
@@ -2782,7 +2809,7 @@ export function MissionSimulation() {
           // flow is tracked separately so the power balance can be displayed consistently.
           generationKW: solarToBusKW,
           actualSupplyKW: deliveredPowerKW,
-          consumptionKW: nominalLoadKW,
+          consumptionKW: essentialLoadKW + requestedOptionalLoadKW,
           batteryFlowKW,
           generationSources,
           demandSources,
@@ -4350,7 +4377,7 @@ export function MissionSimulation() {
               </div>
               <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                 {[
-                  { id: "generation", label: "Solar generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
+                  { id: "generation", label: "Power generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
                   { id: "demand", label: "Power demand", value: clamp(electricalReadings.consumptionKW / 16 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
                   { id: "battery", label: "Battery reserve", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
                   { id: "batteryFlow", label: "Charging / discharging", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charging` : `${electricalReadings.batteryFlowKW.toFixed(2)} kW discharging`, icon: <BatteryCharging className="h-3 w-3" /> },
@@ -4365,7 +4392,7 @@ export function MissionSimulation() {
                 <div className="mt-1.5 rounded-lg border border-[#2d4a4e] bg-[#0b2024] p-2">
                   {pulseExpandedMetric === "generation" && (
                     <>
-                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Solar generation · share of generated power</p>
+                      <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Power generation · source breakdown</p>
                       {electricalReadings.generationSources.length ? electricalReadings.generationSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.generationKW > 0 ? (source.kw / electricalReadings.generationKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
                       )) : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
