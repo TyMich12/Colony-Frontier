@@ -366,70 +366,56 @@ The existing Solar Power repair procedures in this table are copied from the liv
 
 ---
 
-## Electrical demand model — output-calibrated reference (updated 2026-10-15)
+## Electrical demand model — mission-average reference (updated 2026-10-15)
 
-**Preservation rule:** This section supplements the existing performance, retrofit, repair, and mission tables. It does not replace or alter any previously specified tier ratings, retrofit effects, repair values, costs, durations, or the Apex/Research values above. If a future edit changes one of those existing values, update it only with an explicit review of the affected system.
+**Preservation rule:** This section supplements the existing system ratings, retrofit, repair, costs, durations and mission tables. It does not change any system output rating or any Apex/Research tier values. The demand model is an explicit mission-average engineering/game estimate; it is not a certified hardware specification.
 
-### How to interpret these numbers
+### Why the demand calculation changed
 
-- These are **rated, time-averaged electrical-load estimates for this game's reference colony**, not universal measured specifications for every real system. Real hardware draw depends on design, operating point, duty cycle, thermal environment, and mission architecture. Loads for intermittent equipment (rover drive, excavation, laboratory assays, and maintenance tools) are averaged over the reference mission day; short peak loads should be supplied by local power electronics/storage and are not represented as continuous colony-bus demand. Published reference values are used where comparable data exist; remaining values are explicit engineering/game-model estimates.
-- Power is measured in **kW**; energy is measured in **kWh**. A 1.60 kW load running continuously for 24 hours consumes 38.4 kWh. Do not confuse a system's production/capacity rating with the electricity it consumes.
-- Demand is the sum of the core habitat reference load and the installed optional systems' **rated requested loads**. Battery charging is a separate destination for surplus power; battery discharge is a separate source of bus power. Neither should be added to or subtracted from rated demand.
-- **Demand must not vary with sunlight, battery state of charge, power health, repair condition, emergency load shedding, animation frames, or simulation tick timing.** Those variables change delivered service, available generation, actual battery flow, and system output, not the rated requested-load number.
-- Demand may change only when a system is installed/removed, its technology tier changes, or a retrofit is commissioned. The displayed total and breakdown must use the same calculation and remain unchanged between those events. Emergency shedding changes *served load*; it must not rewrite the rated-demand display.
-- Tier/retrofit additions below represent extra control, processing, actuator, or capacity-related electrical load assumptions. They are deliberately small for mostly passive/controller hardware and larger for active processing equipment. They are game reference assumptions, not a claim that higher tier inherently consumes more power in every real design.
+The previous demand model treated several cyclic systems as if they drew their reference power continuously and used a 2.55 kW shared core load whose label also implied life-support/electrolysis. That made the starting colony's average demand too high compared with a 12 kW peak-rated Foundation solar array. The revised model separates shared habitat controls from dedicated air revitalisation, water treatment and thermal control, and uses explicit **average kW values** for systems that operate intermittently. It does not use hidden multipliers or make demand fluctuate with sunlight, battery charge, repair condition, animation frames or simulation ticks.
+
+These values are suitable for the game's reference-colony balance, not universal spacecraft hardware facts. Actual electrical demand depends on hardware architecture, duty cycle, crew size, thermal environment and operating schedule. Peak loads must be handled by local electronics/storage and may exceed the mission-average values shown here.
 
 ### Reference base loads and tier/retrofit additions
 
-For a system at Foundation 0/2, use the base load below. Each tier step above Foundation adds the listed **tier-step** amount for each step (Foundation → Frontier → Apex → Research). Each installed retrofit step (0/2 → 1/2 → 2/2) adds the listed **retrofit-step** amount. These are absolute kW additions; do not apply percentages or hidden multipliers. The revised values use continuous loads for life support/water/thermal/agriculture, but mission-day averages for intermittent equipment so the simulation does not pretend a rover is driving or a drill is cutting at full power every second.
+At Foundation 0/2, use the base load below. Each technology tier step adds the listed absolute kW value, and each installed retrofit level adds the listed absolute kW value. Foundation → Frontier → Apex → Research is three tier steps; retrofit level is 0, 1 or 2. Do not use percentages or hidden performance multipliers.
 
-| System ID | Foundation 0/2 base load (kW) | Each tier step (kW) | Each retrofit step (kW) | Reference basis / modelling note |
+| System ID | Foundation 0/2 base load (kW) | Each tier step (kW) | Each retrofit step (kW) | Modelling basis |
 |---|---:|---:|---:|---|
-| Core habitat / life-support controls | 2.55 | 0 | 0 | Fixed shared reference load; does not fluctuate with emergency mode |
-| Solar Power | 0.04 | 0.01 | 0.01 | Array controller, tracking and sensor electronics; PV generation itself is not consumption |
-| Energy Storage | 0.03 | 0.01 | 0.01 | Battery-management and monitoring electronics; stored energy/capacity is not a load |
-| Water | 0.86 | 0.08 | 0.04 | Reference estimate scaled to a four-person crew; actual pumps/heaters depend on the selected plant |
-| Power Grid | 0.05 | 0.02 | 0.01 | Distribution monitoring and switching controls; transfer capacity is not consumption |
-| Science | 0.25 | 0.05 | 0.025 | Time-averaged instrument draw; short assay peaks are intermittent |
-| Rover | 0.25 | 0.05 | 0.025 | Average colony-bus charging/standby draw; traction motors can briefly draw around 2 kW from rover storage |
-| Resource Extraction | 0.75 | 0.10 | 0.05 | Time-averaged pilot excavation: 18 kWh/day for 100 kg/day, or 0.18 kWh/kg; peak motor load is intermittent |
-| ISRU | 2.00 | 0.20 | 0.10 | Small pilot process at 1 kg/day: 48 kWh/kg product at 2 kW continuous; real value is recipe-specific |
-| Agriculture | 1.60 | 0.12 | 0.06 | Small controlled-environment LED crop module; this is supplemental production, not a complete crew food farm |
-| Maintenance | 0.05 | 0.01 | 0.005 | Diagnostic electronics standby; powered tools are temporary job loads, not continuous draw |
-| Radiation Monitoring | 0.02 | 0.005 | 0.002 | Sensor/monitor electronics only; passive shielding has no continuous electrical load |
-| Communications | 0.30 | 0.05 | 0.02 | Low-end transmitter reference; transmission duty cycle can be modelled separately |
-| Navigation | 0.08 | 0.01 | 0.005 | Avionics and positioning sensor estimate |
-| Thermal Control | 0.69 | 0.05 | 0.025 | Four-person scaled reference estimate; heat rejection capacity (kW thermal) is not the same as electrical input |
-| Combined air revitalisation (O₂ + CO₂) | 3.90 | 0.08 | 0.04 | One combined 5.85 kW reference scaled by 4/6 crew; count once if either/both O₂ or CO₂ modules are installed |
+| Core habitat controls / lighting / avionics | 1.10 | 0 | 0 | Shared non-ECLSS colony overhead; excludes separately counted air, water and thermal systems |
+| Solar Power | 0.04 | 0.01 | 0.01 | Array tracking, control and sensor electronics; PV generation is not consumption |
+| Energy Storage | 0.03 | 0.01 | 0.01 | Battery management electronics; stored energy is not a load |
+| Water | 0.35 | 0.05 | 0.025 | Mission-average pumps/heaters; plant-specific peak draw is intermittent |
+| Power Grid | 0.05 | 0.02 | 0.01 | Distribution monitoring and switching; transfer capacity is not consumption |
+| Science | 0.12 | 0.03 | 0.015 | Day-average instrument load; assays are intermittent |
+| Rover | 0.10 | 0.03 | 0.015 | Average bus charging/standby; drive motors can briefly draw about 2 kW from rover storage |
+| Resource Extraction | 0.25 | 0.08 | 0.04 | Mission-average pilot excavation; full cutting/drive load is intermittent |
+| ISRU | 0.80 | 0.15 | 0.075 | Small pilot process scheduled in work periods; not a continuous full-power industrial plant |
+| Agriculture | 0.75 | 0.08 | 0.04 | Compulsory small LED crop module; 18 kWh/day for the existing 0.50 kg/day Foundation output |
+| Maintenance | 0.05 | 0.01 | 0.005 | Diagnostic standby electronics; powered tools are temporary job loads |
+| Radiation Monitoring | 0.02 | 0.005 | 0.002 | Sensors only; passive shielding uses no continuous electricity |
+| Communications | 0.15 | 0.04 | 0.02 | Average draw including duty-cycled transmission windows |
+| Navigation | 0.04 | 0.01 | 0.005 | Avionics and positioning sensors |
+| Thermal Control | 0.35 | 0.04 | 0.02 | Mission-average electrical input; heat-rejection rating in kW thermal is not electrical demand |
+| Combined air revitalisation (O₂ + CO₂) | 2.40 | 0.06 | 0.03 | Four-crew mission-average allowance for cyclic regeneration/compression; count once if either or both O₂/CO₂ modules are installed |
 
 ### Deterministic calculation and validation rules
 
-1. For a selected optional system, calculate: **rated load = base load + (tier index × tier-step kW) + (retrofit level × retrofit-step kW)**, where Foundation = 0, Frontier = 1, Apex = 2, Research = 3, and retrofit level is clamped to 0, 1, or 2.
-2. For combined air revitalisation, count the combined reference load **once**. Use the higher of the installed oxygen/CO₂ tier indices and the higher of their retrofit levels so upgrading either subsystem can increase the shared rated draw without double-counting the air plant.
-3. Build the demand breakdown from these same rated-load values. The sum of the displayed core load and all displayed system loads must equal the displayed total, subject only to rounding in the UI.
-4. Solar output, dust, illumination, temperature, pointing, faults, and array condition affect **generation**. Battery state of charge, charge/discharge efficiency, power limits, and available energy affect **battery flow**. They must never change rated demand.
-5. Emergency power management may reduce the load actually served and pause noncritical work. Keep this as separate telemetry (for example, “served load” or “loads shed”) instead of reducing the rated-demand number.
-6. Use a small display precision (two decimal places for kW) consistently. Avoid animation-dependent random values, recomputing the rated total from fluctuating generation, or state updates that alternate between a rounded and unrounded value.
-7. The agriculture module's 1.60 kW average draw is a reference design estimate, not a universal crop-production law. At the existing Foundation rating of 0.50 kg/day dry-food-equivalent, that corresponds to 38.4 kWh/day or 76.8 kWh per kg of dry-food-equivalent. This is a plausible but design-dependent controlled-environment crop-system estimate; retain the existing master-table yield rating and do not apply a second, unlisted yield multiplier. The Foundation crop module remains supplemental and does not meet the full four-person food demand.
-8. These estimates should be refined only when a specific hardware architecture and duty cycle are chosen. Do not describe them as experimentally verified spacecraft specifications.
+1. For each installed optional system: **rated load = base load + (tier index × tier-step kW) + (retrofit level × retrofit-step kW)**. Foundation = 0, Frontier = 1, Apex = 2, Research = 3. Clamp retrofit level to 0–2.
+2. Count combined air revitalisation **once**, if either oxygen or CO₂ control is installed. Use the higher installed tier and the higher retrofit level for its load.
+3. Displayed demand is the sum of shared core load plus all installed-system rated loads. The displayed breakdown must sum to the same total, subject only to UI rounding.
+4. Solar illumination, dust, temperature, pointing, faults and array condition affect generation—not demand. Battery state, efficiency, limits and available energy affect battery flow—not demand.
+5. Battery charging is a destination for surplus power and battery discharge is a separate source. Neither is added to rated system demand.
+6. Emergency load shedding changes **served load**, not the rated requested-demand display. Show any curtailed loads separately.
+7. Demand changes only when systems are installed/removed, a system's tier changes, or a retrofit is commissioned. Do not recalculate it from live generation, SOC or animation/tick timing.
+8. Keep two decimal places for kW consistently. Avoid random values and hidden multipliers.
+9. The Foundation agriculture output remains **0.50 kg/day**. At 0.75 kW average, the crop module uses 18 kWh/day, or 36 kWh per kg of dry-food-equivalent. This is a small supplemental module, not a complete four-person food farm; do not alter the master-table yield ratings.
+10. These are mission-average game assumptions pending a specified hardware design. They should not be presented as experimentally verified flight-hardware specifications.
 
+### Solar and sustainability interpretation
 
+The Foundation solar array remains **12 kW rated peak output**. Live output continues to be calculated from the array rating and illumination, temperature, dust, pointing, condition and power-conversion effects. A 12 kW nameplate is not 12 kW continuously available, and no fixed output should be forced into the display.
 
-### Calibration against the existing output ratings
+With the revised base loads, the reference colony's core + air revitalisation + water + thermal + compulsory agriculture is about **4.95 kW** before communications, navigation, controllers or optional equipment. This is a more credible starting point for a daylight power budget, while optional science, rover work, extraction and ISRU can still create a deficit and be shed or scheduled. It does **not** claim that a 1,200 kWh Foundation battery can sustain every system through the full 14-Earth-day lunar night; nighttime survival still requires carefully managed loads and sufficient storage or another dependable power source.
 
-This update recalibrates electrical-demand assumptions, the derived solar reference profile, and Foundation power-grid transfer capacity; it does **not** change any resource-output target, retrofit effect, repair value, or any Apex/Research tier rating.
-
-| System | Foundation 0/2 output reference | Demand interpretation used for calibration |
-|---|---|---|
-| Solar Power | 12 kW rated at reference illumination | Live output is calculated from rated output × sunlight geometry × cell-temperature derating × dust transmission × pointing factor × operational condition. At the existing noon reference (temperature loss 9.5%, pointing error 15°, clean array), output is about **10.49 kW**, not 7.24 kW. |
-| Agriculture | 0.50 kg dry-food-equivalent/day | 1.60 kW continuous = 38.4 kWh/day, or 76.8 kWh/kg of dry-food-equivalent. This is a small LED-lit module, not a complete high-efficiency farm. |
-| Resource Extraction | 100 kg regolith/24 h simulation day | 0.75 kW day-average = 18 kWh/day, or 0.18 kWh/kg. Short cutting/drive peaks are intermittent. |
-| ISRU | 1.0 kg product/24 h simulation day | 2.00 kW continuous = 48 kWh/kg product. This is an intentionally energy-intensive small pilot process; the actual value must vary by recipe/feedstock in a future detailed process model. |
-| Science | 2 assays/24 h simulation day | 0.25 kW day-average = 3 kWh per assay, recognising that instruments are not continuously at peak draw. |
-| Rover | 5 km reference range per charge | 0.25 kW is average colony-bus charging/standby demand; approximately 2 kW drive demand is a transient rover-side load, not a continuous colony load. |
-| Air revitalisation | 3.90 kW for the four-crew reference | Preserves the scaled NASA reference load (5.85 kW × 4/6); counted once for oxygen + CO₂ control. |
-| Water / thermal control | 0.86 kW / 0.69 kW electrical reference | Preserves the four-crew-scaled NASA concept references; water recovery efficiency and thermal heat-rejection capacity are outputs, not electrical input ratings. |
-
-The Foundation grid transfer limit is now 12 kW so it no longer clips the 12 kW Foundation solar-array nameplate at reference illumination; Frontier, Apex and Research transfer-capacity values remain unchanged. The solar-profile foundationOutputKW and energyPer10SecondsKWh entries now use the same equation as live simulation at the clean-array, 15° pointing-error reference. At local noon, 10.49 kW corresponds to about **0.0291 kWh per 10 seconds**. Dust, faults, poor pointing, and non-noon illumination reduce that value in the live model.
-
-These are better-calibrated mission-game assumptions, not certified spacecraft hardware specifications. A full scientific model would also represent transient duty cycles, thermal state, conversion losses, local rover storage, and recipe-specific ISRU energy separately.
+This demand-model update changes **no resource-output target, repair effect, retrofit effect, costs/durations, or existing tier output ratings**, including Apex and Research values. Foundation grid capacity and solar reference settings remain as previously specified.
