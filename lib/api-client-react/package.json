@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.js"
   },
   "dependencies": {
     "@tanstack/react-query": "catalog:"
   },
   "peerDependencies": {
     "react": ">=18"
-  }
+  },
+  "scripts": {}
 }

@@ -194,9 +194,9 @@ Research additional metrics also jump where physically meaningful: battery conti
 
 ---
 
-## Live repair-option numerical master — synced from simulationBalance.ts
+## Live repair-option numerical master — synced from simulationBalance.js
 
-**Source of truth:** `artifacts/mockup-sandbox/src/components/mockups/colony-frontier/_shared/simulationBalance.ts` → `REPAIR_OPTIONS`. This section records all 136 current repair procedures. The system tier rating tables above, including every **Apex and Research value**, are intentionally unchanged by this repair-catalogue sync.
+**Source of truth:** `artifacts/mockup-sandbox/src/components/mockups/colony-frontier/_shared/simulationBalance.js` → `REPAIR_OPTIONS`. This section records all 136 current repair procedures. The system tier rating tables above, including every **Apex and Research value**, are intentionally unchanged by this repair-catalogue sync.
 
 ### Reading the repair catalogue
 

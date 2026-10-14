@@ -38,13 +38,13 @@ async function walk(directory) {
 }
 
 function jsPath(relative) {
-  return relative.endsWith(".tsx")
+  return relative.endsWith(".jsx")
     ? relative.slice(0, -4) + ".jsx"
     : relative.endsWith(".mts")
       ? relative.slice(0, -4) + ".mjs"
       : relative.endsWith(".cts")
         ? relative.slice(0, -4) + ".cjs"
-        : relative.endsWith(".ts")
+        : relative.endsWith(".js")
           ? relative.slice(0, -3) + ".js"
           : relative;
 }
@@ -61,7 +61,7 @@ if (sourceFiles.length === 0) {
 // Original source files are not deleted until all transpilation succeeds.
 const outputs = [];
 for (const source of sourceFiles) {
-  if (/\.d\.ts$/.test(source.relative)) {
+  if (/\.d\.js$/.test(source.relative)) {
     outputs.push({ ...source, outputPath: null, outputText: null, declaration: true });
     continue;
   }
@@ -122,7 +122,7 @@ for (const output of outputs) {
 }
 
 // Update explicit source suffixes and glob patterns in generated output/config files.
-const extFix = text => text.replace(/\.tsx\b/g, ".jsx").replace(/\.ts\b/g, ".js");
+const extFix = text => text.replace(/\.jsx\b/g, ".jsx").replace(/\.js\b/g, ".js");
 for (const absolute of textFiles) {
   try {
     let text = await readFile(absolute, "utf8");
@@ -174,7 +174,7 @@ for (const packagePath of packagePaths) {
   }
   if (relative === "scripts/package.json") {
     pkg.scripts.hello = "node ./src/hello.js";
-    if (pkg.devDependencies) delete pkg.devDependencies.tsx;
+    if (pkg.devDependencies) delete pkg.devDependencies.jsx;
   }
   if (relative === "lib/api-spec/package.json") {
     pkg.scripts.codegen = "orval --config ./orval.config.js";
@@ -197,7 +197,7 @@ for (const packagePath of packagePaths) {
 const componentsJson = path.join(root, "artifacts/mockup-sandbox/components.json");
 try {
   const config = JSON.parse(await readFile(componentsJson, "utf8"));
-  config.tsx = false;
+  config.jsx = false;
   config.typescript = false;
   await writeFile(componentsJson, JSON.stringify(config, null, 2) + "\n", "utf8");
 } catch (error) {
@@ -221,7 +221,7 @@ if (leftover.length) {
 }
 
 const converted = outputs.filter(x => !x.declaration).length;
-const jsxCount = outputs.filter(x => !x.declaration && x.relative.endsWith(".tsx")).length;
+const jsxCount = outputs.filter(x => !x.declaration && x.relative.endsWith(".jsx")).length;
 const report = [
   "# JavaScript language migration",
   "",
