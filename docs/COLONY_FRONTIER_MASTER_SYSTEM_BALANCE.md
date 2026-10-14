@@ -364,3 +364,52 @@ The existing Solar Power repair procedures in this table are copied from the liv
 3. The Water support choices remain meaningfully different: Thermal Control targets distillation temperature-profile error (°C), Science targets contaminant detection/conductivity calibration (% of reference contaminants identified), and ISRU targets suitable condensate returned to treatment (L / simulation day). These are distinct from the Standalone potable-water recovery-efficiency effect.
 4. Apex and Research tier rating values in the earlier **Main system ratings**, **Additional system metrics**, and **Research-tier jump revision** tables are unchanged by this update.
 
+---
+
+## Electrical demand model — stable rated-load reference (added 2026-10-15)
+
+**Preservation rule:** This section supplements the existing performance, retrofit, repair, and mission tables. It does not replace or alter any previously specified tier ratings, retrofit effects, repair values, costs, durations, or the Apex/Research values above. If a future edit changes one of those existing values, update it only with an explicit review of the affected system.
+
+### How to interpret these numbers
+
+- These are **rated electrical-load estimates for this game's reference colony**, not universal measured specifications for every real system. Real hardware draw depends on design, operating point, duty cycle, thermal environment, and mission architecture. Where a subsystem is based on a published reference, the code comments identify it; other values are explicit engineering/game-model estimates.
+- Power is measured in **kW**; energy is measured in **kWh**. A 1.60 kW load running continuously for 24 hours consumes 38.4 kWh. Do not confuse a system's production/capacity rating with the electricity it consumes.
+- Demand is the sum of the core habitat reference load and the installed optional systems' **rated requested loads**. Battery charging is a separate destination for surplus power; battery discharge is a separate source of bus power. Neither should be added to or subtracted from rated demand.
+- **Demand must not vary with sunlight, battery state of charge, power health, repair condition, emergency load shedding, animation frames, or simulation tick timing.** Those variables change delivered service, available generation, actual battery flow, and system output, not the rated requested-load number.
+- Demand may change only when a system is installed/removed, its technology tier changes, or a retrofit is commissioned. The displayed total and breakdown must use the same calculation and remain unchanged between those events. Emergency shedding changes *served load*; it must not rewrite the rated-demand display.
+- Tier/retrofit additions below represent extra control, processing, actuator, or capacity-related electrical load assumptions. They are deliberately small for mostly passive/controller hardware and larger for active processing equipment. They are game reference assumptions, not a claim that higher tier inherently consumes more power in every real design.
+
+### Reference base loads and tier/retrofit additions
+
+For a system at Foundation 0/2, use the base load below. Each tier step above Foundation adds the listed **tier-step** amount for each step (Foundation → Frontier → Apex → Research). Each installed retrofit step (0/2 → 1/2 → 2/2) adds the listed **retrofit-step** amount. These are absolute kW additions; do not apply percentages or hidden multipliers.
+
+| System ID | Foundation 0/2 base load (kW) | Each tier step (kW) | Each retrofit step (kW) | Reference basis / modelling note |
+|---|---:|---:|---:|---|
+| Core habitat / life-support controls | 2.55 | 0 | 0 | Fixed shared reference load; does not fluctuate with emergency mode |
+| Solar Power | 0.04 | 0.01 | 0.01 | Array controller, tracking and sensor electronics; PV generation itself is not consumption |
+| Energy Storage | 0.03 | 0.01 | 0.01 | Battery-management and monitoring electronics; stored energy/capacity is not a load |
+| Water | 0.86 | 0.08 | 0.04 | Reference estimate scaled to a four-person crew; actual pumps/heaters depend on the selected plant |
+| Power Grid | 0.05 | 0.02 | 0.01 | Distribution monitoring and switching controls; transfer capacity is not consumption |
+| Science | 0.50 | 0.10 | 0.05 | Reference active instrument workload; experiments may need separately specified loads if modelled individually |
+| Rover | 2.00 | 0.15 | 0.08 | Approximate operating load for a conceptual unpressurised rover; only include while the chosen game load represents it as installed/available |
+| Resource Extraction | 2.00 | 0.20 | 0.10 | Low-end pilot drilling/support-equipment estimate; real drill loads vary substantially by geology and duty cycle |
+| ISRU | 5.00 | 0.30 | 0.15 | Pilot processing/heater/pump estimate; industrial-scale ISRU may require much more |
+| Agriculture | 1.60 | 0.12 | 0.06 | Small controlled-environment LED crop module; this is supplemental production, not a complete crew food farm |
+| Maintenance | 0.15 | 0.02 | 0.01 | Diagnostic electronics standby; active tools should be modelled as temporary job loads if needed |
+| Radiation Monitoring | 0.02 | 0.005 | 0.002 | Sensor/monitor electronics only; passive shielding has no continuous electrical load |
+| Communications | 0.30 | 0.05 | 0.02 | Low-end transmitter reference; transmission duty cycle can be modelled separately |
+| Navigation | 0.08 | 0.01 | 0.005 | Avionics and positioning sensor estimate |
+| Thermal Control | 0.69 | 0.05 | 0.025 | Four-person scaled reference estimate; heat rejection capacity (kW thermal) is not the same as electrical input |
+| Combined air revitalisation (O₂ + CO₂) | 3.90 | 0.08 | 0.04 | One combined 5.85 kW reference scaled by 4/6 crew; count once if either/both O₂ or CO₂ modules are installed |
+
+### Deterministic calculation and validation rules
+
+1. For a selected optional system, calculate: **rated load = base load + (tier index × tier-step kW) + (retrofit level × retrofit-step kW)**, where Foundation = 0, Frontier = 1, Apex = 2, Research = 3, and retrofit level is clamped to 0, 1, or 2.
+2. For combined air revitalisation, count the combined reference load **once**. Use the higher of the installed oxygen/CO₂ tier indices and the higher of their retrofit levels so upgrading either subsystem can increase the shared rated draw without double-counting the air plant.
+3. Build the demand breakdown from these same rated-load values. The sum of the displayed core load and all displayed system loads must equal the displayed total, subject only to rounding in the UI.
+4. Solar output, dust, illumination, temperature, pointing, faults, and array condition affect **generation**. Battery state of charge, charge/discharge efficiency, power limits, and available energy affect **battery flow**. They must never change rated demand.
+5. Emergency power management may reduce the load actually served and pause noncritical work. Keep this as separate telemetry (for example, “served load” or “loads shed”) instead of reducing the rated-demand number.
+6. Use a small display precision (two decimal places for kW) consistently. Avoid animation-dependent random values, recomputing the rated total from fluctuating generation, or state updates that alternate between a rounded and unrounded value.
+7. The agriculture module's 1.60 kW draw is a reference design estimate, not a universal crop-production law. Its reduced draw must be paired with the reduced food-yield assumption already applied in the simulation; do not claim the smaller module meets the full four-person food demand.
+8. These estimates should be refined only when a specific hardware architecture and duty cycle are chosen. Do not describe them as experimentally verified spacecraft specifications.
+
