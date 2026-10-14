@@ -1,0 +1,51 @@
+name: Validate Colony Frontier rewrite
+
+on:
+  push:
+    branches:
+      - main
+      - rust-python-rewrite
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build existing game after JavaScript conversion
+        run: pnpm run build
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test Python flight formulae
+        run: python -m unittest discover -s rewrite/tests -v
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Compile Rust mission authority
+        run: cargo check --manifest-path rewrite/server/Cargo.toml
