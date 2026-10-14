@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#101923">
+<title>Colony Frontier | Flight Systems</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="wordmark" href="/">COLONY<span> FRONTIER</span></a><div class="system-status"><span class="status-dot"></span> LOCAL SIMULATION</div></header>
+<main class="shell">
+<section class="intro"><p class="eyebrow">MISSION CONTROL / FLIGHT OPERATIONS</p><h1>Flight systems</h1><p class="lede">Monitor liftoff, ascent, descent and touchdown. Python calculates the flight model; Rust makes the authoritative mission verdict.</p></section>
+<section class="phase-strip" aria-label="Mission phase"><div class="phase active" data-phase="liftoff"><span>01</span> Liftoff</div><div class="phase" data-phase="ascent"><span>02</span> Ascent</div><div class="phase" data-phase="descent"><span>03</span> Descent</div><div class="phase" data-phase="landing"><span>04</span> Landing</div></section>
+<section class="main-grid">
+<div class="panel flight-panel">
+<div class="panel-heading"><div><p class="eyebrow">LIVE FLIGHT TELEMETRY</p><h2 id="phase-title">Pre-ignition checks</h2></div><span id="verdict-pill" class="pill neutral">STANDBY</span></div>
+<div class="mission-visual" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="planet"></div><div class="rocket"><div class="rocket-window"></div><div class="flame"></div></div><div class="visual-caption"><span>CF / FLIGHT COMPUTER</span><span id="elapsed">T+000 s</span></div></div>
+<div class="telemetry-grid">
+<article class="metric"><span>Oxygen reserve</span><strong id="oxygen">8.00 <small>kg</small></strong><div class="meter"><i id="oxygen-bar"></i></div></article>
+<article class="metric"><span>Electrical energy</span><strong id="energy">500 <small>kJ</small></strong><div class="meter"><i id="energy-bar"></i></div></article>
+<article class="metric"><span>Cabin pressure</span><strong id="pressure">— <small>kPa</small></strong><div class="meter"><i id="pressure-bar"></i></div></article>
+<article class="metric"><span>Cabin temperature</span><strong id="temperature">20.0 <small>°C</small></strong><div class="meter"><i id="temperature-bar"></i></div></article>
+<article class="metric"><span>Radiation dose</span><strong id="radiation">0.000 <small>Gy</small></strong><div class="meter"><i id="radiation-bar"></i></div></article>
+<article class="metric"><span>Acceleration</span><strong id="acceleration">— <small>g</small></strong><div class="meter"><i id="acceleration-bar"></i></div></article>
+</div>
+<div class="controls"><button id="advance" class="button primary">Run preflight checks</button><button id="next-phase" class="button secondary" disabled>Advance phase →</button><button id="reset" class="button quiet">Reset mission</button></div>
+<p class="microcopy">Game-balance thresholds only. This simulation is not a real flight-safety or medical model.</p>
+</div>
+<aside class="side-column">
+<section class="panel"><p class="eyebrow">RUST AUTHORITY</p><h2 id="mission-status">Awaiting telemetry</h2><p id="status-description" class="status-description">Run the preflight checks to send calculated state to the Rust mission authority.</p><div class="divider"></div><p class="eyebrow">DECISION LOG</p><ul id="decision-log" class="decision-log"><li class="muted">No verdict received yet.</li></ul></section>
+<section class="panel settings-panel"><p class="eyebrow">FLIGHT PARAMETERS</p><h2>Adjust the scenario</h2>
+<label>Oxygen consumption <output id="oxygen-rate-label">0.0010 kg/s</output><input id="oxygen-rate" type="range" min="0.0002" max="0.008" step="0.0002" value="0.001"></label>
+<label>Electrical load <output id="load-label">900 W</output><input id="load" type="range" min="200" max="2500" step="50" value="900"></label>
+<label>Vertical speed at touchdown <output id="speed-label">1.0 m/s</output><input id="speed" type="range" min="0" max="15" step="0.5" value="1"></label>
+<label>Cabin heat input <output id="heat-label">0 W</output><input id="heat" type="range" min="-2000" max="2000" step="100" value="0"></label>
+<p class="microcopy">Changes affect the next simulation step. Other values are illustrative defaults.</p></section>
+</aside></section>
+<footer>COLONY FRONTIER <span>REWRITE EXPERIMENT · RUST + PYTHON + WEB</span></footer>
+</main></body></html>
