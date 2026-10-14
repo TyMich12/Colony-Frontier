@@ -2663,7 +2663,7 @@ export function MissionSimulation() {
         // short peaks are not falsely represented as continuous colony-bus demand.
         // All values are explicit kW additions by tier/retrofit, with no hidden multipliers.
         // Agriculture retains the master-sheet Foundation yield of 0.50 kg/day.
-                const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
+        const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
         const essentialLoadKW = POWER_DEMAND_MODEL.coreLoadKW;
         const requestedLoads = Object.entries(POWER_DEMAND_MODEL.systems)
           .filter(([systemId]) => Boolean(pending.selected[systemId]))
