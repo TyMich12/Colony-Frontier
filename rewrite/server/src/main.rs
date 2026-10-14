@@ -17,6 +17,103 @@ struct FlightReport {
     flight_control_ok: bool,
 }
 
+
+#[derive(Debug, Deserialize)]
+struct MissionReport {
+    phase: String,
+    elapsed_seconds: f64,
+    oxygen_percent: f64,
+    water_percent: f64,
+    food_percent: f64,
+    power_percent: f64,
+    battery_percent: f64,
+    battery_minimum_soc_percent: f64,
+    habitat_percent: f64,
+    temperature_c: f64,
+    radiation_index: f64,
+    oxygen_kg: f64,
+    energy_j: f64,
+    pressure_pa: f64,
+    temperature_k: f64,
+    radiation_gy: f64,
+}
+
+fn evaluate_mission(report: MissionReport) -> Verdict {
+    let values = [
+        report.elapsed_seconds, report.oxygen_percent, report.water_percent,
+        report.food_percent, report.power_percent, report.battery_percent,
+        report.battery_minimum_soc_percent, report.habitat_percent,
+        report.temperature_c, report.radiation_index, report.oxygen_kg,
+        report.energy_j, report.pressure_pa, report.temperature_k,
+        report.radiation_gy,
+    ];
+    let mut reasons = Vec::new();
+    let mut warnings = Vec::new();
+
+    if !finite(&values) {
+        reasons.push("Python supplied a non-finite colony simulation value.".to_string());
+    }
+    if report.elapsed_seconds < 0.0 ||
+       values[1..8].iter().any(|v| *v < 0.0 || *v > 100.0) ||
+       report.radiation_index < 0.0 || report.radiation_index > 100.0 {
+        reasons.push("Colony telemetry contains an out-of-range resource meter.".to_string());
+    }
+    if report.temperature_c < -100.0 || report.temperature_c > 100.0 {
+        reasons.push("Colony telemetry contains an invalid temperature.".to_string());
+    }
+    if !report.temperature_c.is_finite() || !report.temperature_k.is_finite() {
+        reasons.push("Colony temperature is not finite.".to_string());
+    }
+
+    // These failure conditions mirror the existing minigame's resource rules.
+    // The minigame still simulates resources and events; Rust owns the verdict.
+    if report.oxygen_percent <= 1.5 {
+        reasons.push("Cabin oxygen reserve fell below the minimum safe operating margin.".to_string());
+    }
+    if report.water_percent <= 1.0 {
+        reasons.push("The usable water reserve was exhausted before recovery could be restored.".to_string());
+    }
+    if report.food_percent <= 1.5 {
+        reasons.push("Usable food reserves were exhausted before sustainable production or resupply could be restored.".to_string());
+    }
+    if report.habitat_percent <= 1.0 {
+        reasons.push("Habitat integrity fell below its simulated pressure-boundary limit.".to_string());
+    }
+    if report.power_percent <= 5.0 &&
+       report.battery_percent <= report.battery_minimum_soc_percent + 0.5 {
+        reasons.push("Generation cannot sustain the colony and the battery has reached its protected reserve.".to_string());
+    }
+    if report.temperature_c <= 16.05 || report.temperature_c >= 27.95 {
+        reasons.push("Cabin temperature passed the simulated crew-safe operating envelope.".to_string());
+    }
+    if report.radiation_index >= 90.0 {
+        reasons.push("Modelled effective dose rate exceeded the emergency shelter threshold.".to_string());
+    }
+    if report.oxygen_kg <= 0.0 || report.energy_j < 0.0 || report.pressure_pa < 0.0 {
+        reasons.push("Derived colony telemetry contains an impossible negative resource.".to_string());
+    }
+
+    if report.pressure_pa < 70_000.0 || report.pressure_pa > 110_000.0 {
+        warnings.push("Derived cabin pressure is outside the configured game range.".to_string());
+    }
+    if report.temperature_k < 285.0 || report.temperature_k > 305.0 {
+        warnings.push("Cabin temperature is outside the configured normal range.".to_string());
+    }
+    if report.radiation_gy > 0.001 {
+        warnings.push("Configured radiation warning threshold exceeded.".to_string());
+    }
+
+    let alive = reasons.is_empty();
+    let mission_status = if !alive {
+        "MISSION_LOSS"
+    } else if report.phase == "recovery" {
+        "SUCCESS"
+    } else {
+        "IN_PROGRESS"
+    };
+    Verdict { alive, mission_status: mission_status.to_string(), reasons, warnings }
+}
+
 #[derive(Debug, Serialize)]
 struct Verdict {
     alive: bool,
@@ -97,6 +194,16 @@ fn evaluate(report: FlightReport) -> Verdict {
     Verdict { alive, mission_status: mission_status.to_string(), reasons, warnings }
 }
 
+
+async fn evaluate_mission_route(
+    Json(report): Json<MissionReport>,
+) -> Result<Json<Verdict>, (StatusCode, String)> {
+    if report.phase != "minigame" && report.phase != "recovery" {
+        return Err((StatusCode::BAD_REQUEST, "Unknown colony mission phase".to_string()));
+    }
+    Ok(Json(evaluate_mission(report)))
+}
+
 async fn health() -> &'static str {
     "Colony Frontier Rust authority online"
 }
@@ -115,7 +222,8 @@ async fn evaluate_route(
 async fn main() {
     let app = Router::new()
         .route("/health", get(health))
-        .route("/evaluate", post(evaluate_route));
+        .route("/evaluate", post(evaluate_route))
+        .route("/evaluate-mission", post(evaluate_mission_route));
     let address = SocketAddr::from(([127, 0, 0, 1], 8081));
     println!("Rust mission authority listening on http://{address}");
     let listener = tokio::net::TcpListener::bind(address).await.expect("bind Rust authority");
