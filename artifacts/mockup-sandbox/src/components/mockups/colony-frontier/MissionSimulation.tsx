@@ -2826,7 +2826,7 @@ export function MissionSimulation() {
         const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics) * POWER_DEMAND_MODEL.agricultureYieldScale
+          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
