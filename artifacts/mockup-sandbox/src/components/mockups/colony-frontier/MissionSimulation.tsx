@@ -2722,17 +2722,30 @@ export function MissionSimulation() {
           thermal: 0.025, oxygen: 0.04, co2: 0.04,
         };
         const ratedLoadFor = (systemId: string, baseKW: number) => {
-          const tier = pending.selected[systemId];
+          // CO₂ removal and oxygen generation share one reference air-system load.
+          // Use the more advanced of the deployed pair so upgrading either loop is reflected once.
+          const linkedAirSystem = systemId === "air-revitalization";
+          const linkedTier = linkedAirSystem
+            ? [pending.selected.co2, pending.selected.oxygen].filter(Boolean).sort((a, b) => (tierIndexByName[b!] ?? 0) - (tierIndexByName[a!] ?? 0))[0]
+            : undefined;
+          const tier = pending.selected[systemId] ?? linkedTier;
           const tierSteps = tier ? tierIndexByName[tier] ?? 0 : 0;
-          const retrofitSteps = Math.max(0, Math.min(2, buildings[systemId]?.upgradeLevel ?? 0));
+          const retrofitSteps = linkedAirSystem
+            ? Math.max(buildings.co2?.upgradeLevel ?? 0, buildings.oxygen?.upgradeLevel ?? 0)
+            : (buildings[systemId]?.upgradeLevel ?? 0);
           return baseKW
-            + tierSteps * (tierDemandAdderKW[systemId] ?? 0)
-            + retrofitSteps * (retrofitDemandAdderKW[systemId] ?? 0);
+            + tierSteps * (tierDemandAdderKW[systemId] ?? (linkedAirSystem ? 0.08 : 0))
+            + Math.max(0, Math.min(2, retrofitSteps)) * (retrofitDemandAdderKW[systemId] ?? (linkedAirSystem ? 0.04 : 0));
         };
         const ratedRequestedLoads = requestedLoads.map((source) => ({
           ...source,
           kw: ratedLoadFor(source.systemId, source.kw),
         }));
+        if (airRevitalizationOnline) {
+          const airLoad = ratedLoadFor("air-revitalization", 3.9);
+          const airSource = ratedRequestedLoads.find((source) => source.systemId === "air-revitalization");
+          if (airSource) airSource.kw = airLoad;
+        }
         const requestedOptionalLoadKW = ratedRequestedLoads.reduce((sum, source) => sum + source.kw, 0);
         // Do not convert solar-cell temperature directly into an extra electrical load:
         // that made demand rise with sunlight and double-counted thermal control when
