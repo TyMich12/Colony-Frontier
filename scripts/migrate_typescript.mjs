@@ -3,7 +3,8 @@ import path from "node:path";
 import ts from "typescript";
 
 // One-time migration entrypoint; run from repository root.
-// Keeps the current game structure while emitting JavaScript/JSX source.\nconst root = process.cwd();
+// Keeps the current game structure while emitting JavaScript/JSX source.
+const root = process.cwd();
 const skipDirectories = new Set([".git", "node_modules", ".pnpm", ".cache", "dist", "target", "coverage"]);
 const sourceFiles = [];
 const configFiles = [];
