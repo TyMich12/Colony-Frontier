@@ -33,19 +33,18 @@ def calculate_flight(payload):
                  (float(state.get("generation_w", 1200.0)) -
                   float(state.get("load_w", 900.0))) * dt)
 
-    # Ideal gas law P = nRT/V; moles are estimated from cabin gas mass and
-    # a game-level average molar mass. Inputs are configurable for balancing.
-    gas_mass_kg = max(0.0, float(state.get("cabin_gas_mass_kg", 2.4)))
-    molar_mass_kg_mol = max(0.001, float(state.get("molar_mass_kg_mol", 0.029)))
-    volume_m3 = max(0.1, float(state.get("cabin_volume_m3", 30.0)))
     temperature = float(state.get("temperature_k", 293.15))
-    moles = gas_mass_kg / molar_mass_kg_mol
-    pressure = max(0.0, moles * 8.314462618 * temperature / volume_m3)
-
     # Simple thermal balance: net heat divided by effective cabin heat capacity.
     heat_w = float(state.get("heater_w", 0.0)) - float(state.get("cooling_w", 0.0))
     heat_capacity_j_k = max(1.0, float(state.get("thermal_capacity_j_k", 120_000.0)))
     temperature = temperature + heat_w * dt / heat_capacity_j_k
+
+    # Ideal gas law P = nRT/V using the updated cabin temperature.
+    gas_mass_kg = max(0.0, float(state.get("cabin_gas_mass_kg", 36.0)))
+    molar_mass_kg_mol = max(0.001, float(state.get("molar_mass_kg_mol", 0.029)))
+    volume_m3 = max(0.1, float(state.get("cabin_volume_m3", 30.0)))
+    moles = gas_mass_kg / molar_mass_kg_mol
+    pressure = max(0.0, moles * 8.314462618 * temperature / volume_m3)
 
     radiation_rate = max(0.0, float(state.get("radiation_rate_gy_s", 0.00000001)))
     radiation = max(0.0, float(state.get("radiation_gy", 0.0)) + radiation_rate * dt)
