@@ -30,7 +30,7 @@
 | ISRU | Usable target product output under standard recipe | kg product/24 h sim day, higher | 1.0 → 1.1 → 1.2 | 5.0 → 5.2 → 5.4 | 15 → 15.5 → 16 | 40 → 60 → 80 |
 | Agriculture | Edible dry-food-equivalent yield | kg/day, higher | 0.50 → 0.52 → 0.54 | 1.8 → 1.85 → 1.9 | 4.0 → 4.1 → 4.2 | 8.0 → 12.0 → 16.0 |
 | Maintenance | Condition points restored by standard maintenance job | condition points/job, higher | 5.0 → 5.5 → 6.0 | 15 → 15.5 → 16 | 35 → 36 → 37 | 60 → 80 → 100 |
-| Power Grid | Continuous power-transfer capacity | kW, higher | 8.0 → 8.3 → 8.6 | 22 → 23 → 24 | 50 → 52 → 54 | 120 → 180 → 250 |
+| Power Grid | Continuous power-transfer capacity | kW, higher | 12.0 → 12.4 → 12.8 | 22 → 23 → 24 | 50 → 52 → 54 | 120 → 180 → 250 |
 | Science | Detailed sample assays completed | assays/24 h sim day, higher | 2.0 → 2.1 → 2.2 | 8.0 → 8.3 → 8.6 | 24 → 25 → 26 | 60 → 90 → 120 |
 | Navigation | Horizontal position error under reference terrain conditions | m error, lower | 50 → 48 → 46 | 15 → 14.5 → 14 | 3.0 → 2.8 → 2.6 | 0.20 → 0.10 → 0.05 |
 
@@ -417,7 +417,7 @@ For a system at Foundation 0/2, use the base load below. Each tier step above Fo
 
 ### Calibration against the existing output ratings
 
-This update changes only the electrical-demand model and the derived solar reference profile; it does **not** change any system's stated resource-output target, capacity rating, retrofit effect, repair value, or tier rating.
+This update recalibrates electrical-demand assumptions, the derived solar reference profile, and Foundation power-grid transfer capacity; it does **not** change any resource-output target, retrofit effect, repair value, or any Apex/Research tier rating.
 
 | System | Foundation 0/2 output reference | Demand interpretation used for calibration |
 |---|---|---|
@@ -430,6 +430,6 @@ This update changes only the electrical-demand model and the derived solar refer
 | Air revitalisation | 3.90 kW for the four-crew reference | Preserves the scaled NASA reference load (5.85 kW × 4/6); counted once for oxygen + CO₂ control. |
 | Water / thermal control | 0.86 kW / 0.69 kW electrical reference | Preserves the four-crew-scaled NASA concept references; water recovery efficiency and thermal heat-rejection capacity are outputs, not electrical input ratings. |
 
-The solar-profile foundationOutputKW and energyPer10SecondsKWh entries now use the same equation as live simulation at the clean-array, 15° pointing-error reference. At local noon, 10.49 kW corresponds to about **0.0291 kWh per 10 seconds**. Dust, faults, poor pointing, and non-noon illumination reduce that value in the live model.
+The Foundation grid transfer limit is now 12 kW so it no longer clips the 12 kW Foundation solar-array nameplate at reference illumination; Frontier, Apex and Research transfer-capacity values remain unchanged. The solar-profile foundationOutputKW and energyPer10SecondsKWh entries now use the same equation as live simulation at the clean-array, 15° pointing-error reference. At local noon, 10.49 kW corresponds to about **0.0291 kWh per 10 seconds**. Dust, faults, poor pointing, and non-noon illumination reduce that value in the live model.
 
 These are better-calibrated mission-game assumptions, not certified spacecraft hardware specifications. A full scientific model would also represent transient duty cycles, thermal state, conversion losses, local rover storage, and recipe-specific ISRU energy separately.
