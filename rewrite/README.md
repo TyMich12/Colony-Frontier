@@ -6,8 +6,8 @@ This branch removes the existing TypeScript source files while keeping the game 
 
 - **HTML/CSS:** page structure and visual presentation.
 - **JavaScript/JSX:** existing game screens, controls, 3D map components and state handling. JSX is compiled by Vite; no TypeScript files are required.
-- **Python:** flight simulation equations for oxygen, electrical energy, cabin pressure, temperature, radiation, acceleration and landing impact.
-- **Rust:** the authoritative verdict service. It validates the telemetry calculated by Python and decides whether the astronaut remains alive, the mission is lost, or landing is successful.
+- **Python:** flight equations plus colony-minigame telemetry derivation for oxygen, electrical energy, cabin pressure, temperature, radiation, acceleration and landing impact.
+- **Rust:** the authoritative verdict service. It validates flight telemetry and continuously checks the existing colony minigame's life-support meters. Rust decides crew survival/loss and confirms successful recovery; the minigame's existing event choices, operations, resource simulation and controls remain in JavaScript.
 
 ## Run the integrated game locally
 
@@ -41,8 +41,8 @@ You can also open `http://127.0.0.1:8080` to inspect the standalone flight-contr
 
 ## Validation
 
-The GitHub Actions validation workflow builds the migrated Vite workspace, tests the Python formulae, and compiles the Rust service. The language migration report is in the repository root as `LANGUAGE_MIGRATION_REPORT.md`.
+The GitHub Actions validation workflow builds the migrated Vite workspace, tests flight and colony-survival formulae in Python, and compiles the Rust service. The language migration report is in the repository root as `LANGUAGE_MIGRATION_REPORT.md`.
 
 ## Scope and safety
 
-The existing game was mechanically transpiled to JavaScript/JSX to preserve its established screens and calculations. No TypeScript source/config files remain on this branch. The standalone flight model's numerical limits are illustrative game-balance values, not real astronaut safety or medical limits.
+The existing game screens and the full colony minigame were converted to JavaScript/JSX without replacing their established controls, event decisions, operation timers, resource simulation, 3D map, or rewards logic. A light authority bridge sends telemetry snapshots through Python to Rust during minigame play and recovery; it does not replace the minigame's mechanics. No TypeScript source/config files remain on this branch. All numerical thresholds are illustrative game-balance values, not real astronaut safety or medical limits.
