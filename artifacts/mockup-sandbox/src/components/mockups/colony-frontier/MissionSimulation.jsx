@@ -2665,7 +2665,7 @@ export function MissionSimulation() {
         saveGameState(nextState);
         clearMissionRuntime();
         clearPendingMission();
-    }, [activeFaults, metrics, missionFailed, pending, results, sampleQuality, sampleStages]);
+    }, [activeFaults, metrics, missionAuthorityVerified, missionFailed, pending, results, sampleQuality, sampleStages]);
     const handleEventChoice = (choiceId) => {
         if (!activeEvent || !pending || eventResponseRef.current === activeEvent.id)
             return;
