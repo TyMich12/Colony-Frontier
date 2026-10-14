@@ -6,7 +6,7 @@
 - Preserved the existing React/Vite screens and game logic through transpilation instead of intentionally redesigning the game.
 - CI validation passed for the migrated workspace build, Python formula tests, and Rust authority compilation.
 - Integrated a launch-to-flight sequence screen between mission loadout and the existing colony mission simulation; the old mission simulation and minigame internals were not edited in this integration step.
-- Python calculates flight telemetry, and Rust validates that telemetry and determines alive/loss/success.
+- Python calculates flight telemetry and converts the existing colony-minigame meters into a derived telemetry snapshot. Rust validates both reports, checks survival continuously during minigame play, and confirms the recovery result.
 - The Rust/Python services must be running locally for the flight sequence to operate. See `rewrite/README.md`.
 
 ## Important scope note
