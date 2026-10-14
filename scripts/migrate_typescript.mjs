@@ -2,7 +2,7 @@ import { readdir, readFile, writeFile, unlink, stat } from "node:fs/promises";
 import path from "node:path";
 import ts from "typescript";
 
-const root = process.cwd();
+// One-time migration entrypoint; run from repository root.\nconst root = process.cwd();
 const skipDirectories = new Set([".git", "node_modules", ".pnpm", ".cache", "dist", "target", "coverage"]);
 const sourceFiles = [];
 const configFiles = [];
