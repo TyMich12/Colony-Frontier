@@ -13,6 +13,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
 RUST_URL = "http://127.0.0.1:8081/evaluate"
+RUST_MISSION_URL = "http://127.0.0.1:8081/evaluate-mission"
 G0 = 9.80665
 
 
@@ -81,12 +82,85 @@ def calculate_flight(payload):
     return result
 
 
+def calculate_mission_survival(payload):
+    """Convert existing colony-minigame meters into a report for Rust.
+
+    The colony minigame already owns its resource simulation and event mechanics.
+    This function derives a consistent telemetry snapshot without advancing or
+    replacing that simulation.
+    """
+    phase = str(payload.get("phase", "minigame"))
+    if phase not in {"minigame", "recovery"}:
+        raise ValueError("Unknown colony mission phase")
+
+    state = payload.get("state", {})
+    if not isinstance(state, dict):
+        raise ValueError("Mission state must be an object")
+
+    def number(key, default=None):
+        if key not in state and default is None:
+            raise ValueError(f"Missing mission metric: {key}")
+        value = float(state.get(key, default))
+        if not math.isfinite(value):
+            raise ValueError(f"Mission metric {key} must be finite")
+        return value
+
+    metrics = {
+        "oxygen_percent": number("oxygen"),
+        "water_percent": number("water"),
+        "food_percent": number("food"),
+        "power_percent": number("power"),
+        "battery_percent": number("battery"),
+        "habitat_percent": number("habitat"),
+        "radiation_index": number("radiation"),
+        "temperature_c": number("temperature"),
+        "battery_minimum_soc_percent": number("battery_minimum_soc_percent", 20.0),
+    }
+    for key, value in metrics.items():
+        if key.endswith("_percent") or key == "radiation_index":
+            if not 0.0 <= value <= 100.0:
+                raise ValueError(f"Mission metric {key} must be between 0 and 100")
+    if not -100.0 <= metrics["temperature_c"] <= 100.0:
+        raise ValueError("Mission temperature is outside the model's accepted range")
+    if not 0.0 <= metrics["battery_minimum_soc_percent"] <= 100.0:
+        raise ValueError("Battery minimum SOC must be between 0 and 100")
+
+    elapsed = float(payload.get("elapsed_seconds", 0.0))
+    if not math.isfinite(elapsed) or elapsed < 0.0:
+        raise ValueError("Mission elapsed time must be finite and non-negative")
+
+    # Convert the minigame's 0–100 resource meters into illustrative telemetry.
+    # These derived values are for consistent game rules, not real vehicle data.
+    oxygen_kg = metrics["oxygen_percent"] * 0.08
+    energy_j = (
+        metrics["battery_percent"] / 100.0 * 400_000.0
+        + metrics["power_percent"] / 100.0 * 100_000.0
+    )
+    pressure_pa = 101_325.0 * (metrics["oxygen_percent"] / 88.0) * (metrics["habitat_percent"] / 94.0)
+    temperature_k = metrics["temperature_c"] + 273.15
+    radiation_gy = metrics["radiation_index"] / 100.0 * 0.001
+
+    result = {
+        "phase": phase,
+        "elapsed_seconds": elapsed,
+        **metrics,
+        "oxygen_kg": oxygen_kg,
+        "energy_j": energy_j,
+        "pressure_pa": max(0.0, pressure_pa),
+        "temperature_k": temperature_k,
+        "radiation_gy": radiation_gy,
+    }
+    if not all(math.isfinite(value) for value in result.values() if isinstance(value, float)):
+        raise ValueError("Mission formula produced a non-finite value")
+    return result
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_ROOT), **kwargs)
 
     def do_POST(self):
-        if self.path != "/simulate":
+        if self.path not in {"/simulate", "/mission-survival"}:
             self.send_error(404, "Unknown endpoint")
             return
         try:
@@ -94,9 +168,14 @@ class Handler(SimpleHTTPRequestHandler):
             if length <= 0 or length > 64_000:
                 raise ValueError("Request body missing or too large")
             payload = json.loads(self.rfile.read(length))
-            calculated = calculate_flight(payload)
+            if self.path == "/simulate":
+                calculated = calculate_flight(payload)
+                rust_url = RUST_URL
+            else:
+                calculated = calculate_mission_survival(payload)
+                rust_url = RUST_MISSION_URL
             request = urllib.request.Request(
-                RUST_URL,
+                rust_url,
                 data=json.dumps(calculated).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 method="POST",
