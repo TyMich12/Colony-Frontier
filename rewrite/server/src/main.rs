@@ -229,3 +229,63 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(address).await.expect("bind Rust authority");
     axum::serve(listener, app).await.expect("serve Rust authority");
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn healthy_report(phase: &str) -> MissionReport {
+        MissionReport {
+            phase: phase.to_string(),
+            elapsed_seconds: 120.0,
+            oxygen_percent: 88.0,
+            water_percent: 86.0,
+            food_percent: 84.0,
+            power_percent: 72.0,
+            battery_percent: 70.0,
+            battery_minimum_soc_percent: 20.0,
+            habitat_percent: 94.0,
+            temperature_c: 21.0,
+            radiation_index: 10.0,
+            oxygen_kg: 7.04,
+            energy_j: 352_000.0,
+            pressure_pa: 101_325.0,
+            temperature_k: 294.15,
+            radiation_gy: 0.0001,
+        }
+    }
+
+    #[test]
+    fn healthy_colony_remains_in_progress_during_minigame() {
+        let verdict = evaluate_mission(healthy_report("minigame"));
+        assert!(verdict.alive);
+        assert_eq!(verdict.mission_status, "IN_PROGRESS");
+        assert!(verdict.reasons.is_empty());
+    }
+
+    #[test]
+    fn depleted_oxygen_causes_authoritative_mission_loss() {
+        let mut report = healthy_report("minigame");
+        report.oxygen_percent = 1.0;
+        report.oxygen_kg = 0.08;
+        let verdict = evaluate_mission(report);
+        assert!(!verdict.alive);
+        assert_eq!(verdict.mission_status, "MISSION_LOSS");
+        assert!(verdict.reasons.iter().any(|reason| reason.contains("oxygen")));
+    }
+
+    #[test]
+    fn successful_recovery_requires_a_survivable_colony_state() {
+        let success = evaluate_mission(healthy_report("recovery"));
+        assert!(success.alive);
+        assert_eq!(success.mission_status, "SUCCESS");
+
+        let mut failed = healthy_report("recovery");
+        failed.temperature_c = 28.0;
+        failed.temperature_k = 301.15;
+        let failure = evaluate_mission(failed);
+        assert!(!failure.alive);
+        assert_eq!(failure.mission_status, "MISSION_LOSS");
+    }
+}
