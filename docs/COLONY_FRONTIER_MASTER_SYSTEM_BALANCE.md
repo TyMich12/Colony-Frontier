@@ -421,7 +421,7 @@ This update changes only the electrical-demand model and the derived solar refer
 
 | System | Foundation 0/2 output reference | Demand interpretation used for calibration |
 |---|---|---|
-| Solar Power | 12 kW rated at reference illumination | Live output is calculated from rated output × sunlight geometry × cell-temperature derating × dust transmission × pointing factor × operational condition. At the existing noon reference (temperature loss 9.5%, pointing error 15°, clean array), output is about **10.47 kW**, not 7.24 kW. |
+| Solar Power | 12 kW rated at reference illumination | Live output is calculated from rated output × sunlight geometry × cell-temperature derating × dust transmission × pointing factor × operational condition. At the existing noon reference (temperature loss 9.5%, pointing error 15°, clean array), output is about **10.49 kW**, not 7.24 kW. |
 | Agriculture | 0.50 kg dry-food-equivalent/day | 1.60 kW continuous = 38.4 kWh/day, or 76.8 kWh/kg of dry-food-equivalent. This is a small LED-lit module, not a complete high-efficiency farm. |
 | Resource Extraction | 100 kg regolith/24 h simulation day | 0.75 kW day-average = 18 kWh/day, or 0.18 kWh/kg. Short cutting/drive peaks are intermittent. |
 | ISRU | 1.0 kg product/24 h simulation day | 2.00 kW continuous = 48 kWh/kg product. This is an intentionally energy-intensive small pilot process; the actual value must vary by recipe/feedstock in a future detailed process model. |
@@ -430,6 +430,6 @@ This update changes only the electrical-demand model and the derived solar refer
 | Air revitalisation | 3.90 kW for the four-crew reference | Preserves the scaled NASA reference load (5.85 kW × 4/6); counted once for oxygen + CO₂ control. |
 | Water / thermal control | 0.86 kW / 0.69 kW electrical reference | Preserves the four-crew-scaled NASA concept references; water recovery efficiency and thermal heat-rejection capacity are outputs, not electrical input ratings. |
 
-The solar-profile foundationOutputKW and energyPer10SecondsKWh entries now use the same equation as live simulation at the clean-array, 15° pointing-error reference. At local noon, 10.47 kW corresponds to about **0.0291 kWh per 10 seconds**. Dust, faults, poor pointing, and non-noon illumination reduce that value in the live model.
+The solar-profile foundationOutputKW and energyPer10SecondsKWh entries now use the same equation as live simulation at the clean-array, 15° pointing-error reference. At local noon, 10.49 kW corresponds to about **0.0291 kWh per 10 seconds**. Dust, faults, poor pointing, and non-noon illumination reduce that value in the live model.
 
 These are better-calibrated mission-game assumptions, not certified spacecraft hardware specifications. A full scientific model would also represent transient duty cycles, thermal state, conversion losses, local rover storage, and recipe-specific ISRU energy separately.
