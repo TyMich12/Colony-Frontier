@@ -71,6 +71,7 @@ const starterCategories = new Set([
   "comms",
   "navigation",
   "radiation",
+  "agriculture",
 ]);
 
 const minimumDeploymentReserve = technologyTracks.length
