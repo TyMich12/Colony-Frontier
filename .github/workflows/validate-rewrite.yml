@@ -47,5 +47,5 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Compile Rust mission authority
-        run: cargo check --manifest-path rewrite/server/Cargo.toml
+      - name: Test Rust mission authority
+        run: cargo test --manifest-path rewrite/server/Cargo.toml
