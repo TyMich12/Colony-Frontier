@@ -2656,20 +2656,20 @@ export function MissionSimulation() {
             ? repairAdjustedRating("grid", getBaselineRating("grid", pending.selected.grid, gridUpgrade), buildings.grid?.repairMetrics)
             : 0
           : Number.POSITIVE_INFINITY;
-        // Electrical load model (kW): reference-grounded where public NASA concept data
-        // gives a comparable subsystem, with explicit game-design assumptions for smaller
-        // electronics/control loads. These are not claimed to be measured flight-hardware values.
-        // NASA TM / NTRS 20200001622 Table 8 gives a 6-crew ECLSS reference:
-        // air revitalization + O2 generation 5.85 kW, water processing 1.29 kW,
-        // biomass production 6.10 kW, and thermal control 1.03 kW.
-        // Scale those four loads linearly to this game's 4-crew habitat (×4/6).
-        // NASA NTRS 20050161948 gives a 2-kW unpressurized lunar rover reference;
-        // NASA CR-2020-220368 gives 0.3–1.0 kW per communications transmitter and
-        // 2–10 kW for support equipment. ISRU/extraction are modelled as pilot equipment
-        // inside those broad ranges; actual values depend heavily on process and duty cycle.
-        // The 2.55 kW core is a separate game-design allowance for fixed habitat controls,
-        // lighting, avionics and miscellaneous loads; it does NOT include the modeled ECLSS
-        // loads below. Passive radiation shielding uses no electricity.
+        // Electrical load model (kW): the 4-crew air-revitalization (3.90 kW),
+        // water-processing (0.86 kW) and thermal-control (0.69 kW) values are scaled
+        // from NASA's 6-crew concept reference. The reference's 4.07 kW biomass value
+        // describes a larger crop-production subsystem; this game deliberately models a
+        // small supplemental LED crop module at 1.60 kW for 0.50 kg/day dry-food-equivalent.
+        // The published 2-kW unpressurized rover figure is treated as a transient drive
+        // peak, not a continuous colony-bus load: the stable model uses 0.25 kW average
+        // charging/standby. Excavation and science loads are likewise mission-day averages.
+        // The 2.00 kW ISRU load is a small pilot process (48 kWh/kg at the 1 kg/day
+        // Foundation output target); real energy use varies with feedstock and product.
+        // Remaining small electronics loads are explicit game-model assumptions, not
+        // universal measured flight-hardware values. The 2.55 kW core is a separate
+        // allowance for fixed habitat controls, lighting, avionics and miscellaneous loads.
+        // Passive radiation shielding uses no electricity.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
         const essentialLoadKW = POWER_DEMAND_MODEL.coreLoadKW;
         const requestedLoads = Object.entries(POWER_DEMAND_MODEL.systems)
