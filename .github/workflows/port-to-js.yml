@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   migrate-and-build:
-    if: hashFiles('scripts/migrate_typescript.mjs') != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout migration branch
