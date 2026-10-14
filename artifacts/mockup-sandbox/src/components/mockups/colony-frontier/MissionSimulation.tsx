@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LEVEL1_ENVIRONMENT, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile, type RepairOption } from "./_shared/simulationBalance";
+import { LEVEL1_ENVIRONMENT, POWER_DEMAND_MODEL, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile, type RepairOption } from "./_shared/simulationBalance";
 import {
   Activity,
   AlertTriangle,
@@ -2671,81 +2671,56 @@ export function MissionSimulation() {
         // lighting, avionics and miscellaneous loads; it does NOT include the modeled ECLSS
         // loads below. Passive radiation shielding uses no electricity.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
-        const criticalReserveMode = current.battery <= 25 && solarGeneration < 2.55;
-        const essentialLoadKW = 2.55; // Fixed rated core load; emergency shedding changes delivered service, not the colony's requested-load rating.
-        const optionalSystemLoadKW: Record<string, number> = {
-          solar: 0.04,       // Solar-array controller and sensor standby; game-design estimate.
-          battery: 0.03,     // Battery-management electronics standby; game-design estimate.
-          water: 0.86,       // 1.29 kW × 4/6 crew, NASA ECLSS reference.
-          grid: 0.05,        // Distribution controller standby; game-design estimate.
-          science: 0.5,      // Instrument workload; depends on the selected experiment.
-          rover: 2.0,        // NASA conceptual 2-kW unpressurized lunar rover, while operating.
-          extraction: 2.0,   // Lower end of NASA 2–10 kW support-equipment range; pilot drill assumption.
-          isru: 5.0,         // Within NASA 2–10 kW support-equipment range; pilot processing assumption.
-          agriculture: 1.60, // Small controlled-environment LED crop module; supplemental food production, not a full bioregenerative farm.
-          maintenance: 0.15, // Standby diagnostic electronics; game-design estimate.
-          radiation: 0.02,   // Active monitor electronics only; game-design estimate.
-          comms: 0.3,        // Low end of NASA 0.3–1.0 kW per transmitter range.
-          navigation: 0.08,  // Avionics workload; game-design estimate.
-          thermal: 0.69,    // 1.03 kW × 4/6 crew, NASA ECLSS thermal-control reference.
-        };
-        const requestedLoads = Object.entries(optionalSystemLoadKW)
+        const essentialLoadKW = POWER_DEMAND_MODEL.coreLoadKW;
+        const requestedLoads = Object.entries(POWER_DEMAND_MODEL.systems)
           .filter(([systemId]) => Boolean(pending.selected[systemId]))
-          .map(([systemId, loadKW]) => ({ systemId, label: SYSTEM_LABELS[systemId] ?? systemId, kw: loadKW }));
-        // NASA's reference reports CO₂ removal and oxygen generation as one combined 5.85-kW
-        // air-system load, not separately. Count that combined load once whenever either
-        // operational module is installed, rather than inventing an unsupported split.
+          .map(([systemId, model]) => ({
+            systemId,
+            label: SYSTEM_LABELS[systemId] ?? systemId,
+            kw: model.baseKW,
+          }));
+        // O₂ production and CO₂ removal share one reference air-revitalisation load.
+        // Count it once if either or both modules are installed.
         const airRevitalizationOnline =
           Boolean(pending.selected.co2) || Boolean(pending.selected.oxygen);
         if (airRevitalizationOnline) {
           requestedLoads.push({
             systemId: "air-revitalization",
             label: "Air revitalization (CO₂ removal + O₂ generation)",
-            kw: 3.9, // 5.85 kW × 4/6 crew; fixed rated load independent of emergency shedding.
+            kw: POWER_DEMAND_MODEL.airRevitalization.baseKW,
           });
         }
-        // Rated demand is deliberately stable: changing battery SOC, sunlight, emergency
-        // shedding, or repair timers must not make the displayed requested load flicker.
-        // Only a selected technology tier or installed retrofit changes these direct kW adders.
-        // Adders are explicit model assumptions for the extra capacity/control hardware.
-        const tierIndexByName: Record<string, number> = { Foundation: 0, Frontier: 1, Apex: 2, Research: 3 };
-        const tierDemandAdderKW: Record<string, number> = {
-          solar: 0.01, battery: 0.01, water: 0.08, grid: 0.02, science: 0.10,
-          rover: 0.15, extraction: 0.20, isru: 0.30, agriculture: 0.12,
-          maintenance: 0.02, radiation: 0.005, comms: 0.05, navigation: 0.01,
-          thermal: 0.05, oxygen: 0.08, co2: 0.08,
-        };
-        const retrofitDemandAdderKW: Record<string, number> = {
-          solar: 0.01, battery: 0.01, water: 0.04, grid: 0.01, science: 0.05,
-          rover: 0.08, extraction: 0.10, isru: 0.15, agriculture: 0.06,
-          maintenance: 0.01, radiation: 0.002, comms: 0.02, navigation: 0.005,
-          thermal: 0.025, oxygen: 0.04, co2: 0.04,
+
+        // Rated demand is a deterministic function of installed systems, their selected
+        // tier, and completed retrofit level only. Live generation, SOC, fault condition,
+        // emergency shedding and tick timing never enter this calculation.
+        const tierIndexByName: Record<string, number> = {
+          Foundation: 0, Frontier: 1, Apex: 2, Research: 3,
         };
         const ratedLoadFor = (systemId: string, baseKW: number) => {
-          // CO₂ removal and oxygen generation share one reference air-system load.
-          // Use the more advanced of the deployed pair so upgrading either loop is reflected once.
           const linkedAirSystem = systemId === "air-revitalization";
           const linkedTier = linkedAirSystem
-            ? [pending.selected.co2, pending.selected.oxygen].filter(Boolean).sort((a, b) => (tierIndexByName[b!] ?? 0) - (tierIndexByName[a!] ?? 0))[0]
+            ? [pending.selected.co2, pending.selected.oxygen]
+                .filter((tier): tier is Tier => Boolean(tier))
+                .sort((a, b) => (tierIndexByName[b] ?? 0) - (tierIndexByName[a] ?? 0))[0]
             : undefined;
           const tier = pending.selected[systemId] ?? linkedTier;
+          const model = linkedAirSystem
+            ? POWER_DEMAND_MODEL.airRevitalization
+            : POWER_DEMAND_MODEL.systems[systemId as keyof typeof POWER_DEMAND_MODEL.systems];
+          if (!model) return baseKW;
           const tierSteps = tier ? tierIndexByName[tier] ?? 0 : 0;
           const retrofitSteps = linkedAirSystem
             ? Math.max(buildings.co2?.upgradeLevel ?? 0, buildings.oxygen?.upgradeLevel ?? 0)
             : (buildings[systemId]?.upgradeLevel ?? 0);
-          return baseKW
-            + tierSteps * (tierDemandAdderKW[systemId] ?? (linkedAirSystem ? 0.08 : 0))
-            + Math.max(0, Math.min(2, retrofitSteps)) * (retrofitDemandAdderKW[systemId] ?? (linkedAirSystem ? 0.04 : 0));
+          return model.baseKW
+            + tierSteps * model.tierStepKW
+            + Math.max(0, Math.min(2, retrofitSteps)) * model.retrofitStepKW;
         };
         const ratedRequestedLoads = requestedLoads.map((source) => ({
           ...source,
           kw: ratedLoadFor(source.systemId, source.kw),
         }));
-        if (airRevitalizationOnline) {
-          const airLoad = ratedLoadFor("air-revitalization", 3.9);
-          const airSource = ratedRequestedLoads.find((source) => source.systemId === "air-revitalization");
-          if (airSource) airSource.kw = airLoad;
-        }
         const requestedOptionalLoadKW = ratedRequestedLoads.reduce((sum, source) => sum + source.kw, 0);
         // Do not convert solar-cell temperature directly into an extra electrical load:
         // that made demand rise with sunlight and double-counted thermal control when
@@ -2851,7 +2826,7 @@ export function MissionSimulation() {
         const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics) * (1.60 / 4.07)
+          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics) * POWER_DEMAND_MODEL.agricultureYieldScale
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
