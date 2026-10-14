@@ -544,7 +544,7 @@ export function MissionLoadout() {
         setNotice((replay ? "REPLAY DEPLOYED" : "MISSION DEPLOYED") +
             " — launch systems online. Entering mission simulation...");
         window.setTimeout(() => {
-            window.location.href = "/preview/MissionSimulation";
+            window.location.href = "/preview/FlightSequence";
         }, 350);
     }
     const visibleTracks = openCategory
