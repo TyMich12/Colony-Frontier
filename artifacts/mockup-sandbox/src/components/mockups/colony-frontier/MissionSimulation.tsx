@@ -125,6 +125,7 @@ const starterCategories = new Set([
   "comms",
   "navigation",
   "radiation",
+  "agriculture",
 ]);
 
 const categoryIcons = {
