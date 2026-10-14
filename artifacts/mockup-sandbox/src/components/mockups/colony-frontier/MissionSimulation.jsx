@@ -1748,6 +1748,12 @@ export function MissionSimulation() {
     const [results, setResults] = useState(false);
     const [missionFailed, setMissionFailed] = useState(false);
     const [missionFailureReason, setMissionFailureReason] = useState(null);
+    const [missionAuthorityVerdict, setMissionAuthorityVerdict] = useState(null);
+    const [missionAuthorityError, setMissionAuthorityError] = useState(null);
+    const [missionAuthorityVerified, setMissionAuthorityVerified] = useState(false);
+    const missionAuthorityBusyRef = useRef(false);
+    const missionAuthorityRetryAtRef = useRef(0);
+    const missionAuthoritySnapshotRef = useRef(null);
     const eventPointerRef = useRef(runtime?.eventsTriggered ?? ((runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0)));
     const eventResponseRef = useRef(null);
     const completionSavedRef = useRef(false);
@@ -1760,6 +1766,65 @@ export function MissionSimulation() {
     const activeEvent = activeEventCandidate && pending && eventTargetIsDeployed(activeEventCandidate, pending.selected, missionEnvironmentLabel)
         ? activeEventCandidate
         : null;
+
+    // Keep the established colony minigame loop and decisions intact. Python
+    // derives the telemetry snapshot; Rust is the sole authority for crew loss
+    // and for confirming recovery after the 14-day simulation.
+    missionAuthoritySnapshotRef.current = {
+        metrics, elapsed, activeEventId, activeOperations, results,
+        manualPaused, missionFailed, missionAuthorityVerified,
+    };
+
+    async function checkMissionAuthority(phase, metricsSnapshot = metrics, elapsedSnapshot = elapsed) {
+        if (!pending || missionAuthorityBusyRef.current || Date.now() < missionAuthorityRetryAtRef.current) return;
+        missionAuthorityBusyRef.current = true;
+        setMissionAuthorityError(null);
+        try {
+            const response = await fetch("/mission-survival", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phase,
+                    elapsed_seconds: elapsedSnapshot,
+                    state: {
+                        ...metricsSnapshot,
+                        battery_minimum_soc_percent: LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent,
+                    },
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Rust mission authority request failed.");
+            const verdict = data.verdict;
+            if (!verdict || typeof verdict.alive !== "boolean" || typeof verdict.mission_status !== "string") {
+                throw new Error("Rust returned an invalid colony survival verdict.");
+            }
+            missionAuthorityRetryAtRef.current = 0;
+            setMissionAuthorityVerdict(verdict);
+            if (!verdict.alive) {
+                const reason = verdict.reasons?.[0] || "Rust mission authority declared mission loss.";
+                setMissionFailureReason(reason);
+                setMissionFailed(true);
+                setMissionAuthorityVerified(true);
+                setActiveEventId(null);
+                setActiveOperations({});
+                setAiMessage(`MISSION ABORTED · ${reason} Rust mission authority has confirmed crew loss; review the recovery report before redeploying.`);
+                setResults(true);
+            } else if (phase === "recovery") {
+                if (verdict.mission_status !== "SUCCESS") {
+                    throw new Error("Rust has not confirmed a successful recovery.");
+                }
+                setMissionAuthorityVerified(true);
+                setResults(true);
+            }
+        } catch (cause) {
+            const message = cause instanceof Error ? cause.message : String(cause);
+            setMissionAuthorityError(message);
+            missionAuthorityRetryAtRef.current = Date.now() + 2500;
+        } finally {
+            missionAuthorityBusyRef.current = false;
+        }
+    }
+
     const activeTargetTrackId = activeEvent?.trackId === "power"
         ? (pending?.selected.grid ? "grid" : pending?.selected.battery ? "battery" : pending?.selected.solar ? "solar" : null)
         : activeEvent?.trackId ?? null;
@@ -2049,19 +2114,32 @@ export function MissionSimulation() {
         return () => window.clearInterval(timer);
     }, [activeEventId, finishOperation, manualPaused, pending, results, speed]);
     useEffect(() => {
-        if (!pending || missionFailed)
+        if (!pending || missionFailed || results)
             return;
-        const reason = getMissionFailureReason(metrics);
-        if (!reason)
+        // Local metrics may request a check, but cannot declare crew loss.
+        if (getMissionFailureReason(metrics)) {
+            void checkMissionAuthority("minigame", metrics, elapsed);
+        }
+    }, [elapsed, metrics, missionFailed, pending, results]);
+
+    useEffect(() => {
+        if (!pending)
             return;
-        setMissionFailureReason(reason);
-        setMissionFailed(true);
-        if (!results)
-            setResults(true);
-        setActiveEventId(null);
-        setActiveOperations({});
-        setAiMessage(`MISSION ABORTED · ${reason} Preserve the remaining equipment and review the failure report before redeploying.`);
-    }, [metrics, missionFailed, pending, results]);
+        const timer = window.setInterval(() => {
+            const snapshot = missionAuthoritySnapshotRef.current;
+            if (!snapshot || snapshot.results || snapshot.missionAuthorityVerified)
+                return;
+            const recoveryReady = snapshot.elapsed >= TOTAL_MISSION_SECONDS &&
+                !snapshot.activeEventId &&
+                Object.keys(snapshot.activeOperations ?? {}).length === 0;
+            void checkMissionAuthority(
+                recoveryReady ? "recovery" : "minigame",
+                snapshot.metrics,
+                snapshot.elapsed,
+            );
+        }, 3000);
+        return () => window.clearInterval(timer);
+    }, [pending?.missionId, missionAuthorityVerified]);
     useEffect(() => {
         if (!pending || results || manualPaused || activeEventId)
             return;
@@ -2152,7 +2230,14 @@ export function MissionSimulation() {
                     }, 0);
                 }
                 if (next >= TOTAL_MISSION_SECONDS && !activeEventId && Object.keys(activeOperationsRef.current).length === 0) {
-                    setTimeout(() => setResults(true), 0);
+                    setTimeout(() => {
+                        const snapshot = missionAuthoritySnapshotRef.current;
+                        void checkMissionAuthority(
+                            "recovery",
+                            snapshot?.metrics ?? metrics,
+                            Math.max(snapshot?.elapsed ?? 0, next),
+                        );
+                    }, 0);
                 }
                 return next;
             });
@@ -2543,7 +2628,7 @@ export function MissionSimulation() {
         });
     }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes, partsInventoryKg]);
     useEffect(() => {
-        if (!results || !pending || completionSavedRef.current)
+        if (!results || !pending || completionSavedRef.current || !missionAuthorityVerified)
             return;
         completionSavedRef.current = true;
         const finalState = loadGameState();
@@ -3887,6 +3972,13 @@ export function MissionSimulation() {
       </div>);
     }
     return (<div className="fixed inset-0 h-[100dvh] w-full overflow-hidden bg-[#05040a] text-white">
+      {missionAuthorityError && <div role="alert" className="fixed right-3 top-3 z-[80] max-w-sm border border-[#d58a58] bg-[#241914] px-4 py-3 text-[10px] leading-5 text-[#ffe2bd] shadow-xl">
+        <strong className="block uppercase tracking-[0.14em]">Mission authority offline</strong>
+        {missionAuthorityError} The minigame is waiting for Python/Rust to confirm survival or recovery, and will retry automatically.
+      </div>}
+      {missionAuthorityVerdict && !missionAuthorityError && <div aria-live="polite" className="fixed right-3 top-3 z-[70] border border-[#365d5d] bg-[#0b2022]/95 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-[#b6d2b0]">
+        Rust authority · {missionAuthorityVerdict.mission_status.replaceAll("_", " ")}
+      </div>}
       <main className="relative h-full w-full overflow-hidden">
         <IsometricMap tracks={selectedTracks} selected={pending.selected} buildings={buildings} onSelect={(trackId) => {
             setSelectedResourceId(null);
