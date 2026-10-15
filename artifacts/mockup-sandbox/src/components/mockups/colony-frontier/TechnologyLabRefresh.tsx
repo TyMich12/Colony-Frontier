@@ -328,7 +328,6 @@ export function TechnologyLabRefresh() {
               return (
                 <button
                   key={track.id}
-                  type="button"
                   onClick={() => {
                     setSelectedTrackId(track.id);
                     setSelectedTier("Foundation");
