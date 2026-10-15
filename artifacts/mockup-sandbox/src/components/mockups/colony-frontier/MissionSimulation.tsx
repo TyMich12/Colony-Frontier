@@ -1666,10 +1666,12 @@ function BuildingInspector({
   const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? Math.min(96, waterConditionNow / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
   const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(2.65, agricultureConditionNow / 100 * Math.max(3.2, ratedFoodNow)) : agricultureConditionNow / 100 * ratedFoodNow) : 0;
-  const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
+  const foodWaterUseNow = isFirstMission ? Math.min(10, getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0)) : getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
   const ratedWaterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
   const waterThroughputNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(8, ratedWaterThroughputNow) : ratedWaterThroughputNow) : 0;
   const estimatedWaterLossPerDay = Math.max(0, 8 - Math.min(8, waterThroughputNow) * waterRecoveryNow / 100) + foodProductionNow * foodWaterUseNow * (1 - waterRecoveryNow / 100);
+  const waterMakeupNow = isFirstMission && waterOperational && electricalReadings.actualSupplyKW >= 1.0 ? 6.0 : 0;
+  const estimatedNetWaterBalancePerDay = waterMakeupNow - estimatedWaterLossPerDay;
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
     switch (track.id) {
@@ -1697,7 +1699,9 @@ function BuildingInspector({
         { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
         { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery support adds up to 45 percentage points when online and powered (96% cap)" : "Rated recovery scaled by condition" },
         { label: "Treatment throughput", value: (waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(8, extraReading("throughput") * liveCondition / 100) : extraReading("throughput") * liveCondition / 100) : 0).toFixed(1) + " L/day", note: isFirstMission ? "Level 1 starter recovery module maintains 8 L/day treatment throughput while powered" : "Condition-adjusted rated throughput" },
-        { label: "Estimated net water loss", value: estimatedWaterLossPerDay.toFixed(1) + " L/day", note: "Includes unrecovered crew make-up water and crop water" },
+        { label: "Net water balance", value: (estimatedNetWaterBalancePerDay >= 0 ? "+" : "") + estimatedNetWaterBalancePerDay.toFixed(1) + " L/day", note: isFirstMission ? "Includes 6.0 L/day local feedstock water production while the starter module is online and powered; positive means the reserve grows" : "Positive means reserve grows; negative means reserve falls" },
+        { label: "Local water production", value: waterMakeupNow.toFixed(1) + " L/day", note: isFirstMission ? "Mission 1 local volatile-feed module; no extra inventory item required" : "No tutorial feedstock source active" },
+        { label: "Crop water use", value: foodWaterUseNow.toFixed(1) + " L/kg food", note: isFirstMission ? "Level 1 starter grow module uses a 10 L/kg tutorial water-efficiency setting" : "Selected Agriculture system rating" },
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
       ];
       case "oxygen": {
@@ -3073,7 +3077,8 @@ export function MissionSimulation() {
             : conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings))
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
-        const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
+        const ratedCropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
+        const cropWaterUseLPerKg = missionStage === 1 ? Math.min(10, ratedCropWaterUseLPerKg) : ratedCropWaterUseLPerKg;
         const grossCropWaterLDay = foodProductionKgDay * cropWaterUseLPerKg;
         // The humidity/recovery loop returns a share of crop transpiration to the clean-water tank.
         // The 8 L/day crew stream represents water that can actually be lost/recovered,
@@ -3081,7 +3086,10 @@ export function MissionSimulation() {
         // none of that stream or crop transpiration is returned to the clean-water tank.
         const netCropWaterLossLDay = grossCropWaterLDay * (1 - effectiveWaterRecoveryPct / 100);
         const netWaterLossLDay = crewWaterLossLDay + netCropWaterLossLDay;
-        const waterDelta = -netWaterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
+        // Mission 1 has a small powered local volatile-feed source. This is actual make-up
+        // water entering the tank, not a recovery-efficiency bonus or a free reserve refill.
+        const waterMakeupLDay = missionStage === 1 && waterOnline && deliveredPowerKW >= 1.0 ? 6.0 : 0;
+        const waterDelta = -(netWaterLossLDay - waterMakeupLDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalRatedKW = thermalOnline
@@ -4759,9 +4767,9 @@ export function MissionSimulation() {
                     { label: "Power demand", value: clamp(electricalReadings.consumptionKW / 16 * 100), display: electricalReadings.consumptionKW.toFixed(2) + " kW", inverse: false },
                     { label: "Battery charging / discharging rate", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : 50, display: Math.abs(electricalReadings.batteryFlowKW).toFixed(2) + " kW " + (electricalReadings.batteryFlowKW < -0.01 ? "charging" : electricalReadings.batteryFlowKW > 0.01 ? "discharging" : "idle"), inverse: false },
                     { label: "Stored energy", value: metrics.battery, display: physicalTelemetry.battery, inverse: false },
-                    { label: "O₂ reserve", value: metrics.oxygen, display: (metrics.oxygen / 100 * 24).toFixed(1) + " kg O₂", inverse: false },
-                    { label: "Water reserve", value: metrics.water, display: Math.round(metrics.water / 100 * 180) + " L", inverse: false },
-                    { label: "Food reserve", value: metrics.food, display: (metrics.food / 100 * 42).toFixed(1) + " kg food", inverse: false },
+                    { label: "O₂ reserve", value: metrics.oxygen, display: (metrics.oxygen / 100 * RESOURCE_CAPACITIES.oxygenReserveKg).toFixed(1) + " kg O₂", inverse: false },
+                    { label: "Water reserve", value: metrics.water, display: Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL) + " L", inverse: false },
+                    { label: "Food reserve", value: metrics.food, display: (metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1) + " kg food", inverse: false },
                     { label: "Hull integrity", value: metrics.habitat, display: Math.round(metrics.habitat) + "% integrity", inverse: false },
                     { label: "Temperature", value: clamp(100 - Math.abs(metrics.temperature - 21) * 12), display: `${metrics.temperature.toFixed(1)}°C`, inverse: false },
                     { label: "Radiation dose rate", value: clamp(metrics.radiation * 3.33), display: (metrics.radiation / 100 * 0.06).toFixed(3) + " mSv/h", inverse: true },
