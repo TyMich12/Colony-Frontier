@@ -1663,11 +1663,12 @@ function BuildingInspector({
   const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
   const waterConditionNow = clamp(buildings.water?.condition ?? 100, 0, 100);
   const agricultureConditionNow = clamp(buildings.agriculture?.condition ?? 100, 0, 100);
-  const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= 2 ? Math.min(96, waterConditionNow / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
+  const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? Math.min(96, waterConditionNow / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
-  const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= 2 ? agricultureConditionNow / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow) : 0;
+  const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(2.65, agricultureConditionNow / 100 * Math.max(3.2, ratedFoodNow)) : agricultureConditionNow / 100 * ratedFoodNow) : 0;
   const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
-  const waterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
+  const ratedWaterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
+  const waterThroughputNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(8, ratedWaterThroughputNow) : ratedWaterThroughputNow) : 0;
   const estimatedWaterLossPerDay = Math.max(0, 8 - Math.min(8, waterThroughputNow) * waterRecoveryNow / 100) + foodProductionNow * foodWaterUseNow * (1 - waterRecoveryNow / 100);
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
@@ -1695,7 +1696,7 @@ function BuildingInspector({
       case "water": return [
         { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
         { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery support adds up to 45 percentage points when online and powered (96% cap)" : "Rated recovery scaled by condition" },
-        { label: "Treatment throughput", value: (extraReading("throughput") * liveCondition / 100).toFixed(1) + " L/day" },
+        { label: "Treatment throughput", value: (waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(8, extraReading("throughput") * liveCondition / 100) : extraReading("throughput") * liveCondition / 100) : 0).toFixed(1) + " L/day", note: isFirstMission ? "Level 1 starter recovery module maintains 8 L/day treatment throughput while powered" : "Condition-adjusted rated throughput" },
         { label: "Estimated net water loss", value: estimatedWaterLossPerDay.toFixed(1) + " L/day", note: "Includes unrecovered crew make-up water and crop water" },
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
       ];
@@ -1862,7 +1863,7 @@ function BuildingInspector({
               <p className="mt-0.5 text-[8px] leading-3 text-[#d79aa2]">This fault is affecting this system until the response is stabilised and its repair work order completes.</p>
             </div>}
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {liveSystemReadings.map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
+              {[...liveSystemReadings, { label: "Equipment condition", value: liveCondition.toFixed(0) + "% output efficiency" }, { label: "Live operating state", value: activeFault ? "FAULT · " + activeFault.title : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS" }, { label: "Colony bus supply / demand", value: electricalReadings.actualSupplyKW.toFixed(2) + " / " + electricalReadings.consumptionKW.toFixed(2) + " kW" }, { label: "Active fault severity", value: activeFault ? activeFault.severity.toFixed(2) + "×" : "No active fault" }].map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
                 <p className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#81a8ad]">{reading.label}</p>
                 <p className="mt-0.5 break-words font-mono text-[10px] font-black text-[#d8f5e8]">{reading.value}</p>
                 {reading.note && <p className="mt-0.5 break-words text-[8px] leading-3 text-[#77989e]">{reading.note}</p>}
@@ -3056,14 +3057,17 @@ export function MissionSimulation() {
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
         const ratedWaterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
         const waterRecoveryPct = Math.min(96, conditionAdjustedOutput("water", ratedWaterRecoveryPct, buildings) + (missionStage === 1 ? 45 : 0));
-        const waterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
+        const ratedWaterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
+        const waterThroughputLDay = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0) ? (missionStage === 1 ? Math.max(8, ratedWaterThroughputLDay) : ratedWaterThroughputLDay) : 0;
         const circulatingWaterLDay = 8; // Recoverable crew make-up stream, not all water circulated through the loop.
-        const effectiveWaterRecoveryPct = waterOnline && powerPathAvailable ? waterRecoveryPct : 0;
+        const effectiveWaterRecoveryPct = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0) ? waterRecoveryPct : 0;
         const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
-        const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? conditionAdjustedOutput("agriculture", missionStage === 1 ? Math.max(3.0, ratedFoodProductionKgDay) : ratedFoodProductionKgDay, buildings)
+        const foodProductionKgDay = agricultureOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0)
+          ? (missionStage === 1
+            ? Math.max(2.65, conditionAdjustedOutput("agriculture", Math.max(3.2, ratedFoodProductionKgDay), buildings))
+            : conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings))
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
@@ -3148,7 +3152,7 @@ export function MissionSimulation() {
             condition: clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear),
             status: buildingStatus(clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear)),
             // Dust accumulates on simulated mission time, not browser wall-clock time.
-            dust: trackId === "solar" ? clamp(state.dust + (2.6 + (100 - state.condition) * 0.018) * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
+            dust: trackId === "solar" ? clamp(state.dust + (4.0 + (100 - state.condition) * 0.06) * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
           };
         }
         return next;
