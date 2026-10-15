@@ -1701,7 +1701,7 @@ function BuildingInspector({
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
       ];
       case "oxygen": {
-        const oxygenRate = systemOperational && electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 : 0;
+        const oxygenRate = systemOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(3.36, liveCondition / 100 * Math.max(3.5, ratedReading)) : ratedReading * liveCondition / 100) : 0;
         return [
           { label: "Oxygen production", value: oxygenRate.toFixed(2) + " kg O₂/day" },
           { label: "Delivered oxygen purity", value: extraReading("purity").toFixed(2) + "%" },
@@ -3050,8 +3050,11 @@ export function MissionSimulation() {
         const batteryDelta = batteryCapacityKWh > 0 ? batteryDeltaKWh / batteryCapacityKWh * 100 : 0;
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-resourceDt / 7200));
         const powerPathAvailable = deliveredPowerKW >= 2;
-        const oxygenProductionKgDay = oxygenOnline && powerPathAvailable
-          ? conditionAdjustedOutput("oxygen", repairAdjustedRating("oxygen", getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade), buildings.oxygen?.repairMetrics), buildings)
+        const ratedOxygenProductionKgDay = repairAdjustedRating("oxygen", getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade), buildings.oxygen?.repairMetrics);
+        const oxygenProductionKgDay = oxygenOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0)
+          ? (missionStage === 1
+            ? Math.max(3.36, conditionAdjustedOutput("oxygen", Math.max(3.5, ratedOxygenProductionKgDay), buildings))
+            : conditionAdjustedOutput("oxygen", ratedOxygenProductionKgDay, buildings))
           : 0;
         const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
