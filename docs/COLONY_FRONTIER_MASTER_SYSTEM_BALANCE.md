@@ -65,7 +65,7 @@
 - **1/2 — first field retrofit:** one focused improvement, such as better seals, a calibrated controller, a filter insert, a sensor, or a replaceable wear component.
 - **2/2 — second field retrofit:** a further compatible improvement to the same system, not a duplicate full upgrade. It should provide a smaller additional gain than changing to a higher tier.
 
-A retrofit must be an actual installed component or adjustment. It consumes local inventory/materials, commissioning energy, and simulation time. It must **not** silently repair damage, apply an unrelated percentage multiplier, or give the same benefit twice.
+A retrofit is a discrete installed improvement. It uses commissioning energy and simulation time. It must **not** silently repair damage, apply an unrelated percentage multiplier, or give the same benefit twice.
 
 ## Retrofit mechanisms and intended gameplay effects by system
 
@@ -113,7 +113,7 @@ A retrofit must be an actual installed component or adjustment. It consumes loca
 
 ## Numerical retrofit effects — exact intended changes
 
-**Important:** the effects below define what each installed kit *does*. The primary-metric changes match the proposed 0/2 → 1/2 → 2/2 ratings above. Secondary effects are additional proposed simulation behaviours; they must be implemented as distinct metrics and must not be added twice through both the table and an old `directGain`.
+**Important:** the effects below define what each installed retrofit *does*. The primary-metric changes match the proposed 0/2 → 1/2 → 2/2 ratings above. Secondary effects are additional proposed simulation behaviours; they must be implemented as distinct metrics and must not be added twice through both the table and an old `directGain`.
 
 For compactness, tier abbreviations are **F = Foundation, Fr = Frontier, A = Apex, R = Research**. Each pair is **first retrofit (0/2 → 1/2) / second retrofit (1/2 → 2/2)**. “pp” means percentage points, not percent multiplicatively.
 
