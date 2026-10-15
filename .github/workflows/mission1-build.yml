@@ -30,5 +30,7 @@ jobs:
           cache: pnpm
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      - name: Type-check mockup sandbox
+        run: pnpm --dir artifacts/mockup-sandbox run typecheck
       - name: Build mockup sandbox
         run: pnpm --dir artifacts/mockup-sandbox run build
