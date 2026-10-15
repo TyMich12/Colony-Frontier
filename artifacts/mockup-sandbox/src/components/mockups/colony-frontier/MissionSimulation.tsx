@@ -129,14 +129,16 @@ function solarFaultProtection(readings: Record<string, number> | undefined): num
   const protectedStrings = clamp(readings["Faulted strings protected from propagation"] ?? 0, 0, 10) / 10;
   return clamp(coverage * protection + protectedStrings, 0, 0.8);
 }
-function estimatedSolarDamagedStrings(condition: number): number {
-  return Math.min(4, Math.max(0, Math.round((100 - clamp(condition, 0, 100)) / 25)));
+function estimatedSolarDamagedStrings(condition: number, readings?: Record<string, number>): number {
+  const conditionLinkedFaults = Math.min(4, Math.max(0, Math.round((100 - clamp(condition, 0, 100)) / 25)));
+  const restoredStrings = Math.max(0, readings?.["Failed array strings restored"] ?? 0);
+  return Math.max(0, conditionLinkedFaults - restoredStrings);
 }
 function estimatedSolarHotspots(condition: number, dust: number): number {
   return Math.min(6, Math.max(0, Math.round((100 - clamp(condition, 0, 100)) / 30 + clamp(dust, 0, 100) / 40)));
 }
 function solarDegradationPenaltyFraction(condition: number, dust: number, readings: Record<string, number> | undefined): number {
-  return Math.min(0.18, (estimatedSolarDamagedStrings(condition) * 0.012 + estimatedSolarHotspots(condition, dust) * 0.01) * (1 - solarFaultProtection(readings)));
+  return Math.min(0.18, (estimatedSolarDamagedStrings(condition, readings) * 0.012 + estimatedSolarHotspots(condition, dust) * 0.01) * (1 - solarFaultProtection(readings)));
 }
 
 const starterCategories = new Set([
@@ -264,7 +266,7 @@ const SYSTEM_ACTION_EFFECTS: Record<string, string> = {
   "thermal-waste-heat-recovery": "Recovers usable waste heat from the power system to reduce cabin-temperature drift",
   "comms-priority-window": "Reserves a high-gain uplink window using navigation timing",
   "habitat-composite-patch": "Uses processed structural composite and thermal-controlled curing for a stronger seal repair",
-  "radiation-regolith-berm": "Uses excavated regolith mass to reduce the modelled residual dose rate",
+  "radiation-regolith-berm": "Improves local regolith shielding coverage to reduce the modelled residual dose rate",
   "grid-black-start": "Restarts the distribution bus from stored battery energy and stable solar input",
   "science-fusion": "Fuses analysed specimen data with navigation / thermal telemetry for higher research yield",
   "request-earth-report": "Earth Mission Control report · up to 20 simulated seconds; Navigation Research at 2/2 caches guidance locally",
@@ -1525,7 +1527,7 @@ function BuildingInspector({
       { id: "fallback-habitat", label: "Emergency seal patch", detail: "Apply a small manual pressure patch with no powered repair rig." },
       { id: "repair", label: "Repair seal", detail: hasMaintenance ? "Maintenance support enables a stronger structural seal repair." : "Requires maintenance bay + thermal control." },
       { id: "seal", label: "Pressure check", detail: "Maintenance + thermal control support a focused leak-isolation cycle." },
-      { id: "habitat-composite-patch", label: "Cure structural composite", detail: "ISRU material + maintenance + thermal control create a stronger, longer-lasting patch." },
+      { id: "habitat-composite-patch", label: "Cure structural composite", detail: "Maintenance + thermal control + ISRU support a stronger, longer-lasting seal repair." },
     ],
     water: [
       { id: "fallback-water", label: "Gravity-fed recovery", detail: "Recover a small amount of condensate without powered purification." },
@@ -1561,7 +1563,7 @@ function BuildingInspector({
       { id: "fallback-radiation", label: "Crew shelter lockdown", detail: "Use passive habitat shielding to reduce near-term exposure." },
       { id: "shield", label: "Check shielding", detail: "Habitat + maintenance improve the shielding inspection and protection plan." },
       { id: "shelter", label: "Shelter protocol", detail: "Use the habitat and stored/grid power for a stronger shelter response." },
-      { id: "radiation-regolith-berm", label: "Build regolith berm", detail: "Habitat + extraction + ISRU add shielding mass around the protected volume." },
+      { id: "radiation-regolith-berm", label: "Build regolith berm", detail: "Habitat + extraction + ISRU improve the local regolith shielding layout." },
     ],
     science: [
       { id: "fallback-science", label: "Bench recalibration", detail: "Perform a basic local instrument reference check without consuming a sample." },
@@ -1637,7 +1639,7 @@ function BuildingInspector({
   const liveSolarText = track.id === "solar" ? physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value : "";
   const liveSolarKW = Number(liveSolarText.match(/([\d.]+) kW current/)?.[1] ?? 0);
   const pointingAngle = runtime.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
-  const damagedStrings = estimatedSolarDamagedStrings(liveCondition);
+  const damagedStrings = estimatedSolarDamagedStrings(liveCondition, runtime.repairMetrics);
   const detectedHotspots = estimatedSolarHotspots(liveCondition, runtime.dust);
   const hotspotPenalty = solarDegradationPenaltyFraction(liveCondition, runtime.dust, runtime.repairMetrics);
   const hotspotLossKW = hotspotPenalty > 0 ? liveSolarKW * hotspotPenalty / Math.max(0.01, 1 - hotspotPenalty) : 0;
@@ -2733,7 +2735,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setOperationResult(null);
-            setAiMessage(`CRITICAL INCIDENT: ${event.title}. The fault is live now; stored power, consumables and equipment condition continue to change until you respond.`);
+            setAiMessage(`CRITICAL INCIDENT: ${event.title}. The fault is live now; stored power and equipment condition continue to change until you respond.`);
 
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
@@ -4343,7 +4345,7 @@ export function MissionSimulation() {
       case "process": {
         const processedFeedstockKg = gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current);
         setResourceYield((value) => value + processedFeedstockKg);
-        // Processed ISRU feed is the local source of retrofit / repair material stock.
+        // ISRU processing creates usable feedstock for extraction and science workflows; it is not repair/retrofit inventory.
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
         setScore((value) => clamp(value + gain(5)));
         setAiMessage(`ISRU feed processed. Produced ${processedFeedstockKg.toFixed(1)} kg of usable feedstock. Processing consumes power and battery energy.`);
