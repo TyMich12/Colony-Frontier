@@ -53,7 +53,8 @@ import { Colony3DMap } from "./Colony3DMap";
 
 const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
 const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
-const EVENT_TIMES = [0.10, 0.21, 0.32, 0.44, 0.55, 0.67, 0.79, 0.91].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
+// Ten staggered incidents create meaningful maintenance pressure without relying on random failures.
+const EVENT_TIMES = [0.08, 0.16, 0.24, 0.32, 0.40, 0.50, 0.60, 0.70, 0.80, 0.91].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
 const STARTING_REPAIR_PARTS_KG = 60; // On-site spares; game-balance assumption, no launch-mass change.
 
 const REPAIR_GAP_PREFIX = "Unrestored fault gap · ";
@@ -743,7 +744,22 @@ function describeRepairOutcome(
   }
   // Keep every procedure tied to its workbook-defined metric. A broad "restored" matcher
   // made unrelated repairs look like the same generic performance increase.
-  return `${systemLabel}: ${amount} ${unit} — ${metric}`;
+  const plainMetric = metric
+    .replace(/reduced/gi, "lowered")
+    .replace(/restored/gi, "recovered")
+    .replace(/reference error/gi, "normal operating error")
+    .replace(/reference noise/gi, "normal electrical noise")
+    .replace(/reference contaminants identified/gi, "contaminants detected")
+    .replace(/per simulation day/gi, "per mission day")
+    .replace(/of reference/gi, "compared with normal")
+    .replace(/optical path\/detector alignment error/gi, "instrument alignment error")
+    .replace(/horizontal position error/gi, "rover position error")
+    .replace(/inertial\/optical sensor bias/gi, "navigation sensor drift")
+    .replace(/sensor-supply electrical noise/gi, "navigation sensor electrical noise")
+    .replace(/instrument-supply noise/gi, "science instrument electrical noise")
+    .replace(/sealed sample delivery time/gi, "sealed sample delivery time")
+    .replace(/suitable condensate returned to treatment/gi, "usable water returned for cleaning");
+  return `${systemLabel}: ${amount} ${unit} — ${plainMetric}. This is a measurable change to the named fault, not a generic performance bonus.`;
 }
 
 function describeRepairOptionOutcome(
@@ -877,8 +893,10 @@ const RESOURCE_CAPACITIES = {
   availablePowerKW: 8,
   storedEnergyKWh: 1200,
   oxygenReserveKg: 24,
-  waterReserveL: 180,
-  foodReserveKg: 42,
+  // A 240 L clean-water buffer and 60 kg of stored dry food give four crew a
+  // realistic reserve while still requiring recycling and crop production.
+  waterReserveL: 240,
+  foodReserveKg: 60,
 } as const;
 
 function physicalResourceTelemetry(
@@ -2376,7 +2394,15 @@ export function MissionSimulation() {
             }
             if (faultResolved && primaryMetric) delete repairMetrics[repairInitialGapKey(primaryMetric)];
           }
-          const repaired = { ...current, [repairTarget]: { ...previous, repairMetrics, status: buildingStatus(previous.condition) } };
+          // Every completed repair has a tangible condition benefit as well as its
+          // workbook-defined metric. More coordinated procedures restore more condition.
+          const conditionGain = option
+            ? option.category === "Standalone" ? 5
+              : option.category === "Enhanced" ? 7
+                : option.category === "Dual" ? 9 : 12
+            : 3;
+          const repairedCondition = clamp(previous.condition + conditionGain);
+          const repaired = { ...current, [repairTarget]: { ...previous, condition: repairedCondition, repairMetrics, status: buildingStatus(repairedCondition) } };
           if (option && /dust removed from (existing deposit|array surface)/i.test(option.metric)) {
             const currentSolar = repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
             repaired.solar = { ...currentSolar, dust: dustAfter };
@@ -2529,7 +2555,7 @@ export function MissionSimulation() {
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
-            const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.45;
+            const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.52;
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
             const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
 
@@ -2888,7 +2914,10 @@ export function MissionSimulation() {
       setBuildings((current) => {
         const next = { ...current };
         for (const [trackId, state] of Object.entries(next)) {
-          const wear = (trackId === "solar" ? 0.013 : 0.0075) * stagePressure;
+          // Baseline wear is measured in condition points per simulated Earth day.
+          // The old wall-clock scaling made every module lose ~100+ points in one mission.
+          // Keep gradual wear visible; the more frequent incidents supply the acute damage.
+          const wearPerDay = (trackId === "solar" ? 1.1 : 0.65) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
@@ -2896,9 +2925,10 @@ export function MissionSimulation() {
             .reduce((sum, fault) => sum + 0.26 * fault.severity * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * (repairingTrack ? 0.25 : 1) * (1 - solarProtection), 0);
           next[trackId] = {
             ...state,
-            condition: clamp(state.condition - Math.max(0.00025, wear) * (resourceDt / GAME_TIME_ACCELERATION) - faultWear),
-            status: buildingStatus(clamp(state.condition - Math.max(0.00025, wear) * (resourceDt / GAME_TIME_ACCELERATION) - faultWear)),
-            dust: trackId === "solar" ? clamp(state.dust + 0.018 * (resourceDt / GAME_TIME_ACCELERATION) * stagePressure) : state.dust,
+            condition: clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear),
+            status: buildingStatus(clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear)),
+            // Dust accumulates on simulated mission time, not browser wall-clock time.
+            dust: trackId === "solar" ? clamp(state.dust + 1.1 * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
           };
         }
         return next;
@@ -4172,12 +4202,16 @@ export function MissionSimulation() {
       case "diagnostics": {
         setScore((value) => clamp(value + gain(3)));
         const faults = Object.values(activeFaults);
-        const weakest = Object.entries(buildings).sort(([, a], [, b]) => a.condition - b.condition)[0];
-        setAiMessage(faults.length
-          ? `DIAGNOSTICS COMPLETE · ${faults.length} unresolved fault(s): ${faults.map((fault) => `${fault.targetTrackId.toUpperCase()} / ${fault.title}`).join("; ")}. Open an affected system and use Isolate · repair · verify.`
-          : weakest
-            ? `DIAGNOSTICS COMPLETE · No unresolved incidents. The weakest equipment is ${weakest[0].toUpperCase()} at ${Math.round(weakest[1].condition)}% condition; schedule preventative service before another emergency.`
-            : "DIAGNOSTICS COMPLETE · No unresolved incidents detected.");
+        const deployed = Object.entries(buildings).filter(([id]) => Boolean(pending.selected[id]));
+        const damaged = deployed.filter(([, state]) => state.condition < 82).sort(([, a], [, b]) => a.condition - b.condition);
+        const weakest = damaged[0] ?? deployed.sort(([, a], [, b]) => a.condition - b.condition)[0];
+        const faultReport = faults.length
+          ? `${faults.length} active fault(s): ${faults.map((fault) => `${SYSTEM_LABELS[fault.targetTrackId] ?? fault.targetTrackId} — ${fault.title}`).join("; ")}.`
+          : "No active incident is open.";
+        const conditionReport = damaged.length
+          ? `${damaged.length} module(s) need attention: ${damaged.slice(0, 4).map(([id, state]) => `${SYSTEM_LABELS[id] ?? id} ${Math.round(state.condition)}%`).join(", ")}${damaged.length > 4 ? ", and others" : ""}.`
+          : "All deployed modules are above 82% condition.";
+        setAiMessage(`DIAGNOSTICS COMPLETE · ${faultReport} ${conditionReport} ${weakest ? `Start with ${SYSTEM_LABELS[weakest[0]] ?? weakest[0]} at ${Math.round(weakest[1].condition)}% condition.` : "No deployed modules were available to inspect."}`);
         break;
       }
       default:
