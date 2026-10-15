@@ -1493,7 +1493,7 @@ function BuildingInspector({
   earthReportAtSeconds: number;
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
-  electricalReadings: { generationKW: number; actualSupplyKW: number; consumptionKW: number; batteryFlowKW: number; batteryFlowKW: number; enduranceHours: number | null; generationSources: { label: string; kw: number }[]; demandSources: { label: string; kw: number }[] };
+  electricalReadings: { generationKW: number; actualSupplyKW: number; consumptionKW: number; batteryFlowKW: number; enduranceHours: number | null; generationSources: { label: string; kw: number }[]; demandSources: { label: string; kw: number }[] };
   buildings: Record<string, BuildingRuntime>;
   simulationSpeed: number;
   campaign: "moon" | "mars";
