@@ -585,7 +585,7 @@ export function MissionLoadout() {
     if (newSpend > gameState.credits) {
       setNotice(
         `${track.category} / ${tier} requires ${formatCredits(nextEquipment.cost)}, but your Colony Treasury only has ${formatCredits(
-          Math.max(0, gameState.credits - (spend - (previousEquipment?.cost ?? 0))),
+          Math.max(0, gameState.credits - (spend - (previousTier ? track.tiers[previousTier].cost : 0))),
         )} available for this change.`,
       );
       return;
