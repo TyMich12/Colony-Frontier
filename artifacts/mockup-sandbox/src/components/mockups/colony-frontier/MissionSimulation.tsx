@@ -2928,10 +2928,10 @@ export function MissionSimulation() {
       setBuildings((current) => {
         const next = { ...current };
         for (const [trackId, state] of Object.entries(next)) {
-          // Baseline wear is measured in condition points per simulated Earth day.
-          // The old wall-clock scaling made every module lose ~100+ points in one mission.
-          // Keep gradual wear visible; the more frequent incidents supply the acute damage.
-          const wearPerDay = (trackId === "solar" ? 1.1 : 0.65) * stagePressure;
+          // Condition wear is measured in points per simulated Earth day.
+          // Make routine wear clearly visible over a mission, with solar wearing faster
+          // because of dust and exposed surface hardware. Incidents add further damage.
+          const wearPerDay = (trackId === "solar" ? 6.0 : 3.5) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
