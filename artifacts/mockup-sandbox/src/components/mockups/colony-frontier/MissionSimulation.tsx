@@ -1643,9 +1643,17 @@ function BuildingInspector({
   const damagedStrings = estimatedSolarDamagedStrings(liveCondition, runtime.repairMetrics);
   const detectedHotspots = estimatedSolarHotspots(liveCondition, runtime.dust);
   const hotspotPenalty = solarDegradationPenaltyFraction(liveCondition, runtime.dust, runtime.repairMetrics);
-  const hotspotLossKW = hotspotPenalty > 0 ? liveSolarKW * hotspotPenalty / Math.max(0.01, 1 - hotspotPenalty) : 0;
+  const solarFaultProtectionNow = solarFaultProtection(runtime.repairMetrics);
+  const stringFaultWeight = damagedStrings * 0.012;
+  const hotspotFaultWeight = detectedHotspots * 0.01;
+  const totalFaultWeight = stringFaultWeight + hotspotFaultWeight;
+  const solarPreFaultKW = liveSolarKW / Math.max(0.01, 1 - hotspotPenalty);
+  const damagedStringLossKW = totalFaultWeight > 0 ? solarPreFaultKW * hotspotPenalty * stringFaultWeight / totalFaultWeight : 0;
+  const hotspotLossKW = totalFaultWeight > 0 ? solarPreFaultKW * hotspotPenalty * hotspotFaultWeight / totalFaultWeight : 0;
   const dustTransmissionNow = dustTransmission(runtime.dust);
   const dustLossKW = dustTransmissionNow > 0 ? liveSolarKW * (1 / dustTransmissionNow - 1) : 0;
+  const pointingCosine = Math.max(0.01, Math.cos(pointingAngle * Math.PI / 180));
+  const pointingLossKW = liveSolarKW * (1 / pointingCosine - 1);
   const storedBatteryKWh = battery / 100 * batteryCapacityKWh;
   const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
   const waterRecoveryNow = Math.min(96, liveCondition / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0));
@@ -1657,9 +1665,9 @@ function BuildingInspector({
       case "solar": return [
         { label: "Live generation", value: liveSolarKW.toFixed(2) + " kW", note: (liveSolarKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(4) + " kWh per 10 simulated seconds" },
         { label: "Dust-related output loss", value: "≈ " + dustLossKW.toFixed(2) + " kW", note: Math.round(runtime.dust) + "% surface dust · dust builds faster as condition falls" },
-        { label: "Damaged strings", value: damagedStrings + " / 10 estimated", note: "Condition-linked simulation estimate" },
-        { label: "Hot spots detected", value: detectedHotspots + " estimated", note: "≈ " + hotspotLossKW.toFixed(2) + " kW lost to the modelled string/hot-spot penalty" },
-        { label: "Residual calibration angle", value: pointingAngle.toFixed(1) + "°", note: "Residual array pointing error; smaller is better" },
+        { label: "Damaged strings", value: damagedStrings + " / 10 estimated", note: "Estimated output penalty ≈ " + damagedStringLossKW.toFixed(2) + " kW" },
+        { label: "Hot spots detected", value: detectedHotspots + " estimated", note: "Estimated output penalty ≈ " + hotspotLossKW.toFixed(2) + " kW" },
+        { label: "Residual calibration angle", value: pointingAngle.toFixed(1) + "°", note: "Estimated pointing loss ≈ " + pointingLossKW.toFixed(2) + " kW" },
         { label: "Rated / current output", value: getBaselineRating("solar", tier, upgradeLevel).toFixed(2) + " / " + liveSolarKW.toFixed(2) + " kW" },
       ];
       case "battery": return [
@@ -1788,7 +1796,7 @@ function BuildingInspector({
             <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3c5056] bg-[#0a1317] text-xl text-[#9fb0b3] transition hover:border-[#f0c964] hover:text-white" aria-label="Close building panel">×</button>
           </div>
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
-            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Rated operating output · current tier + retrofit</p>
+            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Live output · current tier + retrofit</p>
             <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
               <span className="text-[9px] text-[#b6c9c3]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).label}</span>
               <span className="min-w-0 whitespace-normal break-words text-right font-mono text-[10px] font-black leading-5 text-[#a8edc2]">{physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value}</span>
