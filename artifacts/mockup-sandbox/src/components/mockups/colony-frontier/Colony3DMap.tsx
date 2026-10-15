@@ -1127,7 +1127,7 @@ function Rover({
     }
   }, [position[0], position[1]]);
 
-  useFrame(({ clock, delta }) => {
+  useFrame(({ clock }, delta) => {
     const rover = ref.current;
     if (!rover) return;
     const current = rover.position;
