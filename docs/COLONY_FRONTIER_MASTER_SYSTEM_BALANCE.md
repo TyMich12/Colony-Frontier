@@ -206,7 +206,7 @@ Research additional metrics also jump where physically meaningful: battery conti
 - Required systems are support systems that must be available for the procedure. Standalone has no required support system. Enhanced has one; Dual has two; Integrated has three.
 - Secondary and tertiary effects are separate metrics and units, not extra gains to the primary metric.
 - Respect the option's cap and remaining fault. Percentages cannot exceed 100%; outputs cannot exceed rated system capacity; a repair cannot restore more than the fault requires.
-- Repair and retrofit procedures have no consumable-inventory prerequisites. Activation uses energy and simulated time; optional support systems remain distinct from inventory.
+- Repair and retrofit procedures are activated using energy and simulated time; optional support systems are selected as part of the procedure.
 
 ### Complete repair procedure table
 
@@ -351,7 +351,7 @@ Research additional metrics also jump where physically meaningful: battery conti
 
 ### Universal repair and retrofit activation rule
 
-Across **all missions**, repair and retrofit activation uses energy, simulated time and optional support-system choices only. No consumable-inventory prerequisites appear in the playable interface. Repair cards show numerical benefits, activation energy and duration; retrofit cards show the rated gain, activation energy and duration.
+Across **all missions**, repair and retrofit activation uses energy, simulated time and optional support-system choices only. Repair cards show numerical benefits, activation energy and duration; retrofit cards show the rated gain, activation energy and duration.
 
 ### Solar Power protection rule
 
@@ -451,7 +451,7 @@ These are explicit game-model assumptions for readable mission pacing, not certi
 - Mission 1 uses six incident windows, lower condition wear, and smaller incident damage so a first-time player can recover instead of being overwhelmed by cascading faults.
 - Solar dust accumulates faster than before and its rate rises as equipment condition falls. Solar output is condition-adjusted and also includes explicit modelled string/hot-spot derating. The system inspector reports live generation, dust loss, estimated damaged strings, estimated hot spots and residual pointing/calibration angle; the string/hot-spot counts are simulation estimates, not sensor-grade physical measurements.
 - Every deployed system's inspector shows a live telemetry block with its key rated/current values, reserve or throughput readings where applicable, and fault/status state.
-- Repair and retrofit actions use activation energy, simulated duration and optional support-system combinations; they do not consume or require inventory items.
+- Repair and retrofit actions use activation energy, simulated duration and optional support-system combinations.
 - Mission 1 food production targets 3.2 kg/day at 100% Agriculture condition against 2.48 kg/day four-crew demand, with a 2.65 kg/day operational tutorial floor while at least 1.0 kW reaches the colony bus. The starter water module maintains at least 8 L/day treatment throughput while online and powered, and water recovery receives a +45 percentage-point support bonus after condition derating, capped at 96%. Both safeguards are specific to Mission 1; Foundation/Frontier/Apex/Research rating-table values, including Apex and Research, remain unchanged.
 
 ## Condition-linked output and water/food pacing — updated 2026-10-15
@@ -485,6 +485,6 @@ Outside Mission 1, food production remains the selected Agriculture system's rat
 - Mission 1 water recovery retains the +45 percentage-point support bonus (96% cap) and provides at least 8 L/day treatment throughput while the water module is operational and at least 1.0 kW reaches the bus. A powered starter local-volatile feed adds 6 L/day of actual make-up water, and the tutorial crop module uses 10 L/kg rather than the Foundation table value of 30 L/kg. These tutorial-only source/efficiency settings are shown in live telemetry; if the Water system or power is offline, the 6 L/day source stops and water is still consumed.
 - Solar dust rises at 4.0 percentage points per simulated Earth day at 100% condition, increasing by 0.06 points/day for every missing condition point, capped at 10.0 points/day at 0% condition. Dust remains capped at 100% and can be reduced by cleaning actions.
 - The live inspector includes system-specific operating readings plus common live condition, operating state, colony-bus supply versus demand, and active-fault severity. Solar diagnostics separately show estimated damaged strings, hot spots, pointing/calibration error, and their estimated output penalties. These counts are model estimates, not literal hardware sensor measurements.
-- Repair/retrofit workflows have no required mass, spare-parts, maintenance-toolkit or consumable-item prerequisites. Do not reintroduce these inventory requirements or explanatory UI text in the Mission 1 flow.
+- Repair/retrofit workflows use energy, simulated time and optional support-system combinations only. Mission 1 presents no additional equipment or materials in the loadout or action interface.
 - Dashboard reserve displays use the declared capacities: 24 kg O₂, 240 L water, and 60 kg food. Mission 1 local volatile feed is a real source term in the tank balance, not a recovery-efficiency bonus; the 10 L/kg crop-water value is a tutorial exception, not a tier-table edit.
 - These are Level 1 gameplay safeguards, not certified spacecraft design values. They do not change Apex or Research tier ratings.
