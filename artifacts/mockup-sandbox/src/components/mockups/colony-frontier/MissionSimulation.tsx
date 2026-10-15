@@ -2355,6 +2355,13 @@ export function MissionSimulation() {
           }
         }
         const currentDust = buildingsRef.current.solar?.dust ?? 0;
+        const previousCondition = buildingsRef.current[repairTarget]?.condition ?? 100;
+        const plannedConditionGain = option
+          ? option.category === "Standalone" ? 5
+            : option.category === "Enhanced" ? 7
+              : option.category === "Dual" ? 9 : 12
+          : 3;
+        const actualConditionGain = Math.min(plannedConditionGain, Math.max(0, 100 - previousCondition));
         const dustAfter = option && /dust removed from (existing deposit|array surface)/i.test(option.metric)
           ? clamp(/of current dust/i.test(option.unit)
               ? currentDust * (1 - Math.min(100, Math.max(0, outcome)) / 100)
@@ -2403,12 +2410,7 @@ export function MissionSimulation() {
           }
           // Every completed repair has a tangible condition benefit as well as its
           // workbook-defined metric. More coordinated procedures restore more condition.
-          const conditionGain = option
-            ? option.category === "Standalone" ? 5
-              : option.category === "Enhanced" ? 7
-                : option.category === "Dual" ? 9 : 12
-            : 3;
-          const repairedCondition = clamp(previous.condition + conditionGain);
+          const repairedCondition = clamp(previous.condition + actualConditionGain);
           const repaired = { ...current, [repairTarget]: { ...previous, condition: repairedCondition, repairMetrics, status: buildingStatus(repairedCondition) } };
           if (option && /dust removed from (existing deposit|array surface)/i.test(option.metric)) {
             const currentSolar = repaired.solar ?? { condition: 100, dust: 0, status: "ONLINE" };
@@ -2441,7 +2443,12 @@ export function MissionSimulation() {
             ? [describeRepairOutcome(repairTarget, option.tertiary.metric, option.tertiary.unit, tertiaryValue)]
             : []),
         ] : [];
-        const effectCopy = option ? effectLines.join(" · ") : "The fault state has been cleared using the fallback standalone service.";
+        const conditionCopy = actualConditionGain > 0
+          ? `Equipment condition: +${formatRating(actualConditionGain)} points`
+          : "Equipment condition is already at 100%; the selected procedure still applies its named metric";
+        const effectCopy = option
+          ? [...effectLines, conditionCopy].join(" · ")
+          : `The fault state has been cleared using the fallback standalone service. ${conditionCopy}`;
         const faultStatusCopy = faultResolved
           ? `${faults.length} fault(s) cleared.`
           : repairTarget === "solar"
