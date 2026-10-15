@@ -1643,7 +1643,6 @@ function BuildingInspector({
   const damagedStrings = estimatedSolarDamagedStrings(liveCondition, runtime.repairMetrics);
   const detectedHotspots = estimatedSolarHotspots(liveCondition, runtime.dust);
   const hotspotPenalty = solarDegradationPenaltyFraction(liveCondition, runtime.dust, runtime.repairMetrics);
-  const solarFaultProtectionNow = solarFaultProtection(runtime.repairMetrics);
   const stringFaultWeight = damagedStrings * 0.012;
   const hotspotFaultWeight = detectedHotspots * 0.01;
   const totalFaultWeight = stringFaultWeight + hotspotFaultWeight;
