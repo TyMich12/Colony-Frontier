@@ -30,7 +30,6 @@ import {
 } from "./_shared/GameShell";
 import {
   formatCredits,
-  payloadProgression,
   technologyTracks,
   tierMeta,
   tierUnlockRequirements,
@@ -80,18 +79,6 @@ const minimumDeploymentReserve = technologyTracks.length
       return total + (track?.tiers.Foundation.cost ?? 0);
     }, 0)
   : 0;
-
-function getMissionCapacity(campaign: "moon" | "mars", completedCount: number) {
-  if (campaign === "moon") {
-    if (completedCount >= 6) return payloadProgression[2].capacity;
-    if (completedCount >= 3) return payloadProgression[1].capacity;
-    return payloadProgression[0].capacity;
-  }
-
-  if (completedCount >= 6) return payloadProgression[5].capacity;
-  if (completedCount >= 3) return payloadProgression[4].capacity;
-  return payloadProgression[3].capacity;
-}
 
 function getNextMission(
   campaign: "moon" | "mars",
@@ -145,7 +132,6 @@ function getTierStatus(
   tier: Tier,
   gameState: ReturnType<typeof loadGameState>,
   availableCredits: number,
-  availableMass: number,
 ) {
   if (!isTierUnlocked(track, tier, gameState)) {
     return "locked";
@@ -160,10 +146,6 @@ function getTierStatus(
 
   if (cost > availableCredits) {
     return "funds";
-  }
-
-  if (equipment.mass > availableMass) {
-    return "mass";
   }
 
   return "available";
@@ -287,7 +269,7 @@ function TierOption({
   track: TechnologyTrack;
   tier: Tier;
   selected: boolean;
-  status: "locked" | "funds" | "mass" | "available";
+  status: "locked" | "funds" | "available";
   onSelect: () => void;
   hoverEnabled: boolean;
 }) {
@@ -297,7 +279,7 @@ function TierOption({
   const baseline = getBaselineRow(track.id);
   const baselineValue = baseline?.values[baselineStateIndex(tier, 0)];
 
-  const disabled = status === "locked" || status === "mass";
+  const disabled = status === "locked";
 
   const statusLabel =
     selected
@@ -308,9 +290,7 @@ function TierOption({
           : `LOCKED — Requires ${requirement.xp.toLocaleString()} XP in Technology Lab`
         : status === "funds"
           ? "INSUFFICIENT FUNDS / MISSION ALLOCATION"
-          : status === "mass"
-            ? "EXCEEDS MISSION PAYLOAD CAPACITY"
-            : "AVAILABLE";
+          : "AVAILABLE";
 
   return (
     <button
@@ -382,11 +362,8 @@ function TierOption({
         </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-[#2c4445] pt-2 text-[8px] uppercase tracking-[0.1em]">
+      <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#2c4445] pt-2 text-[8px] uppercase tracking-[0.1em]">
         <span className="text-[#89a39e]">{equipment.efficiency}</span>
-        <span className="text-[#89a39e]">
-          {equipment.mass.toLocaleString()} kg
-        </span>
         <span className="font-mono text-[#d7e3d1]">
           {formatCredits(equipment.cost)}
         </span>
@@ -423,7 +400,6 @@ function TierOption({
 
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[8px] uppercase tracking-[0.1em] text-[#8da8a0]">
           <span>{equipment.efficiency}</span>
-          <span>{equipment.mass.toLocaleString()} kg</span>
           <span>{formatCredits(equipment.cost)}</span>
         </div>
       </div>
@@ -436,7 +412,6 @@ function getAutomaticTier(
   track: TechnologyTrack,
   gameState: ReturnType<typeof loadGameState>,
   availableCredits: number,
-  availableMass: number,
 ) {
   for (let index = tierOrder.length - 1; index >= 0; index -= 1) {
     const tier = tierOrder[index];
@@ -447,10 +422,7 @@ function getAutomaticTier(
 
     const equipment = track.tiers[tier];
 
-    if (
-      equipment.cost <= availableCredits &&
-      equipment.mass <= availableMass
-    ) {
+    if (equipment.cost <= availableCredits) {
       return tier;
     }
   }
@@ -460,11 +432,9 @@ function getAutomaticTier(
 
 function createInitialSelection(
   gameState: ReturnType<typeof loadGameState>,
-  missionCapacity: number,
 ) {
   const selection: Record<string, Tier> = {};
   let availableCredits = gameState.credits;
-  let availableMass = missionCapacity;
 
   const requiredTracks = technologyTracks.filter((track) =>
     starterCategories.has(track.id),
@@ -478,17 +448,10 @@ function createInitialSelection(
         total + remainingTrack.tiers.Foundation.cost,
       0,
     );
-    const reservedFoundationMass = remainingTracks.reduce(
-      (total, remainingTrack) =>
-        total + remainingTrack.tiers.Foundation.mass,
-      0,
-    );
-
     const tier = getAutomaticTier(
       track,
       gameState,
       Math.max(0, availableCredits - reservedFoundationCost),
-      Math.max(0, availableMass - reservedFoundationMass),
     );
 
     if (tier === undefined) {
@@ -497,14 +460,13 @@ function createInitialSelection(
 
     selection[track.id] = tier;
     availableCredits -= track.tiers[tier].cost;
-    availableMass -= track.tiers[tier].mass;
   }
 
   return selection;
 }
 
 export function MissionLoadout() {
-  // An unfinished payload can be reconfigured from here, but only after an explicit second confirmation.
+  // An unfinished mission loadout can be reconfigured from here, but only after an explicit second confirmation.
   const activePendingAtStart = loadPendingMission();
   const storedGameState = loadGameState();
   const gameState = activePendingAtStart
@@ -518,7 +480,7 @@ export function MissionLoadout() {
     params.get("campaign") === "mars" || (!params.get("campaign") && moonComplete)
       ? "mars"
       : "moon";
-  const campaign =
+  const campaign: "moon" | "mars" =
     requestedCampaign === "mars" && !moonComplete ? "moon" : requestedCampaign;
   const campaignMissions = campaign === "moon" ? moonMissions : marsMissions;
   const campaignCompletedCount = campaign === "moon" ? moonCompletedCount : marsCompletedCount;
@@ -533,13 +495,12 @@ export function MissionLoadout() {
   const missionLocked =
     (campaign === "mars" && !moonComplete) ||
     (!alreadyCompleted && !previousMissionsComplete);
-  const missionCapacity = getMissionCapacity(campaign, campaignCompletedCount);
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const catalogScrollY = useRef(0);
   const deployingRef = useRef(false);
 
   const [selected, setSelected] = useState<Record<string, Tier>>(() =>
-    createInitialSelection(gameState, missionCapacity),
+    createInitialSelection(gameState),
   );
   const [replaceActiveMission, setReplaceActiveMission] = useState(false);
 
@@ -563,17 +524,11 @@ export function MissionLoadout() {
     [selected],
   );
 
-  const mass = selectedTracks.reduce((total, track) => {
-    const tier = selected[track.id];
-    return total + track.tiers[tier].mass;
-  }, 0);
-
   const spend = selectedTracks.reduce((total, track) => {
     const tier = selected[track.id];
     return total + deploymentCost(track, tier, gameState.unlockedTechnologies);
   }, 0);
 
-  const remainingMass = missionCapacity - mass;
   const remainingTreasury = gameState.credits - spend;
   const requiredCategories = starterCategories;
   const blockedEssentialCategories = technologyTracks.filter(
@@ -611,9 +566,6 @@ export function MissionLoadout() {
       return;
     }
 
-    const previousEquipment = previousTier
-      ? track.tiers[previousTier]
-      : null;
     const nextEquipment = track.tiers[tier];
 
     const previousCost = previousTier
@@ -629,23 +581,12 @@ export function MissionLoadout() {
       gameState.unlockedTechnologies,
     );
     const newSpend = spend - previousCost + nextCost;
-    const newMass =
-      mass - (previousEquipment?.mass ?? 0) + nextEquipment.mass;
 
     if (newSpend > gameState.credits) {
       setNotice(
         `${track.category} / ${tier} requires ${formatCredits(nextEquipment.cost)}, but your Colony Treasury only has ${formatCredits(
           Math.max(0, gameState.credits - (spend - (previousEquipment?.cost ?? 0))),
         )} available for this change.`,
-      );
-      return;
-    }
-
-    if (newMass > missionCapacity) {
-      setNotice(
-        `${track.category} / ${tier} exceeds the remaining payload capacity by ${(
-          newMass - missionCapacity
-        ).toLocaleString()} kg.`,
       );
       return;
     }
@@ -663,7 +604,6 @@ export function MissionLoadout() {
 
   function categoryIsBlocked(track: TechnologyTrack) {
     const previousTier = selected[track.id];
-    const previousEquipment = previousTier ? track.tiers[previousTier] : null;
     const previousCost = previousTier
       ? deploymentCost(
           track,
@@ -674,8 +614,6 @@ export function MissionLoadout() {
     const availableTreasury =
       gameState.credits - (spend - previousCost);
     const availableCredits = availableTreasury;
-    const availableMass =
-      missionCapacity - (mass - (previousEquipment?.mass ?? 0));
 
     return tierOrder.every((tier) => {
       const status = getTierStatus(
@@ -683,7 +621,6 @@ export function MissionLoadout() {
         tier,
         gameState,
         availableCredits,
-        availableMass,
       );
       return status !== "available";
     });
@@ -797,11 +734,6 @@ export function MissionLoadout() {
       return;
     }
 
-    if (mass > missionCapacity) {
-      setNotice("Mission exceeds the payload capacity.");
-      return;
-    }
-
     if (spend > gameState.credits) {
       setNotice(
         "Mission requires " +
@@ -900,7 +832,7 @@ export function MissionLoadout() {
 
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#efb658]">
-                  {campaign === "moon" ? "Lunar" : "Martian"} operations / {missionCapacity.toLocaleString()} kg payload
+                  {campaign === "moon" ? "Lunar" : "Martian"} operations
                 </p>
                 <p className="mt-1 text-xs text-[#9cb2aa]">
                   Mission {currentMission.number} · {currentMission.title} · choose one technology tier per category
@@ -978,21 +910,12 @@ export function MissionLoadout() {
 
                         const availableCredits = availableTreasury;
 
-                        const previousEquipment = previousTier
-                          ? track.tiers[previousTier]
-                          : null;
-
-                        const availableMass =
-                          missionCapacity -
-                          (mass - (previousEquipment?.mass ?? 0));
-
                         const status = getTierStatus(
                           track,
                           tier,
                           gameState,
                           availableCredits,
-                          availableMass,
-                        );
+                                          );
 
                         return (
                           <TierOption
@@ -1091,35 +1014,6 @@ export function MissionLoadout() {
                 </p>
               </div>
 
-              <div>
-                <div className="mb-2 flex items-end justify-between">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-[#9ab1a8]">
-                    Payload capacity
-                  </span>
-                  <span className="font-mono text-sm text-[#f4e7c5]">
-                    {mass.toLocaleString()}{" "}
-                    <span className="text-[#839993]">
-                      / {missionCapacity.toLocaleString()} kg
-                    </span>
-                  </span>
-                </div>
-                <ProgressBar
-                  value={Math.min(
-                    100,
-                    Math.round((mass / missionCapacity) * 100),
-                  )}
-                  color="#efb658"
-                />
-                <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.15em] text-[#758e89]">
-                  <span>
-                    {Math.max(0, remainingMass).toLocaleString()} kg remaining
-                  </span>
-                  <span>
-                    {Math.round((mass / missionCapacity) * 100)}% loaded
-                  </span>
-                </div>
-              </div>
-
               <div className="border border-[#304949]/ bg-[#101f23] p-4">
                 <div className="mb-3 text-[9px] font-bold uppercase tracking-[0.2em] text-[#718f80]">
                   Deployment finances
@@ -1168,9 +1062,6 @@ export function MissionLoadout() {
                           <span className="ml-3.5 text-[8px] uppercase tracking-[0.12em] text-[#718f80]">
                             {tier} · {equipment.name}
                           </span>
-                        </span>
-                        <span className="shrink-0 font-mono text-[#859f99]">
-                          {equipment.mass.toLocaleString()} kg
                         </span>
                       </div>
                     );
@@ -1224,31 +1115,7 @@ export function MissionLoadout() {
             </div>
           </div>
 
-          <section className="border border-[#29434a] bg-[#0d2028] p-5">
-            <SectionLabel>Payload progression</SectionLabel>
-            <div className="space-y-3">
-              {payloadProgression.map((step, index) => (
-                <div
-                  key={step.phase}
-                  className={`flex items-center justify-between border-b border-[#29434a] pb-3 last:border-0 last:pb-0 ${
-                    index === 0 ? "text-[#dfeacb]" : "text-[#718b8c]"
-                  }`}
-                >
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.16em]">
-                      {step.phase}
-                    </p>
-                    <p className="mt-1 text-[9px] uppercase tracking-[0.1em]">
-                      {step.unlock}
-                    </p>
-                  </div>
-                  <span className="font-mono text-xs">
-                    {step.capacity.toLocaleString()} kg
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
+
         </aside>
       </div>
     </GameShell>
