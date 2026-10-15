@@ -1680,7 +1680,7 @@ function BuildingInspector({
         {track.id === "water" && (
           <section className="mx-4 mt-3 rounded-xl border border-[#2c6670] bg-gradient-to-br from-[#0c2931] to-[#0b1b23] p-3">
             <div className="flex items-start justify-between gap-3">
-              <div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#8dd9eb]">Potable-water storage</p><p className="mt-1 text-[8px] leading-4 text-[#83aeb8]">Four independent reserve tanks · 45 L nominal per tank</p></div>
+              <div><p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#8dd9eb]">Potable-water storage</p><p className="mt-1 text-[8px] leading-4 text-[#83aeb8]">Four independent reserve tanks · 60 L nominal per tank</p></div>
               <div className="text-right"><p className="font-mono text-sm font-black text-[#b9f0ff]">{Math.round(metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL)} L</p><p className="text-[8px] text-[#83aeb8]">of {RESOURCE_CAPACITIES.waterReserveL} L</p></div>
             </div>
             <div className="mt-3 grid grid-cols-4 gap-2">
@@ -2341,11 +2341,18 @@ export function MissionSimulation() {
         const priorRepairMetrics = buildingsRef.current[repairTarget]?.repairMetrics ?? {};
         const primaryMetric = getPrimaryRepairMetric(repairTarget);
         let remainingGapAfter: number | null = null;
-        if (option && option.metric === primaryMetric && repairTarget !== "solar" && repairTarget !== "maintenance") {
-          const currentGap = typeof priorRepairMetrics[repairGapKey(primaryMetric)] === "number"
-            ? priorRepairMetrics[repairGapKey(primaryMetric)]
-            : getStandardRepairGap(repairTarget, selectedTiers);
-          remainingGapAfter = Math.max(0, currentGap - Math.max(0, outcome));
+        if (option && primaryMetric && repairTarget !== "solar" && repairTarget !== "maintenance") {
+          if (option.metric === primaryMetric) {
+            const currentGap = typeof priorRepairMetrics[repairGapKey(primaryMetric)] === "number"
+              ? priorRepairMetrics[repairGapKey(primaryMetric)]
+              : getStandardRepairGap(repairTarget, selectedTiers);
+            remainingGapAfter = Math.max(0, currentGap - Math.max(0, outcome));
+          } else {
+            // This procedure restores a different workbook-defined metric, but completing
+            // it also clears the active incident and returns the system's primary capability.
+            // Do not subtract unlike units (e.g. °C from L/day) from the primary fault gap.
+            remainingGapAfter = 0;
+          }
         }
         const currentDust = buildingsRef.current.solar?.dust ?? 0;
         const dustAfter = option && /dust removed from (existing deposit|array surface)/i.test(option.metric)
@@ -2368,7 +2375,7 @@ export function MissionSimulation() {
           ? dustAfter <= 0.0001
           : remainingGapAfter !== null
             ? remainingGapAfter <= 0.0001
-            : false);
+            : Boolean(option));
         setActiveFaults((current) => {
           if (faultResolved) return Object.fromEntries(Object.entries(current).filter(([, fault]) => fault.targetTrackId !== repairTarget));
           return Object.fromEntries(Object.entries(current).map(([key, fault]) => [
