@@ -944,7 +944,7 @@ function physicalResourceTelemetry(
   };
 }
 
-function physicalThreshold(resource: "power" | "battery", points: number, batteryCapacityKWh = RESOURCE_CAPACITIES.storedEnergyKWh): string {
+function physicalThreshold(resource: "power" | "battery", points: number, batteryCapacityKWh: number = RESOURCE_CAPACITIES.storedEnergyKWh): string {
   if (resource === "power") return `${(points / 100 * RESOURCE_CAPACITIES.availablePowerKW).toFixed(2)} kW available power`;
   return `${(points / 100 * batteryCapacityKWh).toFixed(2)} kWh stored energy`;
 }
@@ -2765,7 +2765,6 @@ export function MissionSimulation() {
           setTimeout(() => {
             eventResponseRef.current = null;
             setActiveEventId(event.id);
-            setIncidentRepairCategory("Standalone");
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setOperationResult(null);
@@ -2911,7 +2910,7 @@ export function MissionSimulation() {
         // Agriculture retains the master-sheet Foundation yield of 0.50 kg/day.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
         const essentialLoadKW = POWER_DEMAND_MODEL.coreLoadKW;
-        const requestedLoads = Object.entries(POWER_DEMAND_MODEL.systems)
+        const requestedLoads: { systemId: string; label: string; kw: number }[] = Object.entries(POWER_DEMAND_MODEL.systems)
           .filter(([systemId]) => Boolean(pending.selected[systemId]))
           .map(([systemId, model]) => ({
             systemId,
