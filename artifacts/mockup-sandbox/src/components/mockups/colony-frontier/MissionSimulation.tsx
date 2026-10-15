@@ -54,8 +54,8 @@ import { Colony3DMap } from "./Colony3DMap";
 const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
 const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
 // Ten staggered incidents create meaningful maintenance pressure without relying on random failures.
-const EVENT_TIMES = [0.08, 0.16, 0.24, 0.32, 0.40, 0.50, 0.60, 0.70, 0.80, 0.91].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
-const STARTING_REPAIR_PARTS_KG = 60; // On-site spares; game-balance assumption, no launch-mass change.
+const EVENT_TIMES = [0.14, 0.30, 0.47, 0.65, 0.82, 0.94].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
+// Level 1 pacing prioritises a recoverable first run.
 
 const REPAIR_GAP_PREFIX = "Unrestored fault gap · ";
 const REPAIR_GAP_INITIAL_PREFIX = "Initial fault gap · ";
@@ -128,6 +128,15 @@ function solarFaultProtection(readings: Record<string, number> | undefined): num
   const protection = clamp(readings["Hotspot fault protection"] ?? 0, 0, 100) / 100;
   const protectedStrings = clamp(readings["Faulted strings protected from propagation"] ?? 0, 0, 10) / 10;
   return clamp(coverage * protection + protectedStrings, 0, 0.8);
+}
+function estimatedSolarDamagedStrings(condition: number): number {
+  return Math.min(4, Math.max(0, Math.round((100 - clamp(condition, 0, 100)) / 25)));
+}
+function estimatedSolarHotspots(condition: number, dust: number): number {
+  return Math.min(6, Math.max(0, Math.round((100 - clamp(condition, 0, 100)) / 30 + clamp(dust, 0, 100) / 40)));
+}
+function solarDegradationPenaltyFraction(condition: number, dust: number, readings: Record<string, number> | undefined): number {
+  return Math.min(0.18, (estimatedSolarDamagedStrings(condition) * 0.012 + estimatedSolarHotspots(condition, dust) * 0.01) * (1 - solarFaultProtection(readings)));
 }
 
 const starterCategories = new Set([
@@ -454,7 +463,6 @@ const ACTION_REQUIREMENTS: Record<string, ActionRequirementRule> = {
 
 type ActionRequirementContext = {
   selected: Record<string, Tier>;
-  partsInventoryKg?: number;
   buildings: Record<string, BuildingRuntime>;
   activeFaults: Record<string, ActiveFault>;
   metrics: MissionMetrics;
@@ -832,8 +840,10 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
           ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
           : liveDay < 14 ? (liveDay < 1 ? 0.22 : liveProfile.sunlightGeometry) : 0;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
-      const checkpointKW = Math.min(rating, rating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
-      const currentKW = _condition < 28 ? 0 : Math.min(rating, rating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)));
+      const conditionAdjustedRating = rating * clamp(_condition, 0, 100) / 100;
+      const modeledSolarFaultPenalty = solarDegradationPenaltyFraction(_condition, dust, repairMetrics);
+      const checkpointKW = Math.min(conditionAdjustedRating, conditionAdjustedRating * day7.sunlightGeometry * (1 - day7.cellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)) * (1 - modeledSolarFaultPenalty));
+      const currentKW = Math.min(conditionAdjustedRating, conditionAdjustedRating * liveSunlight * (1 - liveCellTemperatureLoss) * dustTransmission(dust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)) * (1 - modeledSolarFaultPenalty));
       label = "Solar output · rated / Day 7 checkpoint / current live output";
       value = `${formatRating(rating)} kW rated · ${checkpointKW.toFixed(3)} kW Day 7 · ${currentKW.toFixed(3)} kW current · ${(currentKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(5)} kWh / 10 sim s`;
       break;
@@ -1453,7 +1463,7 @@ function BuildingInspector({
   earthReportAtSeconds,
   elapsedSeconds,
   fallbackReadyAt,
-  partsInventoryKg,
+
   simulationSpeed,
   campaign,
   missionTitle,
@@ -1482,7 +1492,6 @@ function BuildingInspector({
   earthReportAtSeconds: number;
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
-  partsInventoryKg: number;
   simulationSpeed: number;
   campaign: "moon" | "mars";
   missionTitle: string;
@@ -1619,7 +1628,7 @@ function BuildingInspector({
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
-  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0 && ((missionNumber ?? "").replace(/[^0-9]/g, "") === "1" || partsInventoryKg >= (nextInstallation?.materialKg ?? Number.POSITIVE_INFINITY));
+  const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
@@ -1784,14 +1793,14 @@ function BuildingInspector({
               <div className="min-w-0 flex-1">
                 <p className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeFault ? "text-[#ff9aa2]" : "text-[#8dd9b7]"}`}>{activeFault ? "Unresolved equipment fault" : "Preventative service & repair"}</p>
                 <h3 className="mt-1 text-[11px] font-black uppercase text-white">{activeFault?.title ?? "System recovery procedures"}</h3>
-                {activeFault ? <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)}× · {activeFault.remainingSeconds > 0 ? `${Math.ceil(activeFault.remainingSeconds)}s before the next escalation` : "escalation window expired"}. This fault remains until the procedure restores the relevant function and verification finishes.</p> : <p className="mt-1 text-[9px] leading-4 text-[#a5c8be]">Choose one of the four categories below to inspect exact effects, duration, energy and parts requirements. Standalone procedures require no optional support systems.</p>}
+                {activeFault ? <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)}× · {activeFault.remainingSeconds > 0 ? `${Math.ceil(activeFault.remainingSeconds)}s before the next escalation` : "escalation window expired"}. This fault remains until the procedure restores the relevant function and verification finishes.</p> : <p className="mt-1 text-[9px] leading-4 text-[#a5c8be]">Choose one of the four categories below to compare effects, activation energy and duration. Standalone procedures require no optional support systems.</p>}
                 {activeFault && typeof remainingRepairGap === "number" && track.id !== "solar" && track.id !== "maintenance" && <p className="mt-2 text-[8px] font-bold leading-4 text-[#ffcb8d]">Remaining performance shortfall: {formatRating(remainingRepairGap)} {repairOptions.find((option) => option.metric === primaryRepairMetric)?.unit ?? ""}. A partial repair leaves the fault active; choose another category/procedure to finish recovery.</p>}
               </div>
             </div>
             <button type="button" onClick={() => setShowRepairMethods((open) => !open)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#526b74] bg-[#14272e] px-3 py-2.5 text-left hover:border-[#e8c568]">
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-[#c7e5e0]">Repair catalogue · select a recovery category</span>
-                <span className="mt-0.5 block text-[8px] text-[#8faeae]">{isFirstMission ? "Mission 1: inspect numerical effects, activation energy and repair duration." : `Stock: ${partsInventoryKg.toFixed(2)} kg · categories filter procedures and show live effects, duration, energy, parts, trade-offs and lock reasons.`}</span>
+                <span className="mt-0.5 block text-[8px] text-[#8faeae]">Compare numerical effects, activation energy, duration and optional support systems.</span>
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
             </button>
@@ -1855,9 +1864,7 @@ function BuildingInspector({
                       </span>
                     ))}
                     <span className="mt-2 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#d8c18a]">
-                      {missionStage === 1
-                        ? `Activation cost: ${option.energyKWh} kWh`
-                        : `Activation cost: ${option.energyKWh} kWh · ${option.partsMassKg} kg parts · ${option.kit}`}
+                      `Activation energy: ${option.energyKWh} kWh`
                     </span>
                     <span className="mt-1 block min-w-0 whitespace-normal break-words text-[8px] leading-4 text-[#8fa7ab]">
                       {option.tradeoff}
@@ -1967,10 +1974,8 @@ function BuildingInspector({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#e5c56b]">Module retrofit · {upgradeLevel}/2</p>
               {nextInstallation ? <>
                 <p className="mt-1 text-[9px] font-bold leading-4 text-[#dcebe4]">{nextInstallation.currentProgress} → {nextInstallation.newProgress} · {nextInstallation.metric}: {nextInstallation.directGain}</p>
-                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">{(missionNumber ?? "").replace(/[^0-9]/g, "") === "1" ? `Activation cost: ${nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · ${nextInstallationSeconds} simulated seconds at 1×` : `Activation cost: ${nextInstallation.materialKg.toFixed(1)} kg on-site material + ${nextInstallation.energyKWh.toFixed(2)} kWh commissioning energy · ${nextInstallationSeconds} simulated seconds at 1×`}</p>
-                {(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" && <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">{nextInstallation.kit}. {nextInstallation.missionEffect}</p>}
+                <p className="mt-1 text-[8px] leading-4 text-[#e5c56b]">`Activation energy: ${nextInstallation.energyKWh.toFixed(2)} kWh · ${nextInstallationSeconds} simulated seconds at 1×`</p>
                 <p className="mt-1 text-[8px] leading-4 text-[#9ce3b2]">Secondary rating / effect: {retrofitSecondaryPreview(track.id, tier, upgradeLevel + 1)}</p>
-                {(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" && <p className="mt-1 text-[8px] leading-4 text-[#9cb0b2]">Stock available: {partsInventoryKg.toFixed(1)} kg. Installation uses existing stock; it does not add launch mass or repair unrelated damage.</p>}
               </> : <p className="mt-1 text-[9px] leading-4 text-[#9cb0b2]">Both retrofit stages are complete for this selected tier.</p>}
             </div>
             <button
@@ -2176,7 +2181,6 @@ export function MissionSimulation() {
   const [sampleStages, setSampleStages] = useState<Record<string, SampleStage>>(() => runtime?.sampleStages ?? Object.fromEntries((runtime?.surveyedNodes ?? []).map((id) => [id, "SURVEYED" as SampleStage])));
   const [sampleQuality, setSampleQuality] = useState<Record<string, number>>(() => runtime?.sampleQuality ?? {});
   const [resourceYield, setResourceYield] = useState(runtime?.resourceYield ?? 0);
-  const [partsInventoryKg, setPartsInventoryKg] = useState(runtime?.partsInventoryKg ?? STARTING_REPAIR_PARTS_KG);
   const [activeOperations, setActiveOperations] = useState<Record<string, MissionOperation>>(() => {
     if (runtime?.activeOperations) return runtime.activeOperations;
     return runtime?.activeOperation ? { [runtime.activeOperation.operationKey ?? runtime.activeOperation.targetId]: runtime.activeOperation } : {};
@@ -2595,11 +2599,11 @@ export function MissionSimulation() {
               const previous = current[targetId];
               if (!previous) return current;
               const solarProtection = targetId === "solar" ? solarFaultProtection(current.solar?.repairMetrics) : 0;
-              const damage = Math.min(18, (5 + eventIndex * 0.65) * shock) * (1 - solarProtection);
+              const damage = Math.min(9, (2.5 + eventIndex * 0.3) * shock) * (1 - solarProtection);
               const condition = clamp(previous.condition - damage);
               const nextBuildings = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
               if (event.id === "solar-dust" || event.id === "regional-dust-front") {
-                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 12 * shock) };
+                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 8 * shock) };
               }
               const primaryMetric = getPrimaryRepairMetric(targetId);
               if (primaryMetric && targetId !== "solar" && targetId !== "maintenance") {
@@ -2698,8 +2702,9 @@ export function MissionSimulation() {
         const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
         const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
         const solarRatedKW = solarOnline ? conditionAdjustedOutput("solar", getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade), buildings) : 0;
+        const solarFaultPenalty = solarDegradationPenaltyFraction(buildings.solar?.condition ?? 100, solarDust, buildings.solar?.repairMetrics);
         const solarGeneration = solarOnline
-          ? Math.min(solarRatedKW, solarRatedKW * solarAvailability * (1 - cellTemperatureLoss) * dustTransmission(solarDust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)))
+          ? Math.min(solarRatedKW, solarRatedKW * solarAvailability * (1 - cellTemperatureLoss) * dustTransmission(solarDust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)) * (1 - solarFaultPenalty))
           : 0;
         const batteryCapacityKWh = ratedBatteryCapacityKWh(pending.selected, buildings);
         const storedEnergyKWh = batteryOnline ? batteryCapacityKWh * current.battery / 100 : 0;
@@ -2759,7 +2764,8 @@ export function MissionSimulation() {
           const retrofitSteps = linkedAirSystem
             ? Math.max(buildings.co2?.upgradeLevel ?? 0, buildings.oxygen?.upgradeLevel ?? 0)
             : (buildings[systemId]?.upgradeLevel ?? 0);
-          return model.baseKW
+          const missionOneGrowLoad = missionStage === 1 && systemId === "agriculture" ? 0.55 : 0;
+          return model.baseKW + missionOneGrowLoad
             + tierSteps * model.tierStepKW
             + Math.max(0, Math.min(2, retrofitSteps)) * model.retrofitStepKW;
         };
@@ -2865,14 +2871,16 @@ export function MissionSimulation() {
           : 0;
         const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
-        const waterRecoveryPct = conditionAdjustedOutput("water", repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics), buildings);
+        const ratedWaterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
+        const waterRecoveryPct = conditionAdjustedOutput("water", Math.min(96, ratedWaterRecoveryPct + 30), buildings);
         const waterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
         const circulatingWaterLDay = 8; // Recoverable crew make-up stream, not all water circulated through the loop.
         const effectiveWaterRecoveryPct = waterOnline && powerPathAvailable ? waterRecoveryPct : 0;
         const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
+        const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? conditionAdjustedOutput("agriculture", repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics), buildings)
+          ? conditionAdjustedOutput("agriculture", Math.max(2.65, ratedFoodProductionKgDay), buildings)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
@@ -2946,7 +2954,7 @@ export function MissionSimulation() {
           // Condition wear is measured in points per simulated Earth day.
           // Make routine wear clearly visible over a mission, with solar wearing faster
           // because of dust and exposed surface hardware. Incidents add further damage.
-          const wearPerDay = (trackId === "solar" ? 12.0 : 7.0) * stagePressure;
+          const wearPerDay = (trackId === "solar" ? 3.0 : 1.6) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
@@ -2957,7 +2965,7 @@ export function MissionSimulation() {
             condition: clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear),
             status: buildingStatus(clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear)),
             // Dust accumulates on simulated mission time, not browser wall-clock time.
-            dust: trackId === "solar" ? clamp(state.dust + 1.1 * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
+            dust: trackId === "solar" ? clamp(state.dust + (2.6 + (100 - state.condition) * 0.018) * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
           };
         }
         return next;
@@ -3004,12 +3012,12 @@ export function MissionSimulation() {
       earthReportAtSeconds,
       fallbackReadyAt,
       activeFaults,
-      partsInventoryKg,
+
       sampleQuality,
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
     });
-  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes, partsInventoryKg]);
+  }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
     if (!results || !pending || completionSavedRef.current) return;
@@ -3496,7 +3504,6 @@ export function MissionSimulation() {
         surveyedNodes,
         sampleStages,
         resourceYield,
-        partsInventoryKg: missionStage === 1 ? Number.POSITIVE_INFINITY : partsInventoryKg,
       },
       node,
     );
@@ -3660,10 +3667,6 @@ export function MissionSimulation() {
         setAiMessage(`${trackId.toUpperCase()} is already at 2/2 retrofit progress for its selected technology tier.`);
         return;
       }
-      if (missionStage !== 1 && partsInventoryKg + 1e-6 < installation.materialKg) {
-        setOperationResult(`RETROFIT LOCKED · ${installation.kit} requires ${installation.materialKg.toFixed(1)} kg material; only ${partsInventoryKg.toFixed(1)} kg is available.`);
-        return;
-      }
       const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
       const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
       if (availableEnergyKWh < installation.energyKWh) {
@@ -3671,11 +3674,10 @@ export function MissionSimulation() {
         return;
       }
       const targetLevel = currentLevel + 1;
-      if (missionStage !== 1) setPartsInventoryKg((stock) => Math.max(0, stock - installation.materialKg));
       setMetrics((value) => ({ ...value, battery: clamp(value.battery - installation.energyKWh / batteryCapacity * 100) }));
       const installationSeconds = [12, 15, 18, 20][Math.min(3, currentLevel)];
       beginOperation("UPGRADE", trackId, `Installing ${installation.tier} retrofit ${installation.newProgress} · ${technologyTracks.find((track) => track.id === trackId)?.category ?? trackId}`, installationSeconds, targetLevel, undefined, "retrofit");
-      setAiMessage(`RETROFIT STARTED · ${installation.metric}: ${installation.directGain}. Cost paid: ${missionStage === 1 ? "no spare parts in Mission 1" : `${installation.materialKg.toFixed(1)} kg on-site material`} and ${installation.energyKWh.toFixed(2)} kWh commissioning energy. Additional effect: ${retrofitSecondaryPreview(trackId, installation.tier, targetLevel)}. Installation takes ${installationSeconds} simulated seconds at 1× and scales with simulation speed.`);
+      setAiMessage(`RETROFIT STARTED · ${installation.metric}: ${installation.directGain}. Commissioning energy: ${installation.energyKWh.toFixed(2)} kWh. Additional effect: ${retrofitSecondaryPreview(trackId, installation.tier, targetLevel)}. Installation takes ${installationSeconds} simulated seconds at 1× and scales with simulation speed.`);
       return;
     }
     const matchingFaults = Object.values(activeFaults).filter((fault) =>
@@ -3703,12 +3705,7 @@ export function MissionSimulation() {
         setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.energyKWh} kWh; stored energy is ${availableEnergyKWh.toFixed(2)} kWh.`);
         return;
       }
-      if (missionStage !== 1 && partsInventoryKg < selectedRepair.partsMassKg) {
-        setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.partsMassKg} kg parts; ${partsInventoryKg.toFixed(2)} kg is available.`);
-        return;
-      }
       setMetrics((current) => ({ ...current, battery: clamp(current.battery - selectedRepair.energyKWh / batteryCapacity * 100) }));
-      if (missionStage !== 1) setPartsInventoryKg((current) => Math.max(0, current - selectedRepair.partsMassKg));
       const repairSupports = selectedRepair.requiredSystems;
       const roverCanAssist = pending.selected.rover !== undefined && repairSupports.includes("rover") && !roverOnFieldJob;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
@@ -3724,7 +3721,7 @@ export function MissionSimulation() {
         roverCanAssist,
         repairSupports,
       );
-      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Consumes ${selectedRepair.energyKWh} kWh and ${missionStage === 1 ? "no spare parts (Mission 1 exemption)" : `${selectedRepair.partsMassKg} kg of parts`}. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
+      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Activation energy: ${selectedRepair.energyKWh} kWh. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
       return;
     }
 
@@ -3831,7 +3828,7 @@ export function MissionSimulation() {
         setAiMessage("EMERGENCY SEAL PATCH · A small manual patch restored limited pressure margin. A maintenance/thermal-cured composite repair is stronger.");
         break;
       case "fallback-water":
-        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(1)) }));
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(2.5)) }));
         setAiMessage("GRAVITY-FED CONDENSATE RECOVERY · A small amount of water recovered without running the powered purification loop.");
         break;
       case "fallback-oxygen":
@@ -4066,11 +4063,11 @@ export function MissionSimulation() {
         setAiMessage("Oxygen output temporarily increased. The extra processing load is drawing power.");
         break;
       case "flush":
-        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(4)), power: clamp(current.power - cost(2)) }));
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(6)), power: clamp(current.power - cost(2)) }));
         setAiMessage("Water recovery loop flushed. Differential pressure has fallen.");
         break;
       case "purify":
-        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(6)), power: clamp(current.power - cost(4)) }));
+        setMetrics((current) => ({ ...current, water: clamp(current.water + gain(9)), power: clamp(current.power - cost(4)) }));
         setAiMessage("Deep purification cycle completed. Water reserve improved at a higher energy cost.");
         break;
       case "scrub":
@@ -4195,10 +4192,9 @@ export function MissionSimulation() {
         const processedMaterialKg = gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current);
         setResourceYield((value) => value + processedMaterialKg);
         // Processed ISRU feed is the local source of retrofit / repair material stock.
-        setPartsInventoryKg((value) => value + processedMaterialKg);
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
         setScore((value) => clamp(value + gain(5)));
-        setAiMessage(`ISRU feed processed. Produced ${processedMaterialKg.toFixed(1)} kg of local material; available retrofit / repair stock is now ${(partsInventoryKg + processedMaterialKg).toFixed(1)} kg. Processing consumes power and battery energy.`);
+        setAiMessage(`ISRU feed processed. Produced ${processedMaterialKg.toFixed(1)} kg of local material; . Processing consumes power and battery energy.`);
         break;
       }
       case "purge":
@@ -4207,12 +4203,12 @@ export function MissionSimulation() {
         setAiMessage("ISRU feed line purged. Pressure margin and process stability improved.");
         break;
       case "tune-crops":
-        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(5)), water: clamp(current.water - cost(2)), power: clamp(current.power - cost(2)) }));
+        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(7)), water: clamp(current.water - cost(1)), power: clamp(current.power - cost(2)) }));
         conditionBoost(1);
         setAiMessage("Controlled crop environment tuned. Food production increased with a modest water and power cost.");
         break;
       case "harvest":
-        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(7)), water: clamp(current.water - cost(2)) }));
+        setMetrics((current) => ({ ...current, food: clamp(current.food + gain(9)), water: clamp(current.water - cost(1)) }));
         setResourceYield((value) => value + gain(1));
         setScore((value) => clamp(value + gain(3)));
         setAiMessage("Harvest cycle complete. Fresh food output has been added to the colony reserve.");
@@ -4260,9 +4256,6 @@ export function MissionSimulation() {
       : 0;
     if (availableEnergyKWh + 1e-6 < option.energyKWh) {
       blockers.push(`Insufficient stored energy: needs ${option.energyKWh} kWh; available ${availableEnergyKWh.toFixed(2)} kWh.`);
-    }
-    if (missionStage !== 1 && partsInventoryKg + 1e-6 < option.partsMassKg) {
-      blockers.push(`Insufficient parts: needs ${option.partsMassKg} kg; stock is ${partsInventoryKg.toFixed(2)} kg.`);
     }
     const runningOperation = activeOperationsRef.current[systemId];
     if (runningOperation) blockers.push(`Target system already has an active work order: ${runningOperation.label}.`);
@@ -4729,7 +4722,7 @@ export function MissionSimulation() {
             earthReportAtSeconds={earthReportAtSeconds}
             elapsedSeconds={elapsed}
             fallbackReadyAt={fallbackReadyAt}
-            partsInventoryKg={partsInventoryKg}
+
             simulationSpeed={speed}
             campaign={pending.campaign}
             missionTitle={pending.missionTitle}
