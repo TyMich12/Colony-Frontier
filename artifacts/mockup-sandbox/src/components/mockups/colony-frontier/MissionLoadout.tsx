@@ -945,17 +945,19 @@ export function MissionLoadout() {
                             )
                           : 0;
 
-                        const availableTreasury =
-                          gameState.credits - (spend - previousCost);
-
-                        const availableCredits = availableTreasury;
+                        const availableCredits =
+                          maxDeploymentSpend - (spend - previousCost);
+                        const availableMass =
+                          missionCapacity -
+                          (mass - (previousTier ? track.tiers[previousTier].mass : 0));
 
                         const status = getTierStatus(
                           track,
                           tier,
                           gameState,
                           availableCredits,
-                                          );
+                          availableMass,
+                        );
 
                         return (
                           <TierOption
