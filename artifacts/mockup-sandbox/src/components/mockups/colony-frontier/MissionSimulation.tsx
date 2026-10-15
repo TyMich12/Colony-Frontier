@@ -1469,6 +1469,8 @@ function BuildingInspector({
   electricalReadings,
   buildings,
   systemOperational,
+  waterOperational,
+  agricultureOperational,
   simulationSpeed,
   campaign,
   missionTitle,
@@ -1500,6 +1502,8 @@ function BuildingInspector({
   electricalReadings: { generationKW: number; actualSupplyKW: number; consumptionKW: number; batteryFlowKW: number; enduranceHours: number | null; generationSources: { label: string; kw: number }[]; demandSources: { label: string; kw: number }[] };
   buildings: Record<string, BuildingRuntime>;
   systemOperational: boolean;
+  waterOperational: boolean;
+  agricultureOperational: boolean;
   simulationSpeed: number;
   campaign: "moon" | "mars";
   missionTitle: string;
@@ -1657,11 +1661,13 @@ function BuildingInspector({
   const pointingLossKW = liveSolarKW * (1 / pointingCosine - 1);
   const storedBatteryKWh = battery / 100 * batteryCapacityKWh;
   const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
-  const waterRecoveryNow = systemOperational && electricalReadings.actualSupplyKW >= 2 ? Math.min(96, liveCondition / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
+  const waterConditionNow = clamp(buildings.water?.condition ?? 100, 0, 100);
+  const agricultureConditionNow = clamp(buildings.agriculture?.condition ?? 100, 0, 100);
+  const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= 2 ? Math.min(96, waterConditionNow / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
-  const foodProductionNow = systemOperational && electricalReadings.actualSupplyKW >= 2 ? liveCondition / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow) : 0;
+  const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= 2 ? agricultureConditionNow / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow) : 0;
   const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
-  const waterThroughputNow = extraReading("throughput") * liveCondition / 100;
+  const waterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
   const estimatedWaterLossPerDay = Math.max(0, 8 - Math.min(8, waterThroughputNow) * waterRecoveryNow / 100) + foodProductionNow * foodWaterUseNow * (1 - waterRecoveryNow / 100);
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
@@ -4897,6 +4903,8 @@ export function MissionSimulation() {
             electricalReadings={electricalReadings}
             buildings={buildings}
             systemOperational={systemIsOperational(selectedTrack.id, { selected: pending.selected, buildings, activeFaults, metrics, surveyedNodes, sampleStages, resourceYield })}
+            waterOperational={systemIsOperational("water", { selected: pending.selected, buildings, activeFaults, metrics, surveyedNodes, sampleStages, resourceYield })}
+            agricultureOperational={systemIsOperational("agriculture", { selected: pending.selected, buildings, activeFaults, metrics, surveyedNodes, sampleStages, resourceYield })}
             simulationSpeed={speed}
             campaign={pending.campaign}
             missionTitle={pending.missionTitle}
