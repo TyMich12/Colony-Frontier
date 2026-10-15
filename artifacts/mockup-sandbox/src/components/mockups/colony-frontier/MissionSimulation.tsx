@@ -54,7 +54,8 @@ import { Colony3DMap } from "./Colony3DMap";
 const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
 const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
 // Ten staggered incidents create meaningful maintenance pressure without relying on random failures.
-const EVENT_TIMES = [0.14, 0.30, 0.47, 0.65, 0.82, 0.94].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
+const EVENT_TIMES = [0.08, 0.16, 0.24, 0.32, 0.40, 0.50, 0.60, 0.70, 0.80, 0.91].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
+const LEVEL_ONE_EVENT_TIMES = [0.14, 0.30, 0.47, 0.65, 0.82, 0.94].map((fraction) => Math.round(TOTAL_MISSION_SECONDS * fraction));
 // Level 1 pacing prioritises a recoverable first run.
 
 const REPAIR_GAP_PREFIX = "Unrestored fault gap · ";
@@ -2753,11 +2754,11 @@ export function MissionSimulation() {
               const previous = current[targetId];
               if (!previous) return current;
               const solarProtection = targetId === "solar" ? solarFaultProtection(current.solar?.repairMetrics) : 0;
-              const damage = Math.min(9, (2.5 + eventIndex * 0.3) * shock) * (1 - solarProtection);
+              const damage = (missionStage === 1 ? Math.min(9, (2.5 + eventIndex * 0.3) * shock) : Math.min(18, (5 + eventIndex * 0.65) * shock)) * (1 - solarProtection);
               const condition = clamp(previous.condition - damage);
               const nextBuildings = { ...current, [targetId]: { ...previous, condition, status: buildingStatus(condition) } };
               if (event.id === "solar-dust" || event.id === "regional-dust-front") {
-                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + 8 * shock) };
+                nextBuildings.solar = { ...(current.solar ?? { condition: 100, dust: 0, status: "ONLINE" }), dust: clamp((current.solar?.dust ?? 0) + (missionStage === 1 ? 8 : 12) * shock) };
               }
               const primaryMetric = getPrimaryRepairMetric(targetId);
               if (primaryMetric && targetId !== "solar" && targetId !== "maintenance") {
@@ -3108,7 +3109,7 @@ export function MissionSimulation() {
           // Condition wear is measured in points per simulated Earth day.
           // Make routine wear clearly visible over a mission, with solar wearing faster
           // because of dust and exposed surface hardware. Incidents add further damage.
-          const wearPerDay = (trackId === "solar" ? 3.0 : 1.6) * stagePressure;
+          const wearPerDay = (missionStage === 1 ? (trackId === "solar" ? 3.0 : 1.6) : (trackId === "solar" ? 12.0 : 7.0)) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
