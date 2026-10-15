@@ -93,6 +93,19 @@ function repairAdjustedRating(
   const gap = Math.max(0, repairMetrics?.[repairGapKey(metric)] ?? 0);
   return lowerIsBetter ? ratedValue + gap : Math.max(0, ratedValue - gap);
 }
+// Equipment condition directly derates useful output: 100 condition = 100% rated output,
+// 50 condition = 50% output, and 0 condition = no useful output. Missing runtime state
+// means the system has not yet been degraded, so it retains full rated output.
+function conditionAdjustedOutput(
+  systemId: string,
+  ratedOutput: number,
+  buildings: Record<string, BuildingRuntime>,
+): number {
+  const condition = buildings[systemId]?.condition;
+  const outputFraction = condition === undefined ? 1 : clamp(condition, 0, 100) / 100;
+  return Math.max(0, ratedOutput) * outputFraction;
+}
+
 function mergeRepairReading(readings: Record<string, number>, metric: string, value: number): number {
   return /hotspot-fault diagnosis coverage|hotspot fault protection|faulted strings protected/i.test(metric)
     ? Math.max(readings[metric] ?? 0, value)
@@ -2684,16 +2697,16 @@ export function MissionSimulation() {
         const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
         const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
         const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
-        const solarRatedKW = solarOnline ? getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade) : 0;
+        const solarRatedKW = solarOnline ? conditionAdjustedOutput("solar", getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade), buildings) : 0;
         const solarGeneration = solarOnline
           ? Math.min(solarRatedKW, solarRatedKW * solarAvailability * (1 - cellTemperatureLoss) * dustTransmission(solarDust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)))
           : 0;
         const batteryCapacityKWh = ratedBatteryCapacityKWh(pending.selected, buildings);
         const storedEnergyKWh = batteryOnline ? batteryCapacityKWh * current.battery / 100 : 0;
-        const batteryDischargeLimitKW = batteryOnline ? getAdditionalRating("battery", "continuous discharge power", pending.selected.battery ?? "Foundation", batteryUpgrade) : 0;
+        const batteryDischargeLimitKW = batteryOnline ? conditionAdjustedOutput("battery", getAdditionalRating("battery", "continuous discharge power", pending.selected.battery ?? "Foundation", batteryUpgrade), buildings) : 0;
         const gridTransferLimitKW = pending.selected.grid
           ? gridOnline
-            ? repairAdjustedRating("grid", getBaselineRating("grid", pending.selected.grid, gridUpgrade), buildings.grid?.repairMetrics)
+            ? conditionAdjustedOutput("grid", repairAdjustedRating("grid", getBaselineRating("grid", pending.selected.grid, gridUpgrade), buildings.grid?.repairMetrics), buildings)
             : 0
           : Number.POSITIVE_INFINITY;
         // Electrical load model: use the mission-average values in POWER_DEMAND_MODEL.
@@ -2848,18 +2861,18 @@ export function MissionSimulation() {
         const powerRecovery = (powerBase - current.power) * (1 - Math.exp(-resourceDt / 7200));
         const powerPathAvailable = deliveredPowerKW >= 2;
         const oxygenProductionKgDay = oxygenOnline && powerPathAvailable
-          ? repairAdjustedRating("oxygen", getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade), buildings.oxygen?.repairMetrics)
+          ? conditionAdjustedOutput("oxygen", repairAdjustedRating("oxygen", getBaselineRating("oxygen", pending.selected.oxygen ?? "Foundation", oxygenUpgrade), buildings.oxygen?.repairMetrics), buildings)
           : 0;
         const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
-        const waterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
-        const waterThroughputLDay = getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade);
-        const circulatingWaterLDay = 20; // Four-crew loop-flow assumption; recovery reduces net make-up loss.
+        const waterRecoveryPct = conditionAdjustedOutput("water", repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics), buildings);
+        const waterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
+        const circulatingWaterLDay = 8; // Recoverable crew make-up stream, not all water circulated through the loop.
         const effectiveWaterRecoveryPct = waterOnline && powerPathAvailable ? waterRecoveryPct : 0;
         const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics)
+          ? conditionAdjustedOutput("agriculture", repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics), buildings)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
@@ -2872,14 +2885,14 @@ export function MissionSimulation() {
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalRatedKW = thermalOnline
-          ? repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics)
+          ? conditionAdjustedOutput("thermal", repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics), buildings)
           : 0;
         const thermalNeedKW = 0.7 + Math.abs(ambientTemperature - 21) * 0.15;
         const thermalCoverage = Math.min(1, thermalRatedKW / Math.max(0.1, thermalNeedKW));
         const thermalTarget = thermalOnline ? 21 + (ambientTemperature - 21) * (1 - thermalCoverage) : ambientTemperature;
         const thermalResponse = thermalOnline ? 1 - Math.exp(-resourceDt / (7200 / Math.max(0.25, thermalCoverage))) : 1 - Math.exp(-resourceDt / 28800);
         const radiationAvoidedPct = radiationOnline
-          ? repairAdjustedRating("radiation", getBaselineRating("radiation", pending.selected.radiation ?? "Foundation", radiationUpgrade), buildings.radiation?.repairMetrics)
+          ? conditionAdjustedOutput("radiation", repairAdjustedRating("radiation", getBaselineRating("radiation", pending.selected.radiation ?? "Foundation", radiationUpgrade), buildings.radiation?.repairMetrics), buildings)
           : 0;
         const radiationDelta = 0.8 * (1 - radiationAvoidedPct / 100) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const habitatPressureLossRate = repairAdjustedRating("habitat", getBaselineRating("habitat", pending.selected.habitat ?? "Foundation", habitatUpgrade), buildings.habitat?.repairMetrics, true);
