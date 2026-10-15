@@ -172,8 +172,7 @@ function EquipmentRow({
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#29434a] pt-3 sm:grid-cols-4">
-        <Metric label="Mass" value={`${equipment.mass.toLocaleString()} kg`} />
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#29434a] pt-3 sm:grid-cols-3">
         <Metric label="Equipment cost" value={formatCredits(equipment.cost)} />
         <Metric label="Efficiency" value={equipment.efficiency} />
         <Metric label="Slot" value={isSelected ? "Selected" : "Available"} />
