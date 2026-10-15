@@ -1632,7 +1632,7 @@ function BuildingInspector({
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
   const liveCondition = clamp(runtime.condition, 0, 100);
-  const ratedReading = getBaselineRating(track.id, tier, upgradeLevel);
+  const ratedReading = repairAdjustedRating(track.id, getBaselineRating(track.id, tier, upgradeLevel), runtime.repairMetrics, track.id === "habitat" || track.id === "navigation");
   const extraReading = (needle: string) => getAdditionalRating(track.id, needle, tier, upgradeLevel);
   const liveSolarText = track.id === "solar" ? physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value : "";
   const liveSolarKW = Number(liveSolarText.match(/([\d.]+) kW current/)?.[1] ?? 0);
@@ -1644,9 +1644,10 @@ function BuildingInspector({
   const dustTransmissionNow = dustTransmission(runtime.dust);
   const dustLossKW = dustTransmissionNow > 0 ? liveSolarKW * (1 / dustTransmissionNow - 1) : 0;
   const storedBatteryKWh = battery / 100 * batteryCapacityKWh;
-  const waterRecoveryNow = liveCondition / 100 * Math.min(96, getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) + (isFirstMission ? 30 : 0));
-  const ratedFoodNow = getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
-  const foodProductionNow = liveCondition / 100 * (isFirstMission ? Math.max(2.65, ratedFoodNow) : ratedFoodNow);
+  const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
+  const waterRecoveryNow = Math.min(96, liveCondition / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0));
+  const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
+  const foodProductionNow = liveCondition / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow);
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
     switch (track.id) {
@@ -3023,7 +3024,7 @@ export function MissionSimulation() {
         const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
         const ratedWaterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
-        const waterRecoveryPct = conditionAdjustedOutput("water", missionStage === 1 ? Math.min(96, ratedWaterRecoveryPct + 30) : ratedWaterRecoveryPct, buildings);
+        const waterRecoveryPct = Math.min(96, conditionAdjustedOutput("water", ratedWaterRecoveryPct, buildings) + (missionStage === 1 ? 45 : 0));
         const waterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
         const circulatingWaterLDay = 8; // Recoverable crew make-up stream, not all water circulated through the loop.
         const effectiveWaterRecoveryPct = waterOnline && powerPathAvailable ? waterRecoveryPct : 0;
@@ -3031,7 +3032,7 @@ export function MissionSimulation() {
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? conditionAdjustedOutput("agriculture", missionStage === 1 ? Math.max(2.65, ratedFoodProductionKgDay) : ratedFoodProductionKgDay, buildings)
+          ? conditionAdjustedOutput("agriculture", missionStage === 1 ? Math.max(3.0, ratedFoodProductionKgDay) : ratedFoodProductionKgDay, buildings)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
