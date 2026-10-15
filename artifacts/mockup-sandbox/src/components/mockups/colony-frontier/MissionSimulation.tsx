@@ -1588,7 +1588,7 @@ function BuildingInspector({
       { id: "fallback-rover", label: "Check wheel encoders", detail: "Run a local manual check without depending on remote navigation." },
       { id: "survey", label: "Survey site", detail: "Rover + navigation + comms are required to reach and map a field site." },
       { id: "return", label: "Return home", detail: "Use navigation and an energy source to return to the launch lane." },
-      { id: "inspect", label: "Inspect rover", detail: "Check wheels, payload, and navigation health." },
+      { id: "inspect", label: "Inspect rover", detail: "Check wheels, sensors, and navigation health." },
     ],
     extraction: [
       { id: "fallback-extraction", label: "Unload drill torque", detail: "Safely clear a local torque latch; no material is extracted." },
