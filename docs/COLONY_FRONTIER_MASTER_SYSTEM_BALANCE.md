@@ -391,7 +391,7 @@ At Foundation 0/2, use the base load below. Each technology tier step adds the l
 | Rover | 0.10 | 0.03 | 0.015 | Average bus charging/standby; drive motors can briefly draw about 2 kW from rover storage |
 | Resource Extraction | 0.25 | 0.08 | 0.04 | Mission-average pilot excavation; full cutting/drive load is intermittent |
 | ISRU | 0.80 | 0.15 | 0.075 | Small pilot process scheduled in work periods; not a continuous full-power industrial plant |
-| Agriculture | 0.75 | 0.08 | 0.04 | Compulsory small LED crop module; 18 kWh/day for the existing 0.50 kg/day Foundation output |
+| Agriculture | 0.75 | 0.08 | 0.04 | Foundation rating baseline: 0.75 kW for 0.50 kg/day; Mission 1 adds 0.55 kW grow-light support for its 3.0 kg/day tutorial output |
 | Maintenance | 0.05 | 0.01 | 0.005 | Diagnostic standby electronics; powered tools are temporary job loads |
 | Radiation Monitoring | 0.02 | 0.005 | 0.002 | Sensors only; passive shielding uses no continuous electricity |
 | Communications | 0.15 | 0.04 | 0.02 | Average draw including duty-cycled transmission windows |
@@ -431,10 +431,10 @@ This section records the gameplay pacing constants used by `MissionSimulation.ts
 | Resource | Capacity | Initial fill | Approximate initial amount | Model |
 |---|---:|---:|---:|---|
 | Potable/recycled water | 240 L | 86% | 206 L | Four tanks at 60 L each; water is consumed by crew make-up losses and crop water not recovered by the loop |
-| Stored edible food | 60 kg | 84% | 50.4 kg | Four-crew planning demand is 2.48 kg/day; the Foundation crop module contributes 0.50 kg/day when agriculture and power are operational |
+| Stored edible food | 60 kg | 84% | 50.4 kg | Four-crew planning demand is 2.48 kg/day; outside Mission 1 the Foundation crop contributes 0.50 kg/day, while Mission 1's supported grow module targets 3.0 kg/day at full condition |
 | Oxygen buffer | 24 kg | 88% | 21.1 kg | Net balance is driven by production minus four-crew demand; an active fault adds a separate penalty |
 
-The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day instead of hiding a lower consumption rate to make the game easier. The Foundation crop module is supplemental, not a full food-production farm. The larger food reserve represents stocked provisions. Water is not depleted at a fixed arbitrary percentage: its change is calculated from the water loop's recovery rate, throughput, crew make-up losses and crop water recovery. If a relevant system or power path is offline, its recovery contribution is unavailable.
+The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day instead of hiding a lower consumption rate to make the game easier. Outside Mission 1, Foundation Agriculture is supplemental; Mission 1's supported grow module is tuned to produce enough to replenish reserves at full condition. The larger food reserve represents stocked provisions. Water is not depleted at a fixed arbitrary percentage: its change is calculated from the water loop's recovery rate, throughput, crew make-up losses and crop water recovery. If a relevant system or power path is offline, its recovery contribution is unavailable.
 
 ### Equipment wear and incidents
 
