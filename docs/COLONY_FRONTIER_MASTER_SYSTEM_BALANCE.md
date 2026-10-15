@@ -419,3 +419,29 @@ The Foundation solar array remains **12 kW rated peak output**. Live output cont
 With the revised base loads, the reference colony's core + air revitalisation + water + thermal + compulsory agriculture is about **4.95 kW** before communications, navigation, controllers or optional equipment. This is a more credible starting point for a daylight power budget, while optional science, rover work, extraction and ISRU can still create a deficit and be shed or scheduled. It does **not** claim that a 1,200 kWh Foundation battery can sustain every system through the full 14-Earth-day lunar night; nighttime survival still requires carefully managed loads and sufficient storage or another dependable power source.
 
 This demand-model update changes **no resource-output target, repair effect, retrofit effect, costs/durations, or existing tier output ratings**, including Apex and Research values. Foundation grid capacity and solar reference settings remain as previously specified.
+
+---
+
+## Mission simulation pacing and reserve assumptions — updated 2026-10-15
+
+This section records the gameplay pacing constants used by `MissionSimulation.tsx`. It does not change the system rating, repair-effect, retrofit, or tier tables above.
+
+### Consumable reserves
+
+| Resource | Capacity | Initial fill | Approximate initial amount | Model |
+|---|---:|---:|---:|---|
+| Potable/recycled water | 240 L | 86% | 206 L | Four tanks at 60 L each; water is consumed by crew make-up losses and crop water not recovered by the loop |
+| Stored edible food | 60 kg | 84% | 50.4 kg | Four-crew planning demand is 2.48 kg/day; the Foundation crop module contributes 0.50 kg/day when agriculture and power are operational |
+| Oxygen buffer | 24 kg | 88% | 21.1 kg | Net balance is driven by production minus four-crew demand; an active fault adds a separate penalty |
+
+The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day instead of hiding a lower consumption rate to make the game easier. The Foundation crop module is supplemental, not a full food-production farm. The larger food reserve represents stocked provisions. Water is not depleted at a fixed arbitrary percentage: its change is calculated from the water loop's recovery rate, throughput, crew make-up losses and crop water recovery. If a relevant system or power path is offline, its recovery contribution is unavailable.
+
+### Equipment wear and incidents
+
+- A standard mission schedules **10 incident windows** across the 14-Earth-day mission, instead of eight. Incident damage is more noticeable, and later incidents/stages apply increased pressure. The event schedule is deterministic; the selected incident still depends on deployed systems and unresolved-event history.
+- Background condition wear is **0.65 condition points per simulated Earth day** for ordinary equipment and **1.1 points per simulated Earth day** for the solar array, before stage pressure and live-fault propagation. This avoids the old wall-clock scaling bug that could drain more than 100 condition points during one mission.
+- Incidents provide the acute damage and fault propagation; background wear remains gradual. Repairs restore both the selected workbook-defined metric and visible equipment condition: Standalone +5 points, Enhanced +7, Dual +9, Integrated +12 (condition is capped at 100).
+- Completing a valid procedure on a system clears its targeted active incident and restores the system's primary capability. A repair must not subtract values in incompatible units; for example, a temperature-margin improvement cannot be subtracted from a water-throughput fault gap.
+- Diagnostics must report active incidents **and** deployed modules below 82% condition, naming the weakest module and its condition. A clean incident list must not be presented as “nothing is wrong” if equipment is degraded.
+
+These are explicit game-model assumptions for readable mission pacing, not certified spacecraft specifications. They preserve the existing Apex and Research tier rating values.
