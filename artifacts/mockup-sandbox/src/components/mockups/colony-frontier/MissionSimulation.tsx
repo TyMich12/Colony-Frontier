@@ -1463,7 +1463,8 @@ function BuildingInspector({
   earthReportAtSeconds,
   elapsedSeconds,
   fallbackReadyAt,
-
+  electricalReadings,
+  buildings,
   simulationSpeed,
   campaign,
   missionTitle,
@@ -1492,6 +1493,8 @@ function BuildingInspector({
   earthReportAtSeconds: number;
   elapsedSeconds: number;
   fallbackReadyAt: Record<string, number>;
+  electricalReadings: { generationKW: number; actualSupplyKW: number; consumptionKW: number; batteryFlowKW: number; batteryFlowKW: number; enduranceHours: number | null; generationSources: { label: string; kw: number }[]; demandSources: { label: string; kw: number }[] };
+  buildings: Record<string, BuildingRuntime>;
   simulationSpeed: number;
   campaign: "moon" | "mars";
   missionTitle: string;
@@ -2136,7 +2139,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" &&  < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
@@ -4870,7 +4873,8 @@ export function MissionSimulation() {
             earthReportAtSeconds={earthReportAtSeconds}
             elapsedSeconds={elapsed}
             fallbackReadyAt={fallbackReadyAt}
-
+            electricalReadings={electricalReadings}
+            buildings={buildings}
             simulationSpeed={speed}
             campaign={pending.campaign}
             missionTitle={pending.missionTitle}
