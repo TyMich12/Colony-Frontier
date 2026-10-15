@@ -409,7 +409,7 @@ At Foundation 0/2, use the base load below. Each technology tier step adds the l
 6. Emergency load shedding changes **served load**, not the rated requested-demand display. Show any curtailed loads separately.
 7. Demand changes only when systems are installed/removed, a system's tier changes, or a retrofit is commissioned. Do not recalculate it from live generation, SOC or animation/tick timing.
 8. Keep two decimal places for kW consistently. Avoid random values and hidden multipliers.
-9. The Foundation agriculture *rated table value* remains **0.50 kg/day** and is preserved for tier comparisons. Mission 1 specifically uses a supported starter grow module delivering **2.65 kg/day at 100% condition**, with an additional 0.55 kW grow-light allowance; this is a Level 1 tutorial balance exception, not a change to the underlying tier table.
+9. The Foundation agriculture *rated table value* remains **0.50 kg/day** and is preserved for tier comparisons. Mission 1 specifically uses a supported starter grow module delivering **3.0 kg/day at 100% condition**, with an additional 0.55 kW grow-light allowance; this is a Level 1 tutorial balance exception, not a change to the underlying tier table.
 10. These are mission-average game assumptions pending a specified hardware design. They should not be presented as experimentally verified flight-hardware specifications.
 
 ### Solar and sustainability interpretation
@@ -466,7 +466,7 @@ Examples: 100% condition = 100% rated output; 75% condition = 75%; 40% condition
 
 ### Water balance correction
 
-The crew water model uses an **8 L/day recoverable/make-up stream** for four crew, rather than treating the full 20 L/day loop circulation as water that is lost unless recovered. Mission 1 gets a +30 percentage-point recovery-loop support bonus (capped at 96%) to make water recovery forgiving while still scaling with equipment condition. Recovered water is calculated from the stream throughput and the effective recovery percentage. Crop water demand is still calculated from actual food production × the agriculture water-use rating, with the recovered share returned to the clean-water reserve. Thus:
+The crew water model uses an **8 L/day recoverable/make-up stream** for four crew, rather than treating the full 20 L/day loop circulation as water that is lost unless recovered. Mission 1 gets a +45 percentage-point recovery-loop support bonus (capped at 96%) to make water recovery forgiving while still scaling with equipment condition. Recovered water is calculated from the stream throughput and the effective recovery percentage. Crop water demand is still calculated from actual food production × the agriculture water-use rating, with the recovered share returned to the clean-water reserve. Thus:
 - Lower Water condition reduces recovery efficiency and treatment throughput, so less water is returned.
 - Lower Agriculture condition reduces food production and also reduces crop water use because fewer crops are produced.
 - Water reserve changes by the net amount lost after recovery, not by gross plumbing circulation.
@@ -474,5 +474,5 @@ The crew water model uses an **8 L/day recoverable/make-up stream** for four cre
 
 ### Food balance
 
-Outside Mission 1, food production remains the selected Agriculture system's rated kg/day multiplied by its condition fraction and available-power/system status. Four-crew food demand remains 2.48 kg/day. Mission 1 has a tutorial grow-module support output of 2.65 kg/day at 100% condition and a matching additional 0.55 kW allowance so food can replenish instead of only depleting. This update does **not** alter the existing Foundation/Frontier/Apex/Research system-rating tables or Apex/Research values; it changes how current condition affects delivered output and corrects the water-loss calculation.
+Outside Mission 1, food production remains the selected Agriculture system's rated kg/day multiplied by its condition fraction and available-power/system status. Four-crew food demand remains 2.48 kg/day. Mission 1 has a tutorial grow-module support output of 3.0 kg/day at 100% condition and a matching additional 0.55 kW allowance so food can replenish instead of only depleting. This update does **not** alter the existing Foundation/Frontier/Apex/Research system-rating tables or Apex/Research values; it changes how current condition affects delivered output and corrects the water-loss calculation.
 
