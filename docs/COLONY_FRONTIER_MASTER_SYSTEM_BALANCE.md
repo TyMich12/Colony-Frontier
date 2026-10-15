@@ -1,6 +1,6 @@
 # Colony-Frontier — Master System Performance & Upgrade Table
 
-**Status: shared live balance table updated; secondary retrofit effects still require implementation.** Research-tier values below supersede the earlier Research column and create a much larger generation jump. These are explicit game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating. Before implementation, reconcile these targets with retrofit installation recipes, power draw, inventory, and the current simulation.
+**Status: shared live balance table updated; secondary retrofit effects still require implementation.** Research-tier values below supersede the earlier Research column and create a much larger generation jump. These are explicit game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating. Before implementation, reconcile these targets with retrofit behaviour, power draw, and the current simulation.
 
 ## How to read the table
 
@@ -56,7 +56,7 @@
 |---|---|---|
 | **Foundation** | Robust, relatively simple, Earth-manufactured baseline hardware | Affordable and maintainable, but lower throughput, efficiency, redundancy, or precision. Suitable for getting the outpost running, not comfortably supporting every optional system at once. |
 | **Frontier** | Improved components, better controls and materials, more capable actuators/processors | A meaningful step up: greater throughput, lower losses, better reliability, and fewer bottlenecks. It should be clearly better than a fully retrofitted Foundation system. |
-| **Apex** | High-performance hardware with advanced control, improved thermal/material design, and stronger fault tolerance | Large gains to capacity and efficiency; supports heavier workloads and more demanding mission tasks. Higher purchase/launch mass, complexity, and potentially higher electrical draw are reasonable trade-offs. |
+| **Apex** | High-performance hardware with advanced control, improved thermal/material design, and stronger fault tolerance | Large gains to capacity and efficiency; supports heavier workloads and more demanding mission tasks. Higher purchase cost, complexity, and potentially higher electrical draw are reasonable trade-offs. |
 | **Research** | Cutting-edge, tightly integrated experimental equipment | The largest capability jump and best specialist performance. May be expensive, harder to maintain, use more power, or require advanced support systems. It should feel exceptional, not magically free of constraints. |
 
 ## What each retrofit level means
@@ -79,7 +79,7 @@ A retrofit must be an actual installed component or adjustment. It consumes loca
 | Thermal Control | Improve loop seals/flow balancing; improves heat transfer modestly | Tune pump/valve controls and radiator deployment; increases effective rejection | Radiator area, coolant-loop capacity, and pump capability |
 | Communications | Calibrate antenna pointing and connectors; improves usable link performance | Upgrade local amplifier/filter and timing calibration; improves throughput/availability | Antenna gain, radio/modem generation, and data rate |
 | Habitat | Install a seal/gasket reinforcement retrofit; lowers leak rate | Add a secondary seal patch/pressure-monitor calibration; lowers leak rate further | Pressure-vessel/seal design and fault tolerance |
-| Radiation | Add locally available shielding panels/regolith placement aids; improves event-specific dose reduction | Improve shielding coverage and monitoring/placement verification; small further gain | Shield material/layout and protected volume; account for secondary radiation and mass |
+| Radiation | Add locally available shielding panels/regolith placement aids; improves event-specific dose reduction | Improve shielding coverage and monitoring/placement verification; small further gain | Shield layout and protected volume; account for secondary radiation and coverage trade-offs |
 | Rovers | Tune wheel alignment/suspension and traction control; improves safe speed on reference terrain | Calibrate navigation/drive controls and improve wheel protection; modest speed/range gain | Drive train, suspension, sensors, battery, and terrain capability |
 | Resource Extraction | Replace bucket teeth/cutting edge; improves excavation throughput | Tune feed control and service the conveyor/drive; improves throughput and jam resistance | Excavator size, drive torque, and material-handling capacity |
 | ISRU | Replace catalyst/reactor insert; improves recipe-specific product output or recovery | Calibrate process sensors and seals; improves purity and repeatability | Reactor throughput, process control, and recipe capability |
