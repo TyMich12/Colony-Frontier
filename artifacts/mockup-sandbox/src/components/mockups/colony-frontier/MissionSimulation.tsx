@@ -1468,6 +1468,7 @@ function BuildingInspector({
   fallbackReadyAt,
   electricalReadings,
   buildings,
+  systemOperational,
   simulationSpeed,
   campaign,
   missionTitle,
@@ -1498,6 +1499,7 @@ function BuildingInspector({
   fallbackReadyAt: Record<string, number>;
   electricalReadings: { generationKW: number; actualSupplyKW: number; consumptionKW: number; batteryFlowKW: number; enduranceHours: number | null; generationSources: { label: string; kw: number }[]; demandSources: { label: string; kw: number }[] };
   buildings: Record<string, BuildingRuntime>;
+  systemOperational: boolean;
   simulationSpeed: number;
   campaign: "moon" | "mars";
   missionTitle: string;
@@ -1655,9 +1657,9 @@ function BuildingInspector({
   const pointingLossKW = liveSolarKW * (1 / pointingCosine - 1);
   const storedBatteryKWh = battery / 100 * batteryCapacityKWh;
   const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
-  const waterRecoveryNow = Math.min(96, liveCondition / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0));
+  const waterRecoveryNow = systemOperational && electricalReadings.actualSupplyKW >= 2 ? Math.min(96, liveCondition / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
-  const foodProductionNow = liveCondition / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow);
+  const foodProductionNow = systemOperational && electricalReadings.actualSupplyKW >= 2 ? liveCondition / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow) : 0;
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
     switch (track.id) {
@@ -1688,7 +1690,7 @@ function BuildingInspector({
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
       ];
       case "oxygen": {
-        const oxygenRate = ratedReading * liveCondition / 100;
+        const oxygenRate = systemOperational && electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 : 0;
         return [
           { label: "Oxygen production", value: oxygenRate.toFixed(2) + " kg O₂/day" },
           { label: "Four-crew demand", value: "3.36 kg O₂/day" },
@@ -1697,7 +1699,7 @@ function BuildingInspector({
         ];
       }
       case "co2": return [
-        { label: "CO₂ removal capacity", value: (ratedReading * liveCondition / 100).toFixed(2) + " kg CO₂/day" },
+        { label: "CO₂ removal capacity", value: (systemOperational && electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 : 0).toFixed(2) + " kg CO₂/day" },
         { label: "Four-crew reference", value: "4.16 kg CO₂/day" },
         { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
         { label: "Status", value: activeFault ? "FAULT · " + activeFault.title : runtime.status },
@@ -1839,7 +1841,7 @@ function BuildingInspector({
           <section className="mt-3 rounded-xl border border-[#3a5960] bg-[#08171c] p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#9bd9cf]">Live system readings</p>
-              <span className={activeFault ? "rounded-full bg-[#4b2029] px-2 py-0.5 text-[8px] font-black uppercase text-[#ffadb5]" : "rounded-full bg-[#14372d] px-2 py-0.5 text-[8px] font-black uppercase text-[#9be8bc]"}>{activeFault ? "FAULT ACTIVE" : runtime.status}</span>
+              <span className={activeFault ? "rounded-full bg-[#4b2029] px-2 py-0.5 text-[8px] font-black uppercase text-[#ffadb5]" : "rounded-full bg-[#14372d] px-2 py-0.5 text-[8px] font-black uppercase text-[#9be8bc]"}>{activeFault ? "FAULT ACTIVE" : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS"}</span>
             </div>
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {liveSystemReadings.map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
@@ -4887,6 +4889,7 @@ export function MissionSimulation() {
             fallbackReadyAt={fallbackReadyAt}
             electricalReadings={electricalReadings}
             buildings={buildings}
+            systemOperational={systemIsOperational(selectedTrack.id, { selected: pending.selected, buildings, activeFaults, metrics, surveyedNodes, sampleStages, resourceYield })}
             simulationSpeed={speed}
             campaign={pending.campaign}
             missionTitle={pending.missionTitle}
