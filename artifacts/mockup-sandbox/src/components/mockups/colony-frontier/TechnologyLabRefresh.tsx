@@ -510,15 +510,7 @@ export function TechnologyLabRefresh() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[#29434a] pt-4 sm:grid-cols-4">
-                    <div>
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-[#76908e]">
-                        Mass
-                      </p>
-                      <p className="font-mono text-xs text-[#d8e3cf]">
-                        {equipment.mass.toLocaleString()} kg
-                      </p>
-                    </div>
+                  <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[#29434a] pt-4 sm:grid-cols-3">
                     <div>
                       <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-[#76908e]">
                         Cost
