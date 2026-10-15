@@ -2724,8 +2724,9 @@ export function MissionSimulation() {
 
         const missionStage = Math.max(1, Number.parseInt((pending.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1);
         const scheduleShift = Math.min(TOTAL_MISSION_SECONDS * 0.04, (missionStage - 1) * TOTAL_MISSION_SECONDS * 0.003) + (pending.campaign === "mars" ? TOTAL_MISSION_SECONDS * 0.01 : 0);
-        const nextEventAt = Math.max(TOTAL_MISSION_SECONDS * 0.01, EVENT_TIMES[eventPointerRef.current] - scheduleShift);
-        if (!activeEventId && eventPointerRef.current < EVENT_TIMES.length && next >= nextEventAt) {
+        const activeEventTimes = missionStage === 1 ? LEVEL_ONE_EVENT_TIMES : EVENT_TIMES;
+        const nextEventAt = Math.max(TOTAL_MISSION_SECONDS * 0.01, activeEventTimes[eventPointerRef.current] - scheduleShift);
+        if (!activeEventId && eventPointerRef.current < activeEventTimes.length && next >= nextEventAt) {
           const eventIndex = eventPointerRef.current;
           const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventIndex, metrics);
           eventPointerRef.current += 1;
