@@ -196,7 +196,7 @@ export const technologyTracks: TechnologyTrack[] = [
     description: "Explores terrain and transports tools and samples.",
     tiers: {
       Foundation: tier("Scout-1 Rover", 180, 1, "2 km/h safe speed", "Basic transport and exploration."),
-      Frontier: tier("Pathfinder-L Rover", 350, 2.5, "4 km/h safe speed", "Greater range, payload, and navigation capability."),
+      Frontier: tier("Pathfinder-L Rover", 350, 2.5, "4 km/h safe speed", "Greater range and navigation capability."),
       Apex: tier("Odyssey-X Rover", 650, 5.5, "7 km/h safe speed", "Highly autonomous exploration and resource operations."),
       Research: tier("Odyssey-Titan Rover", 550, 9, "12 km/h safe speed", "Research-generation rover: 12 km/h safe rough-terrain speed at 0/2, with a major speed/range jump and repair assistance.", 1)
     },
@@ -258,14 +258,7 @@ export const tierMeta: Record<Tier, { color: string; short: string }> = {
   Research: { color: "#e9a15d", short: "RSH" },
 };
 
-export const payloadProgression = [
-  { phase: "Early Moon", capacity: 8000, unlock: "Starting capacity" },
-  { phase: "Mid Moon", capacity: 12000, unlock: "Unlock after Mission 03" },
-  { phase: "Late Moon", capacity: 16000, unlock: "Unlock after Mission 06" },
-  { phase: "Early Mars", capacity: 12000, unlock: "Mars Campaign start" },
-  { phase: "Mid Mars", capacity: 18000, unlock: "Unlock after Mars 03" },
-  { phase: "Late Mars", capacity: 25000, unlock: "Unlock after Mars 06" },
-] as const;
+
 
 export const tierUnlockRequirements = tierUnlocks;
 
