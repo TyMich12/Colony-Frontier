@@ -1628,6 +1628,140 @@ function BuildingInspector({
     ...(connection.any?.length ? [connection.any.map((id) => SYSTEM_LABELS[id] ?? id).join(" OR ")] : []),
   ];
   const connectionBlockers = getBlockers(track.id, "link-check");
+  const liveCondition = clamp(runtime.condition, 0, 100);
+  const ratedReading = getBaselineRating(track.id, tier, upgradeLevel);
+  const extraReading = (needle: string) => getAdditionalRating(track.id, needle, tier, upgradeLevel);
+  const liveSolarText = track.id === "solar" ? physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value : "";
+  const liveSolarKW = Number(liveSolarText.match(/([\d.]+) kW current/)?.[1] ?? 0);
+  const pointingAngle = runtime.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
+  const damagedStrings = estimatedSolarDamagedStrings(liveCondition);
+  const detectedHotspots = estimatedSolarHotspots(liveCondition, runtime.dust);
+  const hotspotPenalty = solarDegradationPenaltyFraction(liveCondition, runtime.dust, runtime.repairMetrics);
+  const hotspotLossKW = hotspotPenalty > 0 ? liveSolarKW * hotspotPenalty / Math.max(0.01, 1 - hotspotPenalty) : 0;
+  const dustTransmissionNow = dustTransmission(runtime.dust);
+  const dustLossKW = dustTransmissionNow > 0 ? liveSolarKW * (1 / dustTransmissionNow - 1) : 0;
+  const storedBatteryKWh = battery / 100 * batteryCapacityKWh;
+  const waterRecoveryNow = liveCondition / 100 * Math.min(96, getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) + (isFirstMission ? 30 : 0));
+  const ratedFoodNow = getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
+  const foodProductionNow = liveCondition / 100 * (isFirstMission ? Math.max(2.65, ratedFoodNow) : ratedFoodNow);
+  const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
+  const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
+    switch (track.id) {
+      case "solar": return [
+        { label: "Live generation", value: liveSolarKW.toFixed(2) + " kW", note: (liveSolarKW * LEVEL1_ENVIRONMENT.energyWindowSeconds / 3600).toFixed(4) + " kWh per 10 simulated seconds" },
+        { label: "Dust-related output loss", value: "≈ " + dustLossKW.toFixed(2) + " kW", note: Math.round(runtime.dust) + "% surface dust · dust builds faster as condition falls" },
+        { label: "Damaged strings", value: damagedStrings + " / 10 estimated", note: "Condition-linked simulation estimate" },
+        { label: "Hot spots detected", value: detectedHotspots + " estimated", note: "≈ " + hotspotLossKW.toFixed(2) + " kW lost to the modelled string/hot-spot penalty" },
+        { label: "Residual calibration angle", value: pointingAngle.toFixed(1) + "°", note: "Residual array pointing error; smaller is better" },
+        { label: "Rated / current output", value: getBaselineRating("solar", tier, upgradeLevel).toFixed(2) + " / " + liveSolarKW.toFixed(2) + " kW" },
+      ];
+      case "battery": return [
+        { label: "State of charge", value: battery.toFixed(1) + "%", note: storedBatteryKWh.toFixed(1) + " / " + batteryCapacityKWh.toFixed(0) + " kWh stored" },
+        { label: "Live power flow", value: Math.abs(batteryFlowKW).toFixed(2) + " kW · " + (Math.abs(batteryFlowKW) < 0.01 ? "idle" : batteryFlowKW > 0 ? "discharging" : "charging") },
+        { label: "Discharge / charge limit", value: extraReading("continuous discharge power").toFixed(1) + " / " + extraReading("continuous charge power").toFixed(1) + " kW" },
+        { label: "Protected reserve", value: (batteryCapacityKWh * LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent / 100).toFixed(1) + " kWh", note: electricalReadings.enduranceHours === null ? "No active discharge estimate" : "≈ " + electricalReadings.enduranceHours.toFixed(1) + " h to reserve at current flow" },
+      ];
+      case "grid": return [
+        { label: "Transfer capacity", value: (ratedReading * liveCondition / 100).toFixed(2) + " kW" },
+        { label: "Actual supply / demand", value: electricalReadings.actualSupplyKW.toFixed(2) + " / " + electricalReadings.consumptionKW.toFixed(2) + " kW" },
+        { label: "Power-conversion efficiency", value: extraReading("conversion efficiency").toFixed(1) + "%" },
+        { label: "Current power margin", value: (electricalReadings.actualSupplyKW - electricalReadings.consumptionKW).toFixed(2) + " kW" },
+      ];
+      case "water": return [
+        { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
+        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery-loop support is active" : "Rated recovery scaled by condition" },
+        { label: "Treatment throughput", value: (extraReading("throughput") * liveCondition / 100).toFixed(1) + " L/day" },
+        { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
+      ];
+      case "oxygen": {
+        const oxygenRate = ratedReading * liveCondition / 100;
+        return [
+          { label: "Oxygen production", value: oxygenRate.toFixed(2) + " kg O₂/day" },
+          { label: "Four-crew demand", value: "3.36 kg O₂/day" },
+          { label: "Net daily balance", value: (oxygenRate - 3.36).toFixed(2) + " kg/day" },
+          { label: "Stored oxygen", value: (metrics.oxygen / 100 * RESOURCE_CAPACITIES.oxygenReserveKg).toFixed(1) + " kg / " + RESOURCE_CAPACITIES.oxygenReserveKg + " kg" },
+        ];
+      }
+      case "co2": return [
+        { label: "CO₂ removal capacity", value: (ratedReading * liveCondition / 100).toFixed(2) + " kg CO₂/day" },
+        { label: "Four-crew reference", value: "4.16 kg CO₂/day" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Status", value: activeFault ? "FAULT · " + activeFault.title : runtime.status },
+      ];
+      case "thermal": return [
+        { label: "Cabin temperature", value: metrics.temperature.toFixed(1) + " °C" },
+        { label: "Control target", value: "21.0 °C" },
+        { label: "Heat rejection capacity", value: (ratedReading * liveCondition / 100).toFixed(2) + " kW thermal" },
+        { label: "Temperature error", value: (metrics.temperature - 21).toFixed(1) + " °C from target" },
+      ];
+      case "habitat": return [
+        { label: "Integrity / pressure margin", value: metrics.habitat.toFixed(1) + "%" },
+        { label: "Reference pressure-loss rate", value: ratedReading.toFixed(2) + " kPa/day", note: "Lower is better; active leaks can add loss" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Status", value: activeFault ? "FAULT · " + activeFault.title : runtime.status },
+      ];
+      case "radiation": return [
+        { label: "Reference-event dose avoided", value: (ratedReading * liveCondition / 100).toFixed(1) + "%" },
+        { label: "Exposure indicator", value: metrics.radiation.toFixed(1) + " / 100", note: "Mission hazard indicator; lower is safer" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Status", value: activeFault ? "INSPECTION / REPAIR NEEDED" : runtime.status },
+      ];
+      case "comms": return [
+        { label: "Data throughput", value: (ratedReading * liveCondition / 100).toFixed(2) + " Mbps" },
+        { label: "Reference link availability", value: extraReading("link availability").toFixed(2) + "%" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Link status", value: activeFault ? "DEGRADED" : runtime.status },
+      ];
+      case "navigation": return [
+        { label: "Horizontal position error", value: ratedReading.toFixed(2) + " m", note: "Lower is better" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "%" },
+        { label: "Guidance report", value: earthReport ? "Latest report received" : "No new report cached" },
+        { label: "Status", value: activeFault ? "CALIBRATION / REPAIR NEEDED" : runtime.status },
+      ];
+      case "rover": return [
+        { label: "Safe traverse speed", value: (ratedReading * liveCondition / 100).toFixed(2) + " km/h" },
+        { label: "Reference range", value: extraReading("safe range").toFixed(1) + " km per charge" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Mobility status", value: activeFault ? "MOBILITY FAULT" : runtime.status },
+      ];
+      case "extraction": return [
+        { label: "Extraction throughput", value: (ratedReading * liveCondition / 100).toFixed(1) + " kg/day" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Colony bus supply", value: electricalReadings.actualSupplyKW.toFixed(2) + " kW" },
+        { label: "Drill status", value: activeFault ? "DRILL FAULT" : runtime.status },
+      ];
+      case "isru": return [
+        { label: "Product output", value: (ratedReading * liveCondition / 100).toFixed(2) + " kg/day" },
+        { label: "Product purity", value: extraReading("purity").toFixed(2) + "%" },
+        { label: "Feedstock recovery", value: extraReading("product recovery").toFixed(2) + "%" },
+        { label: "Process status", value: activeFault ? "PROCESS FAULT" : runtime.status },
+      ];
+      case "science": return [
+        { label: "Assay throughput", value: (ratedReading * liveCondition / 100).toFixed(2) + " assays/day" },
+        { label: "Reference accuracy", value: extraReading("accuracy").toFixed(2) + "%" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
+        { label: "Instrument status", value: activeFault ? "CALIBRATION NEEDED" : runtime.status },
+      ];
+      case "agriculture": return [
+        { label: "Edible food production", value: foodProductionNow.toFixed(2) + " kg/day", note: isFirstMission ? "Level 1 starter grow module support is active" : "Tier-rated output scaled by condition" },
+        { label: "Four-crew food demand", value: "2.48 kg/day" },
+        { label: "Net daily food balance", value: (foodProductionNow - 2.48).toFixed(2) + " kg/day" },
+        { label: "Stored food", value: (metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1) + " kg / " + RESOURCE_CAPACITIES.foodReserveKg + " kg" },
+        { label: "Water per kg food", value: extraReading("water consumed").toFixed(1) + " L/kg" },
+      ];
+      case "maintenance": return [
+        { label: "Condition restored per job", value: ratedReading.toFixed(1) + " points" },
+        { label: "Weakest system", value: weakestSystem ? (SYSTEM_LABELS[weakestSystem[0]] ?? weakestSystem[0]) + " · " + weakestSystem[1].condition.toFixed(0) + "%" : "No deployed systems" },
+        { label: "Diagnostic status", value: activeFault ? "ACTIVE FAULT DETECTED" : "Monitoring deployed systems" },
+        { label: "Condition", value: liveCondition.toFixed(0) + "%" },
+      ];
+      default: return [
+        { label: "Condition", value: liveCondition.toFixed(0) + "%" },
+        { label: "Rated output", value: ratedReading.toFixed(2) + " " + (getBaselineRow(track.id)?.unit ?? "") },
+        { label: "Status", value: activeFault ? "FAULT · " + activeFault.title : runtime.status },
+      ];
+    }
+  })();
   const canUpgrade = upgradeLevel < 2 && Boolean(nextInstallation) && power >= 8 && battery >= 5 && !operation && getBlockers(track.id, "upgrade").length === 0;
 
   return (
@@ -1688,6 +1822,20 @@ function BuildingInspector({
               </div>
             )}
           </div>
+          <section className="mt-3 rounded-xl border border-[#3a5960] bg-[#08171c] p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#9bd9cf]">Live system readings</p>
+              <span className={activeFault ? "rounded-full bg-[#4b2029] px-2 py-0.5 text-[8px] font-black uppercase text-[#ffadb5]" : "rounded-full bg-[#14372d] px-2 py-0.5 text-[8px] font-black uppercase text-[#9be8bc]"}>{activeFault ? "FAULT ACTIVE" : runtime.status}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {liveSystemReadings.map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
+                <p className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#81a8ad]">{reading.label}</p>
+                <p className="mt-0.5 break-words font-mono text-[10px] font-black text-[#d8f5e8]">{reading.value}</p>
+                {reading.note && <p className="mt-0.5 break-words text-[8px] leading-3 text-[#77989e]">{reading.note}</p>}
+              </div>)}
+            </div>
+            {track.id === "solar" && <p className="mt-2 text-[8px] leading-3 text-[#76989b]">String and hot-spot counts are simulation estimates derived from condition and dust. Their combined penalty is included in the live generation reading.</p>}
+          </section>
         </div>
 
         <section className="mx-4 mt-3 rounded-xl border border-[#2d4d53] bg-[#0d2025] p-3">
@@ -1988,7 +2136,7 @@ function BuildingInspector({
             </button>
           </div>
           {!canUpgrade && upgradeLevel < 2 && (
-            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" && partsInventoryKg < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${partsInventoryKg.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
+            <p className="mt-2 text-[9px] leading-4 text-[#e3a2a0]">{(missionNumber ?? "").replace(/[^0-9]/g, "") !== "1" &&  < (nextInstallation?.materialKg ?? 0) ? `INSUFFICIENT MATERIAL · needs ${(nextInstallation?.materialKg ?? 0).toFixed(1)} kg; ${.toFixed(1)} kg available.` : getBlockers(track.id, "upgrade").join(" · ") || `Requires at least ${physicalThreshold("power", 8)} and ${physicalThreshold("battery", 5, batteryCapacityKWh)}.`}</p>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#293e44] px-5 py-3">
