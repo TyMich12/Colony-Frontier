@@ -1466,7 +1466,7 @@ export function TechnicalViewer({
             <SectionLabel>Tier hardware</SectionLabel>
             <div className="mt-3 space-y-3 text-[9px] uppercase tracking-[.14em]">
               <div className="flex justify-between gap-4"><span className="text-[#87958c]">Technology</span><span className="text-right text-[#e4eadf]">{track.tiers[tier].name}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-[#87958c]">Mass</span><span className="font-mono text-[#d9e5d8]">{track.tiers[tier].mass.toLocaleString()} kg</span></div>
+              
               <div className="flex justify-between gap-4"><span className="text-[#87958c]">Mission cost</span><span className="font-mono text-[#d9e5d8]">{formatCredits(track.tiers[tier].cost)}</span></div>
               <div className="flex justify-between gap-4"><span className="text-[#87958c]">Study components</span><span className="font-mono text-[#d9e5d8]">{architecture.parts.length}</span></div>
             </div>
