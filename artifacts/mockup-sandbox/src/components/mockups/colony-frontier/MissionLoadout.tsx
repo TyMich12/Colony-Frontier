@@ -471,11 +471,16 @@ function createInitialSelection(
         total + remainingTrack.tiers.Foundation.cost,
       0,
     );
+    const reservedFoundationMass = remainingTracks.reduce(
+      (total, remainingTrack) =>
+        total + remainingTrack.tiers.Foundation.mass,
+      0,
+    );
     const tier = getAutomaticTier(
       track,
       gameState,
       Math.max(0, availableCredits - reservedFoundationCost),
-      Math.max(0, availableMass),
+      Math.max(0, availableMass - reservedFoundationMass),
     );
 
     if (tier === undefined) {
