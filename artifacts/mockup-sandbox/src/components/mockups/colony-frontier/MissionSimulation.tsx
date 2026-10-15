@@ -3023,7 +3023,7 @@ export function MissionSimulation() {
         const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
         const ratedWaterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
-        const waterRecoveryPct = conditionAdjustedOutput("water", Math.min(96, ratedWaterRecoveryPct + 30), buildings);
+        const waterRecoveryPct = conditionAdjustedOutput("water", missionStage === 1 ? Math.min(96, ratedWaterRecoveryPct + 30) : ratedWaterRecoveryPct, buildings);
         const waterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
         const circulatingWaterLDay = 8; // Recoverable crew make-up stream, not all water circulated through the loop.
         const effectiveWaterRecoveryPct = waterOnline && powerPathAvailable ? waterRecoveryPct : 0;
@@ -3031,7 +3031,7 @@ export function MissionSimulation() {
         const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
         const foodProductionKgDay = agricultureOnline && powerPathAvailable
-          ? conditionAdjustedOutput("agriculture", Math.max(2.65, ratedFoodProductionKgDay), buildings)
+          ? conditionAdjustedOutput("agriculture", missionStage === 1 ? Math.max(2.65, ratedFoodProductionKgDay) : ratedFoodProductionKgDay, buildings)
           : 0;
         const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
