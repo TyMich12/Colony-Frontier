@@ -108,7 +108,6 @@ export type MissionRuntimeSnapshot = {
   /** Simulated mission time when each low-tech emergency fallback can be used again. */
   fallbackReadyAt?: Record<string, number>;
   /** Available on-site repair / retrofit material; consumed on installation, never added to launch mass. */
-  partsInventoryKg?: number;
 };
 
 const PENDING_KEY = "colony-frontier-pending-mission";
