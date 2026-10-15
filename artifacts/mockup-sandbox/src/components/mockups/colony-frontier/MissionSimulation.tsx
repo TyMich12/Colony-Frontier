@@ -1673,7 +1673,7 @@ function BuildingInspector({
       ];
       case "water": return [
         { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
-        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery-loop support is active" : "Rated recovery scaled by condition" },
+        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery-loop support is active (+45 percentage points, capped at 96%)" : "Rated recovery scaled by condition" },
         { label: "Treatment throughput", value: (extraReading("throughput") * liveCondition / 100).toFixed(1) + " L/day" },
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
       ];
@@ -4341,12 +4341,12 @@ export function MissionSimulation() {
         setAiMessage("Extraction sample collected. Resource yield increased, but the operation consumed colony power.");
         break;
       case "process": {
-        const processedMaterialKg = gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current);
-        setResourceYield((value) => value + processedMaterialKg);
+        const processedFeedstockKg = gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current);
+        setResourceYield((value) => value + processedFeedstockKg);
         // Processed ISRU feed is the local source of retrofit / repair material stock.
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
         setScore((value) => clamp(value + gain(5)));
-        setAiMessage(`ISRU feed processed. Produced ${processedMaterialKg.toFixed(1)} kg of local material; . Processing consumes power and battery energy.`);
+        setAiMessage(`ISRU feed processed. Produced ${processedFeedstockKg.toFixed(1)} kg of usable feedstock. Processing consumes power and battery energy.`);
         break;
       }
       case "purge":
