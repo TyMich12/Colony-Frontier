@@ -1856,6 +1856,11 @@ function BuildingInspector({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#9bd9cf]">Live system readings</p>
               <span className={activeFault ? "rounded-full bg-[#4b2029] px-2 py-0.5 text-[8px] font-black uppercase text-[#ffadb5]" : systemOperational ? "rounded-full bg-[#14372d] px-2 py-0.5 text-[8px] font-black uppercase text-[#9be8bc]" : "rounded-full bg-[#4b3a1a] px-2 py-0.5 text-[8px] font-black uppercase text-[#f5d27a]"}>{activeFault ? "FAULT ACTIVE" : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS"}</span>
             </div>
+            {activeFault && <div className="mb-2 rounded-lg border border-[#7a3944] bg-[#29171d] px-2.5 py-2">
+              <p className="text-[8px] font-black uppercase tracking-[0.1em] text-[#ff9da6]">Active fault · severity {activeFault.severity.toFixed(1)}×</p>
+              <p className="mt-0.5 text-[10px] font-bold text-[#ffe1e3]">{activeFault.title}</p>
+              <p className="mt-0.5 text-[8px] leading-3 text-[#d79aa2]">This fault is affecting this system until the response is stabilised and its repair work order completes.</p>
+            </div>}
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {liveSystemReadings.map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
                 <p className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#81a8ad]">{reading.label}</p>
