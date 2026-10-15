@@ -445,3 +445,26 @@ The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day
 - Diagnostics must report active incidents **and** deployed modules below 82% condition, naming the weakest module and its condition. A clean incident list must not be presented as “nothing is wrong” if equipment is degraded.
 
 These are explicit game-model assumptions for readable mission pacing, not certified spacecraft specifications. They preserve the existing Apex and Research tier rating values.
+
+## Condition-linked output and water/food pacing — updated 2026-10-15
+
+### Equipment condition directly affects output
+
+The mission simulation applies a transparent linear condition derating to live system output/capacity for Solar, Battery discharge, Power Grid transfer, Oxygen production, Water recovery and treatment throughput, Agriculture food production, Thermal Control, and Radiation protection:
+
+**Effective output = rated output × (condition / 100).**
+
+Examples: 100% condition = 100% rated output; 75% condition = 75%; 40% condition = 40%; 0% condition = no useful output from the affected function. Existing dust, sunlight, power-path availability, active faults and repair-specific metric effects still apply separately. The condition display labels the percentage as output efficiency. This is a gameplay model that makes maintenance consequences visible; it is not a claim that every real spacecraft component has a perfectly linear failure curve.
+
+### Water balance correction
+
+The crew water model uses an **8 L/day recoverable/make-up stream** for four crew, rather than treating the full 20 L/day loop circulation as water that is lost unless recovered. Recovered water is calculated from the stream throughput and the effective recovery percentage. Crop water demand is still calculated from actual food production × the agriculture water-use rating, with the recovered share returned to the clean-water reserve. Thus:
+- Lower Water condition reduces recovery efficiency and treatment throughput, so less water is returned.
+- Lower Agriculture condition reduces food production and also reduces crop water use because fewer crops are produced.
+- Water reserve changes by the net amount lost after recovery, not by gross plumbing circulation.
+- When the Water system or its power path is unavailable, recovery is zero; the model does not grant free water.
+
+### Food balance
+
+Food production remains the selected Agriculture system's rated kg/day multiplied by its condition fraction and available-power/system status. Four-crew food demand remains 2.48 kg/day, and the Foundation agriculture rating remains 0.50 kg/day at full condition. The crop unit is supplemental food production, not a complete four-person farm. This update does **not** alter the existing Foundation/Frontier/Apex/Research system-rating tables or Apex/Research values; it changes how current condition affects delivered output and corrects the water-loss calculation.
+
