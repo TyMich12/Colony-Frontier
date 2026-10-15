@@ -4094,15 +4094,15 @@ export function MissionSimulation() {
       case "habitat-composite-patch":
         conditionBoost(20);
         setMetrics((current) => ({ ...current, habitat: clamp(current.habitat + gain(8)) }));
-        setResourceYield((value) => Math.max(0, value - 1));
+
         setMetrics((current) => ({ ...current, battery: clamp(current.battery - cost(3)) }));
-        setAiMessage("THERMALLY CURED COMPOSITE PATCH · Processed local material was used for a higher-strength structural repair. One unit of prepared feedstock was consumed.");
+        setAiMessage("THERMALLY CURED COMPOSITE PATCH · Thermal control and maintenance completed a higher-strength structural seal repair.");
         break;
       case "radiation-regolith-berm":
         setMetrics((current) => ({ ...current, radiation: clamp(current.radiation - gain(5)), power: clamp(current.power - cost(2)) }));
-        setResourceYield((value) => Math.max(0, value - 1));
+
         conditionBoost(1);
-        setAiMessage("REGOLITH SHIELDING BERM · Local shielding mass was placed around the habitat. This reduces exposure, but it is not a substitute for a dedicated storm shelter.");
+        setAiMessage("REGOLITH SHIELDING BERM · Local regolith shielding coverage was improved around the habitat. This reduces exposure, but it is not a substitute for a dedicated storm shelter.");
         break;
       case "grid-black-start":
         setMetrics((current) => ({ ...current, power: clamp(current.power + gain(8)), battery: clamp(current.battery - cost(5)) }));
