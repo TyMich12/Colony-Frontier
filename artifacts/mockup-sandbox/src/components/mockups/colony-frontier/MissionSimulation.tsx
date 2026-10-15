@@ -1694,7 +1694,7 @@ function BuildingInspector({
       ];
       case "water": return [
         { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
-        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery-loop support is active (+45 percentage points, capped at 96%)" : "Rated recovery scaled by condition" },
+        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery support adds up to 45 percentage points when online and powered (96% cap)" : "Rated recovery scaled by condition" },
         { label: "Treatment throughput", value: (extraReading("throughput") * liveCondition / 100).toFixed(1) + " L/day" },
         { label: "Estimated net water loss", value: estimatedWaterLossPerDay.toFixed(1) + " L/day", note: "Includes unrecovered crew make-up water and crop water" },
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
@@ -1772,7 +1772,7 @@ function BuildingInspector({
         { label: "Instrument status", value: activeFault ? "CALIBRATION NEEDED" : runtime.status },
       ];
       case "agriculture": return [
-        { label: "Edible food production", value: foodProductionNow.toFixed(2) + " kg/day", note: isFirstMission ? "Level 1 starter grow module support is active" : "Tier-rated output scaled by condition" },
+        { label: "Edible food production", value: foodProductionNow.toFixed(2) + " kg/day", note: isFirstMission ? "Level 1 starter grow capacity; actual output is gated by power and system status" : "Tier-rated output scaled by condition" },
         { label: "Four-crew food demand", value: "2.48 kg/day" },
         { label: "Net daily food balance", value: (foodProductionNow - 2.48).toFixed(2) + " kg/day" },
         { label: "Stored food", value: (metrics.food / 100 * RESOURCE_CAPACITIES.foodReserveKg).toFixed(1) + " kg / " + RESOURCE_CAPACITIES.foodReserveKg + " kg" },
@@ -1854,7 +1854,7 @@ function BuildingInspector({
           <section className="mt-3 rounded-xl border border-[#3a5960] bg-[#08171c] p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#9bd9cf]">Live system readings</p>
-              <span className={activeFault ? "rounded-full bg-[#4b2029] px-2 py-0.5 text-[8px] font-black uppercase text-[#ffadb5]" : "rounded-full bg-[#14372d] px-2 py-0.5 text-[8px] font-black uppercase text-[#9be8bc]"}>{activeFault ? "FAULT ACTIVE" : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS"}</span>
+              <span className={activeFault ? "rounded-full bg-[#4b2029] px-2 py-0.5 text-[8px] font-black uppercase text-[#ffadb5]" : systemOperational ? "rounded-full bg-[#14372d] px-2 py-0.5 text-[8px] font-black uppercase text-[#9be8bc]" : "rounded-full bg-[#4b3a1a] px-2 py-0.5 text-[8px] font-black uppercase text-[#f5d27a]"}>{activeFault ? "FAULT ACTIVE" : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS"}</span>
             </div>
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {liveSystemReadings.map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
