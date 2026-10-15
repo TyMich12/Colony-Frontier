@@ -405,7 +405,6 @@ export function TechnologyLabRefresh() {
               return (
                 <div
                   key={tier}
-                  type="button"
                   role="button"
                   tabIndex={unlocked ? 0 : -1}
                   aria-disabled={!unlocked}
