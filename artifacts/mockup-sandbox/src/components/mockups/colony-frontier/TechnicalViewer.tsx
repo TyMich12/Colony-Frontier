@@ -40,6 +40,7 @@ const P = {
   violet: "#aa8add",
   white: "#e1eee8",
   red: "#d87575",
+  orange: "#e9a15d",
 };
 
 const TIER_LEVEL: Record<Tier, number> = {
