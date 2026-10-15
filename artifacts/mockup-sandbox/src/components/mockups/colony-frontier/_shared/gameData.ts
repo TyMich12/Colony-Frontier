@@ -260,6 +260,15 @@ export const tierMeta: Record<Tier, { color: string; short: string }> = {
 
 
 
+export const payloadProgression = [
+  { phase: "Early Moon", capacity: 8000, unlock: "Starting capacity" },
+  { phase: "Mid Moon", capacity: 12000, unlock: "Unlock after Mission 03" },
+  { phase: "Late Moon", capacity: 16000, unlock: "Unlock after Mission 06" },
+  { phase: "Early Mars", capacity: 12000, unlock: "Mars Campaign start" },
+  { phase: "Mid Mars", capacity: 18000, unlock: "Unlock after Mars 03" },
+  { phase: "Late Mars", capacity: 25000, unlock: "Unlock after Mars 06" },
+] as const;
+
 export const tierUnlockRequirements = tierUnlocks;
 
 export const formatCredits = (value: number) =>
