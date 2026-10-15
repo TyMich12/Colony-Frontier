@@ -1660,6 +1660,9 @@ function BuildingInspector({
   const waterRecoveryNow = systemOperational && electricalReadings.actualSupplyKW >= 2 ? Math.min(96, liveCondition / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
   const foodProductionNow = systemOperational && electricalReadings.actualSupplyKW >= 2 ? liveCondition / 100 * (isFirstMission ? Math.max(3.0, ratedFoodNow) : ratedFoodNow) : 0;
+  const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
+  const waterThroughputNow = extraReading("throughput") * liveCondition / 100;
+  const estimatedWaterLossPerDay = Math.max(0, 8 - Math.min(8, waterThroughputNow) * waterRecoveryNow / 100) + foodProductionNow * foodWaterUseNow * (1 - waterRecoveryNow / 100);
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
     switch (track.id) {
@@ -1687,12 +1690,14 @@ function BuildingInspector({
         { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
         { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery-loop support is active (+45 percentage points, capped at 96%)" : "Rated recovery scaled by condition" },
         { label: "Treatment throughput", value: (extraReading("throughput") * liveCondition / 100).toFixed(1) + " L/day" },
+        { label: "Estimated net water loss", value: estimatedWaterLossPerDay.toFixed(1) + " L/day", note: "Includes unrecovered crew make-up water and crop water" },
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
       ];
       case "oxygen": {
         const oxygenRate = systemOperational && electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 : 0;
         return [
           { label: "Oxygen production", value: oxygenRate.toFixed(2) + " kg O₂/day" },
+          { label: "Delivered oxygen purity", value: extraReading("purity").toFixed(2) + "%" },
           { label: "Four-crew demand", value: "3.36 kg O₂/day" },
           { label: "Net daily balance", value: (oxygenRate - 3.36).toFixed(2) + " kg/day" },
           { label: "Stored oxygen", value: (metrics.oxygen / 100 * RESOURCE_CAPACITIES.oxygenReserveKg).toFixed(1) + " kg / " + RESOURCE_CAPACITIES.oxygenReserveKg + " kg" },
@@ -1701,6 +1706,7 @@ function BuildingInspector({
       case "co2": return [
         { label: "CO₂ removal capacity", value: (systemOperational && electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 : 0).toFixed(2) + " kg CO₂/day" },
         { label: "Four-crew reference", value: "4.16 kg CO₂/day" },
+        { label: "Removal margin", value: ((systemOperational && electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 : 0) - 4.16).toFixed(2) + " kg/day" },
         { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
         { label: "Status", value: activeFault ? "FAULT · " + activeFault.title : runtime.status },
       ];
@@ -1708,6 +1714,7 @@ function BuildingInspector({
         { label: "Cabin temperature", value: metrics.temperature.toFixed(1) + " °C" },
         { label: "Control target", value: "21.0 °C" },
         { label: "Heat rejection capacity", value: (ratedReading * liveCondition / 100).toFixed(2) + " kW thermal" },
+        { label: "Average electrical draw", value: (electricalReadings.demandSources.find((item) => item.label.toLowerCase().includes("thermal"))?.kw ?? 0).toFixed(2) + " kW" },
         { label: "Temperature error", value: (metrics.temperature - 21).toFixed(1) + " °C from target" },
       ];
       case "habitat": return [
