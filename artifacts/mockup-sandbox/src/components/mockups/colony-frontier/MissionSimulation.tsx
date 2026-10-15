@@ -1665,8 +1665,8 @@ function BuildingInspector({
           <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4">
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.16em]">
-                <span className="text-[#87999d]">Equipment condition index</span>
-                <span style={{ color: resourceColor(runtime.condition) }}>{condition}/100</span>
+                <span className="text-[#87999d]">Equipment condition · output efficiency</span>
+                <span style={{ color: resourceColor(runtime.condition) }}>{condition}% output</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-[#22343a]">
                 <div className="h-full rounded-full transition-all" style={{ width: `${condition}%`, background: resourceColor(runtime.condition) }} />
@@ -2878,7 +2878,9 @@ export function MissionSimulation() {
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
         const grossCropWaterLDay = foodProductionKgDay * cropWaterUseLPerKg;
         // The humidity/recovery loop returns a share of crop transpiration to the clean-water tank.
-        // When water recovery or its power path is offline, that returned fraction is zero.
+        // The 8 L/day crew stream represents water that can actually be lost/recovered,
+        // not all water circulating through the plumbing. When recovery/power is offline,
+        // none of that stream or crop transpiration is returned to the clean-water tank.
         const netCropWaterLossLDay = grossCropWaterLDay * (1 - effectiveWaterRecoveryPct / 100);
         const netWaterLossLDay = crewWaterLossLDay + netCropWaterLossLDay;
         const waterDelta = -netWaterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
