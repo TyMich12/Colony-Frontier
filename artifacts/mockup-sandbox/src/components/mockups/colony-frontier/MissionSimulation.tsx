@@ -4381,7 +4381,7 @@ export function MissionSimulation() {
       case "process": {
         const processedFeedstockKg = gain(3) * repairCapabilityFraction("isru", pending?.selected ?? {}, buildingsRef.current);
         setResourceYield((value) => value + processedFeedstockKg);
-        // ISRU processing creates usable feedstock for extraction and science workflows; it is not repair/retrofit inventory.
+        // ISRU processing creates usable feedstock for extraction and science workflows.
         setMetrics((current) => ({ ...current, power: clamp(current.power - cost(5)), battery: clamp(current.battery - cost(1)) }));
         setScore((value) => clamp(value + gain(5)));
         setAiMessage(`ISRU feed processed. Produced ${processedFeedstockKg.toFixed(1)} kg of usable feedstock. Processing consumes power and battery energy.`);
