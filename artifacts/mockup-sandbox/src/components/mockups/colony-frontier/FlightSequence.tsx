@@ -31,7 +31,6 @@ type Factor = {
   display: string;
   severity: "SURVIVAL" | "CRITICAL" | "EXTREME";
   note: string;
-  score: number;
   position: number;
 };
 
@@ -103,7 +102,8 @@ function buildFactors(t: Telemetry, inFlight: boolean): Factor[] {
     } else {
       position = 41 + ((entry.value - min) / Math.max(0.001, max - min)) * 18;
     }
-    return { ...entry, severity, score: severity === "EXTREME" ? 2 : severity === "CRITICAL" ? 1 : 0, position: clamp(position, 0, 100) };
+    if (!inFlight && entry.id === "acceleration") severity = "SURVIVAL";
+    return { ...entry, severity, position: clamp(position, 0, 100) };
   });
 }
 
@@ -193,9 +193,7 @@ export function FlightSequence() {
     electricalLoad: 0.55, oxygenFlow: 0.35, heatBalance: 0,
   });
   const telemetryRef = useRef(telemetry);
-  const phaseRef = useRef<Phase>(phase);
   telemetryRef.current = telemetry;
-  phaseRef.current = phase;
 
   useEffect(() => {
     let index = 0;
