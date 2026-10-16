@@ -1,9 +1,11 @@
 # Colony Frontier — Launch Survival & Flight-Control Master Sheet
 
 **Document type:** Collaborative design and implementation specification  
-**Status:** Proposed design; numerical limits are prototype values and must be reconciled with the live model before they become authoritative.
+**Status:** Initial implementation is present on `rust-python-rewrite`. The deployment route now opens the animated launch console; the Python model calculates flight telemetry and Rust authorises launch and decides survival. The frontend build, Python tests, and Rust tests have passed on this branch. Thresholds remain provisional until collaborators playtest and tune them.
 
 This is a separate document from the **Master System Performance & Upgrade Table**. That existing table covers colony-system performance and upgrades. This sheet covers the crewed rocket's pre-flight checks, survival-factor gauges, player-controlled launch and 2D flight simulation.
+
+**Implementation files:** artifacts/mockup-sandbox/src/components/mockups/colony-frontier/FlightSequence.jsx (screen, gauges and controls), rewrite/app.py (flight calculations), and rewrite/server/src/main.rs (authoritative launch and survival decisions). The landing approach uses a compressed gameplay transfer so the player gets a controllable final touchdown window; it is not a continuous real-world trajectory model.
 
 ## 1. Purpose
 
