@@ -1379,7 +1379,6 @@ function MissionTaskRibbon({
 }) {
   const elapsedDay = Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
   const dayProgress = elapsed >= TOTAL_MISSION_SECONDS ? 14 : Math.min(13.9, elapsedDay);
-  const day = Math.min(14, Math.floor(elapsedDay) + 1);
   const eventGoal = EVENT_TIMES.length;
   const surveyedCount = Object.values(sampleStages).filter((stage) => stage !== "UNSURVEYED").length;
   const analysedCount = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
