@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+import { getBaselineRating } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
   id: string;
@@ -1061,7 +1062,7 @@ function Rover({
   onClick,
   selected,
   alerted,
-  performanceMultiplier,
+  traverseSpeedKmh,
   navigationAccuracy,
   simulationSpeed,
 }: {
@@ -1072,7 +1073,7 @@ function Rover({
   onClick: () => void;
   selected: boolean;
   alerted: boolean;
-  performanceMultiplier: number;
+  traverseSpeedKmh: number;
   navigationAccuracy: number;
   simulationSpeed: number;
 }) {
@@ -1233,9 +1234,12 @@ function Rover({
           const arriveRadius = finalWaypoint ? (isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28) : 0.08;
           if (distance > arriveRadius) {
             // The route must finish before the timed field task does. Simulation speed and rover tier both affect travel time.
-            const baseSpeed = isTransferring || isReturning ? 9.5 : 9.0;
+            // One colony-map unit represents approximately one metre. Convert the rated
+            // safe traverse speed from km/h to m/s; simulation speed accelerates both travel
+            // and the corresponding timed field-operation clock.
+            const baseSpeedMps = Math.max(0, traverseSpeedKmh / 3.6);
             const simRate = Math.min(4, Math.max(0.5, simulationSpeed));
-            const move = Math.min(Math.max(0, delta) * baseSpeed * simRate * Math.max(0.9, performanceMultiplier), distance - arriveRadius);
+            const move = Math.min(Math.max(0, delta) * baseSpeedMps * simRate, distance - arriveRadius);
             current.x += (dx / distance) * move;
             current.z += (dz / distance) * move;
             travelled = move;
@@ -1861,18 +1865,23 @@ function MissionGuide({ mars }: { mars: boolean }) {
 function Scene({ props }: { props: Props }) {
   const mars = props.environmentLabel === "MARS";
   const roverTier = props.selected.rover ?? "Foundation";
-  const roverTierIndex = roverTier === "Frontier" ? 1 : roverTier === "Apex" ? 2 : roverTier === "Research" ? 3 : 0;
+  const roverTier = props.selected.rover ?? "Foundation";
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
-  // A complete technology-tier step (+18%) is always better than both field retrofits together (+10%).
-  const roverPerformanceMultiplier = 1 + roverTierIndex * 0.18 + Math.max(0, Math.min(2, roverRetrofitLevel)) * 0.05;
+  const roverCondition = Math.max(0, Math.min(100, props.buildings.rover?.condition ?? 100));
+  const roverRatedSpeedKmh = getBaselineRating("rover", roverTier, roverRetrofitLevel);
+  const roverSpeedGap = props.buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed on reference rough terrain"] ?? 0;
+  const roverTraverseSpeedKmh = Math.max(0, roverRatedSpeedKmh - roverSpeedGap) * roverCondition / 100;
   const navTier = props.selected.navigation ?? "Foundation";
-  const navTierIndex = navTier === "Frontier" ? 1 : navTier === "Apex" ? 2 : navTier === "Research" ? 3 : 0;
   const navRetrofitLevel = props.buildings.navigation?.upgradeLevel ?? 0;
-  const navCondition = props.buildings.navigation?.condition ?? 100;
-  // Accuracy increases by tier first; two retrofits add less than one full tier step.
-  const navigationAccuracy = Math.max(0.42, Math.min(0.98, (0.60 + navTierIndex * 0.10 + Math.max(0, Math.min(2, navRetrofitLevel)) * 0.04) * (0.65 + 0.35 * navCondition / 100)));
+  const navCondition = Math.max(25, Math.min(100, props.buildings.navigation?.condition ?? 100));
+  const navRatedErrorM = getBaselineRating("navigation", navTier, navRetrofitLevel);
+  const navErrorGapM = props.buildings.navigation?.repairMetrics?.["Unrestored fault gap · Horizontal position error under reference terrain conditions"] ?? 0;
+  const navigationErrorM = (navRatedErrorM + navErrorGapM) * (100 / navCondition);
+  const navigationAccuracy = Math.max(0, Math.min(100, 100 - navigationErrorM)) / 100;
   const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
-  const sunAngleDeg = props.lunarNight ? 0 : Math.max(0, Math.sin((lunarDay / 14) * Math.PI) * 90);
+  const sunAngleDeg = props.lunarNight ? -8 : Math.max(0, Math.sin((lunarDay / 14) * Math.PI) * 90);
+  const sunAzimuth = (lunarDay / 14) * Math.PI;
+  const sunPosition: [number, number, number] = [Math.cos(sunAzimuth) * 36, props.lunarNight ? -12 : 3.5 + Math.sin((sunAngleDeg * Math.PI) / 180) * 29, Math.sin(sunAzimuth) * 36];
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
@@ -1882,10 +1891,16 @@ function Scene({ props }: { props: Props }) {
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
     >
-      <color attach="background" args={[mars ? "#7b4638" : "#55545a"]} />
-      <ambientLight intensity={0.68} color={mars ? "#ffe6db" : "#edf3ff"} />
-      <hemisphereLight args={[mars ? "#ffe5da" : "#f7f9ff", mars ? "#3d2722" : "#2f3035", 1.0]} />
-      <directionalLight position={[18, 34, 20]} intensity={1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
+      <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#080d18" : "#55545a"]} />
+      <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.12 : 0.38} color={mars ? "#ffe6db" : "#edf3ff"} />
+      <hemisphereLight args={[mars ? "#ffe5da" : "#f7f9ff", mars ? "#3d2722" : "#171923", mars ? 1.0 : props.lunarNight ? 0.22 : 0.72]} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.04 : 1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
+      {!mars && !props.lunarNight && <group position={sunPosition} frustumCulled={false}><mesh><sphereGeometry args={[1.35, 20, 16]} /><meshBasicMaterial color="#ffe17a" /></mesh><pointLight color="#ffe6a3" intensity={0.55} distance={90} /></group>}
+      {!mars && <group position={[-32, 26, -38]} frustumCulled={false}>
+        <mesh><sphereGeometry args={[1.55, 24, 18]} /><meshStandardMaterial color="#397fb4" emissive="#12314b" emissiveIntensity={0.55} roughness={0.72} /></mesh>
+        <mesh position={[0.42, 0.24, 1.08]} rotation={[0.2, 0.2, -0.25]}><sphereGeometry args={[0.48, 10, 8]} /><meshStandardMaterial color="#70a66d" emissive="#203c26" emissiveIntensity={0.22} roughness={1} /></mesh>
+        <mesh position={[-0.48, -0.34, 1.02]} rotation={[-0.2, 0.3, 0.4]}><sphereGeometry args={[0.33, 10, 8]} /><meshStandardMaterial color="#6c9d64" emissive="#1b3320" emissiveIntensity={0.2} roughness={1} /></mesh>
+      </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
       <RoverRockField mars={mars} />
@@ -1910,7 +1925,7 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} performanceMultiplier={roverPerformanceMultiplier} navigationAccuracy={navigationAccuracy} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} navigationAccuracy={navigationAccuracy} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
         <Crew mars={mars} />
