@@ -14,15 +14,51 @@
 6. **Resolve.** Four or more critical factors cause mission loss. A successful 20-second ascent unlocks the existing colony simulation.
 7. **Retry if needed.** Failure does not erase the pending mission. The player can change controls and reset the flight.
 
+## Master feature and implementation table
+
+This table is copied from the collaborator's launch-survival specification and is the acceptance checklist for the TypeScript implementation on `main`. It describes the required experience, not a requirement to merge the branch's separate Python/Rust services.
+
+| ID | Feature | What the player sees or does | Required behaviour | Acceptance check |
+|---|---|---|---|---|
+| LS-01 | Animated diagnostic terminal | Flight-computer checks reveal line by line with a cursor and status | Check results are derived from current telemetry; the player can skip the animation | Skipping changes presentation only, not readings or launch eligibility |
+| LS-02 | Survival-factor gauge | Envelope summary and individual factor bars | Visual status matches numeric readings | The same telemetry produces the same severity in every display |
+| LS-03 | Green target band | Green survival range | Shows preferred operating range | Zone labels and units are visible |
+| LS-04 | Yellow critical bands | Amber/yellow warning range | Warns that a reading needs correction | Low/high limits are tested separately where applicable |
+| LS-05 | Red extreme zones | Red limit-breach range | Clearly identifies severe readings | A factor is classified in exactly one state |
+| LS-06 | Critical counter | Distinct at-risk factor count | Counts each yellow or red factor once, not every simulation frame | A factor remains one count across repeated ticks |
+| LS-07 | Critical-count outcome | Caution, emergency, and loss states | 0–2 at-risk factors: continue; 3: emergency; 4+: mission loss | Four distinct at-risk factors trigger failure |
+| LS-08 | Player-controlled launch | Throttle and pitch-trim controls | Inputs affect thrust/acceleration and vehicle attitude over time | Changes are gradual and visible |
+| LS-09 | 2D rocket scene | Rocket, launch pad, horizon, altitude and trajectory cues | Rocket rises and rotates in response to simulation state | Scene motion agrees with telemetry |
+| LS-10 | Motion telemetry | Pitch, target pitch, speed, acceleration, altitude and elapsed time | Values use units and follow the same state as the scene | No random/decorative values are shown as physics |
+| LS-11 | Survival simulation | Oxygen, energy, pressure, temperature, radiation and crew-load factors | Updates throughout flight | Resource trends are consistent with controls |
+| LS-12 | Authoritative outcome | Success, warning/emergency, or mission loss | The simulation state determines the result | UI cannot report success after the loss condition is met |
+| LS-13 | Calculation model | Deterministic local TypeScript flight calculations | Validates finite values and uses documented units | Invalid readings cannot be treated as safe |
+| LS-14 | Retry/reset | Restart after failure | Resets telemetry, controls, timers and terminal state | Retry starts from a clean initial state |
+| LS-15 | Readability and accessibility | Units, labels, colour plus text, skip control | Colour is not the only way to understand status | All factors show a numeric value and text status |
+
+## Critical-state counting and launch rule
+
+Count **distinct factors currently in either the yellow CRITICAL or red EXTREME state**. Each factor contributes at most one count, regardless of how many simulation ticks it remains outside its target band.
+
+| At-risk factor count | UI state | Outcome |
+|---:|---|---|
+| 0 | Green / nominal | Continue |
+| 1 | Yellow / caution | Name the factor and suggest correction |
+| 2 | Orange / high alert | Continue while correcting readings |
+| 3 | Red / emergency | Alarm; one more at-risk factor causes mission loss |
+| 4 or more | Mission loss | Stop the flight and offer retry |
+
+A red factor inhibits ignition. During flight, an individual red factor does not automatically end the mission in this prototype; four or more distinct yellow/red factors cause loss. This avoids counting the same factor twice or applying undocumented instant-failure rules. Thresholds remain prototype gameplay values, not real-world launch certification limits.
+
 ## Threshold language
 
 | State | Colour | Meaning | Rule |
 |---|---|---|---|
 | **SURVIVAL** | Green | Within the intended operating band | Aim to keep every factor here. |
-| **CRITICAL** | Amber / yellow | Outside the target band but not yet at an extreme limit | Three critical factors are survivable; four or more ends the run. |
-| **EXTREME** | Red | Beyond an extreme limit | Launch is inhibited while any red factor is present. In flight, two or more simultaneous extreme factors also cause mission loss. |
+| **CRITICAL** | Amber / yellow | Outside the target band but not yet at an extreme limit | Counted as one at-risk factor; three at-risk factors trigger emergency. |
+| **EXTREME** | Red | Beyond an extreme limit | Launch is inhibited while any red factor is present. In flight, each red factor counts once toward the four-factor loss threshold. |
 
-The circular envelope is a quick stress summary. Each individual factor card is the authoritative display for that factor's state. Red is not a fourth countable critical level; it is shown separately as an extreme factor.
+The circular envelope is a quick stress summary. Each individual factor card is the authoritative display for that factor's state. Yellow and red factors both count once toward the at-risk total, while their severities remain visually distinct.
 
 ## Monitored factors
 
@@ -71,8 +107,8 @@ The model updates at 0.2-second simulated intervals. The target pitch starts nea
 
 ## Failure and success conditions
 
-- **Pre-launch:** ignition is disabled if any factor is red/extreme or if four or more factors are critical.
-- **In flight:** mission loss occurs at four or more simultaneous critical factors, or two or more simultaneous extreme factors.
+- **Pre-launch:** ignition is disabled if any factor is red/extreme or if four or more factors are at risk.
+- **In flight:** mission loss occurs when four or more distinct factors are simultaneously yellow/critical or red/extreme. Three at-risk factors trigger an emergency warning; no undocumented single-factor instant-loss rule is used.
 - **Success:** the ascent timer reaches 20 seconds without crossing the loss conditions.
 - **After success:** the player explicitly selects **Enter colony mission**, which opens the existing `MissionSimulation` screen.
 - **After failure:** the player reviews the readings and can reset the flight. The pending mission and loadout remain available.
@@ -93,7 +129,10 @@ The model updates at 0.2-second simulated intervals. The target pitch starts nea
 - [ ] Adjust each control and confirm the readout changes.
 - [ ] Keep pitch close to the target during ascent and confirm the rocket visibly rotates and rises.
 - [ ] Force an amber reading and confirm the critical counter increments.
-- [ ] Reach four critical factors and confirm the run fails.
+- [ ] Skip the diagnostic animation and confirm the report and readings are unchanged.
+- [ ] Re-run diagnostics after changing controls and confirm results reflect current readings.
+- [ ] Reach three distinct yellow/red factors and confirm emergency state.
+- [ ] Reach four distinct yellow/red factors and confirm the run fails.
 - [ ] Trigger a red factor before ignition and confirm launch is inhibited.
 - [ ] Complete a successful ascent and confirm **Enter colony mission** opens the original minigame.
 - [ ] Refresh at the launch screen and verify the pending mission is still available.
@@ -105,4 +144,4 @@ The model updates at 0.2-second simulated intervals. The target pitch starts nea
 - The survival gauge is a visual stress summary; individual factor states determine the displayed critical / extreme counts.
 - The simplified model uses throttle, trim, electrical load, oxygen flow, and heat balance; it does not yet model a real thrust curve, vehicle mass change, aerodynamic drag, gravity turn, staging, or a proper navigation solution.
 - The current success condition is a timed ascent, not orbital insertion or a full landing sequence.
-- Review the thresholds with collaborators, then centralise the equations and limits before porting the finished feature to Python calculations and Rust-authoritative survival decisions.
+- The current main-branch implementation uses TypeScript locally; it does not require separate Python or Rust servers to launch the game. A later backend port should only happen after the feature and its tests are stable.
