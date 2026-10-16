@@ -487,14 +487,14 @@ This section documents the current MissionSimulation implementation. It supersed
 - Mission 1 should be beatable on a first run through its intended starter equipment, manageable incident pacing and player repairs—not through hidden free water or artificial food-production floors.
 - Continue to use the current Mission 1 incident pacing, reduced condition wear and smaller incident damage so ordinary early faults are recoverable.
 - The dashboard and inspectors must use the same resource calculations as the simulation. Any future change to a resource formula must update the corresponding displayed readings too.
-- Keep the established resource capacities for oxygen and water unless a separately approved balance change is made. The food reserve capacity is 120 kg under the current implementation.
+- Current reserve capacities are 24 kg oxygen, 480 L water, and 160 kg edible dry-food equivalent. Initial fill is 88% oxygen, 86% water, and 84% food; update the capacity and fill figures together whenever the scenario inventory changes.
 - These are transparent gameplay models, not certified spacecraft design values. The master tier-rating tables remain the authority for equipment ratings; no Apex or Research values were changed as part of this update.
 
 
 
 ## Follow-up simulation corrections — 2026-10-17
 
-- **Water is recycled, never generated.** Level 1 uses a 21 L/day total colony water-demand baseline (crew, crop and process demand included). Foundation water recovery at 60% returns 12.6 L/day when treatment throughput can process all 21 L/day, leaving a net loss of 8.4 L/day (about −9 L/day). The water treatment throughput is capacity, not a water source.
+- **Water is recycled, never generated.** Level 1 uses 21 L/day as a minimum reference demand. Actual gross use is the greater of that baseline and crew make-up plus crop-water demand, so mature Mission 1 agriculture can raise daily use above 21 L/day. The model then subtracts only the treated throughput multiplied by the actual recovery efficiency. Water treatment throughput is capacity, not a water source; when the water load is shed, recovery is zero.
 - **Solar degradation is continuous.** Equipment condition no longer hard-switches the solar array off at 25% condition. Output should decline progressively with condition, dust, pointing error and active faults. Lunar illumination still naturally drives output toward zero at sunset / lunar night.
 - **FlightSequence preview registration.** The generated preview module map must include `FlightSequence.tsx`; otherwise `/preview/FlightSequence` displays “No component found” even though the component file exists. The preview plugin regenerates this map on server start.
 
@@ -534,7 +534,7 @@ This pass compared the live simulation formulas, system inspector telemetry, tie
 - Thermal control no longer continues actively controlling cabin temperature when its electrical load has been shed. Water treatment and agriculture likewise require an active optional-load allocation and sufficient bus supply.
 - Mission 1's extra 0.55 kW grow-light allowance now increases crop yield in proportion to the Foundation baseline's electrical input (0.75 kW for 0.50 kg/day), reaching about 0.87 kg/day after crop maturity at full condition. The Foundation tier rating remains 0.50 kg/day.
 - The lunar Sun altitude shown in the scene is interpolated from the same solar profile used for photovoltaic output. A visible Sun moves across the lunar sky, Earth is rendered in the sky, and Mission 2 uses a dark sky with the Sun below the horizon.
-- Rover movement converts the rated safe traverse speed from km/h to map metres per second, derates it by condition and the actual rover repair gap, slows on uneven terrain, and follows obstacle-avoiding paths. Survey/transfer tasks and rover-assisted repairs include estimated travel time so the rover should not be left travelling after the task has already completed.
+- Rover movement converts the rated safe traverse speed from km/h to map metres per second, derates it by condition and the actual rover repair gap, slows on uneven terrain, and follows obstacle-avoiding paths. Survey/transfer tasks and rover-assisted repairs include estimated travel time; motor energy is charged from rated drive power × estimated operation time rather than a fixed multi-percent battery penalty.
 - Navigation error now uses the selected tier's position-error rating, repair gap, and navigation condition; this affects route-planning confidence and field-operation time. Communications throughput and link availability now depend on rated data rate, condition, residual antenna pointing error, and active comms faults. The repoint action records a 1° residual pointing error, and link availability affects Earth-report delay.
 - Water and food inspector figures now match the actual capacity and fill values: 480 L water capacity at 86% (412.8 L initial) and 160 kg food capacity at 84% (134.4 kg initial). Water recovery only returns the fraction of treated throughput that the installed system can process.
 
