@@ -166,15 +166,15 @@ function RocketScene({ telemetry, phase }: { telemetry: Telemetry; phase: Phase 
   const rotation = clamp(telemetry.pitch - 90, -50, 12);
   const translateY = phase === "flight" ? -Math.min(telemetry.altitude / 180, 90) : phase === "success" ? -90 : 0;
   return (
-    <div className="relative h-[290px] overflow-hidden border border-[#294148] bg-[linear-gradient(180deg,#091820_0%,#112b36_60%,#1a3435_100%)]">
+    <div className="relative h-[min(54vh,500px)] min-h-[360px] overflow-hidden border border-[#294148] bg-[linear-gradient(180deg,#091820_0%,#112b36_60%,#1a3435_100%)]">
       <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(167,202,192,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(167,202,192,.12)_1px,transparent_1px)] [background-size:30px_30px]" />
       <div className="absolute right-7 top-6 h-14 w-14 rounded-full border border-[#9bb9ad]/60 bg-[#b8c9b7]/10 shadow-[0_0_35px_rgba(175,208,187,.12)]" />
       <div className="absolute bottom-0 left-0 right-0 h-12 border-t border-[#637f72] bg-[#172a27]" />
       <div className="absolute bottom-12 left-0 right-0 h-5 bg-[linear-gradient(180deg,transparent,rgba(7,16,24,.65))]" />
       <div className="absolute bottom-[54px] left-[16%] h-10 w-16 border-b border-[#547168] opacity-70" />
       <div className="absolute bottom-[54px] right-[17%] h-16 w-24 border-b border-[#547168] opacity-60" />
-      <div className="absolute left-1/2 bottom-[50px] w-[100px] transition-transform duration-200 ease-out" style={{ transform: `translate(-50%, ${translateY}px) rotate(${rotation}deg)` }}>
-        <svg viewBox="0 0 100 190" className="h-[190px] w-[100px] drop-shadow-[0_0_18px_rgba(239,182,88,.18)]" role="img" aria-label="2D launch vehicle">
+      <div className="absolute left-1/2 bottom-[50px] w-[138px] transition-transform duration-200 ease-out" style={{ transform: `translate(-50%, ${translateY}px) rotate(${rotation}deg)` }}>
+        <svg viewBox="0 0 100 190" className="h-[260px] w-[138px] drop-shadow-[0_0_22px_rgba(239,182,88,.25)]" role="img" aria-label="2D launch vehicle">
           <path d="M50 6 C34 25 31 42 31 67 L31 129 L18 154 L34 149 L41 171 L50 160 L59 171 L66 149 L82 154 L69 129 L69 67 C69 42 66 25 50 6Z" fill="#dce3d8" stroke="#91a9a2" strokeWidth="2" />
           <path d="M50 10 C41 28 41 40 41 52 L59 52 C59 40 59 28 50 10Z" fill="#efb658" />
           <rect x="39" y="61" width="22" height="31" rx="4" fill="#193b45" stroke="#8db5b4" strokeWidth="2" />
@@ -209,6 +209,33 @@ export function FlightSequence() {
   const telemetryRef = useRef(telemetry);
   const diagnosticsTimerRef = useRef<number | null>(null);
   telemetryRef.current = telemetry;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+      const key = event.key.toLowerCase();
+      if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "s", "a", "d", "q", "e", "o", "p", "h", "j"].includes(key)) return;
+      event.preventDefault();
+      setTelemetry((old) => {
+        const next = { ...old };
+        if (key === "arrowup" || key === "w") next.throttle = clamp(old.throttle + 0.03, 0.3, 1);
+        if (key === "arrowdown" || key === "s") next.throttle = clamp(old.throttle - 0.03, 0.3, 1);
+        if (key === "arrowleft" || key === "a") next.trim = clamp(old.trim - 1, -18, 18);
+        if (key === "arrowright" || key === "d") next.trim = clamp(old.trim + 1, -18, 18);
+        if (key === "q") next.electricalLoad = clamp(old.electricalLoad - 0.05, 0.2, 1.4);
+        if (key === "e") next.electricalLoad = clamp(old.electricalLoad + 0.05, 0.2, 1.4);
+        if (key === "o") next.oxygenFlow = clamp(old.oxygenFlow - 0.05, 0.1, 1);
+        if (key === "p") next.oxygenFlow = clamp(old.oxygenFlow + 0.05, 0.1, 1);
+        if (key === "h") next.heatBalance = clamp(old.heatBalance - 0.5, -5, 5);
+        if (key === "j") next.heatBalance = clamp(old.heatBalance + 0.5, -5, 5);
+        telemetryRef.current = next;
+        return next;
+      });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     const diagnosticText = buildDiagnosticText(telemetryRef.current);
@@ -423,11 +450,15 @@ export function FlightSequence() {
                 <Zap className="h-4 w-4 text-[#efb658]" />
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#e6eee5]">Pilot controls</h2>
               </div>
-              <Control label="Main throttle" value={telemetry.throttle} min={0.3} max={1} step={0.01} display={`${Math.round(telemetry.throttle * 100)}%`} onChange={(value) => changeControl("throttle", value)} />
-              <Control label="Pitch trim" value={telemetry.trim} min={-18} max={18} step={1} display={`${telemetry.trim > 0 ? "+" : ""}${telemetry.trim}°`} onChange={(value) => changeControl("trim", value)} />
-              <Control label="Electrical load" value={telemetry.electricalLoad} min={0.2} max={1.4} step={0.05} display={`${telemetry.electricalLoad.toFixed(2)}×`} onChange={(value) => changeControl("electricalLoad", value)} />
-              <Control label="Oxygen flow" value={telemetry.oxygenFlow} min={0.1} max={1} step={0.05} display={`${telemetry.oxygenFlow.toFixed(2)}×`} onChange={(value) => changeControl("oxygenFlow", value)} />
-              <Control label="Cabin heat balance" value={telemetry.heatBalance} min={-5} max={5} step={0.5} display={`${telemetry.heatBalance > 0 ? "+" : ""}${telemetry.heatBalance.toFixed(1)}`} onChange={(value) => changeControl("heatBalance", value)} />
+              <Control label="Main throttle" explanation="Controls thrust; too much increases acceleration and risk." value={telemetry.throttle} min={0.3} max={1} step={0.01} display={`${Math.round(telemetry.throttle * 100)}%`} onChange={(value) => changeControl("throttle", value)} />
+              <Control label="Pitch trim" explanation="Offsets the guidance target to correct pitch error." value={telemetry.trim} min={-18} max={18} step={1} display={`${telemetry.trim > 0 ? "+" : ""}${telemetry.trim}°`} onChange={(value) => changeControl("trim", value)} />
+              <Control label="Electrical load" explanation="Higher load drains electrical reserve faster." value={telemetry.electricalLoad} min={0.2} max={1.4} step={0.05} display={`${telemetry.electricalLoad.toFixed(2)}×`} onChange={(value) => changeControl("electricalLoad", value)} />
+              <Control label="Oxygen flow" explanation="Higher flow consumes oxygen faster and helps maintain cabin pressure." value={telemetry.oxygenFlow} min={0.1} max={1} step={0.05} display={`${telemetry.oxygenFlow.toFixed(2)}×`} onChange={(value) => changeControl("oxygenFlow", value)} />
+              <Control label="Cabin heat balance" explanation="Negative cools the cabin; positive heats it." value={telemetry.heatBalance} min={-5} max={5} step={0.5} display={`${telemetry.heatBalance > 0 ? "+" : ""}${telemetry.heatBalance.toFixed(1)}`} onChange={(value) => changeControl("heatBalance", value)} />
+              <div className="mb-4 border border-[#294148] bg-[#071219] p-3">
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#efb658]">Keyboard shortcuts</p>
+                <p className="mt-2 text-[9px] leading-relaxed text-[#a5b6ac]">↑ / W and ↓ / S: throttle · ← / A and → / D: pitch trim · Q / E: electrical load · O / P: oxygen flow · H / J: cabin heat. Keyboard shortcuts pause while you are using a slider.</p>
+              </div>
               <p className="mt-4 flex items-start gap-2 text-[9px] leading-relaxed text-[#779b9b]"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-[#d6a84c]" /> Guidance target changes through ascent. Use trim to keep pitch error low; excessive throttle increases acceleration and risk.</p>
             </div>
 
@@ -464,11 +495,12 @@ export function FlightSequence() {
   );
 }
 
-function Control({ label, value, min, max, step, display, onChange }: { label: string; value: number; min: number; max: number; step: number; display: string; onChange: (value: number) => void }) {
+function Control({ label, explanation, value, min, max, step, display, onChange }: { label: string; explanation: string; value: number; min: number; max: number; step: number; display: string; onChange: (value: number) => void }) {
   return (
     <label className="mb-4 block last:mb-0">
       <span className="flex items-center justify-between gap-3 text-[10px] text-[#dce8df]"><span>{label}</span><span className="font-mono text-[#efb658]">{display}</span></span>
-      <input aria-label={label} className="mt-2 w-full accent-[#efb658]" type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+      <span className="mt-1 block text-[9px] leading-relaxed text-[#779b9b]">{explanation}</span>
+      <input aria-label={label} title={explanation} className="mt-2 w-full accent-[#efb658]" type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} />
       <span className="mt-1 flex justify-between text-[8px] uppercase tracking-[0.12em] text-[#6f8c8b]"><span>{min}</span><span>{max}</span></span>
     </label>
   );
