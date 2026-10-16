@@ -21,6 +21,7 @@ type Props = {
   buildings: Record<string, BuildingRuntime>;
   selectedBuildingId: string | null;
   elapsed: number;
+  lunarNight: boolean;
   environmentLabel: "MOON" | "MARS";
   environmentTitle: string;
   activeEventTrackId: string | null;
@@ -1870,7 +1871,11 @@ function Scene({ props }: { props: Props }) {
   const navCondition = props.buildings.navigation?.condition ?? 100;
   // Accuracy increases by tier first; two retrofits add less than one full tier step.
   const navigationAccuracy = Math.max(0.42, Math.min(0.98, (0.60 + navTierIndex * 0.10 + Math.max(0, Math.min(2, navRetrofitLevel)) * 0.04) * (0.65 + 0.35 * navCondition / 100)));
+  const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
+  const sunAngleDeg = props.lunarNight ? 0 : Math.max(0, Math.sin((lunarDay / 14) * Math.PI) * 90);
+  const sunX = 50 + Math.cos((lunarDay / 14) * Math.PI) * 42;
   return (
+    <div className="relative h-full w-full overflow-hidden">
     <Canvas
       orthographic
       shadows
@@ -1933,6 +1938,15 @@ function Scene({ props }: { props: Props }) {
         target={[0, 0, 0]}
       />
     </Canvas>
+    {!mars && <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-3">
+      <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
+        <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
+        {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
+        <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth stays visible from the lunar surface</div>
+      </div>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#91c5e8]/70 bg-[radial-gradient(circle_at_35%_30%,#c6e9ff_0%,#4c9ed0_34%,#1c4d82_72%,#0a1c3c_100%)] shadow-[0_0_18px_rgba(93,169,220,.4)]" aria-label="Earth visible in the lunar sky"><span className="text-[7px] font-black tracking-wider text-white drop-shadow">EARTH</span></div>
+    </div>}
+    </div>
   );
 }
 
