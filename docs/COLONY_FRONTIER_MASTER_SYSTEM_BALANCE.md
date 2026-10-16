@@ -524,7 +524,7 @@ This pass compared the live simulation formulas, system inspector telemetry, tie
 
 **Structural table validation**
 - Checked all **17 baseline systems**, **28 additional-metric rows**, and **136 repair options** in `simulationBalance.ts`.
-- Each system has eight repair options: two Standalone, two Enhanced, two Dual, and two Fully Integrated. All effect vectors contain four numeric tier values; all duration vectors contain four positive values.
+- Each system has eight repair options: one Standalone, three Enhanced, three Dual, and one Fully Integrated. All effect vectors contain four numeric tier values; all duration vectors contain four positive values. Each system has eight distinct mechanisms and four distinct primary repair metrics.
 - All support IDs map to known systems. Standalone options have no required support systems. No repair option requires Solar or Habitat as an optional support dependency.
 - **Apex and Research tier rating values were not changed** in this audit.
 
