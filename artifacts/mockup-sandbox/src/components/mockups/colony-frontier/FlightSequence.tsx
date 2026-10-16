@@ -36,20 +36,35 @@ type Factor = {
 
 const G0 = 9.80665;
 const FLIGHT_DURATION = 20;
-const DIAGNOSTIC_TEXT = [
-  "[BOOT] Colony Frontier launch console / build 04.9",
-  "[LINK] Flight guidance bus ............... ONLINE",
-  "[LIFE] Oxygen loop and cabin pressure .... CHECKED",
-  "[PWR ] Main bus and reserve battery ...... CHECKED",
-  "[THER] Cabin thermal controller .......... CHECKED",
-  "[NAV ] Inertial reference and pitch servo  ONLINE",
-  "[SAFE] Restraints / flight controls ...... CHECKED",
-  "[RULE] Survival envelope loaded .......... READY",
-  "",
-  "[NOTE] Green = target band; amber = critical; red = extreme.",
-  "[NOTE] Four or more critical factors means mission loss.",
-  "[SYS ] Awaiting pilot input.",
-].join("\n");
+function buildDiagnosticText(t: Telemetry): string {
+  const factors = buildFactors(t, false);
+  const status = (id: Factor["id"]) => {
+    const factor = factors.find((item) => item.id === id);
+    if (!factor) return "NO DATA";
+    return factor.severity === "EXTREME" ? "FAIL" : factor.severity === "CRITICAL" ? "WARN" : "PASS";
+  };
+  const validTelemetry = Object.values(t).every((value) => Number.isFinite(value));
+  const yellow = factors.filter((factor) => factor.severity === "CRITICAL").length;
+  const red = factors.filter((factor) => factor.severity === "EXTREME").length;
+  const checksPassed = validTelemetry && red === 0 && yellow < 4;
+  return [
+    "[BOOT] Colony Frontier launch console / build 05.0",
+    "[LINK] Local flight simulation ........... " + (validTelemetry ? "CONNECTED" : "NO DATA"),
+    "[CHECK] Crew oxygen reserve .............. " + status("oxygen"),
+    "[CHECK] Electrical reserve ............... " + status("energy"),
+    "[CHECK] Cabin pressure ................... " + status("pressure"),
+    "[CHECK] Cabin temperature ................ " + status("temperature"),
+    "[CHECK] Radiation exposure ............... " + status("radiation"),
+    "[CHECK] Flight acceleration .............. " + status("acceleration"),
+    "[CHECK] Guidance / pitch error ........... " + status("pitch"),
+    "[CHECK] Control model .................... " + (validTelemetry ? "PASS" : "NO DATA"),
+    "[SUMMARY] " + (factors.length - yellow - red) + " pass; " + yellow + " warning; " + red + " extreme.",
+    "[GO/NO-GO] " + (checksPassed ? "LAUNCH AUTHORISED" : "HOLD — REVIEW RED / INVALID READINGS"),
+    "",
+    "[NOTE] Three at-risk factors = emergency; four or more = mission loss.",
+    "[SYS ] Adjust controls, then re-run checks before ignition.",
+  ].join("\n");
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -193,27 +208,36 @@ export function FlightSequence() {
     electricalLoad: 0.55, oxygenFlow: 0.35, heatBalance: 0,
   });
   const telemetryRef = useRef(telemetry);
+  const diagnosticsTimerRef = useRef<number | null>(null);
   telemetryRef.current = telemetry;
 
   useEffect(() => {
+    const diagnosticText = buildDiagnosticText(telemetryRef.current);
     let index = 0;
     const timer = window.setInterval(() => {
       index += 3;
-      setTerminalText(DIAGNOSTIC_TEXT.slice(0, index));
-      if (index >= DIAGNOSTIC_TEXT.length) {
+      setTerminalText(diagnosticText.slice(0, index));
+      if (index >= diagnosticText.length) {
         window.clearInterval(timer);
-        setTerminalText(DIAGNOSTIC_TEXT);
+        diagnosticsTimerRef.current = null;
+        setTerminalText(diagnosticText);
         setPhase("ready");
       }
     }, 12);
-    return () => window.clearInterval(timer);
+    diagnosticsTimerRef.current = timer;
+    return () => {
+      window.clearInterval(timer);
+      diagnosticsTimerRef.current = null;
+    };
   }, []);
 
   const factors = useMemo(() => buildFactors(telemetry, phase === "flight"), [telemetry, phase]);
   const criticalCount = factors.filter((factor) => factor.severity === "CRITICAL").length;
   const extremeCount = factors.filter((factor) => factor.severity === "EXTREME").length;
+  // Each factor has exactly one severity, so yellow + red counts distinct at-risk factors once.
+  const atRiskCount = criticalCount + extremeCount;
   const riskIndex = Math.min(100, factors.reduce((total, factor) => total + (factor.severity === "EXTREME" ? 18 : factor.severity === "CRITICAL" ? 9 : 0), 0) + Math.max(0, telemetry.acceleration - 1) * 7 + Math.abs(telemetry.pitch - 90) * 0.3);
-  const readyToLaunch = criticalCount < 4 && extremeCount === 0;
+  const readyToLaunch = atRiskCount < 4 && extremeCount === 0;
 
   useEffect(() => {
     if (phase !== "flight") return;
@@ -240,7 +264,8 @@ export function FlightSequence() {
       const nextFactors = buildFactors(next, true);
       const critical = nextFactors.filter((factor) => factor.severity === "CRITICAL").length;
       const extreme = nextFactors.filter((factor) => factor.severity === "EXTREME").length;
-      if (critical >= 4 || extreme >= 2) {
+      const atRisk = critical + extreme;
+      if (atRisk >= 4) {
         setPhase("failure");
         window.clearInterval(timer);
       } else if (elapsed >= FLIGHT_DURATION) {
@@ -259,20 +284,33 @@ export function FlightSequence() {
     });
   }
 
+  function skipDiagnostics() {
+    if (diagnosticsTimerRef.current !== null) window.clearInterval(diagnosticsTimerRef.current);
+    diagnosticsTimerRef.current = null;
+    const report = buildDiagnosticText(telemetryRef.current);
+    setTerminalText(report);
+    setPhase("ready");
+  }
+
   function beginFlight() {
-    if (!readyToLaunch) return;
+    if (!readyToLaunch) {
+      setTerminalText(buildDiagnosticText(telemetryRef.current));
+      return;
+    }
     setTelemetry((old) => ({ ...old, elapsed: 0, altitude: 0, verticalSpeed: 0, angularVelocity: 0, angularAcceleration: 0, acceleration: 0 }));
     setPhase("flight");
   }
 
   function retry() {
-    setTelemetry({
+    const resetTelemetry: Telemetry = {
       oxygen: 94, energy: 91, pressure: 101.3, temperature: 21.5, radiation: 0.08,
       acceleration: 0, angularAcceleration: 0, pitch: 90, angularVelocity: 0,
       altitude: 0, verticalSpeed: 0, elapsed: 0, throttle: 0.78, trim: 0,
       electricalLoad: 0.55, oxygenFlow: 0.35, heatBalance: 0,
-    });
-    setTerminalText(DIAGNOSTIC_TEXT);
+    };
+    telemetryRef.current = resetTelemetry;
+    setTelemetry(resetTelemetry);
+    setTerminalText(buildDiagnosticText(resetTelemetry));
     setPhase("ready");
   }
 
@@ -302,9 +340,13 @@ export function FlightSequence() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
           <section className="min-w-0 space-y-5">
             <div className="border border-[#294148] bg-[#071219] p-4">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#7fa19d]">Flight computer / diagnostics</span>
-                <span className={`h-2 w-2 rounded-full ${phase === "failure" ? "bg-[#d9534f]" : phase === "success" ? "bg-[#6ebc91]" : "animate-pulse bg-[#efb658]"}`} />
+                <div className="flex items-center gap-3">
+                  {phase === "boot" && <button type="button" onClick={skipDiagnostics} className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#efb658] hover:text-[#f6ca76]">Skip animation ↗</button>}
+                  {phase === "ready" && <button type="button" onClick={() => setTerminalText(buildDiagnosticText(telemetryRef.current))} className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#efb658] hover:text-[#f6ca76]">Re-run checks ↻</button>}
+                  <span className={`h-2 w-2 rounded-full ${phase === "failure" ? "bg-[#d9534f]" : phase === "success" ? "bg-[#6ebc91]" : "animate-pulse bg-[#efb658]"}`} />
+                </div>
               </div>
               <pre className="min-h-[205px] whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.8] text-[#a6c6b7]">{terminalText}<span className="animate-pulse text-[#efb658]">▌</span></pre>
             </div>
@@ -334,12 +376,12 @@ export function FlightSequence() {
                 <DonutEnvelope risk={riskIndex} label="Envelope" />
                 <div className="min-w-[120px] flex-1">
                   <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#779b9b]">Survival envelope</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#edf4ec]">{criticalCount} <span className="text-sm font-normal text-[#a5b6ac]">critical</span></p>
-                  <p className="mt-1 text-xs text-[#a5b6ac]">{extremeCount} extreme factor{extremeCount === 1 ? "" : "s"} detected</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#edf4ec]">{atRiskCount} <span className="text-sm font-normal text-[#a5b6ac]">at-risk</span></p>
+                  <p className="mt-1 text-xs text-[#a5b6ac]">{criticalCount} warning · {extremeCount} extreme</p>
                   <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#1b3035]">
-                    <div className={`h-full transition-all ${criticalCount >= 4 || extremeCount >= 2 ? "bg-[#d9534f]" : criticalCount ? "bg-[#d6a84c]" : "bg-[#6ebc91]"}`} style={{ width: `${Math.min(100, criticalCount / 4 * 100)}%` }} />
+                    <div className={`h-full transition-all ${atRiskCount >= 3 ? "bg-[#d9534f]" : atRiskCount ? "bg-[#d6a84c]" : "bg-[#6ebc91]"}`} style={{ width: `${Math.min(100, atRiskCount / 4 * 100)}%` }} />
                   </div>
-                  <p className="mt-2 text-[9px] leading-relaxed text-[#779b9b]">0–3 critical factors: continue with caution. 4+: mission loss.</p>
+                  <p className="mt-2 text-[9px] leading-relaxed text-[#779b9b]">{atRiskCount === 3 ? "EMERGENCY: one more at-risk factor causes mission loss." : atRiskCount >= 4 ? "MISSION LOSS: four or more distinct factors are critical/extreme." : "Three at-risk factors trigger emergency; four or more cause mission loss."}</p>
                 </div>
               </div>
             </div>
@@ -395,7 +437,7 @@ export function FlightSequence() {
             {phase === "failure" && (
               <div className="border border-[#d9534f]/60 bg-[#260e12] p-4">
                 <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#ff8a8a]"><AlertTriangle className="h-4 w-4" /> Mission lost</p>
-                <p className="mt-2 text-xs leading-relaxed text-[#d4aaa9]">The vehicle exceeded the survival envelope. Review the amber and red factors, adjust the controls, then run the ascent again.</p>
+                <p className="mt-2 text-xs leading-relaxed text-[#d4aaa9]">Four or more distinct factors are currently outside the survival band. Review the amber and red readings, adjust the controls, re-run checks, then try the ascent again.</p>
                 <button type="button" onClick={retry} className="mt-4 flex items-center gap-2 bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#172126]"><RotateCcw className="h-4 w-4" /> Reset flight</button>
               </div>
             )}
