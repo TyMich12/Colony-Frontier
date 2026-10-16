@@ -1651,6 +1651,8 @@ function BuildingInspector({
   const liveSolarText = track.id === "solar" ? physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value : "";
   const liveSolarKW = activeFault ? 0 : Number(liveSolarText.match(/([\d.]+) kW current/)?.[1] ?? 0);
   const pointingAngle = runtime.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
+  const commsPointingErrorDeg = runtime.repairMetrics?.["Residual antenna pointing error after repointing"] ?? (activeFault ? 35 : 12);
+  const commsPointingFactor = Math.pow(Math.max(0, Math.cos(commsPointingErrorDeg * Math.PI / 180)), 2);
   const damagedStrings = estimatedSolarDamagedStrings(liveCondition, runtime.repairMetrics);
   const detectedHotspots = estimatedSolarHotspots(liveCondition, runtime.dust);
   const hotspotPenalty = solarDegradationPenaltyFraction(liveCondition, runtime.dust, runtime.repairMetrics);
@@ -1750,8 +1752,9 @@ function BuildingInspector({
         { label: "Status", value: activeFault ? "INSPECTION / REPAIR NEEDED" : runtime.status },
       ];
       case "comms": return [
-        { label: "Data throughput", value: (ratedReading * liveCondition / 100 * (activeFault ? 0.35 : 1)).toFixed(2) + " Mbps", note: "Rated throughput derated by condition and active communications faults" },
-        { label: "Reference link availability", value: (extraReading("link availability") * liveCondition / 100 * (activeFault ? 0.35 : 1)).toFixed(2) + "%" },
+        { label: "Data throughput", value: (ratedReading * liveCondition / 100 * commsPointingFactor * (activeFault ? 0.35 : 1)).toFixed(2) + " Mbps", note: "Rated throughput derated by condition, antenna pointing and active faults" },
+        { label: "Reference link availability", value: (extraReading("link availability") * liveCondition / 100 * commsPointingFactor * (activeFault ? 0.35 : 1)).toFixed(2) + "%" },
+        { label: "Residual antenna pointing error", value: commsPointingErrorDeg.toFixed(1) + "°", note: "Repointing improves the link budget; active drift faults temporarily degrade it" },
         { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
         { label: "Link status", value: activeFault ? "DEGRADED" : runtime.status },
       ];
@@ -4023,12 +4026,14 @@ export function MissionSimulation() {
       ? getBaselineRating("comms", pending.selected.comms, buildings.comms?.upgradeLevel ?? 0)
       : 0;
     const commsFaultActive = Object.values(activeFaults).some((fault) => fault.targetTrackId === "comms");
+    const commsPointingErrorDeg = buildings.comms?.repairMetrics?.["Residual antenna pointing error after repointing"] ?? (commsFaultActive ? 35 : 12);
+    const commsPointingFactor = Math.pow(Math.max(0, Math.cos(commsPointingErrorDeg * Math.PI / 180)), 2);
     const commsThroughput = pending.selected.comms
-      ? conditionAdjustedOutput("comms", repairAdjustedRating("comms", commsRatedThroughput, buildings.comms?.repairMetrics), buildings) * (commsFaultActive ? 0.35 : 1)
+      ? conditionAdjustedOutput("comms", repairAdjustedRating("comms", commsRatedThroughput, buildings.comms?.repairMetrics), buildings) * commsPointingFactor * (commsFaultActive ? 0.35 : 1)
       : 0;
     const commsLinkAvailability = pending.selected.comms
       ? getAdditionalRating("comms", "link availability", pending.selected.comms, buildings.comms?.upgradeLevel ?? 0)
-        * clamp(buildings.comms?.condition ?? 100, 0, 100) / 100 * (commsFaultActive ? 0.35 : 1)
+        * clamp(buildings.comms?.condition ?? 100, 0, 100) / 100 * commsPointingFactor * (commsFaultActive ? 0.35 : 1)
       : 0;
     const commsQueueFactor = commsRatedThroughput > 0
       ? clamp(commsRatedThroughput / Math.max(0.1, commsThroughput), 1, 5) * clamp(100 / Math.max(10, commsLinkAvailability), 1, 5)
@@ -4369,11 +4374,17 @@ export function MissionSimulation() {
         conditionBoost(1);
         setAiMessage("Thermal protection mode engaged. Temperature drift has been reduced.");
         break;
-      case "repoint":
-        conditionBoost(1);
+      case "repoint": {
+        setBuildings((current) => {
+          const previous = current.comms ?? { condition: 100, dust: 0, status: "ONLINE" };
+          const condition = clamp(previous.condition + 1);
+          const repairMetrics = { ...(previous.repairMetrics ?? {}), "Residual antenna pointing error after repointing": 1 };
+          return { ...current, comms: { ...previous, condition, repairMetrics, status: buildingStatus(condition) } };
+        });
         setScore((value) => clamp(value + gain(3)));
-        setAiMessage("High-gain antenna repointed. Communications geometry is back inside the preferred link budget.");
+        setAiMessage("High-gain antenna repointed to a 1° residual error. Link throughput and availability recover according to the improved pointing geometry.");
         break;
+      }
       case "test":
         conditionBoost(1);
         setScore((value) => clamp(value + gain(2)));
