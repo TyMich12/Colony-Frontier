@@ -286,7 +286,7 @@ export function FlightSequence() {
   return (
     <GameShell active="loadout" eyebrow="Flight Operations / Launch Control" title="Ascent Simulation">
       <div className="relative" style={{ animation: "cfLaunchFade 850ms ease-out both" }}>
-        <style>{`@keyframes cfLaunchFade { from { opacity: 0; filter: brightness(0); } to { opacity: 1; filter: brightness(1); } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }`}</style>
+        <style>{`@keyframes cfLaunchFade { from { opacity: 0; } to { opacity: 1; } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }`}</style>
         <div className="pointer-events-none fixed inset-0 z-[100] bg-[#020609]" style={{ animation: "cfCurtain 1.1s ease-out forwards" }} />
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#294148] bg-[#0a171d] px-5 py-4">
           <div>
