@@ -1701,12 +1701,13 @@ function BuildingInspector({
       ];
       case "water": return [
         { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
-        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: isFirstMission ? "Level 1 recovery support adds up to 45 percentage points when online and powered (96% cap)" : "Rated recovery scaled by condition" },
-        { label: "Treatment throughput", value: (waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(8, extraReading("throughput") * liveCondition / 100) : extraReading("throughput") * liveCondition / 100) : 0).toFixed(1) + " L/day", note: isFirstMission ? "Level 1 starter recovery module maintains 8 L/day treatment throughput while powered" : "Condition-adjusted rated throughput" },
-        { label: "Net water balance", value: (estimatedNetWaterBalancePerDay >= 0 ? "+" : "") + estimatedNetWaterBalancePerDay.toFixed(1) + " L/day", note: isFirstMission ? "Includes 6.0 L/day local feedstock water production while the starter module is online and powered; positive means the reserve grows" : "Positive means reserve grows; negative means reserve falls" },
-        { label: "Local water production", value: waterMakeupNow.toFixed(1) + " L/day", note: isFirstMission ? "Mission 1 local volatile-feed module is built into the starter water system" : "No tutorial feedstock source active" },
-        { label: "Crop water use", value: foodWaterUseNow.toFixed(1) + " L/kg food", note: isFirstMission ? "Level 1 starter grow module uses a 10 L/kg tutorial water-efficiency setting" : "Selected Agriculture system rating" },
-        { label: "Crew make-up stream", value: "8.0 L/day", note: "Recoverable stream, not total plumbing circulation" },
+        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: "Percentage of today's treated water use returned to the reserve" },
+        { label: "Treatment throughput", value: waterThroughputNow.toFixed(1) + " L/day", note: "Condition-adjusted rated treatment capacity; it is not a water source" },
+        { label: "Net water balance", value: (estimatedNetWaterBalancePerDay >= 0 ? "+" : "") + estimatedNetWaterBalancePerDay.toFixed(1) + " L/day", note: "Recovery is subtracted from today's water use; negative means the reserve falls" },
+        { label: "Water used today", value: totalWaterUseNow.toFixed(1) + " L/day", note: "Crew use plus crop water demand at current crop yield" },
+        { label: "Water recovered today", value: recycledWaterNow.toFixed(1) + " L/day", note: "Limited by treatment throughput and the recovery percentage" },
+        { label: "Crop water use", value: foodWaterUseNow.toFixed(1) + " L/kg food", note: "Selected Agriculture system rating" },
+        { label: "Crew make-up stream", value: "8.0 L/day", note: "Included in daily use before recovery is applied" },
       ];
       case "oxygen": {
         const oxygenRate = systemOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(3.36, liveCondition / 100 * Math.max(3.5, ratedReading)) : ratedReading * liveCondition / 100) : 0;
