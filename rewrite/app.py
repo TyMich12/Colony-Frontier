@@ -84,7 +84,7 @@ def calculate_flight(payload):
     target_pitch = clamp(phase_target_pitch + pitch_trim, -15.0, 82.0)
     pitch = clamp(number("pitch_deg", 0.0), -89.0, 89.0)
     angular_velocity = clamp(number("angular_velocity_deg_s", 0.0), -30.0, 30.0)
-    angular_acceleration = clamp((target_pitch - pitch) * 1.4 - angular_velocity * 1.6, -8.0, 8.0)
+    angular_acceleration = clamp((target_pitch - pitch) * 0.5 - angular_velocity * 1.4, -18.0, 18.0)
     if dt > 0.0:
         angular_velocity = clamp(angular_velocity + angular_acceleration * dt, -30.0, 30.0)
         pitch = clamp(pitch + angular_velocity * dt, -89.0, 89.0)
