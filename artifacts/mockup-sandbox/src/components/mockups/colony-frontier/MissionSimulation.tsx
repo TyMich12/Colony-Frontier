@@ -841,7 +841,7 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
         ? 0
         : campaign === "mars"
           ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
-          : liveDay < 14 ? (liveDay < 1 ? 0.22 : liveProfile.sunlightGeometry) : 0;
+          : liveDay < 14 ? liveProfile.sunlightGeometry : 0;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
       const conditionAdjustedRating = rating * clamp(_condition, 0, 100) / 100;
       const modeledSolarFaultPenalty = solarDegradationPenaltyFraction(_condition, dust, repairMetrics);
@@ -1649,7 +1649,7 @@ function BuildingInspector({
   const ratedReading = repairAdjustedRating(track.id, getBaselineRating(track.id, tier, upgradeLevel), runtime.repairMetrics, track.id === "habitat" || track.id === "navigation");
   const extraReading = (needle: string) => getAdditionalRating(track.id, needle, tier, upgradeLevel);
   const liveSolarText = track.id === "solar" ? physicalSystemOutput(track.id, tier, upgradeLevel, runtime.condition, runtime.dust, runtime.repairMetrics, elapsedSeconds, campaign, missionTitle, missionNumber).value : "";
-  const liveSolarKW = Number(liveSolarText.match(/([\d.]+) kW current/)?.[1] ?? 0);
+  const liveSolarKW = activeFault ? 0 : Number(liveSolarText.match(/([\d.]+) kW current/)?.[1] ?? 0);
   const pointingAngle = runtime.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
   const damagedStrings = estimatedSolarDamagedStrings(liveCondition, runtime.repairMetrics);
   const detectedHotspots = estimatedSolarHotspots(liveCondition, runtime.dust);
@@ -1732,7 +1732,7 @@ function BuildingInspector({
       case "thermal": return [
         { label: "Cabin temperature", value: metrics.temperature.toFixed(1) + " °C" },
         { label: "Control target", value: "21.0 °C" },
-        { label: "Heat rejection capacity", value: (ratedReading * liveCondition / 100).toFixed(2) + " kW thermal" },
+        { label: "Heat rejection capacity", value: (electricalReadings.demandSources.some((item) => item.label.toLowerCase().includes("thermal")) ? ratedReading * liveCondition / 100 : 0).toFixed(2) + " kW thermal", note: "Active heat rejection is zero while the thermal-control electrical load is shed" },
         { label: "Average electrical draw", value: (electricalReadings.demandSources.find((item) => item.label.toLowerCase().includes("thermal"))?.kw ?? 0).toFixed(2) + " kW" },
         { label: "Temperature error", value: (metrics.temperature - 21).toFixed(1) + " °C from target" },
       ];
@@ -1749,13 +1749,13 @@ function BuildingInspector({
         { label: "Status", value: activeFault ? "INSPECTION / REPAIR NEEDED" : runtime.status },
       ];
       case "comms": return [
-        { label: "Data throughput", value: (ratedReading * liveCondition / 100).toFixed(2) + " Mbps" },
-        { label: "Reference link availability", value: extraReading("link availability").toFixed(2) + "%" },
+        { label: "Data throughput", value: (ratedReading * liveCondition / 100 * (activeFault ? 0.35 : 1)).toFixed(2) + " Mbps", note: "Rated throughput derated by condition and active communications faults" },
+        { label: "Reference link availability", value: (extraReading("link availability") * liveCondition / 100 * (activeFault ? 0.35 : 1)).toFixed(2) + "%" },
         { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
         { label: "Link status", value: activeFault ? "DEGRADED" : runtime.status },
       ];
       case "navigation": return [
-        { label: "Horizontal position error", value: ratedReading.toFixed(2) + " m", note: "Lower is better" },
+        { label: "Horizontal position error", value: (ratedReading * 100 / Math.max(25, liveCondition)).toFixed(2) + " m", note: "Error rises as navigation hardware condition falls; lower is better" },
         { label: "Condition", value: liveCondition.toFixed(0) + "%" },
         { label: "Guidance report", value: earthReport ? "Latest report received" : "No new report cached" },
         { label: "Status", value: activeFault ? "CALIBRATION / REPAIR NEEDED" : runtime.status },
@@ -2891,7 +2891,7 @@ export function MissionSimulation() {
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
             : missionDay < 14
-              ? (missionDay < 1 ? 0.22 : lunarProfile?.sunlightGeometry ?? 0)
+              ? (lunarProfile?.sunlightGeometry ?? 0)
               : 0;
         const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
         const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
@@ -3041,10 +3041,11 @@ export function MissionSimulation() {
         const generationSources = [
           ...(solarToBusKW > 0.001 ? [{ label: "Solar array", kw: solarToBusKW }] : []),
         ];
+        const activeOptionalFraction = requestedOptionalLoadKW > 0 ? clamp(optionalLoadKW / requestedOptionalLoadKW, 0, 1) : 0;
         const optionalDemandSources = optionalRatedLoads
           .map((source) => ({
             label: source.systemId === "solar" ? "Solar-array controller / sensors" : source.systemId === "battery" ? "Battery-management electronics" : source.label,
-            kw: source.kw,
+            kw: source.kw * activeOptionalFraction,
           }))
           .filter((source) => source.kw > 0.001);
         // System demand is the load consumed by colony systems. Battery charging is
@@ -3059,7 +3060,7 @@ export function MissionSimulation() {
           // flow is tracked separately so the power balance can be displayed consistently.
           generationKW: solarToBusKW,
           actualSupplyKW: deliveredPowerKW,
-          consumptionKW: essentialLoadKW + requestedOptionalLoadKW,
+          consumptionKW: nominalLoadKW,
           batteryFlowKW,
           generationSources,
           demandSources,
@@ -3090,13 +3091,13 @@ export function MissionSimulation() {
         // water or grants a hidden Mission 1 recovery bonus.
         const waterRecoveryPct = clamp(conditionAdjustedOutput("water", ratedWaterRecoveryPct, buildings), 0, 100);
         const ratedWaterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
-        const waterPowered = waterOnline && !(deficitExpected && current.battery <= 95) && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const waterPowered = waterOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const effectiveWaterRecoveryPct = waterPowered ? waterRecoveryPct : 0;
         const crewWaterUseLDay = 8; // Crew make-up stream, included within the colony's total daily water demand.
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
         // Crop output depends on actual installed yield, condition, power and crop maturity.
         // There is no instant mature-crop / Mission 1 production boost.
-        const agriculturePowered = agricultureOnline && !(deficitExpected && current.battery <= 95) && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const agriculturePowered = agricultureOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const cropMaturity = clamp((elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
         const foodProductionKgDay = agriculturePowered
           ? conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings) * cropMaturity
@@ -3116,13 +3117,14 @@ export function MissionSimulation() {
         const waterDelta = -waterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
-        const thermalRatedKW = thermalOnline
+        const thermalPowered = thermalOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const thermalRatedKW = thermalPowered
           ? conditionAdjustedOutput("thermal", repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics), buildings)
           : 0;
         const thermalNeedKW = 0.7 + Math.abs(ambientTemperature - 21) * 0.15;
-        const thermalCoverage = Math.min(1, thermalRatedKW / Math.max(0.1, thermalNeedKW));
-        const thermalTarget = thermalOnline ? 21 + (ambientTemperature - 21) * (1 - thermalCoverage) : ambientTemperature;
-        const thermalResponse = thermalOnline ? 1 - Math.exp(-resourceDt / (7200 / Math.max(0.25, thermalCoverage))) : 1 - Math.exp(-resourceDt / 28800);
+        const thermalCoverage = thermalPowered ? Math.min(1, thermalRatedKW / Math.max(0.1, thermalNeedKW)) : 0;
+        const thermalTarget = thermalPowered ? 21 + (ambientTemperature - 21) * (1 - thermalCoverage) : ambientTemperature;
+        const thermalResponse = thermalPowered ? 1 - Math.exp(-resourceDt / (7200 / Math.max(0.25, thermalCoverage))) : 1 - Math.exp(-resourceDt / 28800);
         const radiationAvoidedPct = radiationOnline
           ? conditionAdjustedOutput("radiation", repairAdjustedRating("radiation", getBaselineRating("radiation", pending.selected.radiation ?? "Foundation", radiationUpgrade), buildings.radiation?.repairMetrics), buildings)
           : 0;
@@ -3997,10 +3999,17 @@ export function MissionSimulation() {
     const commsRatedThroughput = pending.selected.comms
       ? getBaselineRating("comms", pending.selected.comms, buildings.comms?.upgradeLevel ?? 0)
       : 0;
+    const commsFaultActive = Object.values(activeFaults).some((fault) => fault.targetTrackId === "comms");
     const commsThroughput = pending.selected.comms
-      ? repairAdjustedRating("comms", commsRatedThroughput, buildings.comms?.repairMetrics)
+      ? conditionAdjustedOutput("comms", repairAdjustedRating("comms", commsRatedThroughput, buildings.comms?.repairMetrics), buildings) * (commsFaultActive ? 0.35 : 1)
       : 0;
-    const commsQueueFactor = commsRatedThroughput > 0 ? clamp(commsRatedThroughput / Math.max(0.1, commsThroughput), 1, 5) : 1;
+    const commsLinkAvailability = pending.selected.comms
+      ? getAdditionalRating("comms", "link availability", pending.selected.comms, buildings.comms?.upgradeLevel ?? 0)
+        * clamp(buildings.comms?.condition ?? 100, 0, 100) / 100 * (commsFaultActive ? 0.35 : 1)
+      : 0;
+    const commsQueueFactor = commsRatedThroughput > 0
+      ? clamp(commsRatedThroughput / Math.max(0.1, commsThroughput), 1, 5) * clamp(100 / Math.max(10, commsLinkAvailability), 1, 5)
+      : 1;
     const baseDuration = baseActionId === "request-earth-report"
       ? Math.ceil(navigationQueueDuration * commsQueueFactor)
       : (SYSTEM_ACTION_SECONDS[baseActionId] ?? 6);
