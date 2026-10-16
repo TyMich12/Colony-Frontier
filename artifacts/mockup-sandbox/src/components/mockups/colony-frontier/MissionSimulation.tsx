@@ -3823,6 +3823,8 @@ export function MissionSimulation() {
     const roverTravelToBaseSeconds = hasRover && roverEffectiveSpeed > 0.1
       ? Math.hypot(nodeWorldX, nodeWorldZ) * 1.5 / (roverEffectiveSpeed / 3.6)
       : 0;
+    const fieldBatteryCapacityKWh = Math.max(1, ratedBatteryCapacityKWh(pending.selected, buildings));
+    const batteryPercentForEnergy = (energyKWh: number) => Math.max(0, energyKWh) / fieldBatteryCapacityKWh * 100;
 
     if (action === "survey" && stage === "UNSURVEYED") {
       if (hasRover && roverEffectiveSpeed <= 0.1) {
@@ -3830,9 +3832,10 @@ export function MissionSimulation() {
         return;
       }
       const duration = 18 * roverTimeFactor + (hasRover ? roverTravelToNodeSeconds : 0);
+      const surveyEnergyKWh = hasRover ? 2.0 * duration / 3600 : 0.25;
       beginOperation("SURVEY", nodeId, `Surveying ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`SURVEYING ${node.label}`);
-      setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - 1) }));
+      setMetrics((current) => ({ ...current, power: clamp(current.power - (hasRover ? 2 : 3)), battery: clamp(current.battery - batteryPercentForEnergy(surveyEnergyKWh)) }));
       return;
     }
     if (action === "sample" && stage === "SURVEYED") {
@@ -3844,8 +3847,10 @@ export function MissionSimulation() {
       const equipmentFault = Object.values(activeFaults).some((fault) => ["rover", "extraction", "navigation"].includes(fault.targetTrackId));
       const quality = clamp((hasRover ? 60 : 45) + (hasExtraction ? 10 * extractionFactor : 0) + navigationAccuracy * 0.15 + scienceAccuracy * 0.10 - (equipmentFault ? 12 : 0), 38, 98);
       const adjustedDuration = duration * (emergencyPowerMode ? 1.25 : 1);
+      const collectionPowerKW = hasExtraction ? 1.5 : hasRover ? 0.6 : 0.25;
+      const collectionEnergyKWh = collectionPowerKW * adjustedDuration / 3600;
       beginOperation("COLLECT", nodeId, `Collecting sealed core sample · ${node.label}`, adjustedDuration, undefined, quality, undefined, hasRover ? "rover" : nodeId, hasRover);
-      setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - 2), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
+      setMetrics((current) => ({ ...current, power: clamp(current.power - Math.max(2, hasExtraction ? 5 : hasRover ? 3 : 3.5)), battery: clamp(current.battery - batteryPercentForEnergy(collectionEnergyKWh)), radiation: clamp(current.radiation + (hasRover ? 0 : 1.5)) }));
       setRoverTask(hasRover ? `COLLECTING ${node.label}` : hasExtraction ? "DRILLING CORE" : "EVA SAMPLING");
       return;
     }
@@ -3855,9 +3860,10 @@ export function MissionSimulation() {
         return;
       }
       const duration = 16 * roverTimeFactor + (hasRover ? roverTravelToBaseSeconds : 0);
+      const transferEnergyKWh = hasRover ? 2.0 * duration / 3600 : 0.35;
       beginOperation("TRANSFER", nodeId, `Transferring sealed sample · ${node.label}`, duration, undefined, undefined, undefined, hasRover ? "rover" : nodeId, hasRover);
       setRoverTask(`TRANSFERRING ${node.label}`);
-      if (!hasRover) setMetrics((current) => ({ ...current, oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) }));
+      setMetrics((current) => ({ ...current, battery: clamp(current.battery - batteryPercentForEnergy(transferEnergyKWh)), ...(!hasRover ? { oxygen: clamp(current.oxygen - 1.5), radiation: clamp(current.radiation + 1.5) } : {}) }));
       return;
     }
     if (action === "analyze" && stage === "DELIVERED") {
