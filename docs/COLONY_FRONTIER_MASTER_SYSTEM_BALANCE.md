@@ -446,45 +446,47 @@ The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day
 
 These are explicit game-model assumptions for readable mission pacing, not certified spacecraft specifications. They preserve the existing Apex and Research tier rating values.
 
-## Level 1 first-run balance and system telemetry — updated 2026-10-15
+## Level 1 first-run balance, resource simulation and live telemetry — updated 2026-10-16
 
-- Mission 1 uses six incident windows, lower condition wear, and smaller incident damage so a first-time player can recover instead of being overwhelmed by cascading faults.
-- Solar dust accumulates faster than before and its rate rises as equipment condition falls. Solar output is condition-adjusted and also includes explicit modelled string/hot-spot derating. The system inspector reports live generation, dust loss, estimated damaged strings, estimated hot spots and residual pointing/calibration angle; the string/hot-spot counts are simulation estimates, not sensor-grade physical measurements.
-- Every deployed system's inspector shows a live telemetry block with its key rated/current values, reserve or throughput readings where applicable, and fault/status state.
-- Repair and retrofit actions use activation energy, simulated duration and optional support-system combinations.
-- Mission 1 food production targets 3.2 kg/day at 100% Agriculture condition against 2.48 kg/day four-crew demand, with a 2.65 kg/day operational tutorial floor while at least 1.0 kW reaches the colony bus. The starter water module maintains at least 8 L/day treatment throughput while online and powered, and water recovery receives a +45 percentage-point support bonus after condition derating, capped at 96%. Both safeguards are specific to Mission 1; Foundation/Frontier/Apex/Research rating-table values, including Apex and Research, remain unchanged.
+This section documents the current MissionSimulation implementation. It supersedes the older Mission 1 tutorial water/food safeguards described in earlier revisions. It does **not** change the tier-rating tables above; in particular, all Apex and Research values remain untouched.
 
-## Condition-linked output and water/food pacing — updated 2026-10-15
+### Shared condition and operating-state rules
 
-### Equipment condition directly affects output
+- Live output/capacity is condition-adjusted where applicable: **effective output = rated output × (condition / 100)**. System-specific factors (such as sunlight, dust, faults, temperature, pointing, power availability and throughput limits) are applied separately.
+- A system that is offline or does not receive sufficient power does not receive free production or recovery.
+- Inspectors should display the same live values used by the simulation, including current status, relevant physical readings, reserves/throughput and fault state.
+- Repair/retrofit workflows use their selected activation energy, simulation duration and support-system requirements. The standalone option remains genuinely standalone. Mission 1 must not require spare parts or other extra equipment/materials in its loadout or action interface.
 
-The mission simulation applies a transparent linear condition derating to live system output/capacity for Solar, Battery discharge, Power Grid transfer, Oxygen production, Water recovery and treatment throughput, Agriculture food production, Thermal Control, and Radiation protection:
+### Solar generation
 
-**Effective output = rated output × (condition / 100).**
+- Solar generation is calculated from the selected solar installation's rated output and the live operating conditions: sunlight availability, equipment condition, cell-temperature loss, dust transmission, array pointing error and solar-specific fault/degradation penalties.
+- An unrelated system's general operational/dependency flag must not force solar output to zero. Solar should generate whenever the array is selected and healthy enough, daylight is available, and no active solar-specific fault prevents generation.
+- A displayed value of **0.00 kW is valid** during lunar night/no illumination, when the solar installation is not selected, when its condition is below the 25% operating threshold, or when an active solar fault prevents generation. Otherwise, the live output should reflect the factors above rather than remain zero because of an unrelated status flag.
+- Solar dust accumulation and cleaning remain part of the live output calculation. Solar diagnostics may show estimated damaged strings/hot spots and pointing/calibration error; these are model estimates, not literal sensor-grade hardware measurements.
 
-Examples: 100% condition = 100% rated output; 75% condition = 75%; 40% condition = 40%; 0% condition = no useful output from the affected function. Existing dust, sunlight, power-path availability, active faults and repair-specific metric effects still apply separately. The condition display labels the percentage as output efficiency. This is a gameplay model that makes maintenance consequences visible; it is not a claim that every real spacecraft component has a perfectly linear failure curve.
+### Water recovery — recovered water, not generated water
 
-### Water balance correction
+- The Water system does **not** create new water. It returns a percentage of water that was used and processed back into the reserve.
+- The crew recoverable/make-up stream is **8 L/day for four crew**. Crop water use is added using actual food production multiplied by the selected Agriculture system's water-use rating.
+- **Water recovered = min(total water used, available treatment throughput) × effective recovery percentage.** Treatment throughput is a processing-capacity limit, not a water source.
+- **Net reserve change = water recovered − total water used.** The reserve falls by the unrecovered amount; no tutorial local-volatile feed or free 6 L/day water source is applied.
+- Example: if 10 L is used during the day and the effective recovery rate is 60%, with enough powered treatment throughput, 6 L is recovered and 4 L is lost from the reserve.
+- Effective recovery is the selected system's rated recovery efficiency adjusted for condition and capped at 100%. It receives **no Mission 1 +45 percentage-point bonus**. If the Water system is offline or underpowered, effective recovery is zero.
+- Live telemetry should distinguish **water used today**, **water recovered today**, **effective recovery (%)**, **treatment throughput**, **crop water use**, **crew water stream**, and **net water balance**.
 
-The crew water model uses an **8 L/day recoverable/make-up stream** for four crew, rather than treating the full 20 L/day loop circulation as water that is lost unless recovered. Mission 1 gets a +45 percentage-point recovery-loop support bonus (capped at 96%) to make water recovery forgiving while still scaling with equipment condition. Recovered water is calculated from the stream throughput and the effective recovery percentage. Crop water demand is still calculated from actual food production × the agriculture water-use rating, with the recovered share returned to the clean-water reserve. Thus:
-- Lower Water condition reduces recovery efficiency and treatment throughput, so less water is returned.
-- Lower Agriculture condition reduces food production and also reduces crop water use because fewer crops are produced.
-- Water reserve changes by the net amount lost after recovery, not by gross plumbing circulation.
-- When the Water system or its power path is unavailable, recovery is zero; the model does not grant free water.
+### Food production and crew demand
 
-### Food balance
+- Four-crew food demand is **2.48 kg/day** (0.62 kg per crew member per day, expressed as edible dry-food equivalent).
+- Food production is based on the selected Agriculture system's rated yield, equipment condition and available power. The former Mission 1 artificial production floor and extra tutorial production boost are removed.
+- Crop production ramps up as crops mature rather than instantly producing the full rated yield: `cropMaturity = clamp((elapsedDays − 0.5) / 2.5, 0, 1)`. Production is multiplied by this maturity fraction, so the system reaches its rated condition-adjusted output after the ramp.
+- Food reserve capacity is **120 kg**. The initial reserve is set by the mission's starting-reserve percentage. Food reserves are consumed at 2.48 kg/day and replenished only by actual crop production.
+- Agriculture's water use is based on actual crop output, so a lower crop yield also reduces crop water demand. Do not reintroduce a tutorial minimum yield that masks a food deficit.
 
-Outside Mission 1, food production remains the selected Agriculture system's rated kg/day multiplied by its condition fraction and available-power/system status. Four-crew food demand remains 2.48 kg/day. Mission 1 has a tutorial grow-module target of 3.2 kg/day at 100% condition and a matching additional 0.55 kW allowance. While Agriculture remains operational and at least 1.0 kW reaches the bus, a 2.65 kg/day minimum starter output prevents ordinary condition wear from immediately putting the crew into a food deficit. The water loop also maintains 8 L/day minimum starter treatment throughput while online and powered, with its +45 percentage-point recovery support capped at 96%. These are tutorial-only safeguards and do **not** alter the Foundation/Frontier/Apex/Research system-rating tables or Apex/Research values.
+### Mission 1 survivability and balance checks
 
+- Mission 1 should be beatable on a first run through its intended starter equipment, manageable incident pacing and player repairs—not through hidden free water or artificial food-production floors.
+- Continue to use the current Mission 1 incident pacing, reduced condition wear and smaller incident damage so ordinary early faults are recoverable.
+- The dashboard and inspectors must use the same resource calculations as the simulation. Any future change to a resource formula must update the corresponding displayed readings too.
+- Keep the established resource capacities for oxygen and water unless a separately approved balance change is made. The food reserve capacity is 120 kg under the current implementation.
+- These are transparent gameplay models, not certified spacecraft design values. The master tier-rating tables remain the authority for equipment ratings; no Apex or Research values were changed as part of this update.
 
-
-## Level 1 survivability, live diagnostics and equipment requirements — updated 2026-10-15
-
-- Mission 1 agriculture targets 3.2 kg/day at 100% condition against 2.48 kg/day four-crew demand. While Agriculture is operational and at least 1.0 kW reaches the bus, a 2.65 kg/day tutorial floor prevents normal condition degradation alone from creating a food deficit. The regular tier ratings remain unchanged.
-- Mission 1 oxygen production is condition-adjusted with a tutorial safety floor of 3.36 kg O₂/day while the oxygen loop is online and at least 1.0 kW reaches the bus. This matches the four-crew planning demand; oxygen reserves still decline if the loop is offline or power is unavailable. Other missions retain the normal rated-output/condition calculation.
-- Mission 1 water recovery retains the +45 percentage-point support bonus (96% cap) and provides at least 8 L/day treatment throughput while the water module is operational and at least 1.0 kW reaches the bus. A powered starter local-volatile feed adds 6 L/day of actual make-up water, and the tutorial crop module uses 10 L/kg rather than the Foundation table value of 30 L/kg. These tutorial-only source/efficiency settings are shown in live telemetry; if the Water system or power is offline, the 6 L/day source stops and water is still consumed.
-- Solar dust rises at 4.0 percentage points per simulated Earth day at 100% condition, increasing by 0.06 points/day for every missing condition point, capped at 10.0 points/day at 0% condition. Dust remains capped at 100% and can be reduced by cleaning actions.
-- The live inspector includes system-specific operating readings plus common live condition, operating state, colony-bus supply versus demand, and active-fault severity. Solar diagnostics separately show estimated damaged strings, hot spots, pointing/calibration error, and their estimated output penalties. These counts are model estimates, not literal hardware sensor measurements.
-- Repair/retrofit workflows use energy, simulated time and optional support-system combinations only. Mission 1 presents no additional equipment or materials in the loadout or action interface.
-- Dashboard reserve displays use the declared capacities: 24 kg O₂, 240 L water, and 60 kg food. Mission 1 local volatile feed is a real source term in the tank balance, not a recovery-efficiency bonus; the 10 L/kg crop-water value is a tutorial exception, not a tier-table edit.
-- These are Level 1 gameplay safeguards, not certified spacecraft design values. They do not change Apex or Research tier ratings.
