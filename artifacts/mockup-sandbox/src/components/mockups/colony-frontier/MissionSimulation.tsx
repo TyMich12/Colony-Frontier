@@ -1670,16 +1670,18 @@ function BuildingInspector({
   const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
   const waterConditionNow = clamp(buildings.water?.condition ?? 100, 0, 100);
   const agricultureConditionNow = clamp(buildings.agriculture?.condition ?? 100, 0, 100);
-  const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? clamp(waterConditionNow / 100 * waterRecoveryRatedNow, 0, 100) : 0;
+  const waterLoadActive = electricalReadings.demandSources.some((source) => source.label.toLowerCase().includes("water"));
+  const agricultureLoadActive = electricalReadings.demandSources.some((source) => source.label.toLowerCase().includes("agriculture"));
+  const waterRecoveryNow = waterOperational && waterLoadActive && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? clamp(waterConditionNow / 100 * waterRecoveryRatedNow, 0, 100) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
   const cropMaturityNow = clamp((elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
   const missionOneGrowYieldFactor = isFirstMission ? 1 + 0.55 / POWER_DEMAND_MODEL.systems.agriculture.baseKW : 1;
-  const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0)
+  const foodProductionNow = agricultureOperational && agricultureLoadActive && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0)
     ? agricultureConditionNow / 100 * ratedFoodNow * cropMaturityNow * missionOneGrowYieldFactor
     : 0;
   const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
   const ratedWaterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
-  const waterThroughputNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? ratedWaterThroughputNow : 0;
+  const waterThroughputNow = waterOperational && waterLoadActive && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? ratedWaterThroughputNow : 0;
   // Match the resource simulation: 21 L/day total colony use, including crew, crop and process water.
   const totalWaterUseNow = Math.max(21, 8 + foodProductionNow * foodWaterUseNow);
   const recycledWaterNow = Math.min(totalWaterUseNow, Math.max(0, waterThroughputNow)) * waterRecoveryNow / 100;
@@ -1752,8 +1754,8 @@ function BuildingInspector({
         { label: "Status", value: activeFault ? "INSPECTION / REPAIR NEEDED" : runtime.status },
       ];
       case "comms": return [
-        { label: "Data throughput", value: (ratedReading * liveCondition / 100 * commsPointingFactor * (activeFault ? 0.35 : 1)).toFixed(2) + " Mbps", note: "Rated throughput derated by condition, antenna pointing and active faults" },
-        { label: "Reference link availability", value: (extraReading("link availability") * liveCondition / 100 * commsPointingFactor * (activeFault ? 0.35 : 1)).toFixed(2) + "%" },
+        { label: "Data throughput", value: (electricalReadings.actualSupplyKW >= 2 ? ratedReading * liveCondition / 100 * commsPointingFactor * (activeFault ? 0.35 : 1) : 0).toFixed(2) + " Mbps", note: "Rated throughput derated by power, condition, antenna pointing and active faults" },
+        { label: "Reference link availability", value: (electricalReadings.actualSupplyKW >= 2 ? extraReading("link availability") * liveCondition / 100 * commsPointingFactor * (activeFault ? 0.35 : 1) : 0).toFixed(2) + "%" },
         { label: "Residual antenna pointing error", value: commsPointingErrorDeg.toFixed(1) + "°", note: "Repointing improves the link budget; active drift faults temporarily degrade it" },
         { label: "Condition", value: liveCondition.toFixed(0) + "% output" },
         { label: "Link status", value: activeFault ? "DEGRADED" : runtime.status },
@@ -3903,6 +3905,13 @@ export function MissionSimulation() {
       setOperationResult(`EMERGENCY BACKUP RECHARGING · ${action.replace("fallback-", "").toUpperCase()} is available again in ${formatWallClockCountdown(fallbackRemaining, speed, GAME_TIME_ACCELERATION)} seconds.`);
       return;
     }
+    if (baseActionId === "request-earth-report") {
+      const localGuidanceCache = pending.selected.navigation === "Research" && (buildings.navigation?.upgradeLevel ?? 0) >= 2;
+      if (!localGuidanceCache && (!pending.selected.comms || electricalReadings.actualSupplyKW < 2.0)) {
+        setOperationResult("EARTH REPORT HELD · A powered communications link is required; restore at least 2 kW of bus supply or use a fully commissioned Research navigation cache.");
+        return;
+      }
+    }
     const blockers = checkActionPrerequisites(trackId, action);
     if (blockers.length > 0) {
       setOperationResult(`ACTION LOCKED · ${blockers.join(" · ")}.`);
@@ -4028,10 +4037,11 @@ export function MissionSimulation() {
     const commsFaultActive = Object.values(activeFaults).some((fault) => fault.targetTrackId === "comms");
     const commsPointingErrorDeg = buildings.comms?.repairMetrics?.["Residual antenna pointing error after repointing"] ?? (commsFaultActive ? 35 : 12);
     const commsPointingFactor = Math.pow(Math.max(0, Math.cos(commsPointingErrorDeg * Math.PI / 180)), 2);
-    const commsThroughput = pending.selected.comms
+    const commsPowerAvailable = electricalReadings.actualSupplyKW >= 2.0;
+    const commsThroughput = pending.selected.comms && commsPowerAvailable
       ? conditionAdjustedOutput("comms", repairAdjustedRating("comms", commsRatedThroughput, buildings.comms?.repairMetrics), buildings) * commsPointingFactor * (commsFaultActive ? 0.35 : 1)
       : 0;
-    const commsLinkAvailability = pending.selected.comms
+    const commsLinkAvailability = pending.selected.comms && commsPowerAvailable
       ? getAdditionalRating("comms", "link availability", pending.selected.comms, buildings.comms?.upgradeLevel ?? 0)
         * clamp(buildings.comms?.condition ?? 100, 0, 100) / 100 * commsPointingFactor * (commsFaultActive ? 0.35 : 1)
       : 0;
