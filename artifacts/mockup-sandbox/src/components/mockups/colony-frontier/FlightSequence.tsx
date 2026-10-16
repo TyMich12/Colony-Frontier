@@ -62,7 +62,7 @@ function classify(value: number, survivalMin: number, survivalMax: number, extre
 }
 
 function buildFactors(t: Telemetry, inFlight: boolean): Factor[] {
-  const entries: Array<Omit<Factor, "severity" | "score"> & { limits: [number, number, number, number] }> = [
+  const entries: Array<Omit<Factor, "severity" | "position"> & { limits: [number, number, number, number] }> = [
     { id: "oxygen", label: "Oxygen reserve", value: t.oxygen, display: `${Math.round(t.oxygen)}%`, note: "usable reserve", limits: [45, 100, 15, 115] },
     { id: "energy", label: "Electrical reserve", value: t.energy, display: `${Math.round(t.energy)}%`, note: "main bus reserve", limits: [35, 100, 12, 115] },
     { id: "pressure", label: "Cabin pressure", value: t.pressure, display: `${t.pressure.toFixed(1)} kPa`, note: "target 95–105 kPa", limits: [75, 115, 58, 130] },
