@@ -1239,7 +1239,13 @@ function Rover({
             // and the corresponding timed field-operation clock.
             const baseSpeedMps = Math.max(0, traverseSpeedKmh / 3.6);
             const simRate = Math.min(4, Math.max(0.5, simulationSpeed));
-            const move = Math.min(Math.max(0, delta) * baseSpeedMps * simRate, distance - arriveRadius);
+            const terrainSampleDistance = Math.min(0.75, distance);
+            const terrainAheadHeight = terrainHeight(current.x + (dx / distance) * terrainSampleDistance, current.z + (dz / distance) * terrainSampleDistance);
+            const localTerrainRise = Math.abs(terrainAheadHeight - terrainHeight(current.x, current.z));
+            // Slopes / uneven ground slow the rover; path planning separately avoids rocks
+            // and structures, so the displayed speed is not just an animation multiplier.
+            const terrainSpeedFactor = Math.max(0.45, Math.min(1, 1 - localTerrainRise * 0.8));
+            const move = Math.min(Math.max(0, delta) * baseSpeedMps * simRate * terrainSpeedFactor, distance - arriveRadius);
             current.x += (dx / distance) * move;
             current.z += (dz / distance) * move;
             travelled = move;
