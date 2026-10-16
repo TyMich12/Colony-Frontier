@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowUp, ChevronRight, RotateCcw, ShieldCheck, Zap } from "lucide-react";
-import { GameShell } from "./_shared/GameShell";
 import { clearMissionRuntime, loadPendingMission } from "./missionRuntime";
 
 type Phase = "boot" | "ready" | "flight" | "success" | "failure";
