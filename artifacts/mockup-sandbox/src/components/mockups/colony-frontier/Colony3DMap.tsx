@@ -36,7 +36,7 @@ type Props = {
   simulationSpeed: number;
 };
 
-const POSITIONS: Record<string, [number, number]> = {
+export const POSITIONS: Record<string, [number, number]> = {
   // Wide deployment lanes: players pan across the colony instead of seeing every system as a tight cluster.
   habitat: [0, 0],
   water: [-22, 18],
