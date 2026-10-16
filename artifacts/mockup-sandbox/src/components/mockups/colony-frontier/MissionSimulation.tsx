@@ -3797,8 +3797,6 @@ export function MissionSimulation() {
     const hasScience = pending.selected.science !== undefined;
     const fieldWorkInProgress = Object.values(activeOperationsRef.current).some((operation) => operation.roverAssigned || ["SURVEY", "COLLECT", "TRANSFER"].includes(operation.kind) || (operation.kind === "SYSTEM_ACTION" && operation.targetId === "rover") || (hasRover && operation.kind === "SYSTEM_ACTION" && operation.targetId === "solar" && operation.actionId === "clean") || (hasRover && operation.kind === "REPAIR" && roverTask.startsWith("REPAIRING ")));
     if (activeOperationsRef.current[nodeId] || (hasRover && fieldWorkInProgress) || (hasScience && activeOperationsRef.current.science)) return;
-    const navigationErrorM = repairAdjustedRating("navigation", getBaselineRating("navigation", pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0), buildings.navigation?.repairMetrics, true);
-    const navigationAccuracy = clamp(100 - navigationErrorM, 0, 100);
     const scienceBaseAccuracy = getAdditionalRating("science", "accuracy", pending.selected.science ?? "Foundation", buildings.science?.upgradeLevel ?? 0);
     const scienceAccuracy = scienceBaseAccuracy * (hasScience ? repairCapabilityFraction("science", pending.selected, buildings) : 1);
     const roverRatedSpeed = hasRover ? getBaselineRating("rover", pending.selected.rover ?? "Foundation", buildings.rover?.upgradeLevel ?? 0) : 0;
@@ -3806,6 +3804,7 @@ export function MissionSimulation() {
     const roverEffectiveSpeed = hasRover ? repairAdjustedRating("rover", roverRatedSpeed, buildings.rover?.repairMetrics) * roverCondition / 100 : 0;
     const navigationCondition = Math.max(25, buildings.navigation?.condition ?? 100);
     const navigationErrorM = repairAdjustedRating("navigation", getBaselineRating("navigation", pending.selected.navigation ?? "Foundation", buildings.navigation?.upgradeLevel ?? 0), buildings.navigation?.repairMetrics, true) * (100 / navigationCondition);
+    const navigationAccuracy = clamp(100 - navigationErrorM, 0, 100);
     const navigationTimeFactor = clamp(1 + navigationErrorM / 100, 1, 1.5);
     const roverTimeFactor = hasRover && roverRatedSpeed > 0 ? clamp(roverRatedSpeed / Math.max(0.1, roverEffectiveSpeed) * navigationTimeFactor, 1, 5) : 1;
     const extractionFactor = hasExtraction ? repairCapabilityFraction("extraction", pending.selected, buildings) : 1;
@@ -3814,10 +3813,10 @@ export function MissionSimulation() {
     const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : 24;
     const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : -22;
     const roverTravelToNodeSeconds = hasRover && roverEffectiveSpeed > 0.1
-      ? Math.hypot(nodeWorldX - roverStartX, nodeWorldZ - roverStartZ) * 1.25 / (roverEffectiveSpeed / 3.6)
+      ? Math.hypot(nodeWorldX - roverStartX, nodeWorldZ - roverStartZ) * 1.5 / (roverEffectiveSpeed / 3.6)
       : 0;
     const roverTravelToBaseSeconds = hasRover && roverEffectiveSpeed > 0.1
-      ? Math.hypot(nodeWorldX, nodeWorldZ) * 1.25 / (roverEffectiveSpeed / 3.6)
+      ? Math.hypot(nodeWorldX, nodeWorldZ) * 1.5 / (roverEffectiveSpeed / 3.6)
       : 0;
 
     if (action === "survey" && stage === "UNSURVEYED") {
