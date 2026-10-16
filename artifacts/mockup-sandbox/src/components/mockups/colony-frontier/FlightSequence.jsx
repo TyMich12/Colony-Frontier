@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BatteryCharging, Check, ChevronRight, CirclePause, CirclePlay, Gauge as GaugeIcon, RotateCcw, ShieldCheck, Thermometer, Wind, Zap } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, CirclePause, CirclePlay, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 import { technologyTracks } from "./_shared/gameData";
 import { loadPendingMission } from "./missionRuntime";
 
-const G0 = 9.80665;
 const TICK_MS = 580;
 const TIER_LEVEL = { Foundation: 0, Frontier: 1, Apex: 2, Research: 3 };
 const PHASES = [
@@ -401,6 +400,21 @@ export function FlightSequence() {
     }
   }
 
+  function updateHeatBalance(value) {
+    setFlightState((previous) => ({
+      ...previous,
+      heater_w: Math.max(0, value),
+      cooling_w: Math.max(0, -value),
+    }));
+    if (stage === "ready") {
+      setStage("hold");
+      setLaunchAllowed(false);
+      setDiagnosticOutcome(false);
+      setVerdict(null);
+      appendTerminalLine("[SYSTEM] Heat balance changed. Run pre-flight again before ignition.");
+    }
+  }
+
   function adjustTrim(amount) {
     updateControl("pitch_trim_deg", clamp(numberOr(stateRef.current.pitch_trim_deg, 0) + amount, -12, 12));
   }
@@ -662,11 +676,7 @@ export function FlightSequence() {
               </div>
               <ControlSlider label="Oxygen use" value={flightState.oxygen_rate_kg_s} min={0.0003} max={0.012} step={0.0001} display={`${flightState.oxygen_rate_kg_s.toFixed(4)} kg/s`} onChange={(value) => updateControl("oxygen_rate_kg_s", value)} disabled={controlsDisabled} />
               <ControlSlider label="Electrical load" value={flightState.load_w} min={200} max={3000} step={50} display={`${Math.round(flightState.load_w)} W`} onChange={(value) => updateControl("load_w", value)} disabled={controlsDisabled} />
-              <ControlSlider label="Cabin heat balance" value={flightState.heater_w - flightState.cooling_w} min={-3000} max={3000} step={100} display={`${Math.round(flightState.heater_w - flightState.cooling_w)} W`} onChange={(value) => setFlightState((previous) => {
-                const next = { ...previous, heater_w: Math.max(0, value), cooling_w: Math.max(0, -value) };
-                if (stage === "ready") { setStage("hold"); setLaunchAllowed(false); setVerdict(null); }
-                return next;
-              })} disabled={controlsDisabled} />
+              <ControlSlider label="Cabin heat balance" value={flightState.heater_w - flightState.cooling_w} min={-3000} max={3000} step={100} display={`${Math.round(flightState.heater_w - flightState.cooling_w)} W`} onChange={updateHeatBalance} disabled={controlsDisabled} />
               <div className="mt-4 border-t border-[#1e353b] pt-3 text-[9px] leading-5 text-[#6f8987]">
                 <p className="mb-1 font-bold uppercase tracking-[0.15em] text-[#91aaa0]">Keyboard</p>
                 <p>A / ← and D / →: trim attitude</p>
