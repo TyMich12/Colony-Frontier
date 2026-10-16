@@ -490,3 +490,10 @@ This section documents the current MissionSimulation implementation. It supersed
 - Keep the established resource capacities for oxygen and water unless a separately approved balance change is made. The food reserve capacity is 120 kg under the current implementation.
 - These are transparent gameplay models, not certified spacecraft design values. The master tier-rating tables remain the authority for equipment ratings; no Apex or Research values were changed as part of this update.
 
+
+
+## Follow-up simulation corrections — 2026-10-17
+
+- **Water is recycled, never generated.** Level 1 uses a 21 L/day total colony water-demand baseline (crew, crop and process demand included). Foundation water recovery at 60% returns 12.6 L/day when treatment throughput can process all 21 L/day, leaving a net loss of 8.4 L/day (about −9 L/day). The water treatment throughput is capacity, not a water source.
+- **Solar degradation is continuous.** Equipment condition no longer hard-switches the solar array off at 25% condition. Output should decline progressively with condition, dust, pointing error and active faults. Lunar illumination still naturally drives output toward zero at sunset / lunar night.
+- **FlightSequence preview registration.** The generated preview module map must include `FlightSequence.tsx`; otherwise `/preview/FlightSequence` displays “No component found” even though the component file exists. The preview plugin regenerates this map on server start.
