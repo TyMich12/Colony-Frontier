@@ -1313,6 +1313,7 @@ function IsometricMap({
   onSelect,
   selectedBuildingId,
   elapsed,
+  lunarNight,
   environmentLabel,
   environmentTitle,
   activeEventTrackId,
@@ -1329,6 +1330,7 @@ function IsometricMap({
   onSelect: (trackId: string) => void;
   selectedBuildingId: string | null;
   elapsed: number;
+  lunarNight: boolean;
   environmentLabel: string;
   environmentTitle: string;
   activeEventTrackId: string | null;
@@ -1346,7 +1348,7 @@ function IsometricMap({
       buildings={buildings}
       selectedBuildingId={selectedBuildingId}
       elapsed={elapsed}
-      lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02")}
+      lunarNight={lunarNight}
       environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
       environmentTitle={environmentTitle}
       activeEventTrackId={activeEventTrackId}
@@ -4610,6 +4612,7 @@ export function MissionSimulation() {
           }}
           selectedBuildingId={selectedBuildingId}
           elapsed={elapsed}
+          lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02")}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
           activeEventTrackId={activeTargetTrackId}
