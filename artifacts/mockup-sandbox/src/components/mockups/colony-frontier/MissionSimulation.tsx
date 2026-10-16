@@ -1663,15 +1663,19 @@ function BuildingInspector({
   const waterRecoveryRatedNow = repairAdjustedRating("water", getBaselineRating("water", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0), buildings.water?.repairMetrics);
   const waterConditionNow = clamp(buildings.water?.condition ?? 100, 0, 100);
   const agricultureConditionNow = clamp(buildings.agriculture?.condition ?? 100, 0, 100);
-  const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? Math.min(96, waterConditionNow / 100 * waterRecoveryRatedNow + (isFirstMission ? 45 : 0)) : 0;
+  const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? clamp(waterConditionNow / 100 * waterRecoveryRatedNow, 0, 100) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
-  const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(2.65, agricultureConditionNow / 100 * Math.max(3.2, ratedFoodNow)) : agricultureConditionNow / 100 * ratedFoodNow) : 0;
-  const foodWaterUseNow = isFirstMission ? Math.min(10, getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0)) : getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
+  const cropMaturityNow = clamp((elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
+  const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0)
+    ? agricultureConditionNow / 100 * ratedFoodNow * cropMaturityNow
+    : 0;
+  const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
   const ratedWaterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
-  const waterThroughputNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(8, ratedWaterThroughputNow) : ratedWaterThroughputNow) : 0;
-  const estimatedWaterLossPerDay = Math.max(0, 8 - Math.min(8, waterThroughputNow) * waterRecoveryNow / 100) + foodProductionNow * foodWaterUseNow * (1 - waterRecoveryNow / 100);
-  const waterMakeupNow = isFirstMission && waterOperational && electricalReadings.actualSupplyKW >= 1.0 ? 6.0 : 0;
-  const estimatedNetWaterBalancePerDay = waterMakeupNow - estimatedWaterLossPerDay;
+  const waterThroughputNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? ratedWaterThroughputNow : 0;
+  const totalWaterUseNow = 8 + foodProductionNow * foodWaterUseNow;
+  const recycledWaterNow = Math.min(totalWaterUseNow, Math.max(0, waterThroughputNow)) * waterRecoveryNow / 100;
+  const estimatedWaterLossPerDay = totalWaterUseNow - recycledWaterNow;
+  const estimatedNetWaterBalancePerDay = -estimatedWaterLossPerDay;
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
     switch (track.id) {
