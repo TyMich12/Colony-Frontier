@@ -849,7 +849,7 @@ export function MissionLoadout() {
     );
 
     window.setTimeout(() => {
-      window.location.href = "/preview/MissionSimulation";
+      window.location.href = "/preview/FlightSequence";
     }, 350);
   }
 
