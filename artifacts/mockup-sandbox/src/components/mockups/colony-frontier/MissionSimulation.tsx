@@ -836,7 +836,7 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
       const liveProfile = interpolateSolarProfile(liveDay);
       const liveCellTemperatureLoss = liveProfile.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, liveProfile.cellTempC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
       const missionFraction = clamp(elapsedSeconds / TOTAL_MISSION_SECONDS, 0, 1);
-      const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || missionNumber === "02");
+      const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || Number.parseInt(missionNumber.replace(/[^0-9]/g, ""), 10) === 2);
       const liveSunlight = blackoutMission
         ? 0
         : campaign === "mars"
@@ -2890,7 +2890,7 @@ export function MissionSimulation() {
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const gridUpgrade = buildings.grid?.upgradeLevel ?? 0;
         const radiationUpgrade = buildings.radiation?.upgradeLevel ?? 0;
-        const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
+        const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2);
         const lunarProfile = pending.campaign === "moon" ? interpolateSolarProfile(missionDay) : null;
         const solarAvailability = blackoutMission
           ? 0
@@ -4694,7 +4694,7 @@ export function MissionSimulation() {
           }}
           selectedBuildingId={selectedBuildingId}
           elapsed={elapsed}
-          lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02")}
+          lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2)}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
           activeEventTrackId={activeTargetTrackId}
