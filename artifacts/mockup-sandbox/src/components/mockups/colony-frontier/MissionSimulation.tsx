@@ -3008,7 +3008,9 @@ export function MissionSimulation() {
             ? 0
             : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
-        const baseLoadKW = Math.max(2.0, nominalLoadKW);
+        // Use the sum of actual active loads directly; an arbitrary 2 kW floor made
+        // battery balance disagree with the displayed demand on smaller loadouts.
+        const baseLoadKW = nominalLoadKW;
         // Grid conversion efficiency is an active retrofit metric, not display-only telemetry.
         const gridConversionEfficiency = pending.selected.grid && gridOnline
           ? clamp(getAdditionalRating("grid", "conversion efficiency", pending.selected.grid, gridUpgrade) / 100, 0, 1)
@@ -3113,11 +3115,10 @@ export function MissionSimulation() {
         const foodDemandKgDay = 2.48; // Four crew × 0.62 kg edible dry-food equivalent/person/day.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
         const cropWaterUseLDay = foodProductionKgDay * cropWaterUseLPerKg;
-        // Total daily colony water demand is 21 L/day (crew, crop and process use combined).
-        // Crop water is a component of that total, not extra water added on top.
-        // Recovery only returns the rated percentage of treated used water; it never
-        // creates water. Foundation at 60% therefore recovers 12.6 L/day and loses 8.4 L/day
-        // when the treatment unit can process the full 21 L/day.
+        // 21 L/day is the minimum reference use for crew and process water. Crop
+        // irrigation is included through its rated L/kg demand; when crew make-up plus
+        // crop water exceeds that baseline, the additional demand is counted explicitly.
+        // Recovery returns only the rated fraction of treated water; it never creates water.
         const totalWaterUseLDay = Math.max(21, crewWaterUseLDay + cropWaterUseLDay);
         const recoverableWaterLDay = Math.min(totalWaterUseLDay, Math.max(0, ratedWaterThroughputLDay));
         const recycledWaterLDay = recoverableWaterLDay * effectiveWaterRecoveryPct / 100;
