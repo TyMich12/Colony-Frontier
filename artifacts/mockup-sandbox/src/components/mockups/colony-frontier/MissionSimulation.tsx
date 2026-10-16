@@ -3953,7 +3953,7 @@ export function MissionSimulation() {
         return;
       }
       const tierIndex = effectiveRepairTierIndex(pending.selected[repairTargetId] ?? "Foundation", selectedRepair.requiredSystems, pending.selected);
-      const durationSeconds = selectedRepair.category === "Standalone" ? [8, 9, 10, 12][tierIndex] : selectedRepair.category === "Enhanced" ? [15, 16, 18, 20][tierIndex] : selectedRepair.category === "Dual" ? [22, 24, 27, 30][tierIndex] : [30, 33, 36, 40][tierIndex];
+      const baseDurationSeconds = selectedRepair.category === "Standalone" ? [8, 9, 10, 12][tierIndex] : selectedRepair.category === "Enhanced" ? [15, 16, 18, 20][tierIndex] : selectedRepair.category === "Dual" ? [22, 24, 27, 30][tierIndex] : [30, 33, 36, 40][tierIndex];
       const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
       const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
       if (availableEnergyKWh < selectedRepair.energyKWh) {
@@ -3963,6 +3963,21 @@ export function MissionSimulation() {
       setMetrics((current) => ({ ...current, battery: clamp(current.battery - selectedRepair.energyKWh / batteryCapacity * 100) }));
       const repairSupports = selectedRepair.requiredSystems;
       const roverCanAssist = pending.selected.rover !== undefined && repairSupports.includes("rover") && !roverOnFieldJob;
+      const roverTier = pending.selected.rover ?? "Foundation";
+      const roverRatedSpeed = getBaselineRating("rover", roverTier, buildings.rover?.upgradeLevel ?? 0);
+      const roverSpeedGap = buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
+      const roverTravelSpeedKmh = Math.max(0, roverRatedSpeed - roverSpeedGap) * clamp(buildings.rover?.condition ?? 100, 0, 100) / 100;
+      const repairPosition = POSITIONS[repairTargetId] ?? [0, 0];
+      const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : 24;
+      const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : -22;
+      if (roverCanAssist && roverTravelSpeedKmh <= 0.1) {
+        setOperationResult("REPAIR HELD · The supporting rover cannot traverse at its current condition. Restore mobility before selecting a rover-assisted procedure.");
+        return;
+      }
+      const roverTravelSeconds = roverCanAssist
+        ? Math.hypot(repairPosition[0] - roverStartX, repairPosition[1] - roverStartZ) * 1.5 / (roverTravelSpeedKmh / 3.6)
+        : 0;
+      const durationSeconds = baseDurationSeconds + roverTravelSeconds;
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
         "REPAIR",
