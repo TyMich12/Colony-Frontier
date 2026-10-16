@@ -49,7 +49,7 @@ import {
   type PendingMission,
   type SampleStage,
 } from "./missionRuntime";
-import { Colony3DMap } from "./Colony3DMap";
+import { Colony3DMap, POSITIONS } from "./Colony3DMap";
 
 const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
 const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
