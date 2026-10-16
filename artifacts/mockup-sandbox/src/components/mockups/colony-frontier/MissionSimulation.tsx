@@ -919,10 +919,11 @@ const RESOURCE_CAPACITIES = {
   availablePowerKW: 8,
   storedEnergyKWh: 1200,
   oxygenReserveKg: 24,
-  // 240 L of clean water and 120 kg of stored edible dry-food equivalent.
-  // At 2.48 kg/day, the food buffer lasts about 48 days before crop contributions.
-  waterReserveL: 240,
-  foodReserveKg: 120,
+  // 480 L of clean water gives a four-crew Level 1 colony a reserve for the
+  // 28-day mission even if recycling is interrupted during the lunar night.
+  // 160 kg edible dry-food equivalent is about 64 crew-colony days at 2.48 kg/day.
+  waterReserveL: 480,
+  foodReserveKg: 160,
 } as const;
 
 function physicalResourceTelemetry(
@@ -2868,7 +2869,7 @@ export function MissionSimulation() {
         const dt = 0.25 * speed * GAME_TIME_ACCELERATION;
         const resourceDt = dt;
         const missionFraction = clamp(elapsed / TOTAL_MISSION_SECONDS, 0, 1);
-        const missionDay = Math.min(14, Math.max(0, elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
+        const missionDay = Math.max(0, elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay);
         const solarDust = buildings.solar?.dust ?? 0;
         const solarUpgrade = buildings.solar?.upgradeLevel ?? 0;
         const batteryUpgrade = buildings.battery?.upgradeLevel ?? 0;
@@ -2992,10 +2993,13 @@ export function MissionSimulation() {
         else if (solarGeneration > preliminaryLoadKW + 2.0) powerDeficitRef.current = false;
         const deficitExpected = powerDeficitRef.current;
         const optionalLoadKW = batteryRecoveryActive ? 0
-          : deficitExpected && current.battery <= 24
+          // Protect the full lunar night by shedding nonessential loads early, rather
+          // than waiting until the battery is nearly empty. Essential habitat and
+          // air-revitalisation demand remains on the bus.
+          : deficitExpected && current.battery <= 35
             ? (pending.selected.science ? 0.25 : 0)
-            : deficitExpected && current.battery <= 34
-              ? requestedOptionalLoadKW * 0.25
+            : deficitExpected && current.battery <= 95
+              ? requestedOptionalLoadKW * 0.05
               : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
         const baseLoadKW = Math.max(2.0, nominalLoadKW);
