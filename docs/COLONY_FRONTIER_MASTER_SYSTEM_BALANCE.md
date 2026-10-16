@@ -397,7 +397,7 @@ At Foundation 0/2, use the base load below. Each technology tier step adds the l
 | Communications | 0.15 | 0.04 | 0.02 | Average draw including duty-cycled transmission windows |
 | Navigation | 0.04 | 0.01 | 0.005 | Avionics and positioning sensors |
 | Thermal Control | 0.35 | 0.04 | 0.02 | Mission-average electrical input; heat-rejection rating in kW thermal is not electrical demand |
-| Combined air revitalisation (O₂ + CO₂) | 2.40 | 0.06 | 0.03 | Four-crew mission-average allowance for cyclic regeneration/compression; count once if either or both O₂/CO₂ modules are installed |
+| Combined air revitalisation (O₂ + CO₂) | 1.60 | 0.06 | 0.03 | Efficient four-crew mission-average allowance for cyclic regeneration/compression; count once if either or both O₂/CO₂ modules are installed. Mission 1 begins with its battery fully charged so the reserve is available for the lunar night. |
 
 ### Deterministic calculation and validation rules
 
