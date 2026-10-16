@@ -2925,7 +2925,6 @@ export function MissionSimulation() {
         // All values are explicit kW additions by tier/retrofit, with no hidden multipliers.
         // Agriculture retains the master-sheet Foundation yield of 0.50 kg/day.
         const batteryRecoveryActive = Object.values(activeOperationsRef.current).some((operation) => operation.kind === "REPAIR" && operation.targetId === "battery");
-        const essentialLoadKW = POWER_DEMAND_MODEL.coreLoadKW;
         const requestedLoads: { systemId: string; label: string; kw: number }[] = Object.entries(POWER_DEMAND_MODEL.systems)
           .filter(([systemId]) => Boolean(pending.selected[systemId]))
           .map(([systemId, model]) => ({
@@ -2976,7 +2975,11 @@ export function MissionSimulation() {
           ...source,
           kw: ratedLoadFor(source.systemId, source.kw),
         }));
-        const requestedOptionalLoadKW = ratedRequestedLoads.reduce((sum, source) => sum + source.kw, 0);
+        // Air revitalisation is essential for crew survival, not a discretionary load.
+        const essentialAirRevitalizationKW = ratedRequestedLoads.find((source) => source.systemId === "air-revitalization")?.kw ?? 0;
+        const essentialLoadKW = POWER_DEMAND_MODEL.coreLoadKW + essentialAirRevitalizationKW;
+        const optionalRatedLoads = ratedRequestedLoads.filter((source) => source.systemId !== "air-revitalization");
+        const requestedOptionalLoadKW = optionalRatedLoads.reduce((sum, source) => sum + source.kw, 0);
         // Do not convert solar-cell temperature directly into an extra electrical load:
         // that made demand rise with sunlight and double-counted thermal control when
         // the selected thermal-control subsystem was already included above. Array
@@ -2996,11 +2999,9 @@ export function MissionSimulation() {
           // Protect the full lunar night by shedding nonessential loads early, rather
           // than waiting until the battery is nearly empty. Essential habitat and
           // air-revitalisation demand remains on the bus.
-          : deficitExpected && current.battery <= 35
-            ? (pending.selected.science ? 0.25 : 0)
-            : deficitExpected && current.battery <= 95
-              ? requestedOptionalLoadKW * 0.05
-              : requestedOptionalLoadKW;
+          : deficitExpected && current.battery <= 95
+            ? 0
+            : requestedOptionalLoadKW;
         const nominalLoadKW = essentialLoadKW + optionalLoadKW + solarThermalLoadKW;
         const baseLoadKW = Math.max(2.0, nominalLoadKW);
         // Grid conversion efficiency is an active retrofit metric, not display-only telemetry.
@@ -3036,7 +3037,7 @@ export function MissionSimulation() {
         const generationSources = [
           ...(solarToBusKW > 0.001 ? [{ label: "Solar array", kw: solarToBusKW }] : []),
         ];
-        const optionalDemandSources = ratedRequestedLoads
+        const optionalDemandSources = optionalRatedLoads
           .map((source) => ({
             label: source.systemId === "solar" ? "Solar-array controller / sensors" : source.systemId === "battery" ? "Battery-management electronics" : source.label,
             kw: source.kw,
@@ -3046,7 +3047,7 @@ export function MissionSimulation() {
         // a separate destination for surplus power, not part of the load being compared
         // against generation; including it here made demand rise in lockstep with charging.
         const demandSources = [
-          { label: "Core habitat controls, lighting and avionics", kw: essentialLoadKW },
+          { label: "Essential habitat + air revitalisation", kw: essentialLoadKW },
           ...optionalDemandSources,
         ];
         setElectricalReadings({
@@ -3085,13 +3086,13 @@ export function MissionSimulation() {
         // water or grants a hidden Mission 1 recovery bonus.
         const waterRecoveryPct = clamp(conditionAdjustedOutput("water", ratedWaterRecoveryPct, buildings), 0, 100);
         const ratedWaterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
-        const waterPowered = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const waterPowered = waterOnline && !(deficitExpected && current.battery <= 95) && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const effectiveWaterRecoveryPct = waterPowered ? waterRecoveryPct : 0;
         const crewWaterUseLDay = 8; // Crew make-up stream, included within the colony's total daily water demand.
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
         // Crop output depends on actual installed yield, condition, power and crop maturity.
         // There is no instant mature-crop / Mission 1 production boost.
-        const agriculturePowered = agricultureOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const agriculturePowered = agricultureOnline && !(deficitExpected && current.battery <= 95) && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const cropMaturity = clamp((elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
         const foodProductionKgDay = agriculturePowered
           ? conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings) * cropMaturity
