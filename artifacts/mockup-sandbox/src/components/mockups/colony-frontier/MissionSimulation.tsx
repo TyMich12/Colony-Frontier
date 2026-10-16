@@ -919,10 +919,10 @@ const RESOURCE_CAPACITIES = {
   availablePowerKW: 8,
   storedEnergyKWh: 1200,
   oxygenReserveKg: 24,
-  // A 240 L clean-water buffer and 60 kg of stored dry food give four crew a
-  // realistic reserve while still requiring recycling and crop production.
+  // 240 L of clean water and 120 kg of stored edible dry-food equivalent.
+  // At 2.48 kg/day, the food buffer lasts about 48 days before crop contributions.
   waterReserveL: 240,
-  foodReserveKg: 60,
+  foodReserveKg: 120,
 } as const;
 
 function physicalResourceTelemetry(
@@ -2888,10 +2888,19 @@ export function MissionSimulation() {
         const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
         const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
         const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
-        const solarRatedKW = solarOnline ? conditionAdjustedOutput("solar", getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade), buildings) : 0;
+        // Solar is a primary source, not a load behind the general dependency check.
+        // Calculate output from its own installation, condition and active fault so an
+        // unrelated dependency-state glitch cannot force generation to 0 kW.
+        const solarHasActiveFault = Object.values(activeFaultsRef.current).some((fault) => fault.targetTrackId === "solar");
+        const solarCanGenerate = Boolean(pending.selected.solar)
+          && (buildings.solar?.condition ?? 100) >= 25
+          && !solarHasActiveFault;
+        const solarRatedKW = solarCanGenerate
+          ? conditionAdjustedOutput("solar", getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade), buildings)
+          : 0;
         const solarFaultPenalty = solarDegradationPenaltyFraction(buildings.solar?.condition ?? 100, solarDust, buildings.solar?.repairMetrics);
-        const solarGeneration = solarOnline
-          ? Math.min(solarRatedKW, solarRatedKW * solarAvailability * (1 - cellTemperatureLoss) * dustTransmission(solarDust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)) * (1 - solarFaultPenalty))
+        const solarGeneration = solarCanGenerate
+          ? Math.max(0, Math.min(solarRatedKW, solarRatedKW * Math.max(0, solarAvailability) * (1 - cellTemperatureLoss) * dustTransmission(solarDust) * Math.max(0, Math.cos(pointingError * Math.PI / 180)) * (1 - solarFaultPenalty)))
           : 0;
         const batteryCapacityKWh = ratedBatteryCapacityKWh(pending.selected, buildings);
         const storedEnergyKWh = batteryOnline ? batteryCapacityKWh * current.battery / 100 : 0;
@@ -3062,33 +3071,31 @@ export function MissionSimulation() {
         const oxygenBalanceKg = (oxygenProductionKgDay - 3.36) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const oxygenDelta = oxygenBalanceKg / 24 * 100;
         const ratedWaterRecoveryPct = repairAdjustedRating("water", getBaselineRating("water", pending.selected.water ?? "Foundation", waterUpgrade), buildings.water?.repairMetrics);
-        const waterRecoveryPct = Math.min(96, conditionAdjustedOutput("water", ratedWaterRecoveryPct, buildings) + (missionStage === 1 ? 45 : 0));
+        // Recovery efficiency is applied to water actually used today; it never creates
+        // water or grants a hidden Mission 1 recovery bonus.
+        const waterRecoveryPct = clamp(conditionAdjustedOutput("water", ratedWaterRecoveryPct, buildings), 0, 100);
         const ratedWaterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
-        const waterThroughputLDay = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0) ? (missionStage === 1 ? Math.max(8, ratedWaterThroughputLDay) : ratedWaterThroughputLDay) : 0;
-        const circulatingWaterLDay = 8; // Recoverable crew make-up stream, not all water circulated through the loop.
-        const effectiveWaterRecoveryPct = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0) ? waterRecoveryPct : 0;
-        const recycledWaterLDay = Math.min(circulatingWaterLDay, waterThroughputLDay) * effectiveWaterRecoveryPct / 100;
-        const crewWaterLossLDay = Math.max(0, circulatingWaterLDay - recycledWaterLDay);
+        const waterPowered = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const effectiveWaterRecoveryPct = waterPowered ? waterRecoveryPct : 0;
+        const crewWaterUseLDay = 8; // Four-crew hygiene, food preparation and other recoverable wastewater stream.
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
-        const foodProductionKgDay = agricultureOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0)
-          ? (missionStage === 1
-            ? Math.max(2.65, conditionAdjustedOutput("agriculture", Math.max(3.2, ratedFoodProductionKgDay), buildings))
-            : conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings))
+        // Crop output depends on actual installed yield, condition, power and crop maturity.
+        // There is no instant mature-crop / Mission 1 production boost.
+        const agriculturePowered = agricultureOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
+        const cropMaturity = clamp((elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
+        const foodProductionKgDay = agriculturePowered
+          ? conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings) * cropMaturity
           : 0;
-        const foodDemandKgDay = 2.48; // Four-crew edible dry-food planning demand.
-        const ratedCropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
-        const cropWaterUseLPerKg = missionStage === 1 ? Math.min(10, ratedCropWaterUseLPerKg) : ratedCropWaterUseLPerKg;
-        const grossCropWaterLDay = foodProductionKgDay * cropWaterUseLPerKg;
-        // The humidity/recovery loop returns a share of crop transpiration to the clean-water tank.
-        // The 8 L/day crew stream represents water that can actually be lost/recovered,
-        // not all water circulating through the plumbing. When recovery/power is offline,
-        // none of that stream or crop transpiration is returned to the clean-water tank.
-        const netCropWaterLossLDay = grossCropWaterLDay * (1 - effectiveWaterRecoveryPct / 100);
-        const netWaterLossLDay = crewWaterLossLDay + netCropWaterLossLDay;
-        // Mission 1 has a small powered local volatile-feed source. This is actual make-up
-        // water entering the tank, not a recovery-efficiency bonus or a free reserve refill.
-        const waterMakeupLDay = missionStage === 1 && waterOnline && deliveredPowerKW >= 1.0 ? 6.0 : 0;
-        const waterDelta = -(netWaterLossLDay - waterMakeupLDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
+        const foodDemandKgDay = 2.48; // Four crew × 0.62 kg edible dry-food equivalent/person/day.
+        const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
+        const cropWaterUseLDay = foodProductionKgDay * cropWaterUseLPerKg;
+        // Apply recovery to the total wastewater/crop water stream used during this simulated day.
+        // Throughput limits processing; it is not a water source.
+        const totalWaterUseLDay = crewWaterUseLDay + cropWaterUseLDay;
+        const recoverableWaterLDay = Math.min(totalWaterUseLDay, Math.max(0, ratedWaterThroughputLDay));
+        const recycledWaterLDay = recoverableWaterLDay * effectiveWaterRecoveryPct / 100;
+        const waterLossLDay = totalWaterUseLDay - recycledWaterLDay;
+        const waterDelta = -waterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalRatedKW = thermalOnline
