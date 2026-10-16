@@ -838,7 +838,7 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
       const missionFraction = clamp(elapsedSeconds / TOTAL_MISSION_SECONDS, 0, 1);
       const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || missionNumber === "02");
       const liveSunlight = blackoutMission
-        ? (liveDay >= 14 ? 0 : missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
+        ? 0
         : campaign === "mars"
           ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
           : liveDay < 14 ? (liveDay < 1 ? 0.22 : liveProfile.sunlightGeometry) : 0;
@@ -1376,12 +1376,14 @@ function MissionTaskRibbon({
   activeEvent: MissionEvent | null;
   roverTask: string;
 }) {
-  const day = Math.min(14, Math.floor(Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay) + 1);
+  const elapsedDay = Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+  const dayProgress = elapsed >= TOTAL_MISSION_SECONDS ? 14 : Math.min(13.9, elapsedDay);
+  const day = Math.min(14, Math.floor(elapsedDay) + 1);
   const eventGoal = EVENT_TIMES.length;
   const surveyedCount = Object.values(sampleStages).filter((stage) => stage !== "UNSURVEYED").length;
   const analysedCount = Object.values(sampleStages).filter((stage) => stage === "ANALYSED").length;
   const taskRows = [
-    { label: "SURVIVE", value: `DAY ${day.toString().padStart(2, "0")} / 14`, done: elapsed >= TOTAL_MISSION_SECONDS },
+    { label: "SURVIVE", value: `DAY ${dayProgress.toFixed(1)} / 14`, done: elapsed >= TOTAL_MISSION_SECONDS },
     { label: "RESOLVE INCIDENTS", value: `${resolvedEvents.length} / ${eventGoal}`, done: resolvedEvents.length >= eventGoal },
     { label: "FIELD RESEARCH", value: `${analysedCount} ANALYSED`, done: analysedCount > 0 },
     { label: "SITES MAPPED", value: `${surveyedCount} / ${Math.max(1, RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"].length)}`, done: surveyedCount > 0 },
@@ -1389,7 +1391,7 @@ function MissionTaskRibbon({
   return (
     <div className="pointer-events-none absolute left-3 top-3 z-30 w-[min(88vw,270px)]">
       <div className="pointer-events-auto overflow-hidden rounded-xl border-2 border-[#d3a84a] bg-[#172026]/92 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="border-b border-[#4d5050] bg-[#101b20] px-3 py-2"><p className="text-[7px] font-black uppercase tracking-[0.15em] text-[#92a6a4]">Simulated Seconds</p><p className="mt-0.5 font-mono text-[10px] font-bold text-[#e2f0e8]">{Math.floor(Math.max(0, elapsed)).toLocaleString()} s</p><p className="mt-1 text-[7px] font-black uppercase tracking-[0.15em] text-[#f2c960]">Game Time · Day {day} / 14</p></div>
+        <div className="border-b border-[#4d5050] bg-[#101b20] px-3 py-2"><p className="text-[7px] font-black uppercase tracking-[0.15em] text-[#92a6a4]">Simulation Hours</p><p className="mt-0.5 font-mono text-[10px] font-bold text-[#e2f0e8]">Hours: {Math.min(Math.floor(TOTAL_MISSION_SECONDS / 3600), Math.floor(Math.max(0, elapsed) / 3600)).toLocaleString()} / {Math.floor(TOTAL_MISSION_SECONDS / 3600).toLocaleString()}</p><p className="mt-1 text-[7px] font-black uppercase tracking-[0.15em] text-[#f2c960]">Game Day · {dayProgress.toFixed(1)} / 14</p></div>
         <div className="flex items-center gap-2 border-b border-[#4d5050] bg-[#27363a] px-3 py-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#e2b84f] text-[9px] font-black text-[#20261e]">★</span>
           <div className="min-w-0 flex-1">
@@ -2883,7 +2885,7 @@ export function MissionSimulation() {
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02");
         const lunarProfile = pending.campaign === "moon" ? interpolateSolarProfile(missionDay) : null;
         const solarAvailability = blackoutMission
-          ? (missionDay >= 14 ? 0 : missionFraction < 0.16 ? 0.42 : missionFraction < 0.85 ? 0.14 : 0.28)
+          ? 0
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
             : missionDay < 14
