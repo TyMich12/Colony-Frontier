@@ -231,7 +231,7 @@ export function FlightSequence() {
     };
   }, []);
 
-  const factors = useMemo(() => buildFactors(telemetry, phase === "flight"), [telemetry, phase]);
+  const factors = useMemo(() => buildFactors(telemetry, phase === "flight" || telemetry.elapsed > 0), [telemetry, phase]);
   const criticalCount = factors.filter((factor) => factor.severity === "CRITICAL").length;
   const extremeCount = factors.filter((factor) => factor.severity === "EXTREME").length;
   // Each factor has exactly one severity, so yellow + red counts distinct at-risk factors once.
