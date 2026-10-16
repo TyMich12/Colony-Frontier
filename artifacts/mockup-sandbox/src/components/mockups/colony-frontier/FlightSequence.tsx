@@ -322,7 +322,16 @@ export function FlightSequence() {
   }
 
   return (
-    <GameShell active="loadout" eyebrow="Flight Operations / Launch Control" title="Ascent Simulation">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#03090d] text-[#edf4ec] [font-family:Arial,sans-serif]">
+      <div className="pointer-events-none fixed inset-0 opacity-25 [background-image:linear-gradient(rgba(154,199,190,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(154,199,190,0.05)_1px,transparent_1px)] [background-size:36px_36px]" />
+      <div className="relative mx-auto min-h-screen w-full max-w-[1600px] px-3 py-3 sm:px-5 sm:py-4 lg:px-7">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#294148] pb-4">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center border border-[#526c62] bg-[#10221f]"><span className="h-3 w-3 rounded-full bg-[#efb658] shadow-[0_0_14px_#efb658]" /></span>
+          <div><p className="text-[9px] font-bold uppercase tracking-[0.32em] text-[#8aa99a]">Colony-Frontier · Flight Simulator</p><h1 className="mt-1 text-base font-black uppercase tracking-[0.16em] text-[#edf4ec] sm:text-lg">Ascent Operations</h1></div>
+        </div>
+        <div className="text-right"><p className="text-[8px] uppercase tracking-[0.2em] text-[#6f8c8b]">Standalone mission game</p><p className="mt-1 font-mono text-[10px] text-[#efb658]">FLIGHT COMPUTER / LIVE TELEMETRY</p></div>
+      </div>
       <div className="relative" style={{ animation: "cfLaunchFade 850ms ease-out both" }}>
         <style>{`@keyframes cfLaunchFade { from { opacity: 0; } to { opacity: 1; } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }`}</style>
         <div className="pointer-events-none fixed inset-0 z-[100] bg-[#020609]" style={{ animation: "cfCurtain 1.1s ease-out forwards" }} />
@@ -451,7 +460,8 @@ export function FlightSequence() {
           </section>
         </div>
       </div>
-    </GameShell>
+      </div>
+    </div>
   );
 }
 
