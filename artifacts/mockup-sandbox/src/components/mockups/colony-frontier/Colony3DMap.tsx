@@ -5,7 +5,7 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
-import { getBaselineRating } from "./_shared/simulationBalance";
+import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
   id: string;
@@ -1879,9 +1879,11 @@ function Scene({ props }: { props: Props }) {
   const navigationErrorM = (navRatedErrorM + navErrorGapM) * (100 / navCondition);
   const navigationAccuracy = Math.max(0, Math.min(100, 100 - navigationErrorM)) / 100;
   const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
-  const sunAngleDeg = props.lunarNight ? -8 : Math.max(0, Math.sin((lunarDay / 14) * Math.PI) * 90);
+  const sunAngleDeg = props.lunarNight ? -8 : interpolateSolarProfile(lunarDay).sunAltitudeDeg;
   const sunAzimuth = (lunarDay / 14) * Math.PI;
-  const sunPosition: [number, number, number] = [Math.cos(sunAzimuth) * 36, props.lunarNight ? -12 : 3.5 + Math.sin((sunAngleDeg * Math.PI) / 180) * 29, Math.sin(sunAzimuth) * 36];
+  const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
+  const sunHorizontalRadius = 36 * Math.cos(sunAltitudeRad);
+  const sunPosition: [number, number, number] = [Math.cos(sunAzimuth) * sunHorizontalRadius, props.lunarNight ? -12 : Math.max(1.5, 36 * Math.sin(sunAltitudeRad)), Math.sin(sunAzimuth) * sunHorizontalRadius];
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
