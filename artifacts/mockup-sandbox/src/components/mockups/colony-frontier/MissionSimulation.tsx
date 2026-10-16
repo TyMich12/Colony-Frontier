@@ -964,7 +964,7 @@ function formatWallClockCountdown(remainingSeconds: number, simulationSpeed = 1,
 
 function formatMissionTime(seconds: number): string {
   const bounded = Math.max(0, Math.min(TOTAL_MISSION_SECONDS, seconds));
-  const day = Math.min(14, Math.floor(bounded / LEVEL1_ENVIRONMENT.secondsPerEarthDay) + 1);
+  const day = Math.floor(bounded / LEVEL1_ENVIRONMENT.secondsPerEarthDay) + 1;
   const dayProgress = bounded % LEVEL1_ENVIRONMENT.secondsPerEarthDay;
   const hour = Math.floor(dayProgress / 3600);
   const minute = Math.floor((dayProgress % 3600) / 60);
