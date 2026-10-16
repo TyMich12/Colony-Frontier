@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronRight, RotateCcw, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, ArrowUp, ChevronRight, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 import { GameShell } from "./_shared/GameShell";
 import { clearMissionRuntime, loadPendingMission } from "./missionRuntime";
 
