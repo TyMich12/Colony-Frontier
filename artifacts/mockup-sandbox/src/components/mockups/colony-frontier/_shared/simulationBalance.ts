@@ -68,7 +68,6 @@ export const LEVEL1_ENVIRONMENT = {
   batteryDischargeEfficiency: 0.95,
   batteryMinimumSOCPercent: 20,
   batteryInitialSOCPercent: 100,
-  batteryMaximumChargePowerKW: 10,
   energyWindowSeconds: 10,
   referenceCellTemperatureC: 25,
   cellTemperatureDeratePerC: 0.0019,
