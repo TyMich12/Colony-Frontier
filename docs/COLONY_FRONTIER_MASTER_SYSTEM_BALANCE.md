@@ -391,7 +391,7 @@ At Foundation 0/2, use the base load below. Each technology tier step adds the l
 | Rover | 0.10 | 0.03 | 0.015 | Average bus charging/standby; drive motors can briefly draw about 2 kW from rover storage |
 | Resource Extraction | 0.25 | 0.08 | 0.04 | Mission-average pilot excavation; full cutting/drive load is intermittent |
 | ISRU | 0.80 | 0.15 | 0.075 | Small pilot process scheduled in work periods; not a continuous full-power industrial plant |
-| Agriculture | 0.75 | 0.08 | 0.04 | Foundation rating baseline: 0.75 kW for 0.50 kg/day; Mission 1 adds 0.55 kW grow-light support for its 3.0 kg/day tutorial output |
+| Agriculture | 0.75 | 0.08 | 0.04 | Foundation baseline: 0.75 kW for 0.50 kg/day. Mission 1 adds 0.55 kW grow lighting; yield scales with the extra electrical input, while the underlying tier rating remains unchanged |
 | Maintenance | 0.05 | 0.01 | 0.005 | Diagnostic standby electronics; powered tools are temporary job loads |
 | Radiation Monitoring | 0.02 | 0.005 | 0.002 | Sensors only; passive shielding uses no continuous electricity |
 | Communications | 0.15 | 0.04 | 0.02 | Average draw including duty-cycled transmission windows |
@@ -409,7 +409,7 @@ At Foundation 0/2, use the base load below. Each technology tier step adds the l
 6. Emergency load shedding changes **served load**, not the rated requested-demand display. Show any curtailed loads separately.
 7. Demand changes only when systems are installed/removed, a system's tier changes, or a retrofit is commissioned. Do not recalculate it from live generation, SOC or animation/tick timing.
 8. Keep two decimal places for kW consistently. Avoid random values and hidden multipliers.
-9. The Foundation agriculture *rated table value* remains **0.50 kg/day** and is preserved for tier comparisons. Mission 1 specifically uses a supported starter grow module targeting **3.2 kg/day at 100% condition**, with an additional 0.55 kW grow-light allowance. While the farm remains operational and the colony bus has at least 1.0 kW available, the Level 1 tutorial support floor maintains **2.65 kg/day** even if condition is poor. This is a Level 1 tutorial balance exception, not a change to the underlying tier table.
+9. The Foundation agriculture *rated table value* remains **0.50 kg/day** and is preserved for tier comparisons. Mission 1 adds 0.55 kW of grow lighting; the simulation scales yield in proportion to the Foundation baseline specific energy (0.75 kW for 0.50 kg/day), giving about **0.87 kg/day at 100% condition after crop maturity**. Crop output still ramps with maturity, falls with equipment condition, and stops when the farm is unpowered. This is a small scenario-specific lighting addition, not a change to the underlying tier table.
 10. These are mission-average game assumptions pending a specified hardware design. They should not be presented as experimentally verified flight-hardware specifications.
 
 ### Solar and sustainability interpretation
@@ -430,11 +430,11 @@ This section records the gameplay pacing constants used by `MissionSimulation.ts
 
 | Resource | Capacity | Initial fill | Approximate initial amount | Model |
 |---|---:|---:|---:|---|
-| Potable/recycled water | 240 L | 86% | 206 L | Four tanks at 60 L each; water is consumed by crew make-up losses and crop water not recovered by the loop |
-| Stored edible food | 60 kg | 84% | 50.4 kg | Four-crew planning demand is 2.48 kg/day; outside Mission 1 the Foundation crop contributes 0.50 kg/day, while Mission 1's supported grow module targets 3.0 kg/day at full condition |
+| Potable/recycled water | 480 L | 86% | 412.8 L | Four-crew reserve capacity; actual loss is total use minus treated recovered water, and recycling stops when the treatment system is unpowered |
+| Stored edible food | 160 kg | 84% | 134.4 kg | Four-crew planning demand is 2.48 kg/day; Foundation crop output is 0.50 kg/day at full condition, with Mission 1 grow-light yield scaled by its added electrical input after crop maturity |
 | Oxygen buffer | 24 kg | 88% | 21.1 kg | Net balance is driven by production minus four-crew demand; an active fault adds a separate penalty |
 
-The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day instead of hiding a lower consumption rate to make the game easier. Outside Mission 1, Foundation Agriculture is supplemental; Mission 1's supported grow module is tuned to produce enough to replenish reserves at full condition. The larger food reserve represents stocked provisions. Water is not depleted at a fixed arbitrary percentage: its change is calculated from the water loop's recovery rate, throughput, crew make-up losses and crop water recovery. If a relevant system or power path is offline, its recovery contribution is unavailable.
+The food model intentionally keeps the four-crew consumption rate at 2.48 kg/day. Agriculture is supplemental at Foundation level; Mission 1's additional grow-light load raises the fully mature Foundation yield from 0.50 to about 0.87 kg/day at full condition, but stored provisions still cover the remaining demand. The reserve capacity is 160 kg, initially filled to 84% (134.4 kg). Water capacity is 480 L, initially filled to 86% (412.8 L); water change is calculated from total use minus the amount the powered treatment loop can actually recover. If a relevant system or power path is offline, its recovery contribution is unavailable.
 
 ### Equipment wear and incidents
 
@@ -508,7 +508,7 @@ This section documents the current MissionSimulation implementation. It supersed
 
 ### Mission 1 resource reserves and day/night timing (current implementation)
 
-- Mission 1 starts with **480 L of clean water** and **160 kg of edible dry-food equivalent**. These are starting inventory assumptions, not universal human consumption standards. At the implemented four-person food demand of 2.48 kg/day, 160 kg is about 64 days without crop production.
+- Mission 1 has **480 L water capacity filled to 86% (412.8 L)** and **160 kg food capacity filled to 84% (134.4 kg)**. These are scenario inventory assumptions, not universal human consumption standards. At 2.48 kg/day, the initial food stock lasts about 54 days without crop production.
 - The Foundation battery is **1,200 kWh nominal**. With the 20% protected state-of-charge floor, 960 kWh is dispatchable from a full charge before reserve protection. This is a large infrastructure-scale pack, not a small lander battery; at an illustrative 200 Wh/kg pack-level specific energy it would weigh roughly 6,000 kg before additional thermal management, protection, wiring and power electronics. It is a plausible game-scale assumption only if that mass is included in the colony's delivered infrastructure.
 - Foundation solar is **12 kW rated at reference illumination**. The physical reference calculation is 37.2 m² × 1,361 W/m² × 25% cell efficiency × 0.95 packing factor ≈ **12.0 kW** before sunlight angle, temperature, dust, pointing and condition losses. NASA lunar-surface concepts include 10 kW-class solar systems, so the output is a credible order of magnitude, not a guarantee of 12 kW all day.
 - The lunar campaign is split into **two separate 14-Earth-day missions**: **Mission 1 is the lunar daylight phase** (sunrise through sunset), and **Mission 2 is the lunar-night/blackout phase** (the Sun remains below the horizon and solar generation is 0 kW throughout). Each mission has a 336-hour clock; the Mission 1 clock must not continue into Mission 2.
