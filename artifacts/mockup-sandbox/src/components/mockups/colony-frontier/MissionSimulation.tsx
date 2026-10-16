@@ -1672,7 +1672,8 @@ function BuildingInspector({
   const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
   const ratedWaterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
   const waterThroughputNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? ratedWaterThroughputNow : 0;
-  const totalWaterUseNow = 8 + foodProductionNow * foodWaterUseNow;
+  // Match the resource simulation: 21 L/day total colony use, including crew, crop and process water.
+  const totalWaterUseNow = Math.max(21, 8 + foodProductionNow * foodWaterUseNow);
   const recycledWaterNow = Math.min(totalWaterUseNow, Math.max(0, waterThroughputNow)) * waterRecoveryNow / 100;
   const estimatedWaterLossPerDay = totalWaterUseNow - recycledWaterNow;
   const estimatedNetWaterBalancePerDay = -estimatedWaterLossPerDay;
@@ -1704,8 +1705,8 @@ function BuildingInspector({
         { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: "Percentage of today's treated water use returned to the reserve" },
         { label: "Treatment throughput", value: waterThroughputNow.toFixed(1) + " L/day", note: "Condition-adjusted rated treatment capacity; it is not a water source" },
         { label: "Net water balance", value: (estimatedNetWaterBalancePerDay >= 0 ? "+" : "") + estimatedNetWaterBalancePerDay.toFixed(1) + " L/day", note: "Recovery is subtracted from today's water use; negative means the reserve falls" },
-        { label: "Water used today", value: totalWaterUseNow.toFixed(1) + " L/day", note: "Crew use plus crop water demand at current crop yield" },
-        { label: "Water recovered today", value: recycledWaterNow.toFixed(1) + " L/day", note: "Limited by treatment throughput and the recovery percentage" },
+        { label: "Water used today", value: totalWaterUseNow.toFixed(1) + " L/day", note: "Total crew, crop and process demand; crop use is included, not added twice" },
+        { label: "Water recovered today", value: recycledWaterNow.toFixed(1) + " L/day", note: "Used water treated × recovery efficiency; this is recycling, not new water generation" },
         { label: "Crop water use", value: foodWaterUseNow.toFixed(1) + " L/kg food", note: "Selected Agriculture system rating" },
         { label: "Crew make-up stream", value: "8.0 L/day", note: "Included in daily use before recovery is applied" },
       ];
@@ -2897,8 +2898,11 @@ export function MissionSimulation() {
         // Calculate output from its own installation, condition and active fault so an
         // unrelated dependency-state glitch cannot force generation to 0 kW.
         const solarHasActiveFault = Object.values(activeFaultsRef.current).some((fault) => fault.targetTrackId === "solar");
+        // Solar output must degrade continuously with condition; a hard 25% cutoff
+        // caused the array to drop instantly to 0 kW late in the mission.
+        // True zero output comes from no sunlight (lunar night), no installed array,
+        // or an unresolved solar fault—not an arbitrary condition threshold.
         const solarCanGenerate = Boolean(pending.selected.solar)
-          && (buildings.solar?.condition ?? 100) >= 25
           && !solarHasActiveFault;
         const solarRatedKW = solarCanGenerate
           ? conditionAdjustedOutput("solar", getBaselineRating("solar", pending.selected.solar ?? "Foundation", solarUpgrade), buildings)
@@ -3082,7 +3086,7 @@ export function MissionSimulation() {
         const ratedWaterThroughputLDay = conditionAdjustedOutput("water", getAdditionalRating("water", "throughput", pending.selected.water ?? "Foundation", waterUpgrade), buildings);
         const waterPowered = waterOnline && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const effectiveWaterRecoveryPct = waterPowered ? waterRecoveryPct : 0;
-        const crewWaterUseLDay = 8; // Four-crew hygiene, food preparation and other recoverable wastewater stream.
+        const crewWaterUseLDay = 8; // Crew make-up stream, included within the colony's total daily water demand.
         const ratedFoodProductionKgDay = repairAdjustedRating("agriculture", getBaselineRating("agriculture", pending.selected.agriculture ?? "Foundation", foodUpgrade), buildings.agriculture?.repairMetrics);
         // Crop output depends on actual installed yield, condition, power and crop maturity.
         // There is no instant mature-crop / Mission 1 production boost.
@@ -3094,9 +3098,12 @@ export function MissionSimulation() {
         const foodDemandKgDay = 2.48; // Four crew × 0.62 kg edible dry-food equivalent/person/day.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
         const cropWaterUseLDay = foodProductionKgDay * cropWaterUseLPerKg;
-        // Apply recovery to the total wastewater/crop water stream used during this simulated day.
-        // Throughput limits processing; it is not a water source.
-        const totalWaterUseLDay = crewWaterUseLDay + cropWaterUseLDay;
+        // Total daily colony water demand is 21 L/day (crew, crop and process use combined).
+        // Crop water is a component of that total, not extra water added on top.
+        // Recovery only returns the rated percentage of treated used water; it never
+        // creates water. Foundation at 60% therefore recovers 12.6 L/day and loses 8.4 L/day
+        // when the treatment unit can process the full 21 L/day.
+        const totalWaterUseLDay = Math.max(21, crewWaterUseLDay + cropWaterUseLDay);
         const recoverableWaterLDay = Math.min(totalWaterUseLDay, Math.max(0, ratedWaterThroughputLDay));
         const recycledWaterLDay = recoverableWaterLDay * effectiveWaterRecoveryPct / 100;
         const waterLossLDay = totalWaterUseLDay - recycledWaterLDay;
