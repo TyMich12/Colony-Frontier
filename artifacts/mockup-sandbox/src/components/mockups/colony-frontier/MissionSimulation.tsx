@@ -1701,14 +1701,11 @@ function BuildingInspector({
         { label: "Current power margin", value: (electricalReadings.actualSupplyKW - electricalReadings.consumptionKW).toFixed(2) + " kW" },
       ];
       case "water": return [
-        { label: "Water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " L / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
-        { label: "Effective recovery", value: waterRecoveryNow.toFixed(1) + "%", note: "Percentage of today's treated water use returned to the reserve" },
-        { label: "Treatment throughput", value: waterThroughputNow.toFixed(1) + " L/day", note: "Condition-adjusted rated treatment capacity; it is not a water source" },
-        { label: "Net water balance", value: (estimatedNetWaterBalancePerDay >= 0 ? "+" : "") + estimatedNetWaterBalancePerDay.toFixed(1) + " L/day", note: "Recovery is subtracted from today's water use; negative means the reserve falls" },
-        { label: "Water used today", value: totalWaterUseNow.toFixed(1) + " L/day", note: "Total crew, crop and process demand; crop use is included, not added twice" },
-        { label: "Water recovered today", value: recycledWaterNow.toFixed(1) + " L/day", note: "Used water treated × recovery efficiency; this is recycling, not new water generation" },
-        { label: "Crop water use", value: foodWaterUseNow.toFixed(1) + " L/kg food", note: "Selected Agriculture system rating" },
-        { label: "Crew make-up stream", value: "8.0 L/day", note: "Included in daily use before recovery is applied" },
+        { label: "Total water reserve", value: (metrics.water / 100 * RESOURCE_CAPACITIES.waterReserveL).toFixed(1) + " / " + RESOURCE_CAPACITIES.waterReserveL + " L" },
+        { label: "Recovery efficiency", value: waterRecoveryNow.toFixed(1) + "%" },
+        { label: "Daily water demand (crew + farm)", value: totalWaterUseNow.toFixed(1) + " L/day" },
+        { label: "Water recovered", value: recycledWaterNow.toFixed(1) + " L/day", note: "Used water returned to the reserve after treatment; this is recycling, not new water" },
+        { label: "Net reserve change", value: (estimatedNetWaterBalancePerDay >= 0 ? "+" : "") + estimatedNetWaterBalancePerDay.toFixed(1) + " L/day", note: "Recovered water minus total daily demand" },
       ];
       case "oxygen": {
         const oxygenRate = systemOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? (isFirstMission ? Math.max(3.36, liveCondition / 100 * Math.max(3.5, ratedReading)) : ratedReading * liveCondition / 100) : 0;
@@ -1873,7 +1870,7 @@ function BuildingInspector({
               <p className="mt-0.5 text-[8px] leading-3 text-[#d79aa2]">This fault is affecting this system until the response is stabilised and its repair work order completes.</p>
             </div>}
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {[...liveSystemReadings, { label: "Equipment condition", value: liveCondition.toFixed(0) + "% output efficiency" }, { label: "Live operating state", value: activeFault ? "FAULT · " + activeFault.title : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS" }, { label: "Colony bus supply / demand", value: electricalReadings.actualSupplyKW.toFixed(2) + " / " + electricalReadings.consumptionKW.toFixed(2) + " kW" }, { label: "Active fault severity", value: activeFault ? activeFault.severity.toFixed(2) + "×" : "No active fault" }].map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
+              {(track.id === "water" ? liveSystemReadings : [...liveSystemReadings, { label: "Equipment condition", value: liveCondition.toFixed(0) + "% output efficiency" }, { label: "Live operating state", value: activeFault ? "FAULT · " + activeFault.title : systemOperational ? runtime.status : "OFFLINE · CHECK SUPPORTS" }, { label: "Colony bus supply / demand", value: electricalReadings.actualSupplyKW.toFixed(2) + " / " + electricalReadings.consumptionKW.toFixed(2) + " kW" }, { label: "Active fault severity", value: activeFault ? activeFault.severity.toFixed(2) + "×" : "No active fault" }]).map((reading) => <div key={reading.label} className="min-w-0 rounded-lg border border-[#1f3b42] bg-[#0c2026] px-2.5 py-2">
                 <p className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#81a8ad]">{reading.label}</p>
                 <p className="mt-0.5 break-words font-mono text-[10px] font-black text-[#d8f5e8]">{reading.value}</p>
                 {reading.note && <p className="mt-0.5 break-words text-[8px] leading-3 text-[#77989e]">{reading.note}</p>}
@@ -3170,7 +3167,7 @@ export function MissionSimulation() {
           // Condition wear is measured in points per simulated Earth day.
           // Make routine wear clearly visible over a mission, with solar wearing faster
           // because of dust and exposed surface hardware. Incidents add further damage.
-          const wearPerDay = (missionStage === 1 ? (trackId === "solar" ? 3.0 : 1.6) : (trackId === "solar" ? 12.0 : 7.0)) * stagePressure;
+          const wearPerDay = (missionStage === 1 ? (trackId === "solar" ? 0.9 : 1.6) : (trackId === "solar" ? 12.0 : 7.0)) * stagePressure;
           const repairingTrack = activeOperationsRef.current[trackId]?.kind === "REPAIR";
           const solarProtection = trackId === "solar" ? solarFaultProtection(state.repairMetrics) : 0;
           const faultWear = Object.values(activeFaults)
@@ -3181,7 +3178,7 @@ export function MissionSimulation() {
             condition: clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear),
             status: buildingStatus(clamp(state.condition - wearPerDay * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) - faultWear)),
             // Dust accumulates on simulated mission time, not browser wall-clock time.
-            dust: trackId === "solar" ? clamp(state.dust + (4.0 + (100 - state.condition) * 0.06) * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
+            dust: trackId === "solar" ? clamp(state.dust + (1.2 + (100 - state.condition) * 0.025) * (resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay) * stagePressure) : state.dust,
           };
         }
         return next;
