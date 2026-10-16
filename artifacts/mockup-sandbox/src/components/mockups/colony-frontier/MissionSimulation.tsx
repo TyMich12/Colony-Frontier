@@ -3018,7 +3018,7 @@ export function MissionSimulation() {
         const solarToBusKW = Math.min(solarGeneration * gridConversionEfficiency, gridTransferLimitKW);
         const solarNetKW = solarToBusKW - baseLoadKW;
         const batteryChargeLimitKW = batteryOnline
-          ? Math.min(LEVEL1_ENVIRONMENT.batteryMaximumChargePowerKW, getAdditionalRating("battery", "continuous charge power", pending.selected.battery ?? "Foundation", batteryUpgrade))
+          ? conditionAdjustedOutput("battery", getAdditionalRating("battery", "continuous charge power", pending.selected.battery ?? "Foundation", batteryUpgrade), buildings)
           : 0;
         const chargeEfficiency = LEVEL1_ENVIRONMENT.batteryChargeEfficiency;
         const dischargeEfficiency = LEVEL1_ENVIRONMENT.batteryDischargeEfficiency;
