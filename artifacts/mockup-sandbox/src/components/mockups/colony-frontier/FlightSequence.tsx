@@ -372,8 +372,10 @@ export function FlightSequence() {
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
-          <section className="min-w-0 space-y-5">
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,.9fr)]">
+          <section className="min-w-0 space-y-5 xl:col-span-2">
+            <RocketScene telemetry={telemetry} phase={phase} />
+            <p className="text-center text-[9px] font-bold uppercase tracking-[0.25em] text-[#efb658]">Main stage · launch vehicle</p>
             <div className="border border-[#294148] bg-[#071219] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#7fa19d]">Flight computer / diagnostics</span>
@@ -385,8 +387,6 @@ export function FlightSequence() {
               </div>
               <pre className="min-h-[205px] whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.8] text-[#a6c6b7]">{terminalText}<span className="animate-pulse text-[#efb658]">▌</span></pre>
             </div>
-
-            <RocketScene telemetry={telemetry} phase={phase} />
 
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -405,7 +405,7 @@ export function FlightSequence() {
             </div>
           </section>
 
-          <section className="min-w-0 space-y-5">
+          <section className="min-w-0 space-y-5 xl:col-start-3 xl:row-start-1">
             <div className="border border-[#294148] bg-[#0b1a21] p-5">
               <div className="flex flex-wrap items-center gap-5">
                 <DonutEnvelope risk={riskIndex} label="Envelope" />
