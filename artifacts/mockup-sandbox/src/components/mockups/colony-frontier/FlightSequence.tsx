@@ -162,19 +162,26 @@ function ThresholdBar({ position }: { position: number }) {
   );
 }
 
-function RocketScene({ telemetry, phase }: { telemetry: Telemetry; phase: Phase }) {
+function RocketScene({ telemetry, phase, critical }: { telemetry: Telemetry; phase: Phase; critical: boolean }) {
   const rotation = clamp(telemetry.pitch - 90, -50, 12);
   const translateY = phase === "flight" ? -Math.min(telemetry.altitude / 180, 90) : phase === "success" ? -90 : 0;
   return (
-    <div className="relative h-[min(54vh,500px)] min-h-[360px] overflow-hidden border border-[#294148] bg-[linear-gradient(180deg,#091820_0%,#112b36_60%,#1a3435_100%)]">
-      <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(167,202,192,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(167,202,192,.12)_1px,transparent_1px)] [background-size:30px_30px]" />
+    <div className="absolute inset-0 h-full w-full overflow-hidden border-0 bg-[linear-gradient(180deg,#07121c_0%,#102b37_58%,#1a3435_100%)]">
+      <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(167,202,192,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(167,202,192,.12)_1px,transparent_1px)] [background-size:42px_42px]" />
+      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-label="Planned ascent trajectory">
+        <defs><filter id="trajectoryGlow"><feGaussianBlur stdDeviation="3.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        <path d="M 500 635 C 510 540, 555 465, 615 385 S 735 230, 835 120" fill="none" stroke="#6ebc91" strokeWidth="3" strokeDasharray="9 8" opacity="0.95" filter="url(#trajectoryGlow)"/>
+        <path d={critical ? "M 615 385 C 650 335, 690 275, 735 230 S 790 165, 835 120" : "M 615 385 C 650 335, 690 275, 735 230 S 790 165, 835 120"} fill="none" stroke={critical ? "#f05252" : "#6ebc91"} strokeWidth="5" strokeDasharray="7 8" opacity={critical ? "1" : "0.5"}/>
+        <circle cx="835" cy="120" r="9" fill={critical ? "#f05252" : "#6ebc91"} stroke="#e9f4e9" strokeWidth="2"/>
+        <text x="850" y="115" fill={critical ? "#ff8888" : "#9be0b7"} fontSize="15" fontFamily="monospace">TARGET TRAJECTORY</text>
+      </svg>
       <div className="absolute right-7 top-6 h-14 w-14 rounded-full border border-[#9bb9ad]/60 bg-[#b8c9b7]/10 shadow-[0_0_35px_rgba(175,208,187,.12)]" />
       <div className="absolute bottom-0 left-0 right-0 h-12 border-t border-[#637f72] bg-[#172a27]" />
       <div className="absolute bottom-12 left-0 right-0 h-5 bg-[linear-gradient(180deg,transparent,rgba(7,16,24,.65))]" />
       <div className="absolute bottom-[54px] left-[16%] h-10 w-16 border-b border-[#547168] opacity-70" />
       <div className="absolute bottom-[54px] right-[17%] h-16 w-24 border-b border-[#547168] opacity-60" />
-      <div className="absolute left-1/2 bottom-[50px] w-[138px] transition-transform duration-200 ease-out" style={{ transform: `translate(-50%, ${translateY}px) rotate(${rotation}deg)` }}>
-        <svg viewBox="0 0 100 190" className="h-[260px] w-[138px] drop-shadow-[0_0_22px_rgba(239,182,88,.25)]" role="img" aria-label="2D launch vehicle">
+      <div className="absolute left-[50%] bottom-[12%] w-[clamp(100px,13vw,190px)] transition-transform duration-200 ease-out" style={{ transform: `translate(-50%, ${translateY}px) rotate(${rotation}deg)` }}>
+        <svg viewBox="0 0 100 190" className="h-[min(58vh,520px)] w-full drop-shadow-[0_0_28px_rgba(239,182,88,.32)]" role="img" aria-label="2D launch vehicle">
           <path d="M50 6 C34 25 31 42 31 67 L31 129 L18 154 L34 149 L41 171 L50 160 L59 171 L66 149 L82 154 L69 129 L69 67 C69 42 66 25 50 6Z" fill="#dce3d8" stroke="#91a9a2" strokeWidth="2" />
           <path d="M50 10 C41 28 41 40 41 52 L59 52 C59 40 59 28 50 10Z" fill="#efb658" />
           <rect x="39" y="61" width="22" height="31" rx="4" fill="#193b45" stroke="#8db5b4" strokeWidth="2" />
@@ -347,150 +354,82 @@ export function FlightSequence() {
     window.location.href = "/preview/MissionSimulation";
   }
 
+  const [helpOpen, setHelpOpen] = useState(true);
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#03090d] text-[#edf4ec] [font-family:Arial,sans-serif]">
-      <div className="pointer-events-none fixed inset-0 opacity-25 [background-image:linear-gradient(rgba(154,199,190,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(154,199,190,0.05)_1px,transparent_1px)] [background-size:36px_36px]" />
-      <div className="relative mx-auto min-h-screen w-full max-w-[1600px] px-3 py-3 sm:px-5 sm:py-4 lg:px-7">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#294148] pb-4">
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center border border-[#526c62] bg-[#10221f]"><span className="h-3 w-3 rounded-full bg-[#efb658] shadow-[0_0_14px_#efb658]" /></span>
-          <div><p className="text-[9px] font-bold uppercase tracking-[0.32em] text-[#8aa99a]">Colony-Frontier · Flight Simulator</p><h1 className="mt-1 text-base font-black uppercase tracking-[0.16em] text-[#edf4ec] sm:text-lg">Ascent Operations</h1></div>
+    <div className="fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-[#03090d] text-[#edf4ec] [font-family:Arial,sans-serif]">
+      <style>{`@keyframes cfLaunchFade { from { opacity: 0; } to { opacity: 1; } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } .cf-hud { background: rgba(4,14,19,.88); backdrop-filter: blur(8px); }`}</style>
+      <RocketScene telemetry={telemetry} phase={phase} critical={atRiskCount >= 3 || extremeCount > 0} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(2,8,12,.55)_100%)]" />
+      <header className="cf-hud absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-[#294148] px-4 py-2.5 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center border border-[#526c62] bg-[#10221f]"><span className={`h-2.5 w-2.5 rounded-full ${phase === "failure" ? "bg-[#f05252]" : "bg-[#6ebc91] shadow-[0_0_12px_#6ebc91]"}`} /></span>
+          <div className="min-w-0"><p className="truncate text-[8px] font-bold uppercase tracking-[0.25em] text-[#8aa99a]">Colony-Frontier · Flight Simulator</p><h1 className="truncate text-sm font-black uppercase tracking-[0.12em]">Ascent Operations</h1></div>
         </div>
-        <div className="text-right"><p className="text-[8px] uppercase tracking-[0.2em] text-[#6f8c8b]">Standalone mission game</p><p className="mt-1 font-mono text-[10px] text-[#efb658]">FLIGHT COMPUTER / LIVE TELEMETRY</p></div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`hidden border px-2 py-1 text-[8px] font-bold uppercase tracking-[0.14em] sm:inline-block ${phase === "flight" ? "border-[#efb658] text-[#efb658]" : phase === "failure" ? "border-[#f05252] text-[#ff8888]" : phase === "success" ? "border-[#6ebc91] text-[#9be0b7]" : "border-[#35515a] text-[#a5b6ac]"}`}>{phase === "boot" ? "Diagnostics" : phase === "ready" ? "Ready" : phase === "flight" ? "Ascent live" : phase === "success" ? "Ascent complete" : "Mission lost"}</span>
+          <button type="button" title="Open the flight control guide and keyboard shortcuts" onClick={() => setHelpOpen(true)} className="border border-[#6ebc91] bg-[#10251f] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-[#9be0b7] hover:bg-[#19372c]">? Controls</button>
+        </div>
+      </header>
+
+      <div className="pointer-events-none absolute left-1/2 top-[12%] z-10 -translate-x-1/2 text-center">
+        <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-[#8aa99a] sm:text-[10px]">Mission {pending?.missionNumber ?? "—"} · {pending?.missionTitle ?? "Launch vehicle"}</p>
+        <p className="mt-1 font-mono text-[10px] text-[#9be0b7] sm:text-xs">TARGET TRAJECTORY <span className="text-[#6ebc91]">━ GREEN</span> <span className="ml-2 text-[#ff8888]">━ RED = CRITICAL</span></p>
       </div>
-      <div className="relative" style={{ animation: "cfLaunchFade 850ms ease-out both" }}>
-        <style>{`@keyframes cfLaunchFade { from { opacity: 0; } to { opacity: 1; } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }`}</style>
-        <div className="pointer-events-none fixed inset-0 z-[100] bg-[#020609]" style={{ animation: "cfCurtain 1.1s ease-out forwards" }} />
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#294148] bg-[#0a171d] px-5 py-4">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#efb658]">Mission {pending?.missionNumber ?? "—"} / {pending?.campaign?.toUpperCase() ?? "NO ACTIVE MISSION"}</p>
-            <p className="mt-2 text-sm font-semibold uppercase tracking-[0.12em] text-[#e6eee5]">{pending?.missionTitle ?? "No mission staged"}</p>
-            <p className="mt-1 text-[10px] text-[#88a3a2]">Guidance is yours. Keep the vehicle inside the survival envelope.</p>
+
+      <aside className="cf-hud absolute bottom-3 left-3 z-20 w-[min(31vw,330px)] space-y-2 border border-[#294148] p-3 sm:bottom-5 sm:left-5 sm:p-4">
+        <div className="flex items-center justify-between gap-2"><h2 className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#efb658] sm:text-[10px]">Flight diagnostics</h2><span className="font-mono text-[9px] text-[#8aa99a]">{factors.length} checks</span></div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="border border-[#294148] bg-[#0b1a21] p-2"><p className="text-[8px] uppercase text-[#8aa99a]">At risk</p><p className={`mt-1 text-xl font-bold ${atRiskCount >= 3 ? "text-[#ff8888]" : atRiskCount ? "text-[#efb658]" : "text-[#9be0b7]"}`}>{atRiskCount}</p></div>
+          <div className="border border-[#294148] bg-[#0b1a21] p-2"><p className="text-[8px] uppercase text-[#8aa99a]">Stress index</p><p className="mt-1 text-xl font-bold text-[#edf4ec]">{Math.round(riskIndex)}<span className="text-xs text-[#8aa99a]">/100</span></p></div>
+        </div>
+        <div className="space-y-2">
+          {factors.slice(0,5).map((factor) => <div key={factor.id} className="border-b border-[#1b3035] pb-1.5 last:border-0">
+            <div className="flex items-center justify-between gap-2"><span className="truncate text-[9px] text-[#dce8df]">{factor.label}</span><span className={`shrink-0 font-mono text-[9px] ${factor.severity === "SURVIVAL" ? "text-[#9be0b7]" : factor.severity === "CRITICAL" ? "text-[#efb658]" : "text-[#ff8888]"}`}>{factor.display}</span></div>
+            <div className="relative mt-1 h-2 overflow-hidden rounded-sm bg-[#1b3035]"><div className="absolute inset-y-0 left-0 w-[18%] bg-[#d9534f]"/><div className="absolute inset-y-0 left-[18%] w-[23%] bg-[#d6a84c]"/><div className="absolute inset-y-0 left-[41%] w-[18%] bg-[#6ebc91]"/><div className="absolute inset-y-0 left-[59%] w-[23%] bg-[#d6a84c]"/><div className="absolute inset-y-0 right-0 w-[18%] bg-[#d9534f]"/><div className="absolute -top-0.5 h-3 w-[3px] bg-white" style={{left:`${factor.position}%`}}/></div>
+          </div>)}
+        </div>
+        <p className="text-[8px] leading-relaxed text-[#8aa99a]">Green = within safe limits · amber = warning · red = critical.</p>
+      </aside>
+
+      <aside className="cf-hud absolute bottom-3 right-3 z-20 w-[min(31vw,330px)] space-y-3 border border-[#294148] p-3 sm:bottom-5 sm:right-5 sm:p-4">
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ["TIME", `${telemetry.elapsed.toFixed(1)} s`],
+            ["ALTITUDE", `${Math.round(telemetry.altitude).toLocaleString()} m`],
+            ["VERTICAL SPEED", `${telemetry.verticalSpeed.toFixed(1)} m/s`],
+            ["PITCH / TARGET", `${telemetry.pitch.toFixed(0)}° / ${(targetPitch(telemetry.elapsed)+telemetry.trim).toFixed(0)}°`],
+          ].map(([label,value])=><div key={label} className="border border-[#294148] bg-[#0b1a21] p-2"><p className="text-[7px] uppercase tracking-[0.12em] text-[#8aa99a] sm:text-[8px]">{label}</p><p className="mt-1 font-mono text-xs text-[#d7e8bd] sm:text-sm">{value}</p></div>)}
+        </div>
+        <div className="flex items-center justify-between"><h2 className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#efb658]">Pilot controls</h2><button type="button" onClick={() => setHelpOpen(true)} className="text-[8px] text-[#9be0b7] underline">What does what?</button></div>
+        <Control label="Throttle" explanation="Thrust and acceleration" value={telemetry.throttle} min={0.3} max={1} step={0.01} display={`${Math.round(telemetry.throttle*100)}%`} onChange={(value)=>changeControl("throttle",value)} />
+        <Control label="Pitch trim" explanation="Corrects the guidance angle" value={telemetry.trim} min={-18} max={18} step={1} display={`${telemetry.trim>0?"+":""}${telemetry.trim}°`} onChange={(value)=>changeControl("trim",value)} />
+        <div className="hidden space-y-2 md:block">
+          <Control label="Electrical load" explanation="Higher uses battery faster" value={telemetry.electricalLoad} min={0.2} max={1.4} step={0.05} display={`${telemetry.electricalLoad.toFixed(2)}×`} onChange={(value)=>changeControl("electricalLoad",value)} />
+          <Control label="Oxygen flow" explanation="Higher flow uses oxygen faster" value={telemetry.oxygenFlow} min={0.1} max={1} step={0.05} display={`${telemetry.oxygenFlow.toFixed(2)}×`} onChange={(value)=>changeControl("oxygenFlow",value)} />
+          <Control label="Cabin heat" explanation="Negative cools; positive heats" value={telemetry.heatBalance} min={-5} max={5} step={0.5} display={`${telemetry.heatBalance>0?"+":""}${telemetry.heatBalance.toFixed(1)}`} onChange={(value)=>changeControl("heatBalance",value)} />
+        </div>
+        {phase === "boot" && <button type="button" onClick={skipDiagnostics} className="w-full border border-[#526c62] px-3 py-2 text-[9px] font-bold uppercase text-[#dce8df]">Skip checks animation</button>}
+        {phase === "ready" && <button type="button" onClick={beginFlight} disabled={!readyToLaunch} className={`w-full px-3 py-3 text-[9px] font-bold uppercase tracking-[0.15em] ${readyToLaunch ? "bg-[#efb658] text-[#172126]" : "cursor-not-allowed bg-[#351316] text-[#ff8888]"}`}>{readyToLaunch ? "▲ Ignite engines" : "Launch blocked · clear red factors"}</button>}
+        {phase === "flight" && <p className="border border-[#efb658]/50 bg-[#241e14] px-3 py-2 text-[9px] uppercase text-[#efb658]">Ascent live · adjust controls</p>}
+        {phase === "failure" && <div className="space-y-2 border border-[#d9534f]/60 bg-[#260e12] p-3"><p className="text-xs font-bold uppercase text-[#ff8888]">Mission lost</p><button type="button" onClick={retry} className="w-full bg-[#efb658] px-3 py-2 text-[9px] font-bold uppercase text-[#172126]">↻ Reset flight</button></div>}
+        {phase === "success" && <div className="space-y-2 border border-[#6ebc91]/60 bg-[#0b201c] p-3"><p className="text-xs font-bold uppercase text-[#9be0b7]">Ascent successful</p><button type="button" onClick={enterMission} className="w-full bg-[#6ebc91] px-3 py-3 text-[9px] font-bold uppercase text-[#071812]">Enter colony mission →</button></div>}
+      </aside>
+
+      <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 text-center md:block"><p className="font-mono text-[10px] text-[#d7e8bd]">THRUST {Math.round(telemetry.throttle*100)}% · ENERGY {Math.round(telemetry.energy)}% · O₂ {Math.round(telemetry.oxygen)}%</p><p className="mt-1 text-[8px] uppercase tracking-[0.2em] text-[#8aa99a]">Flight path is schematic · maintain green guidance corridor</p></div>
+
+      {helpOpen && <div className="absolute inset-0 z-50 grid place-items-center bg-[#02070b]/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="flight-help-title">
+        <div className="w-full max-w-xl border border-[#6ebc91] bg-[#07151b] p-5 shadow-[0_0_50px_rgba(110,188,145,.16)] sm:p-7">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#efb658]">Pilot briefing</p><h2 id="flight-help-title" className="mt-2 text-lg font-black uppercase tracking-[0.12em] sm:text-2xl">How to fly this mission</h2></div><button type="button" aria-label="Close controls guide" onClick={()=>setHelpOpen(false)} className="border border-[#526c62] px-3 py-2 text-sm text-[#dce8df]">✕</button></div>
+          <p className="mt-3 text-xs leading-relaxed text-[#a5b6ac]">Keep the rocket close to the planned trajectory. Green means the guidance path is safe; red means critical flight conditions. Make small adjustments and watch the readings.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="border border-[#294148] bg-[#0b1a21] p-3"><h3 className="text-[10px] font-bold uppercase text-[#9be0b7]">Movement</h3><p className="mt-2 text-xs leading-relaxed text-[#dce8df]"><b>W / ↑</b> increase throttle<br/><b>S / ↓</b> decrease throttle<br/><b>A / ←</b> pitch trim left<br/><b>D / →</b> pitch trim right</p></div>
+            <div className="border border-[#294148] bg-[#0b1a21] p-3"><h3 className="text-[10px] font-bold uppercase text-[#9be0b7]">Systems</h3><p className="mt-2 text-xs leading-relaxed text-[#dce8df]"><b>Q / E</b> electrical load − / +<br/><b>O / P</b> oxygen flow − / +<br/><b>H / J</b> cabin heat − / +</p></div>
+            <div className="border border-[#294148] bg-[#0b1a21] p-3 sm:col-span-2"><h3 className="text-[10px] font-bold uppercase text-[#efb658]">What the controls do</h3><p className="mt-2 text-xs leading-relaxed text-[#a5b6ac]"><b>Throttle:</b> changes thrust and acceleration. <b>Pitch trim:</b> offsets the target angle. <b>Electrical load:</b> higher settings drain the reserve faster. <b>Oxygen flow:</b> higher settings use oxygen faster and help cabin pressure. <b>Cabin heat:</b> negative cools, positive warms the cabin. Use the side sliders for fine adjustments.</p></div>
           </div>
-          <div className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${phase === "flight" ? "border-[#efb658] text-[#efb658]" : phase === "failure" ? "border-[#d9534f] text-[#ff8a8a]" : phase === "success" ? "border-[#6ebc91] text-[#9be0b7]" : "border-[#35515a] text-[#a5b6ac]"}`}>
-            {phase === "boot" ? "Diagnostics running" : phase === "ready" ? "Awaiting ignition" : phase === "flight" ? "Ascent in progress" : phase === "success" ? "Ascent complete" : "Mission lost"}
-          </div>
+          <button type="button" onClick={()=>setHelpOpen(false)} className="mt-5 w-full bg-[#6ebc91] px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#071812]">Got it · enter flight deck</button>
         </div>
-
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,.9fr)]">
-          <section className="min-w-0 space-y-5 xl:col-span-2">
-            <RocketScene telemetry={telemetry} phase={phase} />
-            <p className="text-center text-[9px] font-bold uppercase tracking-[0.25em] text-[#efb658]">Main stage · launch vehicle</p>
-            <div className="border border-[#294148] bg-[#071219] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#7fa19d]">Flight computer / diagnostics</span>
-                <div className="flex items-center gap-3">
-                  {phase === "boot" && <button type="button" onClick={skipDiagnostics} className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#efb658] hover:text-[#f6ca76]">Skip animation ↗</button>}
-                  {phase === "ready" && <button type="button" onClick={() => setTerminalText(buildDiagnosticText(telemetryRef.current))} className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#efb658] hover:text-[#f6ca76]">Re-run checks ↻</button>}
-                  <span className={`h-2 w-2 rounded-full ${phase === "failure" ? "bg-[#d9534f]" : phase === "success" ? "bg-[#6ebc91]" : "animate-pulse bg-[#efb658]"}`} />
-                </div>
-              </div>
-              <pre className="min-h-[205px] whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.8] text-[#a6c6b7]">{terminalText}<span className="animate-pulse text-[#efb658]">▌</span></pre>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                ["MISSION TIME", `${telemetry.elapsed.toFixed(1)} s`],
-                ["PITCH", `${telemetry.pitch.toFixed(1)}°`],
-                ["TARGET", `${(targetPitch(telemetry.elapsed) + telemetry.trim).toFixed(1)}°`],
-                ["ALTITUDE", `${Math.round(telemetry.altitude).toLocaleString()} m`],
-                ["VERTICAL SPEED", `${telemetry.verticalSpeed.toFixed(1)} m/s`],
-                ["THRUST SETTING", `${Math.round(telemetry.throttle * 100)}%`],
-              ].map(([label, value]) => (
-                <div key={label} className="border border-[#294148] bg-[#0b1a21] px-3 py-3">
-                  <div className="text-[8px] font-bold uppercase tracking-[0.15em] text-[#779b9b]">{label}</div>
-                  <div className="mt-2 font-mono text-sm text-[#d7e8bd]">{value}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="min-w-0 space-y-5 xl:col-start-3 xl:row-start-1">
-            <div className="border border-[#294148] bg-[#0b1a21] p-5">
-              <div className="flex flex-wrap items-center gap-5">
-                <DonutEnvelope risk={riskIndex} label="Envelope" />
-                <div className="min-w-[120px] flex-1">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#779b9b]">Survival envelope</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#edf4ec]">{atRiskCount} <span className="text-sm font-normal text-[#a5b6ac]">at-risk</span></p>
-                  <p className="mt-1 text-xs text-[#a5b6ac]">{criticalCount} warning · {extremeCount} extreme</p>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#1b3035]">
-                    <div className={`h-full transition-all ${atRiskCount >= 3 ? "bg-[#d9534f]" : atRiskCount ? "bg-[#d6a84c]" : "bg-[#6ebc91]"}`} style={{ width: `${Math.min(100, atRiskCount / 4 * 100)}%` }} />
-                  </div>
-                  <p className="mt-2 text-[9px] leading-relaxed text-[#779b9b]">{atRiskCount === 3 ? "EMERGENCY: one more at-risk factor causes mission loss." : atRiskCount >= 4 ? "MISSION LOSS: four or more distinct factors are critical/extreme." : "Three at-risk factors trigger emergency; four or more cause mission loss."}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="border border-[#294148] bg-[#0b1a21] p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#779b9b]">Live factor readings</span>
-                <span className="text-[9px] text-[#779b9b]">{factors.length} monitored</span>
-              </div>
-              <div className="space-y-4">
-                {factors.map((factor) => (
-                  <div key={factor.id} className="border-b border-[#1b3035] pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-semibold text-[#dce8df]">{factor.label}</p>
-                        <p className="mt-1 text-[9px] text-[#779b9b]">{factor.note}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono text-xs text-[#edf4ec]">{factor.display}</p>
-                        <p className={`mt-1 text-[8px] font-bold uppercase tracking-[0.16em] ${factor.severity === "SURVIVAL" ? "text-[#6ebc91]" : factor.severity === "CRITICAL" ? "text-[#d6a84c]" : "text-[#d9534f]"}`}>{factor.severity}</p>
-                      </div>
-                    </div>
-                    <ThresholdBar position={factor.position} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border border-[#294148] bg-[#0b1a21] p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-[#efb658]" />
-                <h2 className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#e6eee5]">Pilot controls</h2>
-              </div>
-              <Control label="Main throttle" explanation="Controls thrust; too much increases acceleration and risk." value={telemetry.throttle} min={0.3} max={1} step={0.01} display={`${Math.round(telemetry.throttle * 100)}%`} onChange={(value) => changeControl("throttle", value)} />
-              <Control label="Pitch trim" explanation="Offsets the guidance target to correct pitch error." value={telemetry.trim} min={-18} max={18} step={1} display={`${telemetry.trim > 0 ? "+" : ""}${telemetry.trim}°`} onChange={(value) => changeControl("trim", value)} />
-              <Control label="Electrical load" explanation="Higher load drains electrical reserve faster." value={telemetry.electricalLoad} min={0.2} max={1.4} step={0.05} display={`${telemetry.electricalLoad.toFixed(2)}×`} onChange={(value) => changeControl("electricalLoad", value)} />
-              <Control label="Oxygen flow" explanation="Higher flow consumes oxygen faster and helps maintain cabin pressure." value={telemetry.oxygenFlow} min={0.1} max={1} step={0.05} display={`${telemetry.oxygenFlow.toFixed(2)}×`} onChange={(value) => changeControl("oxygenFlow", value)} />
-              <Control label="Cabin heat balance" explanation="Negative cools the cabin; positive heats it." value={telemetry.heatBalance} min={-5} max={5} step={0.5} display={`${telemetry.heatBalance > 0 ? "+" : ""}${telemetry.heatBalance.toFixed(1)}`} onChange={(value) => changeControl("heatBalance", value)} />
-              <div className="mb-4 border border-[#294148] bg-[#071219] p-3">
-                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#efb658]">Keyboard shortcuts</p>
-                <p className="mt-2 text-[9px] leading-relaxed text-[#a5b6ac]">↑ / W and ↓ / S: throttle · ← / A and → / D: pitch trim · Q / E: electrical load · O / P: oxygen flow · H / J: cabin heat. Keyboard shortcuts pause while you are using a slider.</p>
-              </div>
-              <p className="mt-4 flex items-start gap-2 text-[9px] leading-relaxed text-[#779b9b]"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-[#d6a84c]" /> Guidance target changes through ascent. Use trim to keep pitch error low; excessive throttle increases acceleration and risk.</p>
-            </div>
-
-            {phase === "boot" && (
-              <div className="border border-[#294148] bg-[#0b1a21] px-4 py-3 text-[10px] uppercase tracking-[0.15em] text-[#a5b6ac]">Waiting for launch computer checks…</div>
-            )}
-            {phase === "ready" && (
-              <button type="button" onClick={beginFlight} disabled={!readyToLaunch} className={`flex w-full items-center justify-center gap-2 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.22em] transition ${readyToLaunch ? "bg-[#efb658] text-[#172126] hover:bg-[#f6ca76]" : "cursor-not-allowed border border-[#d9534f] bg-[#351316] text-[#ff8a8a]"}`}>
-                <ArrowUp className="h-4 w-4" /> {readyToLaunch ? "Ignite engines" : "Launch inhibited — clear red factors"}
-              </button>
-            )}
-            {phase === "flight" && (
-              <div className="border border-[#efb658]/50 bg-[#241e14] px-4 py-3 text-[10px] uppercase tracking-[0.15em] text-[#efb658]">Flight live · keep the vehicle within limits</div>
-            )}
-            {phase === "failure" && (
-              <div className="border border-[#d9534f]/60 bg-[#260e12] p-4">
-                <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#ff8a8a]"><AlertTriangle className="h-4 w-4" /> Mission lost</p>
-                <p className="mt-2 text-xs leading-relaxed text-[#d4aaa9]">Four or more distinct factors are currently outside the survival band. Review the amber and red readings, adjust the controls, re-run checks, then try the ascent again.</p>
-                <button type="button" onClick={retry} className="mt-4 flex items-center gap-2 bg-[#efb658] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#172126]"><RotateCcw className="h-4 w-4" /> Reset flight</button>
-              </div>
-            )}
-            {phase === "success" && (
-              <div className="border border-[#6ebc91]/60 bg-[#0b201c] p-4">
-                <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#9be0b7]"><ShieldCheck className="h-4 w-4" /> Ascent successful</p>
-                <p className="mt-2 text-xs leading-relaxed text-[#b6d2c2]">The vehicle stayed inside the survival envelope and reached the transfer corridor. Continue to the colony mission.</p>
-                <button type="button" onClick={enterMission} className="mt-4 flex w-full items-center justify-center gap-2 bg-[#6ebc91] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#071812]">Enter colony mission <ChevronRight className="h-4 w-4" /></button>
-              </div>
-            )}
-          </section>
-        </div>
-      </div>
-      </div>
+      </div>}
     </div>
   );
 }
