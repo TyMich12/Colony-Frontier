@@ -1873,7 +1873,6 @@ function Scene({ props }: { props: Props }) {
   const navigationAccuracy = Math.max(0.42, Math.min(0.98, (0.60 + navTierIndex * 0.10 + Math.max(0, Math.min(2, navRetrofitLevel)) * 0.04) * (0.65 + 0.35 * navCondition / 100)));
   const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
   const sunAngleDeg = props.lunarNight ? 0 : Math.max(0, Math.sin((lunarDay / 14) * Math.PI) * 90);
-  const sunX = 50 + Math.cos((lunarDay / 14) * Math.PI) * 42;
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
