@@ -95,6 +95,7 @@ export function interpolateSolarProfile(day: number) {
   const upper = profile[Math.min(profile.length - 1, Math.ceil(bounded))];
   const mix = bounded - Math.floor(bounded);
   return {
+    sunAltitudeDeg: lower.sunAltitudeDeg + (upper.sunAltitudeDeg - lower.sunAltitudeDeg) * mix,
     sunlightGeometry: lower.sunlightGeometry + (upper.sunlightGeometry - lower.sunlightGeometry) * mix,
     irradianceWm2: lower.irradianceWm2 + (upper.irradianceWm2 - lower.irradianceWm2) * mix,
     groundTempC: lower.groundTempC + (upper.groundTempC - lower.groundTempC) * mix,
