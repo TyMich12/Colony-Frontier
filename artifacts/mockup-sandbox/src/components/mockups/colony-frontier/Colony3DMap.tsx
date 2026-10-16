@@ -1869,13 +1869,13 @@ function Scene({ props }: { props: Props }) {
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
   const roverCondition = Math.max(0, Math.min(100, props.buildings.rover?.condition ?? 100));
   const roverRatedSpeedKmh = getBaselineRating("rover", roverTier, roverRetrofitLevel);
-  const roverSpeedGap = props.buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed on reference rough terrain"] ?? 0;
+  const roverSpeedGap = props.buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
   const roverTraverseSpeedKmh = Math.max(0, roverRatedSpeedKmh - roverSpeedGap) * roverCondition / 100;
   const navTier = props.selected.navigation ?? "Foundation";
   const navRetrofitLevel = props.buildings.navigation?.upgradeLevel ?? 0;
   const navCondition = Math.max(25, Math.min(100, props.buildings.navigation?.condition ?? 100));
   const navRatedErrorM = getBaselineRating("navigation", navTier, navRetrofitLevel);
-  const navErrorGapM = props.buildings.navigation?.repairMetrics?.["Unrestored fault gap · Horizontal position error under reference terrain conditions"] ?? 0;
+  const navErrorGapM = props.buildings.navigation?.repairMetrics?.["Unrestored fault gap · Horizontal position error reduced"] ?? 0;
   const navigationErrorM = (navRatedErrorM + navErrorGapM) * (100 / navCondition);
   const navigationAccuracy = Math.max(0, Math.min(100, 100 - navigationErrorM)) / 100;
   const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
