@@ -1,7 +1,7 @@
-"""Python formula service and static web server for Colony Frontier rewrite.
+"""Python formula service and static web server for Colony Frontier.
 
-Python calculates simulation values. Rust is the final authority for alive/loss/success.
-All thresholds are illustrative game parameters, not real-world safety limits.
+Python calculates derived simulation values. Rust owns the final survival verdict.
+All numerical limits are illustrative game parameters, not real-world flight rules.
 """
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -15,6 +15,11 @@ WEB_ROOT = ROOT / "web"
 RUST_URL = "http://127.0.0.1:8081/evaluate"
 RUST_MISSION_URL = "http://127.0.0.1:8081/evaluate-mission"
 G0 = 9.80665
+R_UNIVERSAL = 8.314462618
+PLANNED_FLIGHT_SECONDS = 600.0
+EMERGENCY_RESERVE_SECONDS = 300.0
+MIN_OXYGEN_KG = 0.05
+MIN_ENERGY_J = 10_000.0
 
 
 def clamp(value, low, high):
@@ -22,59 +27,156 @@ def clamp(value, low, high):
 
 
 def calculate_flight(payload):
-    """Advance one game step and calculate derived flight quantities."""
-    dt = clamp(float(payload.get("dt_seconds", 1.0)), 0.0, 10.0)
+    """Advance a small, deterministic 2D flight model by one time step."""
     phase = str(payload.get("phase", "liftoff"))
+    if phase not in {"preflight", "liftoff", "ascent", "descent", "landing"}:
+        raise ValueError("Unknown flight phase")
+    dt = clamp(float(payload.get("dt_seconds", 1.0)), 0.0, 10.0)
     state = payload.get("state", {})
+    if not isinstance(state, dict):
+        raise ValueError("Flight state must be an object")
 
-    # Resource formulae: oxygen usage and electrical energy balance.
-    oxygen = max(0.0, float(state.get("oxygen_kg", 8.0)) -
-                 max(0.0, float(state.get("oxygen_rate_kg_s", 0.001))) * dt)
-    energy = max(0.0, float(state.get("energy_j", 500_000.0)) +
-                 (float(state.get("generation_w", 1200.0)) -
-                  float(state.get("load_w", 900.0))) * dt)
+    def number(key, default):
+        value = float(state.get(key, default))
+        if not math.isfinite(value):
+            raise ValueError(f"Flight input {key} must be finite")
+        return value
 
-    temperature = float(state.get("temperature_k", 293.15))
-    # Simple thermal balance: net heat divided by effective cabin heat capacity.
-    heat_w = float(state.get("heater_w", 0.0)) - float(state.get("cooling_w", 0.0))
-    heat_capacity_j_k = max(1.0, float(state.get("thermal_capacity_j_k", 120_000.0)))
-    temperature = temperature + heat_w * dt / heat_capacity_j_k
+    elapsed = max(0.0, number("elapsed_seconds", 0.0))
+    oxygen_before = max(0.0, number("oxygen_kg", 7.5))
+    energy_before = max(0.0, number("energy_j", 400_000.0))
+    oxygen_initial = max(MIN_OXYGEN_KG, number("oxygen_initial_kg", oxygen_before))
+    energy_initial = max(MIN_ENERGY_J, number("energy_initial_j", energy_before))
+    oxygen_rate = max(0.0, number("oxygen_rate_kg_s", 0.001))
+    generation_w = max(0.0, number("generation_w", 1_200.0))
+    load_w = max(0.0, number("load_w", 900.0))
 
-    # Ideal gas law P = nRT/V using the updated cabin temperature.
-    gas_mass_kg = max(0.0, float(state.get("cabin_gas_mass_kg", 36.0)))
-    molar_mass_kg_mol = max(0.001, float(state.get("molar_mass_kg_mol", 0.029)))
-    volume_m3 = max(0.1, float(state.get("cabin_volume_m3", 30.0)))
-    moles = gas_mass_kg / molar_mass_kg_mol
-    pressure = max(0.0, moles * 8.314462618 * temperature / volume_m3)
+    # Life support: reserve balances and cabin thermal state.
+    oxygen = max(0.0, oxygen_before - oxygen_rate * dt)
+    energy = max(0.0, energy_before + (generation_w - load_w) * dt)
+    temperature = number("temperature_k", 293.15)
+    heater_w = number("heater_w", 0.0)
+    cooling_w = number("cooling_w", 0.0)
+    thermal_capacity = max(1.0, number("thermal_capacity_j_k", 120_000.0))
+    temperature += (heater_w - cooling_w) * dt / thermal_capacity
 
-    radiation_rate = max(0.0, float(state.get("radiation_rate_gy_s", 0.00000001)))
-    radiation = max(0.0, float(state.get("radiation_gy", 0.0)) + radiation_rate * dt)
+    # Ideal gas approximation for a sealed cabin.
+    gas_mass = max(0.0, number("cabin_gas_mass_kg", 36.0))
+    molar_mass = max(0.001, number("molar_mass_kg_mol", 0.029))
+    cabin_volume = max(0.1, number("cabin_volume_m3", 30.0))
+    pressure = max(0.0, (gas_mass / molar_mass) * R_UNIVERSAL * temperature / cabin_volume)
 
-    # Acceleration from net thrust: a = (thrust - drag) / mass; convert to g.
-    mass_kg = max(1.0, float(state.get("vehicle_mass_kg", 12_000.0)))
-    thrust_n = max(0.0, float(state.get("thrust_n", 150_000.0)))
-    drag_n = max(0.0, float(state.get("drag_n", 10_000.0)))
-    acceleration_g = abs((thrust_n - drag_n) / mass_kg) / G0
+    radiation_rate = max(0.0, number("radiation_rate_gy_s", 1e-8))
+    radiation = max(0.0, number("radiation_gy", 0.0) + radiation_rate * dt)
 
-    # Landing impact approximation: v²/(2s)/g. Only meaningful in landing phase.
-    vertical_speed = abs(float(state.get("vertical_speed_m_s", 1.0)))
-    stopping_distance = max(0.1, float(state.get("landing_stopping_distance_m", 1.0)))
-    impact_g = (vertical_speed * vertical_speed / (2.0 * stopping_distance)) / G0
-    if phase != "landing":
-        impact_g = None
+    # Guidance pitch is measured away from vertical. The player adjusts a trim
+    # offset; the guidance target changes by flight phase.
+    elapsed_next = elapsed + dt
+    if phase in {"preflight", "liftoff"}:
+        phase_target_pitch = 0.0
+    elif phase == "ascent":
+        phase_target_pitch = clamp((elapsed_next - 8.0) * 0.6, 0.0, 18.0)
+    elif phase == "descent":
+        phase_target_pitch = 70.0
+    else:
+        phase_target_pitch = 0.0
+    pitch_trim = clamp(number("pitch_trim_deg", 0.0), -12.0, 12.0)
+    target_pitch = clamp(phase_target_pitch + pitch_trim, -15.0, 82.0)
+    pitch = clamp(number("pitch_deg", 0.0), -89.0, 89.0)
+    angular_velocity = clamp(number("angular_velocity_deg_s", 0.0), -30.0, 30.0)
+    angular_acceleration = clamp((target_pitch - pitch) * 1.4 - angular_velocity * 1.6, -8.0, 8.0)
+    if dt > 0.0:
+        angular_velocity = clamp(angular_velocity + angular_acceleration * dt, -30.0, 30.0)
+        pitch = clamp(pitch + angular_velocity * dt, -89.0, 89.0)
+    pitch_error = target_pitch - pitch
+
+    # Entering the surface approach is a deliberate gameplay time cut: the
+    # preceding ascent/descent represents the transfer trajectory. The final
+    # approach then models a short, player-controlled landing window.
+    landing_started = bool(state.get("landing_approach_started", False))
+    altitude = max(0.0, number("altitude_m", 0.0))
+    vertical_speed = number("vertical_speed_m_s", 0.0)
+    horizontal_speed = number("horizontal_speed_m_s", 0.0)
+    horizontal_position = number("horizontal_position_m", 0.0)
+    if phase == "landing" and not landing_started:
+        altitude = 350.0
+        vertical_speed = -18.0
+        horizontal_speed = 0.0
+        landing_started = True
+
+    mass = max(1.0, number("vehicle_mass_kg", 9_000.0))
+    throttle = clamp(number("throttle_fraction", 0.92), 0.0, 1.0)
+    base_thrust = max(0.0, number("thrust_n", 150_000.0))
+    thrust = base_thrust * throttle
+    base_drag = max(0.0, number("drag_n", 10_000.0))
+    pitch_rad = math.radians(pitch)
+    # Quadratic aerodynamic drag keeps high-speed lateral movement bounded.
+    drag_x = 0.15 * horizontal_speed * abs(horizontal_speed)
+    drag_y_dynamic = 0.15 * vertical_speed * abs(vertical_speed)
+    force_x = thrust * math.sin(pitch_rad) - drag_x
+    force_y = thrust * math.cos(pitch_rad) - base_drag - drag_y_dynamic
+    acceleration_x = force_x / mass
+    acceleration_y = force_y / mass - G0
+    proper_acceleration_g = math.hypot(force_x, force_y) / mass / G0
+    net_vertical_force = force_y - mass * G0
+
+    if dt > 0.0:
+        horizontal_speed += acceleration_x * dt
+        vertical_speed += acceleration_y * dt
+        horizontal_position += horizontal_speed * dt
+        altitude += vertical_speed * dt
+
+    touchdown = False
+    impact_g = None
+    stopping_distance = max(0.1, number("landing_stopping_distance_m", 10.0))
+    if phase == "landing" and altitude <= 0.0:
+        impact_speed = abs(vertical_speed)
+        impact_g = (impact_speed * impact_speed / (2.0 * stopping_distance)) / G0
+        touchdown = True
+        altitude = 0.0
+        vertical_speed = 0.0
+    elif phase != "landing":
+        altitude = max(0.0, altitude)
+
+    required_oxygen = max(MIN_OXYGEN_KG, oxygen_rate * (PLANNED_FLIGHT_SECONDS + EMERGENCY_RESERVE_SECONDS))
+    required_energy = max(MIN_ENERGY_J, max(0.0, load_w - generation_w) *
+                          (PLANNED_FLIGHT_SECONDS + EMERGENCY_RESERVE_SECONDS))
 
     result = {
         "phase": phase,
-        "elapsed_seconds": max(0.0, float(state.get("elapsed_seconds", 0.0)) + dt),
+        "elapsed_seconds": elapsed_next,
         "oxygen_kg": oxygen,
+        "oxygen_initial_kg": oxygen_initial,
+        "oxygen_rate_kg_s": oxygen_rate,
+        "required_oxygen_kg": required_oxygen,
         "energy_j": energy,
+        "energy_initial_j": energy_initial,
+        "generation_w": generation_w,
+        "load_w": load_w,
+        "required_energy_j": required_energy,
         "pressure_pa": pressure,
         "temperature_k": temperature,
         "radiation_gy": radiation,
-        "acceleration_g": acceleration_g,
+        "acceleration_g": proper_acceleration_g,
+        "linear_acceleration_m_s2": math.hypot(acceleration_x, acceleration_y),
         "landing_impact_g": impact_g,
+        "touchdown": touchdown,
         "restraints_intact": bool(state.get("restraints_intact", True)),
         "flight_control_ok": bool(state.get("flight_control_ok", True)),
+        "pitch_deg": pitch,
+        "target_pitch_deg": target_pitch,
+        "pitch_error_deg": pitch_error,
+        "angular_velocity_deg_s": angular_velocity,
+        "angular_acceleration_deg_s2": angular_acceleration,
+        "altitude_m": altitude,
+        "vertical_speed_m_s": vertical_speed,
+        "horizontal_speed_m_s": horizontal_speed,
+        "horizontal_position_m": horizontal_position,
+        "thrust_n": thrust,
+        "vehicle_mass_kg": mass,
+        "net_vertical_force_n": net_vertical_force,
+        "throttle_fraction": throttle,
+        "landing_approach_started": landing_started,
     }
     for key, value in result.items():
         if isinstance(value, float) and not math.isfinite(value):
@@ -83,16 +185,10 @@ def calculate_flight(payload):
 
 
 def calculate_mission_survival(payload):
-    """Convert existing colony-minigame meters into a report for Rust.
-
-    The colony minigame already owns its resource simulation and event mechanics.
-    This function derives a consistent telemetry snapshot without advancing or
-    replacing that simulation.
-    """
+    """Convert existing colony-minigame meters into a report for Rust."""
     phase = str(payload.get("phase", "minigame"))
     if phase not in {"minigame", "recovery"}:
         raise ValueError("Unknown colony mission phase")
-
     state = payload.get("state", {})
     if not isinstance(state, dict):
         raise ValueError("Mission state must be an object")
@@ -129,25 +225,16 @@ def calculate_mission_survival(payload):
     if not math.isfinite(elapsed) or elapsed < 0.0:
         raise ValueError("Mission elapsed time must be finite and non-negative")
 
-    # Convert the minigame's 0–100 resource meters into illustrative telemetry.
-    # These derived values are for consistent game rules, not real vehicle data.
+    # These equivalents connect the minigame's meters to one telemetry contract.
     oxygen_kg = metrics["oxygen_percent"] * 0.08
-    energy_j = (
-        metrics["battery_percent"] / 100.0 * 400_000.0
-        + metrics["power_percent"] / 100.0 * 100_000.0
-    )
+    energy_j = metrics["battery_percent"] / 100.0 * 400_000.0 + metrics["power_percent"] / 100.0 * 100_000.0
     pressure_pa = 101_325.0 * (metrics["oxygen_percent"] / 88.0) * (metrics["habitat_percent"] / 94.0)
     temperature_k = metrics["temperature_c"] + 273.15
     radiation_gy = metrics["radiation_index"] / 100.0 * 0.001
-
     result = {
-        "phase": phase,
-        "elapsed_seconds": elapsed,
-        **metrics,
-        "oxygen_kg": oxygen_kg,
-        "energy_j": energy_j,
-        "pressure_pa": max(0.0, pressure_pa),
-        "temperature_k": temperature_k,
+        "phase": phase, "elapsed_seconds": elapsed, **metrics,
+        "oxygen_kg": oxygen_kg, "energy_j": energy_j,
+        "pressure_pa": max(0.0, pressure_pa), "temperature_k": temperature_k,
         "radiation_gy": radiation_gy,
     }
     if not all(math.isfinite(value) for value in result.values() if isinstance(value, float)):
