@@ -67,7 +67,7 @@ function buildFactors(t: Telemetry, inFlight: boolean): Factor[] {
     { id: "energy", label: "Electrical reserve", value: t.energy, display: `${Math.round(t.energy)}%`, note: "main bus reserve", limits: [35, 100, 12, 115] },
     { id: "pressure", label: "Cabin pressure", value: t.pressure, display: `${t.pressure.toFixed(1)} kPa`, note: "target 95–105 kPa", limits: [75, 115, 58, 130] },
     { id: "temperature", label: "Cabin temperature", value: t.temperature, display: `${t.temperature.toFixed(1)} °C`, note: "target 18–26 °C", limits: [10, 32, -2, 46] },
-    { id: "radiation", label: "Radiation dose", value: t.radiation, display: `${(t.radiation * 1000).toFixed(2)} mGy`, note: "accumulated dose", limits: [0, 0.65, 0, 1.5] },
+    { id: "radiation", label: "Radiation dose", value: t.radiation, display: `${t.radiation.toFixed(2)} mGy`, note: "accumulated dose", limits: [0, 0.65, 0, 1.5] },
     { id: "acceleration", label: "Linear acceleration", value: t.acceleration, display: `${t.acceleration.toFixed(2)} g`, note: "keep below 3.2 g", limits: [0.2, 3.2, -0.1, 4.2] },
     { id: "angularAcceleration", label: "Angular acceleration", value: Math.abs(t.angularAcceleration), display: `${Math.abs(t.angularAcceleration).toFixed(1)} °/s²`, note: "limit rapid rotation", limits: [0, 8, 0, 18] },
     { id: "pitch", label: "Pitch error", value: Math.abs(t.pitch - (inFlight ? targetPitch(t.elapsed) + t.trim : 90 + t.trim)), display: `${Math.abs(t.pitch - (inFlight ? targetPitch(t.elapsed) + t.trim : 90 + t.trim)).toFixed(1)}°`, note: "difference from guidance target", limits: [0, 8, 0, 22] },
