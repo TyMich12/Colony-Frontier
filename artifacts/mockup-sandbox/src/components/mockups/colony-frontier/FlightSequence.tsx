@@ -32,6 +32,7 @@ type Factor = {
   severity: "SURVIVAL" | "CRITICAL" | "EXTREME";
   note: string;
   score: number;
+  position: number;
 };
 
 const G0 = 9.80665;
@@ -84,7 +85,25 @@ function buildFactors(t: Telemetry, inFlight: boolean): Factor[] {
     if (entry.id === "angularAcceleration") {
       severity = entry.value > 18 ? "EXTREME" : entry.value > 8 ? "CRITICAL" : "SURVIVAL";
     }
-    return { ...entry, severity, score: severity === "EXTREME" ? 2 : severity === "CRITICAL" ? 1 : 0 };
+    let position = 50;
+    if (entry.id === "radiation") {
+      position = entry.value <= 0.65 ? 41 + (entry.value / 0.65) * 18 : entry.value <= 1 ? 59 + ((entry.value - 0.65) / 0.35) * 23 : 82 + Math.min(18, (entry.value - 1) * 36);
+    } else if (entry.id === "angularAcceleration" || entry.id === "pitch") {
+      const upper = entry.id === "pitch" ? 22 : 18;
+      const criticalStart = entry.id === "pitch" ? 8 : 8;
+      position = entry.value <= criticalStart ? 50 + (entry.value / criticalStart) * 9 : entry.value <= upper ? 59 + ((entry.value - criticalStart) / (upper - criticalStart)) * 23 : 82 + Math.min(18, (entry.value - upper) * 2);
+    } else if (entry.value < min) {
+      position = entry.value >= extremeMin
+        ? 18 + ((entry.value - extremeMin) / Math.max(0.001, min - extremeMin)) * 23
+        : Math.max(0, 18 - (extremeMin - entry.value) * 3);
+    } else if (entry.value > max) {
+      position = entry.value <= extremeMax
+        ? 59 + ((entry.value - max) / Math.max(0.001, extremeMax - max)) * 23
+        : Math.min(100, 82 + (entry.value - extremeMax) * 3);
+    } else {
+      position = 41 + ((entry.value - min) / Math.max(0.001, max - min)) * 18;
+    }
+    return { ...entry, severity, score: severity === "EXTREME" ? 2 : severity === "CRITICAL" ? 1 : 0, position: clamp(position, 0, 100) };
   });
 }
 
@@ -116,7 +135,7 @@ function DonutEnvelope({ risk, label }: { risk: number; label: string }) {
   );
 }
 
-function ThresholdBar({ severity, score }: { severity: Factor["severity"]; score: number }) {
+function ThresholdBar({ position }: { position: number }) {
   return (
     <div className="relative mt-3 h-2 overflow-hidden rounded-sm bg-[#1b3035]">
       <div className="absolute inset-y-0 left-0 w-[18%] bg-[#d9534f]" />
@@ -124,7 +143,7 @@ function ThresholdBar({ severity, score }: { severity: Factor["severity"]; score
       <div className="absolute inset-y-0 left-[41%] w-[18%] bg-[#6ebc91]" />
       <div className="absolute inset-y-0 left-[59%] w-[23%] bg-[#d6a84c]" />
       <div className="absolute inset-y-0 right-0 w-[18%] bg-[#d9534f]" />
-      <div className={`absolute -top-1 h-4 w-[3px] ${severity === "SURVIVAL" ? "bg-white" : severity === "CRITICAL" ? "bg-[#fff0a6]" : "bg-white"}`} style={{ left: score === 0 ? "50%" : score === 1 ? "76%" : "92%" }} />
+      <div className="absolute -top-1 h-4 w-[3px] bg-white shadow-[0_0_7px_rgba(255,255,255,.8)]" style={{ left: `${position}%` }} />
     </div>
   );
 }
@@ -268,7 +287,9 @@ export function FlightSequence() {
 
   return (
     <GameShell active="loadout" eyebrow="Flight Operations / Launch Control" title="Ascent Simulation">
-      <div className="relative animate-[fadeIn_.8s_ease-out]">
+      <div className="relative" style={{ animation: "cfLaunchFade 850ms ease-out both" }}>
+        <style>{`@keyframes cfLaunchFade { from { opacity: 0; filter: brightness(0); } to { opacity: 1; filter: brightness(1); } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }`}</style>
+        <div className="pointer-events-none fixed inset-0 z-[100] bg-[#020609]" style={{ animation: "cfCurtain 1.1s ease-out forwards" }} />
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border border-[#294148] bg-[#0a171d] px-5 py-4">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#efb658]">Mission {pending?.missionNumber ?? "—"} / {pending?.campaign?.toUpperCase() ?? "NO ACTIVE MISSION"}</p>
@@ -343,7 +364,7 @@ export function FlightSequence() {
                         <p className={`mt-1 text-[8px] font-bold uppercase tracking-[0.16em] ${factor.severity === "SURVIVAL" ? "text-[#6ebc91]" : factor.severity === "CRITICAL" ? "text-[#d6a84c]" : "text-[#d9534f]"}`}>{factor.severity}</p>
                       </div>
                     </div>
-                    <ThresholdBar severity={factor.severity} score={factor.score} />
+                    <ThresholdBar position={factor.position} />
                   </div>
                 ))}
               </div>
