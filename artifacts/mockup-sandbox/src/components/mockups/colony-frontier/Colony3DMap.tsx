@@ -1865,7 +1865,6 @@ function MissionGuide({ mars }: { mars: boolean }) {
 function Scene({ props }: { props: Props }) {
   const mars = props.environmentLabel === "MARS";
   const roverTier = props.selected.rover ?? "Foundation";
-  const roverTier = props.selected.rover ?? "Foundation";
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
   const roverCondition = Math.max(0, Math.min(100, props.buildings.rover?.condition ?? 100));
   const roverRatedSpeedKmh = getBaselineRating("rover", roverTier, roverRetrofitLevel);
