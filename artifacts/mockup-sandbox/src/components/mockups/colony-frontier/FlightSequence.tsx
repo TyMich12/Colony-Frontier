@@ -164,7 +164,10 @@ function ThresholdBar({ position }: { position: number }) {
 
 function RocketScene({ telemetry, phase, critical }: { telemetry: Telemetry; phase: Phase; critical: boolean }) {
   const rotation = clamp(telemetry.pitch - 90, -50, 12);
-  const translateY = phase === "flight" ? -Math.min(telemetry.altitude / 180, 90) : phase === "success" ? -90 : 0;
+  // Make altitude legible on screen: the vehicle visibly climbs instead of being capped to a tiny 90 px shift.
+  const translateY = phase === "flight" ? -Math.min(telemetry.altitude / 15, 250) : phase === "success" ? -250 : 0;
+  // Pitch trim also changes the visible flight path, matching its effect on the guidance pitch.
+  const translateX = phase === "flight" ? clamp((90 - telemetry.pitch) * 3.2, -120, 120) : 0;
   return (
     <div className="absolute inset-0 h-full w-full overflow-hidden border-0 bg-[linear-gradient(180deg,#07121c_0%,#102b37_58%,#1a3435_100%)]">
       <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(167,202,192,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(167,202,192,.12)_1px,transparent_1px)] [background-size:42px_42px]" />
@@ -180,14 +183,14 @@ function RocketScene({ telemetry, phase, critical }: { telemetry: Telemetry; pha
       <div className="absolute bottom-12 left-0 right-0 h-5 bg-[linear-gradient(180deg,transparent,rgba(7,16,24,.65))]" />
       <div className="absolute bottom-[54px] left-[16%] h-10 w-16 border-b border-[#547168] opacity-70" />
       <div className="absolute bottom-[54px] right-[17%] h-16 w-24 border-b border-[#547168] opacity-60" />
-      <div className="absolute left-[50%] bottom-[12%] w-[clamp(100px,13vw,190px)] transition-transform duration-200 ease-out" style={{ transform: `translate(-50%, ${translateY}px) rotate(${rotation}deg)` }}>
+      <div className="absolute left-[50%] bottom-[12%] w-[clamp(100px,13vw,190px)] transition-transform duration-200 ease-out" style={{ transform: `translate(calc(-50% + ${translateX}px), ${translateY}px) rotate(${rotation}deg)` }}>
         <svg viewBox="0 0 100 190" className="h-[min(58vh,520px)] w-full drop-shadow-[0_0_28px_rgba(239,182,88,.32)]" role="img" aria-label="2D launch vehicle">
           <path d="M50 6 C34 25 31 42 31 67 L31 129 L18 154 L34 149 L41 171 L50 160 L59 171 L66 149 L82 154 L69 129 L69 67 C69 42 66 25 50 6Z" fill="#dce3d8" stroke="#91a9a2" strokeWidth="2" />
           <path d="M50 10 C41 28 41 40 41 52 L59 52 C59 40 59 28 50 10Z" fill="#efb658" />
           <rect x="39" y="61" width="22" height="31" rx="4" fill="#193b45" stroke="#8db5b4" strokeWidth="2" />
           <path d="M40 105 H60 V128 H40Z" fill="#b6c7bd" />
           <path d="M42 171 L50 187 L58 171Z" fill={phase === "flight" ? "#f1a45a" : "#59716f"} />
-          {phase === "flight" && <path d="M44 173 L50 205 L56 173Z" fill="#f3d18b" opacity=".9" />}
+          {phase === "flight" && <path d="M44 173 L50 205 L56 173Z" fill="#f3d18b" opacity=".9" style={{ transformOrigin: "50px 173px", transform: `scaleY(${0.6 + telemetry.throttle * 1.8})` }} />}
         </svg>
       </div>
       <div className="absolute left-4 top-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[#9db7ad]">
