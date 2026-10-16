@@ -1671,8 +1671,9 @@ function BuildingInspector({
   const waterRecoveryNow = waterOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0) ? clamp(waterConditionNow / 100 * waterRecoveryRatedNow, 0, 100) : 0;
   const ratedFoodNow = repairAdjustedRating("agriculture", getBaselineRating("agriculture", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0), buildings.agriculture?.repairMetrics);
   const cropMaturityNow = clamp((elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
+  const missionOneGrowYieldFactor = isFirstMission ? 1 + 0.55 / POWER_DEMAND_MODEL.systems.agriculture.baseKW : 1;
   const foodProductionNow = agricultureOperational && electricalReadings.actualSupplyKW >= (isFirstMission ? 1.0 : 2.0)
-    ? agricultureConditionNow / 100 * ratedFoodNow * cropMaturityNow
+    ? agricultureConditionNow / 100 * ratedFoodNow * cropMaturityNow * missionOneGrowYieldFactor
     : 0;
   const foodWaterUseNow = getAdditionalRating("agriculture", "water consumed", selected.agriculture ?? "Foundation", buildings.agriculture?.upgradeLevel ?? 0);
   const ratedWaterThroughputNow = getAdditionalRating("water", "throughput", selected.water ?? "Foundation", buildings.water?.upgradeLevel ?? 0) * waterConditionNow / 100;
@@ -3099,8 +3100,15 @@ export function MissionSimulation() {
         // There is no instant mature-crop / Mission 1 production boost.
         const agriculturePowered = agricultureOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const cropMaturity = clamp((elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay - 0.5) / 2.5, 0, 1);
+        // Mission 1 adds 0.55 kW of grow lighting. Scale edible yield in proportion to
+        // electrical input using the Foundation baseline specific energy (0.75 kW for
+        // 0.50 kg/day); this gives about 0.87 kg/day at full condition, not an arbitrary
+        // multi-fold tutorial bonus. The base tier table remains unchanged.
+        const missionOneGrowYieldFactor = missionStage === 1
+          ? 1 + 0.55 / POWER_DEMAND_MODEL.systems.agriculture.baseKW
+          : 1;
         const foodProductionKgDay = agriculturePowered
-          ? conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings) * cropMaturity
+          ? conditionAdjustedOutput("agriculture", ratedFoodProductionKgDay, buildings) * cropMaturity * missionOneGrowYieldFactor
           : 0;
         const foodDemandKgDay = 2.48; // Four crew × 0.62 kg edible dry-food equivalent/person/day.
         const cropWaterUseLPerKg = getAdditionalRating("agriculture", "water consumed", pending.selected.agriculture ?? "Foundation", foodUpgrade);
