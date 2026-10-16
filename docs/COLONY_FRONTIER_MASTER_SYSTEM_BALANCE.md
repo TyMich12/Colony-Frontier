@@ -516,3 +516,28 @@ This section documents the current MissionSimulation implementation. It supersed
 - During Mission 2, the battery model must apply charge/discharge efficiency and the protected 20% reserve; when a deficit is expected, shed optional loads first while preserving essential habitat pressure and air revitalisation. Do not assume that a 1,200 kWh Foundation battery can sustain every optional system for 14 days.
 - Physical reference assumptions remain explicit: Foundation solar is 12 kW at normal reference illumination (37.2 m² × 1,361 W/m² × 25% cell efficiency × 0.95 packing), but actual output depends on sun angle, cell temperature, dust, pointing and condition. The 1,200 kWh Foundation battery is a large infrastructure pack (roughly 6 tonnes at an illustrative 200 Wh/kg before packaging and thermal controls), not a small rover battery.
 - Water must be conserved by litres in/out and recovery throughput; food by kg/day and stored edible mass; navigation by position error and sensor/terrain uncertainty; communications by link availability, antenna pointing and data rate; rover movement by speed, terrain, energy and navigation accuracy. These are engineering-grounded simulation models, not exact predictions for a specific flight-qualified NASA vehicle. The game must not use arbitrary percentage bonuses in place of the underlying physical quantities.
+
+
+### Cross-system engineering audit — 2026-10-17
+
+This pass compared the live simulation formulas, system inspector telemetry, tier/repair tables, and Mission 1/Mission 2 timing. It is an engineering consistency audit of the game model, not a flight-qualified NASA simulation.
+
+**Structural table validation**
+- Checked all **17 baseline systems**, **28 additional-metric rows**, and **136 repair options** in `simulationBalance.ts`.
+- Each system has eight repair options: two Standalone, two Enhanced, two Dual, and two Fully Integrated. All effect vectors contain four numeric tier values; all duration vectors contain four positive values.
+- All support IDs map to known systems. Standalone options have no required support systems. No repair option requires Solar or Habitat as an optional support dependency.
+- **Apex and Research tier rating values were not changed** in this audit.
+
+**Corrections made in the live code**
+- Power balance now uses the actual sum of active loads; the arbitrary 2 kW minimum-demand floor was removed. The demand telemetry reflects loads that remain on after optional-load shedding, rather than showing shed systems as still consuming power.
+- Battery charge power follows the selected tier's rated continuous-charge limit and is derated by battery condition. Foundation remains 10 kW at 0/2; higher tiers can use their own workbook ratings instead of being globally capped at 10 kW.
+- Thermal control no longer continues actively controlling cabin temperature when its electrical load has been shed. Water treatment and agriculture likewise require an active optional-load allocation and sufficient bus supply.
+- Mission 1's extra 0.55 kW grow-light allowance now increases crop yield in proportion to the Foundation baseline's electrical input (0.75 kW for 0.50 kg/day), reaching about 0.87 kg/day after crop maturity at full condition. The Foundation tier rating remains 0.50 kg/day.
+- The lunar Sun altitude shown in the scene is interpolated from the same solar profile used for photovoltaic output. A visible Sun moves across the lunar sky, Earth is rendered in the sky, and Mission 2 uses a dark sky with the Sun below the horizon.
+- Rover movement converts the rated safe traverse speed from km/h to map metres per second, derates it by condition and the actual rover repair gap, slows on uneven terrain, and follows obstacle-avoiding paths. Survey/transfer tasks and rover-assisted repairs include estimated travel time so the rover should not be left travelling after the task has already completed.
+- Navigation error now uses the selected tier's position-error rating, repair gap, and navigation condition; this affects route-planning confidence and field-operation time. Communications throughput and link availability now depend on rated data rate, condition, residual antenna pointing error, and active comms faults. The repoint action records a 1° residual pointing error, and link availability affects Earth-report delay.
+- Water and food inspector figures now match the actual capacity and fill values: 480 L water capacity at 86% (412.8 L initial) and 160 kg food capacity at 84% (134.4 kg initial). Water recovery only returns the fraction of treated throughput that the installed system can process.
+
+**Verification boundary**
+- The latest GitHub Actions type-check and production build passed after the compile corrections.
+- Automated checks validated the rating/repair table structure and code compilation. A full interactive browser run through all 336 simulated hours of both lunar missions has **not** been automatically executed by this workflow. Mission 2 must still be play-tested with its actual incident choices and repairs to confirm it is survivable in practice; a successful build alone does not prove that.
