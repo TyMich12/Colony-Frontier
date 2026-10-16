@@ -3972,12 +3972,6 @@ export function MissionSimulation() {
       const tierIndex = effectiveRepairTierIndex(pending.selected[repairTargetId] ?? "Foundation", selectedRepair.requiredSystems, pending.selected);
       const baseDurationSeconds = selectedRepair.category === "Standalone" ? [8, 9, 10, 12][tierIndex] : selectedRepair.category === "Enhanced" ? [15, 16, 18, 20][tierIndex] : selectedRepair.category === "Dual" ? [22, 24, 27, 30][tierIndex] : [30, 33, 36, 40][tierIndex];
       const batteryCapacity = ratedBatteryCapacityKWh(pending.selected, buildings);
-      const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
-      if (availableEnergyKWh < selectedRepair.energyKWh) {
-        setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${selectedRepair.energyKWh} kWh; stored energy is ${availableEnergyKWh.toFixed(2)} kWh.`);
-        return;
-      }
-      setMetrics((current) => ({ ...current, battery: clamp(current.battery - selectedRepair.energyKWh / batteryCapacity * 100) }));
       const repairSupports = selectedRepair.requiredSystems;
       const roverCanAssist = pending.selected.rover !== undefined && repairSupports.includes("rover") && !roverOnFieldJob;
       const roverTier = pending.selected.rover ?? "Foundation";
@@ -3995,6 +3989,13 @@ export function MissionSimulation() {
         ? Math.hypot(repairPosition[0] - roverStartX, repairPosition[1] - roverStartZ) * 1.5 / (roverTravelSpeedKmh / 3.6)
         : 0;
       const durationSeconds = baseDurationSeconds + roverTravelSeconds;
+      const totalRepairEnergyKWh = selectedRepair.energyKWh + (roverCanAssist ? 2.0 * roverTravelSeconds / 3600 : 0);
+      const availableEnergyKWh = (metrics.battery / 100) * batteryCapacity;
+      if (availableEnergyKWh < totalRepairEnergyKWh) {
+        setOperationResult(`REPAIR LOCKED · ${selectedRepair.name} needs ${totalRepairEnergyKWh.toFixed(3)} kWh including rover travel; stored energy is ${availableEnergyKWh.toFixed(2)} kWh.`);
+        return;
+      }
+      setMetrics((current) => ({ ...current, battery: clamp(current.battery - totalRepairEnergyKWh / batteryCapacity * 100) }));
       if (roverCanAssist) setRoverTask(`REPAIRING ${repairTargetId}`);
       beginOperation(
         "REPAIR",
@@ -4008,7 +4009,7 @@ export function MissionSimulation() {
         roverCanAssist,
         repairSupports,
       );
-      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Activation energy: ${selectedRepair.energyKWh} kWh. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
+      setAiMessage(`REPAIR STARTED · ${selectedRepair.name}. Estimated real-time duration: ${durationSeconds} seconds. Activation energy: ${totalRepairEnergyKWh.toFixed(3)} kWh including rover travel. Support requirements: ${repairSupports.length ? selectedRepair.requiredSystemNames.join(" + ") : "none"}. ${repairTargetId === "battery" ? "Non-essential loads are temporarily paused; the battery charges only if solar generation exceeds critical demand." : "Normal power management continues during the repair."}`);
       return;
     }
 
