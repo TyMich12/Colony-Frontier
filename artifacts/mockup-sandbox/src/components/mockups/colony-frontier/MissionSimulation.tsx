@@ -919,9 +919,9 @@ const RESOURCE_CAPACITIES = {
   availablePowerKW: 8,
   storedEnergyKWh: 1200,
   oxygenReserveKg: 24,
-  // 480 L of clean water gives a four-crew Level 1 colony a reserve for the
-  // 28-day mission even if recycling is interrupted during the lunar night.
-  // 160 kg edible dry-food equivalent is about 64 crew-colony days at 2.48 kg/day.
+  // Scenario capacities: 480 L water and 160 kg edible dry-food equivalent.
+  // Initial fill is set separately in initialMetrics (86% water, 84% food), so the
+  // live starting inventories are 412.8 L and 134.4 kg. Food demand is 2.48 kg/day.
   waterReserveL: 480,
   foodReserveKg: 160,
 } as const;
