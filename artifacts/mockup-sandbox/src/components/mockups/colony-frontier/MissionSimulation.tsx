@@ -1346,6 +1346,7 @@ function IsometricMap({
       buildings={buildings}
       selectedBuildingId={selectedBuildingId}
       elapsed={elapsed}
+      lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || pending.missionNumber === "02")}
       environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
       environmentTitle={environmentTitle}
       activeEventTrackId={activeEventTrackId}
