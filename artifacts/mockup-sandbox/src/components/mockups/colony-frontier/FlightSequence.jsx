@@ -285,7 +285,7 @@ export function FlightSequence() {
   }
 
   async function runPreflight() {
-    setStage("diagnostics");
+    setStage("boot");
     setLaunchAllowed(false);
     setDiagnosticOutcome(false);
     setError("");
@@ -335,6 +335,7 @@ export function FlightSequence() {
         `[SURVIVAL] ${findings.length} factor(s) outside target range`,
         outcome ? "[GO / NO-GO] LAUNCH AUTHORISED" : "[GO / NO-GO] HOLD — CORRECT THE FAULTS AND RECHECK",
       ];
+      setStage("diagnostics");
       setTerminalText(report.join("\n") + "\n");
       setTerminalChars(0);
     } catch (cause) {
