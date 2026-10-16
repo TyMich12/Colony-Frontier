@@ -1937,7 +1937,7 @@ function Scene({ props }: { props: Props }) {
         target={[0, 0, 0]}
       />
     </Canvas>
-    {!mars && <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-3">
+    {!mars && <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-3">
       <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
         <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
         {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
