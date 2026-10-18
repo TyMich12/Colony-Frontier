@@ -1688,7 +1688,7 @@ function BuildingInspector({
   // Match the resource simulation: 21 L/day total colony use, including crew, crop and process water.
   const totalWaterUseNow = Math.max(21, 8 + foodProductionNow * foodWaterUseNow);
   const recycledWaterNow = Math.min(totalWaterUseNow, Math.max(0, waterThroughputNow)) * waterRecoveryNow / 100;
-  const estimatedWaterLossPerDay = totalWaterUseNow - recycledWaterNow;
+  const estimatedWaterLossPerDay = (totalWaterUseNow - recycledWaterNow) * (isFirstMission ? 0.22 : 0.45);
   const estimatedNetWaterBalancePerDay = -estimatedWaterLossPerDay;
   const weakestSystem = Object.entries(buildings).filter(([id]) => id !== "maintenance").sort((a, b) => a[1].condition - b[1].condition)[0];
   const liveSystemReadings: { label: string; value: string; note?: string }[] = (() => {
