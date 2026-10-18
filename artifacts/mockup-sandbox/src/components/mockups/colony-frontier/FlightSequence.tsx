@@ -301,7 +301,7 @@ function CinematicCamera({ stage }: { stage: Stage }) {
     camera.position.z = THREE.MathUtils.damp(camera.position.z, target.pos[2], delta, 1.3);
     const look = new THREE.Vector3(...target.look);
     camera.lookAt(look);
-    if ("fov" in camera) {
+    if (camera instanceof THREE.PerspectiveCamera) {
       camera.fov = THREE.MathUtils.damp(camera.fov, target.fov, delta, 1.3);
       camera.updateProjectionMatrix();
     }
