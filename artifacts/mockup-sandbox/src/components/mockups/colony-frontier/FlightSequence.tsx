@@ -231,7 +231,7 @@ function LunarHabitat() {
   );
 }
 
-function Terrain() {
+function Terrain({ stage }: { stage: Stage }) {
   const rocks = useMemo(() => Array.from({ length: 42 }, (_, i) => ({
     x: ((i * 37) % 23) - 11,
     z: -3 + ((i * 19) % 13),
@@ -242,12 +242,12 @@ function Terrain() {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 0]} receiveShadow>
         <planeGeometry args={[200, 200, 80, 80]} />
-        <meshStandardMaterial color="#77776d" roughness={1} metalness={0} />
+        <meshStandardMaterial color={stage === "outside" ? "#aaa99b" : "#77776d"} roughness={1} metalness={0} />
       </mesh>
       {rocks.map((rock, i) => (
         <mesh key={i} position={[rock.x, -0.03 + rock.scale * 0.3, rock.z]} rotation={[rock.rotation, i, rock.rotation * 0.6]} scale={[rock.scale * 1.5, rock.scale, rock.scale]}>
           <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color={i % 3 === 0 ? "#99968a" : "#62665f"} roughness={1} />
+          <meshStandardMaterial color={stage === "outside" ? (i % 3 === 0 ? "#bdb8a8" : "#85877f") : (i % 3 === 0 ? "#99968a" : "#62665f")} roughness={1} />
         </mesh>
       ))}
       <mesh position={[-4.5, -0.02, -7]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -258,31 +258,84 @@ function Terrain() {
   );
 }
 
-function MoonSky() {
-  const moon = useRef<THREE.Mesh>(null);
+function makeEarthTexture() {
+  // Deterministic equirectangular planet map: deep oceans, varied land, and polar ice.
+  const width = 512;
+  const height = 256;
+  const data = new Uint8Array(width * height * 4);
+  const landShapes = [
+    [-0.72, 0.12, 0.17, 0.28], [-0.62, -0.2, 0.10, 0.25],
+    [-0.25, 0.36, 0.18, 0.13], [-0.12, 0.08, 0.13, 0.25],
+    [0.08, 0.2, 0.22, 0.22], [0.27, -0.08, 0.13, 0.24],
+    [0.52, 0.2, 0.24, 0.15], [0.72, -0.12, 0.13, 0.21],
+    [0.02, -0.48, 0.16, 0.08], [0.4, -0.4, 0.12, 0.09],
+  ];
+  for (let y = 0; y < height; y++) {
+    const lat = 0.5 - y / height;
+    for (let x = 0; x < width; x++) {
+      const lon = x / width - 0.5;
+      let land = false;
+      for (let i = 0; i < landShapes.length; i++) {
+        const [cx, cy, rx, ry] = landShapes[i];
+        const wobble = 0.82 + 0.18 * Math.sin(x * 0.12 + y * 0.07) * Math.cos(y * 0.17 - x * 0.035);
+        if (((lon - cx) / rx) ** 2 + ((lat - cy) / ry) ** 2 < wobble) { land = true; break; }
+      }
+      const ice = Math.abs(lat) > 0.44;
+      const noise = Math.sin(x * 0.19 + y * 0.31) * 7 + Math.cos(x * 0.07 - y * 0.11) * 5;
+      const i = (y * width + x) * 4;
+      if (ice) { data[i] = 202; data[i + 1] = 220; data[i + 2] = 225; }
+      else if (land) { data[i] = 48 + noise; data[i + 1] = 111 + noise; data[i + 2] = 67 + noise; }
+      else { data[i] = 15 + noise; data[i + 1] = 76 + noise; data[i + 2] = 155 + noise * 1.4; }
+      data[i + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function MoonSky({ stage }: { stage: Stage }) {
+  const earth = useRef<THREE.Mesh>(null);
+  const outside = stage === "outside";
+  const earthTexture = useMemo(() => makeEarthTexture(), []);
   useFrame(({ clock }) => {
-    if (moon.current) moon.current.rotation.y = clock.elapsedTime * 0.012;
+    if (earth.current) earth.current.rotation.y = clock.elapsedTime * 0.018;
   });
   return (
     <>
-      <color attach="background" args={["#050913"]} />
-      <fog attach="fog" args={["#111c2a", 13, 34]} />
-      <Stars radius={100} depth={65} count={2400} factor={3} saturation={0.15} fade speed={0.25} />
-      <mesh ref={moon} position={[-7, 7.5, -15]} scale={2.2}>
-        <sphereGeometry args={[1, 64, 48]} />
-        <meshStandardMaterial color="#9aabb4" roughness={0.92} metalness={0.04} />
+      <color attach="background" args={[outside ? "#263b4c" : "#030711"]} />
+      <fog attach="fog" args={[outside ? "#71899a" : "#101a29", outside ? 24 : 16, outside ? 65 : 38]} />
+      <Stars radius={100} depth={65} count={outside ? 1300 : 3000} factor={3.2} saturation={0.2} fade speed={0.18} />
+      {/* The Sun is a bright emissive disc with a soft atmospheric halo and strong directional light. */}
+      <mesh position={[7.5, 9, -13]} scale={1.45}>
+        <sphereGeometry args={[1, 48, 32]} />
+        <meshBasicMaterial color="#fff0b5" toneMapped={false} />
       </mesh>
-      <mesh position={[-7, 7.5, -12.7]} scale={2.2}>
-        <sphereGeometry args={[1.005, 48, 32]} />
-        <meshBasicMaterial color="#b7d9ec" transparent opacity={0.09} side={THREE.BackSide} />
+      <mesh position={[7.5, 9, -13]} scale={1.85}>
+        <sphereGeometry args={[1, 32, 24]} />
+        <meshBasicMaterial color="#ffc66e" transparent opacity={0.12} side={THREE.BackSide} depthWrite={false} />
       </mesh>
-      <ambientLight intensity={0.48} />
-      <directionalLight position={[-6, 10, 5]} intensity={3.1} color="#d4e7ff" castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <pointLight position={[3, 5, 4]} intensity={1.1} color="#f2bf87" distance={24} />
+      {/* Textured Earth with oceans, continents and polar ice, lit from the Sun. */}
+      <group position={[-7, 5.5, -15]}>
+        <mesh ref={earth} scale={2.35}>
+          <sphereGeometry args={[1, 96, 64]} />
+          <meshStandardMaterial map={earthTexture} roughness={0.88} metalness={0.02} />
+        </mesh>
+        <mesh scale={2.39}>
+          <sphereGeometry args={[1, 64, 48]} />
+          <meshBasicMaterial color="#56a9ff" transparent opacity={0.10} side={THREE.BackSide} depthWrite={false} />
+        </mesh>
+      </group>
+      <ambientLight intensity={outside ? 0.95 : 0.62} />
+      <hemisphereLight args={[outside ? "#c7e5ff" : "#9cbde4", outside ? "#9b927e" : "#202b3a", outside ? 1.15 : 0.5]} />
+      <directionalLight position={[7.5, 9, -13]} intensity={outside ? 5.2 : 4.3} color="#fff1d0" castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <pointLight position={[7.5, 9, -12]} color="#fff1c2" intensity={outside ? 3.5 : 2.4} distance={80} />
+      <pointLight position={[-7, 5, -12]} color="#5faeff" intensity={0.85} distance={32} />
+      <pointLight position={[0, 4, 6]} color="#dcecff" intensity={outside ? 2.2 : 0.8} distance={28} />
     </>
   );
 }
-
 function CinematicCamera({ stage }: { stage: Stage }) {
   const { camera } = useThree();
   useFrame((_, delta) => {
@@ -415,7 +468,7 @@ export function FlightSequence() {
   const isLanded = stage === "landed" || stage === "outside";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050913] text-[#e7f0eb]" style={{ fontFamily: "Arial, sans-serif" }}>
+    <main className={`relative min-h-screen overflow-hidden ${stage === "outside" ? "bg-[#263b4c]" : "bg-[#050913]"} text-[#e7f0eb]`} style={{ fontFamily: "Arial, sans-serif" }}>
       <header className="relative z-20 flex items-center justify-between border-b border-[#334a4c] bg-[#071017]/85 px-5 py-4 backdrop-blur-xl md:px-10">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center border border-[#6f8a7d] bg-[#14252b] text-[#efb658]"><Radio size={18} /></div>
@@ -425,11 +478,11 @@ export function FlightSequence() {
       </header>
 
       <div className="relative z-10 mx-auto grid min-h-[calc(100vh-73px)] max-w-[1600px] gap-5 p-3 md:grid-cols-[minmax(0,1fr)_330px] md:p-6">
-        <section className="relative min-h-[580px] overflow-hidden border border-[#334d51] bg-[#050913] md:min-h-[calc(100vh-120px)]">
+        <section className={`relative min-h-[580px] overflow-hidden border border-[#54717b] ${stage === "outside" ? "bg-[#71899a]" : "bg-[#050913]"} md:min-h-[calc(100vh-120px)]`}>
           <Canvas shadows dpr={[1, 1.75]} camera={{ position: [-1.7, 3.2, 10.8], fov: 44 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
             <Suspense fallback={null}><Scene stage={stage} /></Suspense>
           </Canvas>
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,13,.34),transparent_18%,transparent_70%,rgba(3,7,13,.36))]" />
+          <div className={`pointer-events-none absolute inset-0 ${stage === "outside" ? "bg-[linear-gradient(180deg,rgba(35,58,72,.06),transparent_18%,transparent_70%,rgba(35,58,72,.10))]" : "bg-[linear-gradient(180deg,rgba(3,7,13,.34),transparent_18%,transparent_70%,rgba(3,7,13,.36))]"}`} />
           <div className="absolute left-4 top-4 z-10 border border-[#58706d]/80 bg-[#071017]/75 px-3 py-2 backdrop-blur-md"><p className="text-[8px] uppercase tracking-[.2em] text-[#a5bdb2]">Live 3D flight deck</p><p className="mt-1 font-mono text-[10px] text-[#d9e8d5]">CAM {String(Math.max(1, stageIndex + 1)).padStart(2, "0")} · {isLanded ? "SURFACE" : isFlight ? "FLIGHT" : "EXTERNAL"}</p></div>
           {stage === "startup" && <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#030910]/45 p-4 backdrop-blur-[2px]"><div className="w-full max-w-[440px] border border-[#587a74] bg-[#08151d]/95 p-5 shadow-[0_0_70px_#0009]"><p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#efb658]"><Power size={14} /> Flight computer startup</p><div className="space-y-1 font-mono text-[10px] leading-5 text-[#9bd3b1]">{bootLines.slice(-7).map((line) => <p key={line}><span className="text-[#efb658]">&gt;</span> {line}</p>)}</div><div className="mt-4 h-1.5 overflow-hidden bg-[#1e3439]"><div className="h-full bg-[#7bc69b] transition-all duration-500" style={{ width: `${Math.min(100, bootLines.length / 8 * 100)}%` }} /></div></div></div>}
           {isLanded && <div className="absolute bottom-4 left-4 z-10 border border-[#719780] bg-[#071710]/80 px-3 py-2 text-[9px] uppercase tracking-[.15em] text-[#a6e0b4]"><CheckCircle2 className="mr-2 inline h-3 w-3" /> Touchdown confirmed</div>}
