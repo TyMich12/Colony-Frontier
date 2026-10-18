@@ -383,7 +383,9 @@ export function FlightSequence() {
   const [manual, setManual] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
 
+  // Boot text only runs while the startup stage is visible.
   useEffect(() => {
+    if (stage !== "startup") return;
     const lines = [
       "COLONY FRONTIER FLIGHT SYSTEM v05.0",
       "Checking crew life-support ........ PASS",
@@ -394,27 +396,23 @@ export function FlightSequence() {
       "Mission uplink .................... CONNECTED",
       "ALL PRIMARY SYSTEMS NOMINAL",
     ];
+    setBootLines([]);
     let index = 0;
-    const start = window.setTimeout(() => {
-      setStage((old) => old === "approach" ? "boarding" : old);
-      const interval = window.setInterval(() => {
-        setBootLines((old) => {
-          if (index >= lines.length) {
-            window.clearInterval(interval);
-            return old;
-          }
-          const next = [...old, lines[index]];
-          index += 1;
-          if (index >= lines.length) window.clearInterval(interval);
-          return next;
-        });
-      }, 520);
-    }, 2600);
-    return () => window.clearTimeout(start);
-  }, []);
+    const interval = window.setInterval(() => {
+      if (index >= lines.length) {
+        window.clearInterval(interval);
+        return;
+      }
+      setBootLines((old) => [...old, lines[index]]);
+      index += 1;
+      if (index >= lines.length) window.clearInterval(interval);
+    }, 650);
+    return () => window.clearInterval(interval);
+  }, [stage]);
 
+  // Each scene stays on screen long enough to actually watch it; the sequence
+  // never jumps to the mission simulation automatically.
   useEffect(() => {
-    if (!["approach", "boarding", "startup", "launch", "landing"].includes(stage)) return;
     const next: Partial<Record<Stage, Stage>> = {
       approach: "boarding",
       boarding: "startup",
@@ -422,10 +420,19 @@ export function FlightSequence() {
       launch: "landing",
       landing: "landed",
     };
-    const delay = stage === "approach" ? 4300 : stage === "boarding" ? 5200 : stage === "startup" ? 7800 : stage === "launch" ? 6500 : 6500;
-    const timer = window.setTimeout(() => setStage((old) => old === stage ? (next[stage] ?? old) : old), delay);
+    const delay: Partial<Record<Stage, number>> = {
+      approach: 7000,
+      boarding: 8000,
+      startup: 11000,
+      launch: 9000,
+      landing: 9000,
+    };
+    const following = next[stage];
+    const duration = delay[stage];
+    if (!following || !duration || manual) return;
+    const timer = window.setTimeout(() => setStage((old) => old === stage ? following : old), duration);
     return () => window.clearTimeout(timer);
-  }, [stage]);
+  }, [stage, manual]);
 
   const stageIndex = timeline.indexOf(stage);
   const skipAhead = () => {
