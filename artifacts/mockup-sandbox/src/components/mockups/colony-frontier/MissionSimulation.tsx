@@ -2358,6 +2358,91 @@ function getAiAnalysis(metrics: MissionMetrics, score: number): string {
   return "The colony survived with a workable balance of power and life support. The next improvement is to intervene slightly earlier when reserves begin falling.";
 }
 
+
+type LocalMissionAnalysis = {
+  outcome: "COMPLETE" | "FAILED";
+  summary: string;
+  problems: string[];
+  recommendations: string[];
+};
+
+/**
+ * Deterministic, zero-cost Mission Control. Analyses actual simulation values,
+ * equipment condition, active faults and the decisions the player made.
+ */
+function buildLocalMissionAnalysis(
+  metrics: MissionMetrics,
+  score: number,
+  decisions: MissionDecision[],
+  activeFaults: Record<string, ActiveFault>,
+  buildings: Record<string, BuildingRuntime>,
+  missionStage: number,
+  missionFailed: boolean,
+): LocalMissionAnalysis {
+  const hardFailure = getMissionFailureReason(metrics, missionStage);
+  const failed = missionFailed || Boolean(hardFailure);
+  const problems: string[] = [];
+  const recommendations: string[] = [];
+  const pushProblem = (condition: boolean, message: string) => { if (condition) problems.push(message); };
+
+  pushProblem(Boolean(hardFailure), hardFailure ?? "");
+  pushProblem(metrics.water < 35, `Water reserve ended at ${Math.round(metrics.water)}%; recovery and irrigation competed for the remaining reserve.`);
+  pushProblem(metrics.oxygen < 45, `Oxygen reserve ended at ${Math.round(metrics.oxygen)}%, leaving a limited life-support margin.`);
+  pushProblem(metrics.battery < 35, `Battery ended at ${Math.round(metrics.battery)}%; low stored energy reduces resilience when solar generation falls.`);
+  pushProblem(metrics.power < 40, `Power health ended at ${Math.round(metrics.power)}%, indicating a generation, demand or distribution bottleneck.`);
+  pushProblem(metrics.food < 35, `Food reserve ended at ${Math.round(metrics.food)}%, so crop production and essential loads need closer coordination.`);
+  pushProblem(metrics.habitat < 75, `Habitat integrity ended at ${Math.round(metrics.habitat)}%; inspect seals and complete structural repairs.`);
+  pushProblem(Math.abs(metrics.temperature - 21) > 2, `Cabin temperature ended at ${metrics.temperature.toFixed(1)}°C, outside the preferred 21°C target.`);
+  pushProblem(metrics.radiation > 55, `Radiation danger indicator reached ${Math.round(metrics.radiation)}%; improve shielding and respond promptly to radiation alerts.`);
+
+  const faults = Object.values(activeFaults);
+  for (const fault of faults.slice(0, 3)) {
+    problems.push(`Unresolved fault: ${fault.title} (${fault.targetTrackId}, severity ${fault.severity.toFixed(1)}×).`);
+    recommendations.push(`Prioritise diagnosing and repairing ${fault.title} on ${fault.targetTrackId}.`);
+  }
+
+  const weakSystems = Object.entries(buildings)
+    .filter(([system]) => system !== "maintenance")
+    .sort((a, b) => a[1].condition - b[1].condition);
+  const weakest = weakSystems[0];
+  if (weakest && weakest[1].condition < 65) {
+    problems.push(`${weakest[0]} was the weakest equipment module at ${Math.round(weakest[1].condition)}% condition.`);
+    recommendations.push(`Schedule maintenance for ${weakest[0]} before its degraded condition reduces useful output further.`);
+  }
+
+  if (metrics.water < 45) recommendations.push("Prioritise water recovery and inspect the filter/throughput reading; temporarily reduce non-essential irrigation if needed.");
+  if (metrics.battery < 45 || metrics.power < 50) recommendations.push("Shed optional electrical loads, protect the battery reserve, and restore solar generation before restarting high-draw work.");
+  if (metrics.oxygen < 55) recommendations.push("Keep oxygen generation and air revitalisation powered ahead of optional systems, then verify the delivered oxygen reserve.");
+  if (metrics.food < 45) recommendations.push("Keep agriculture powered when the energy margin allows and balance crop yield against its water demand.");
+  if (metrics.habitat < 85) recommendations.push("Inspect habitat seals and complete structural repairs before additional high-risk activities.");
+  if (Math.abs(metrics.temperature - 21) > 1.5) recommendations.push("Restore thermal control toward 21°C and check coolant/power availability.");
+  if (metrics.radiation > 35) recommendations.push("Use the shelter/shield response during radiation events and check shielding coverage.");
+  if (decisions.length < 2 && missionStage === 1) recommendations.push("Respond to each incident when it appears; a timely, targeted intervention is usually better than waiting for several faults to accumulate.");
+
+  if (problems.length === 0) {
+    problems.push("No major resource or safety issue remained at closeout.");
+  }
+  if (recommendations.length === 0) {
+    recommendations.push("Continue checking resource trends, respond to active faults promptly, and maintain a reserve before starting optional operations.");
+  }
+
+  const status = failed
+    ? `Mission failed: ${hardFailure ?? "the simulator recorded a critical safety failure"}`
+    : missionStage === 1
+      ? "Mission 1 survived its scheduled duration. Tutorial completion is intentionally based on survival, not perfect resource readings or optional objectives."
+      : "The mission reached closeout without crossing a critical failure limit.";
+  const decisionNote = decisions.length
+    ? ` The crew made ${decisions.length} recorded incident response decision(s).`
+    : " No incident response decisions were recorded.";
+  const summary = `${status}${decisionNote} Final score: ${Math.round(score)}/100. ${faults.length ? `${faults.length} active fault(s) remain and should be addressed before the next deployment.` : "No active faults remain in the fault register."}`;
+  return {
+    outcome: failed ? "FAILED" : "COMPLETE",
+    summary,
+    problems: problems.slice(0, 4),
+    recommendations: [...new Set(recommendations)].slice(0, 4),
+  };
+}
+
 export function MissionSimulation() {
   const pending = useMemo<PendingMission | null>(() => loadPendingMission(), []);
   // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
@@ -3265,6 +3350,22 @@ export function MissionSimulation() {
       eventsTriggered: eventPointerRef.current,
     });
   }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
+
+  useEffect(() => {
+    if (!results || !pending || aiCloseoutReady) return;
+    // Local rules-based analysis: works offline and has no API key or usage cost.
+    const analysis = buildLocalMissionAnalysis(
+      metrics, score, decisions, activeFaults, buildings, missionStage, missionFailed,
+    );
+    setAiCloseout(analysis);
+    if (analysis.outcome === "FAILED") {
+      setMissionFailed(true);
+      const reason = getMissionFailureReason(metrics, missionStage);
+      setMissionFailureReason(reason ?? analysis.summary);
+    }
+    setAiMessage(`Mission Control: ${analysis.summary}`);
+    setAiCloseoutReady(true);
+  }, [activeFaults, aiCloseoutReady, buildings, decisions, metrics, missionFailed, missionStage, pending, results, score]);
 
   useEffect(() => {
     if (!results || !pending || !aiCloseoutReady || completionSavedRef.current) return;
@@ -5147,56 +5248,4 @@ export function MissionSimulation() {
   );
 }
 
-export default MissionSimulation;  useEffect(() => {
-    if (!results || !pending || aiCloseoutReady) return;
-    let cancelled = false;
-    const payload = {
-      mission: { id: pending.missionId, title: pending.missionTitle, campaign: pending.campaign, number: missionStage },
-      elapsedSeconds: elapsed,
-      metrics,
-      score,
-      decisions,
-      activeFaults: Object.values(activeFaults).map((fault) => ({ system: fault.targetTrackId, title: fault.title, severity: fault.severity })),
-      equipment: Object.entries(buildings).map(([system, state]) => ({ system, condition: state.condition, status: state.status })),
-      selectedSystems: Object.keys(pending.selected),
-    };
-    fetch("/api/mission-analysis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).then(async (response) => {
-      if (!response.ok) throw new Error("Mission AI service unavailable");
-      return response.json();
-    }).then((analysis: { outcome?: "COMPLETE" | "FAILED"; summary?: string; problems?: string[]; recommendations?: string[] }) => {
-      if (cancelled) return;
-      const hardFailure = getMissionFailureReason(metrics, missionStage);
-      const outcome = missionFailed || hardFailure ? "FAILED" : analysis.outcome === "FAILED" ? "FAILED" : "COMPLETE";
-      const result = {
-        outcome,
-        summary: analysis.summary || "Mission Control reviewed the final telemetry.",
-        problems: Array.isArray(analysis.problems) ? analysis.problems.slice(0, 4) : [],
-        recommendations: Array.isArray(analysis.recommendations) ? analysis.recommendations.slice(0, 4) : [],
-      } as const;
-      setAiCloseout(result);
-      if (result.outcome === "FAILED") {
-        setMissionFailed(true);
-        setMissionFailureReason(hardFailure ?? result.summary);
-      }
-      setAiMessage("ChatGPT Mission Control: " + result.summary);
-      setAiCloseoutReady(true);
-    }).catch(() => {
-      if (cancelled) return;
-      const reason = getMissionFailureReason(metrics, missionStage);
-      const outcome = missionFailed || Boolean(reason) ? "FAILED" : "COMPLETE";
-      setAiCloseout({
-        outcome,
-        summary: "ChatGPT Mission Control could not be reached, so the simulator used its local safety rules for closeout.",
-        problems: reason ? [reason] : [],
-        recommendations: ["Protect water and oxygen reserves.", "Keep solar generation above essential demand.", "Resolve active faults before starting optional work."],
-      });
-      setAiCloseoutReady(true);
-    });
-    return () => { cancelled = true; };
-  }, [activeFaults, aiCloseoutReady, buildings, decisions, elapsed, metrics, missionFailed, missionStage, pending, results, score]);
-
-
+export default MissionSimulation;
