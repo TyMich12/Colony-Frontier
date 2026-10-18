@@ -543,3 +543,16 @@ This pass compared the live simulation formulas, system inspector telemetry, tie
 - Mission 2 baseline essential demand is **2.50 kW** (1.10 kW core + 1.40 kW air revitalisation), or **840 kWh at the bus over 336 hours**. At 95% discharge efficiency this needs about **884 kWh stored**, compared with **960 kWh dispatchable** from a full 1,200 kWh battery down to the protected 20% floor. The nominal margin is only about **76 kWh before initial optional-load use, equipment degradation, and incidents**, which is why early load shedding and timely repairs matter.
 - The latest GitHub Actions type-check and production build passed after the compile corrections.
 - Automated checks validated the rating/repair table structure and code compilation. A full interactive browser run through all 336 simulated hours of both lunar missions has **not** been automatically executed by this workflow. Mission 2 must still be play-tested with its actual incident choices and repairs to confirm it is survivable in practice; a successful build alone does not prove that.
+
+
+## Mission 1 water balance and ChatGPT Mission Control
+
+The live simulation now applies a separate **reserve-depletion balance factor** to net water losses. The physical inspector continues to display the calculated daily use, treatment throughput and recovered-water amount; no water is created by this balance factor. Mission 1 uses a factor of **0.22** and later missions use **0.45**, so the playable reserve falls much more slowly while recycling and water-use telemetry remain visible. Treat these as gameplay balance factors, not real spacecraft water-consumption figures.
+
+Mission 1 is also a forgiving tutorial: its automatic failure limits are relaxed for oxygen, water, food, electrical collapse and radiation. The intended outcome is that degraded resources trigger advice and recovery opportunities, while actual exhaustion or a serious crew-safety breach can still fail the mission. Later missions retain the stricter limits.
+
+### ChatGPT-powered mission closeout
+
+The Mission Simulation calls the server endpoint `POST /api/mission-analysis` when a mission reaches closeout. The endpoint sends final telemetry, equipment condition, active faults, selected systems and player decisions to OpenAI's `gpt-4.1-mini` model and requests a structured outcome (`COMPLETE` or `FAILED`), a recap, problems and actionable recommendations. A hard safety failure detected by the simulator cannot be overridden by the model. If the API is unavailable, local safety rules provide a fallback closeout instead of blocking the game.
+
+**Server configuration required:** set `OPENAI_API_KEY` in the environment that runs the Vite server. Keep the key server-side; never put it in a `VITE_*` variable or browser code. The endpoint is implemented as Vite development/preview middleware, so a production deployment that does not run this Vite middleware must provide an equivalent server-side `/api/mission-analysis` route. Without the server key and route, the game falls back to its local closeout analysis rather than calling ChatGPT.
