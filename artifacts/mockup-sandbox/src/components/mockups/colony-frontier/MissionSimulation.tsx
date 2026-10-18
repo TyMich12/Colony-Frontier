@@ -1391,7 +1391,7 @@ function MissionTaskRibbon({
     { label: "SITES MAPPED", value: `${surveyedCount} / ${Math.max(1, RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"].length)}`, done: surveyedCount > 0 },
   ];
   return (
-    <div className="pointer-events-none absolute right-3 top-3 z-30 w-[min(88vw,270px)]">
+    <div className="pointer-events-none absolute right-3 bottom-[58px] z-30 w-[min(88vw,270px)]">
       <div className="pointer-events-auto overflow-hidden rounded-xl border-2 border-[#d3a84a] bg-[#172026]/92 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="border-b border-[#4d5050] bg-[#101b20] px-3 py-2"><p className="text-[7px] font-black uppercase tracking-[0.15em] text-[#92a6a4]">Simulation Hours</p><p className="mt-0.5 font-mono text-[10px] font-bold text-[#e2f0e8]">Hours: {Math.min(Math.floor(TOTAL_MISSION_SECONDS / 3600), Math.floor(Math.max(0, elapsed) / 3600)).toLocaleString()} / {Math.floor(TOTAL_MISSION_SECONDS / 3600).toLocaleString()}</p><p className="mt-1 text-[7px] font-black uppercase tracking-[0.15em] text-[#f2c960]">Game Day · {dayProgress.toFixed(1)} / 14</p></div>
         <div className="flex items-center gap-2 border-b border-[#4d5050] bg-[#27363a] px-3 py-2">
