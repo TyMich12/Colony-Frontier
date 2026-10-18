@@ -1848,7 +1848,7 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 }
 
 function ColonyBuilding({
-  track, tier, runtime, selected, alerted, position, onClick, mars
+  track, tier, runtime, selected, alerted, position, onClick, mars, nightMode = false
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1858,6 +1858,7 @@ function ColonyBuilding({
   position: [number, number];
   onClick: () => void;
   mars: boolean;
+  nightMode?: boolean;
 }) {
   const [x, z] = position;
   const p = palette(track.id);
@@ -1874,6 +1875,12 @@ function ColonyBuilding({
       <group position={[0, 0.04, 0]} frustumCulled={false}>
         <BuildingArt id={track.id} accent={tierColor(tier)} />
       </group>
+      {/* Low-power exterior beacons make the colony readable at lunar sunset/night
+          without washing out the dark sky or pretending the Sun is still illuminating it. */}
+      {nightMode && <group position={[0, track.id === "habitat" ? 3.3 : 1.9, 0]}>
+        <mesh><sphereGeometry args={[0.13, 12, 10]} /><meshBasicMaterial color={p.accent} toneMapped={false} /></mesh>
+        <pointLight color={p.accent} intensity={track.id === "habitat" ? 1.1 : 0.42} distance={track.id === "habitat" ? 7 : 3.8} decay={2} />
+      </group>}
       <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       {track.id !== "habitat" && (
         <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
@@ -1971,10 +1978,14 @@ function Scene({ props }: { props: Props }) {
   // simulation was technically drawing them but players could not see them.
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
+  // Celestial bodies live on a distant sky plane, not hovering just behind the habitat.
+  // The orthographic scene uses a deliberately cinematic apparent size: Earth is visibly
+  // larger than the Sun, while both remain clearly separated from the terrain silhouette.
+  const skyDistance = -82;
   const sunPosition: [number, number, number] = [
-    -12 + sunProgress * 24,
-    props.lunarNight ? -12 : 2.5 + Math.max(0, Math.sin(sunAltitudeRad)) * 12,
-    -15,
+    -35 + sunProgress * 70,
+    props.lunarNight ? 10 : 9 + Math.max(-0.15, Math.sin(sunAltitudeRad)) * 25,
+    skyDistance,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   return (
@@ -1991,14 +2002,16 @@ function Scene({ props }: { props: Props }) {
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.10 + daylight * 0.48]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
-        <mesh><sphereGeometry args={[0.72, 40, 32]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff1bb"} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[1.12, 40, 32]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={props.lunarNight ? 0.025 : 0.16} depthWrite={false} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[0.95, 48, 36]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff1bb"} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[1.55, 48, 36]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={props.lunarNight ? 0.025 : 0.18} depthWrite={false} toneMapped={false} /></mesh>
+        {!props.lunarNight && <mesh><sphereGeometry args={[2.35, 32, 24]} /><meshBasicMaterial color="#ffd87a" transparent opacity={0.035} depthWrite={false} toneMapped={false} /></mesh>}
       </group>}
-      {!mars && <group position={[-9, 5.5, -13]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
-        {/* Earth is deliberately small and behind the colony, like a distant sky body. */}
-        <mesh><sphereGeometry args={[1.05, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} /></mesh>
-        <mesh scale={1.018}><sphereGeometry args={[1.05, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
-        <mesh scale={1.045}><sphereGeometry args={[1.05, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.14} side={THREE.BackSide} /></mesh>
+      {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
+        {/* Earth is a distant, recognisable blue-white disc, with an apparent diameter
+            around three times the Sun in this cinematic camera framing. */}
+        <mesh><sphereGeometry args={[2.55, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#0b1d2a" emissiveIntensity={0.18} /></mesh>
+        <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
+        <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
@@ -2019,6 +2032,7 @@ function Scene({ props }: { props: Props }) {
             position={POSITIONS[track.id] ?? [0, 0]}
             onClick={() => props.onSelect(track.id)}
             mars={mars}
+            nightMode={!mars && (props.lunarNight || daylight < 0.18)}
           />
         ))}
         {props.tracks.some((track) => track.id === "rover") && (
