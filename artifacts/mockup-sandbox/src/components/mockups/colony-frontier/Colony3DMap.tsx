@@ -1984,7 +1984,7 @@ function Scene({ props }: { props: Props }) {
   const skyDistance = -82;
   const sunPosition: [number, number, number] = [
     -35 + sunProgress * 70,
-    props.lunarNight ? 10 : 9 + Math.max(-0.15, Math.sin(sunAltitudeRad)) * 25,
+    props.lunarNight ? -25 : -2 + Math.sin(sunAltitudeRad) * 28,
     skyDistance,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
