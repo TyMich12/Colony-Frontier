@@ -85,6 +85,86 @@ function nodeWorldPosition(node: MissionResourceNode): [number, number] {
   return [(node.x - 500) / 22, (node.y - 300) / 10];
 }
 
+function createEarthTextures() {
+  const width = 1536;
+  const height = 768;
+  const surfaceCanvas = document.createElement("canvas");
+  surfaceCanvas.width = width;
+  surfaceCanvas.height = height;
+  const ctx = surfaceCanvas.getContext("2d");
+  if (!ctx) throw new Error("Could not create Earth surface texture");
+  const ocean = ctx.createLinearGradient(0, 0, 0, height);
+  ocean.addColorStop(0, "#153b68");
+  ocean.addColorStop(0.25, "#1764a0");
+  ocean.addColorStop(0.55, "#0a4d8a");
+  ocean.addColorStop(0.78, "#1b6095");
+  ocean.addColorStop(1, "#17365d");
+  ctx.fillStyle = ocean;
+  ctx.fillRect(0, 0, width, height);
+  // Equirectangular continent silhouettes, deliberately irregular rather than icon-like.
+  const continents = [
+    [[0.08,0.22],[0.12,0.16],[0.17,0.13],[0.21,0.17],[0.24,0.22],[0.22,0.28],[0.19,0.31],[0.18,0.39],[0.15,0.45],[0.13,0.39],[0.12,0.32],[0.09,0.29]],
+    [[0.20,0.43],[0.24,0.46],[0.26,0.53],[0.25,0.62],[0.23,0.70],[0.21,0.77],[0.19,0.68],[0.18,0.59],[0.19,0.50]],
+    [[0.40,0.19],[0.45,0.14],[0.51,0.15],[0.54,0.20],[0.51,0.25],[0.47,0.27],[0.45,0.34],[0.42,0.31],[0.40,0.25]],
+    [[0.45,0.32],[0.51,0.30],[0.55,0.36],[0.55,0.44],[0.52,0.52],[0.50,0.62],[0.47,0.68],[0.44,0.59],[0.43,0.48],[0.41,0.40]],
+    [[0.53,0.20],[0.59,0.15],[0.66,0.16],[0.72,0.21],[0.79,0.22],[0.84,0.28],[0.80,0.34],[0.73,0.33],[0.68,0.38],[0.62,0.33],[0.57,0.30]],
+    [[0.60,0.38],[0.65,0.36],[0.70,0.42],[0.73,0.51],[0.70,0.62],[0.66,0.67],[0.62,0.59],[0.60,0.50]],
+    [[0.80,0.58],[0.85,0.55],[0.89,0.59],[0.90,0.65],[0.86,0.69],[0.82,0.65]],
+    [[0.01,0.08],[0.12,0.04],[0.24,0.06],[0.34,0.05],[0.45,0.07],[0.56,0.04],[0.67,0.06],[0.78,0.05],[0.90,0.08],[0.99,0.06],[0.99,0.12],[0.86,0.14],[0.72,0.12],[0.59,0.15],[0.46,0.12],[0.33,0.14],[0.20,0.12],[0.09,0.14]],
+    [[0.01,0.87],[0.12,0.84],[0.23,0.86],[0.34,0.84],[0.45,0.87],[0.57,0.84],[0.69,0.87],[0.82,0.85],[0.98,0.88],[0.98,0.95],[0.85,0.96],[0.70,0.94],[0.55,0.97],[0.40,0.94],[0.25,0.97],[0.11,0.94],[0.01,0.96]]
+  ];
+  continents.forEach((points, index) => {
+    ctx.beginPath();
+    points.forEach(([x,y], i) => i === 0 ? ctx.moveTo(x*width,y*height) : ctx.lineTo(x*width,y*height));
+    ctx.closePath();
+    const land = ctx.createLinearGradient(0, index*45, width*0.3, height*0.75);
+    land.addColorStop(0, "#a9b77a");
+    land.addColorStop(0.45, "#477e53");
+    land.addColorStop(0.75, "#c2b27b");
+    land.addColorStop(1, "#41694a");
+    ctx.fillStyle = land;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(202,211,151,0.45)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  });
+  // Deterministic terrain flecks and highland textures add detail without remote assets.
+  let seed = 1701;
+  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i=0; i<1700; i++) {
+    const x = rand()*width, y = height*(0.14+rand()*0.70);
+    ctx.fillStyle = rand()>0.5 ? "rgba(216,204,145,0.12)" : "rgba(12,54,37,0.14)";
+    ctx.beginPath(); ctx.ellipse(x,y,2+rand()*13,1+rand()*5,rand()*Math.PI,0,Math.PI*2); ctx.fill();
+  }
+  // Polar ice caps.
+  const north = ctx.createLinearGradient(0,0,0,height*0.13);
+  north.addColorStop(0,"rgba(245,250,255,0.98)"); north.addColorStop(1,"rgba(225,240,248,0)");
+  ctx.fillStyle=north; ctx.fillRect(0,0,width,height*0.14);
+  const south = ctx.createLinearGradient(0,height*0.85,0,height);
+  south.addColorStop(0,"rgba(225,240,248,0)"); south.addColorStop(1,"rgba(245,250,255,0.94)");
+  ctx.fillStyle=south; ctx.fillRect(0,height*0.85,width,height*0.15);
+  const surface = new THREE.CanvasTexture(surfaceCanvas);
+  surface.colorSpace = THREE.SRGBColorSpace;
+  surface.anisotropy = 8;
+
+  const cloudCanvas = document.createElement("canvas");
+  cloudCanvas.width=width; cloudCanvas.height=height;
+  const cloud=cloudCanvas.getContext("2d");
+  if (!cloud) throw new Error("Could not create Earth cloud texture");
+  for(let i=0;i<420;i++){
+    const x=rand()*width, y=height*(0.12+rand()*0.76);
+    cloud.save(); cloud.translate(x,y); cloud.rotate((rand()-0.5)*0.8);
+    cloud.strokeStyle="rgba(242,249,255,"+(0.08+rand()*0.25)+")";
+    cloud.lineWidth=2+rand()*10; cloud.lineCap="round";
+    cloud.beginPath(); cloud.moveTo(-10-rand()*30,0); cloud.bezierCurveTo(-20,-8,20,8,18+rand()*36,rand()*8); cloud.stroke();
+    cloud.restore();
+  }
+  const clouds = new THREE.CanvasTexture(cloudCanvas);
+  clouds.colorSpace = THREE.SRGBColorSpace;
+  clouds.anisotropy = 8;
+  return { surface, clouds };
+}
+
 type RoverRockObstacle = {
   id: string;
   label: string;
@@ -1870,6 +1950,7 @@ function MissionGuide({ mars }: { mars: boolean }) {
 
 function Scene({ props }: { props: Props }) {
   const mars = props.environmentLabel === "MARS";
+  const earthTextures = useMemo(() => createEarthTextures(), []);
   const roverTier = props.selected.rover ?? "Foundation";
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
   const roverCondition = Math.max(0, Math.min(100, props.buildings.rover?.condition ?? 100));
@@ -1888,7 +1969,8 @@ function Scene({ props }: { props: Props }) {
   const sunAzimuth = (lunarDay / 14) * Math.PI;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
   const sunHorizontalRadius = 36 * Math.cos(sunAltitudeRad);
-  const sunPosition: [number, number, number] = [Math.cos(sunAzimuth) * sunHorizontalRadius, props.lunarNight ? -12 : Math.max(1.5, 36 * Math.sin(sunAltitudeRad)), Math.sin(sunAzimuth) * sunHorizontalRadius];
+  const sunPosition: [number, number, number] = [Math.cos(sunAzimuth) * sunHorizontalRadius, props.lunarNight ? -12 : Math.max(0.35, 36 * Math.sin(sunAltitudeRad)), Math.sin(sunAzimuth) * sunHorizontalRadius];
+  const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
@@ -1898,15 +1980,15 @@ function Scene({ props }: { props: Props }) {
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
     >
-      <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#080d18" : "#55545a"]} />
-      <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.12 : 0.38} color={mars ? "#ffe6db" : "#edf3ff"} />
-      <hemisphereLight args={[mars ? "#ffe5da" : "#f7f9ff", mars ? "#3d2722" : "#171923", mars ? 1.0 : props.lunarNight ? 0.22 : 0.72]} />
-      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.04 : 1.7} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={120} shadow-camera-left={-52} shadow-camera-right={52} shadow-camera-top={52} shadow-camera-bottom={-52} />
-      {!mars && !props.lunarNight && <group position={sunPosition} frustumCulled={false}><mesh><sphereGeometry args={[1.35, 20, 16]} /><meshBasicMaterial color="#ffe17a" /></mesh><pointLight color="#ffe6a3" intensity={0.55} distance={90} /></group>}
-      {!mars && <group position={[-32, 26, -38]} frustumCulled={false}>
-        <mesh><sphereGeometry args={[1.55, 24, 18]} /><meshStandardMaterial color="#397fb4" emissive="#12314b" emissiveIntensity={0.55} roughness={0.72} /></mesh>
-        <mesh position={[0.42, 0.24, 1.08]} rotation={[0.2, 0.2, -0.25]}><sphereGeometry args={[0.48, 10, 8]} /><meshStandardMaterial color="#70a66d" emissive="#203c26" emissiveIntensity={0.22} roughness={1} /></mesh>
-        <mesh position={[-0.48, -0.34, 1.02]} rotation={[-0.2, 0.3, 0.4]}><sphereGeometry args={[0.33, 10, 8]} /><meshStandardMaterial color="#6c9d64" emissive="#1b3320" emissiveIntensity={0.2} roughness={1} /></mesh>
+      <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
+      <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.06 + daylight * 0.28} color={mars ? "#ffe6db" : "#dce8f5"} />
+      <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.10 + daylight * 0.48]} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
+      {!mars && <group position={sunPosition} frustumCulled={false}><mesh><sphereGeometry args={[0.82, 32, 24]} /><meshBasicMaterial color={daylight > 0.08 ? "#fff1bb" : "#d8d8cf"} toneMapped={false} /></mesh><mesh><sphereGeometry args={[1.02, 32, 24]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={daylight > 0.08 ? 0.12 : 0.035} depthWrite={false} toneMapped={false} /></mesh></group>}
+      {!mars && <group position={[-32, 26, -38]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
+        <mesh><sphereGeometry args={[3.35, 96, 64]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} /></mesh>
+        <mesh scale={1.012}><sphereGeometry args={[3.35, 64, 48]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
+        <mesh scale={1.025}><sphereGeometry args={[3.35, 64, 48]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.11} side={THREE.BackSide} /></mesh>
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
@@ -1944,18 +2026,21 @@ function Scene({ props }: { props: Props }) {
         )}
       </group>
       <OrbitControls
-        enableRotate={false}
+        enableRotate
         enablePan
         enableZoom
         enableDamping
-        dampingFactor={0.08}
+        dampingFactor={0.075}
         screenSpacePanning
+        rotateSpeed={0.55}
         panSpeed={1.0}
-        minZoom={14}
-        maxZoom={42}
+        minPolarAngle={0.12}
+        maxPolarAngle={Math.PI / 2.02}
+        minZoom={10}
+        maxZoom={48}
         zoomSpeed={0.85}
-        mouseButtons={{ LEFT: THREE.MOUSE.PAN }}
-        touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN }}
+        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
         target={[0, 0, 0]}
       />
     </Canvas>
@@ -1965,7 +2050,7 @@ function Scene({ props }: { props: Props }) {
         {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
         <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth stays visible from the lunar surface</div>
       </div>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#91c5e8]/70 bg-[radial-gradient(circle_at_35%_30%,#c6e9ff_0%,#4c9ed0_34%,#1c4d82_72%,#0a1c3c_100%)] shadow-[0_0_18px_rgba(93,169,220,.4)]" aria-label="Earth visible in the lunar sky"><span className="text-[7px] font-black tracking-wider text-white drop-shadow">EARTH</span></div>
+      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">REAL SKY · Earth remains visible · shadows follow sunlight</div>
     </div>}
     </div>
   );
