@@ -5170,7 +5170,7 @@ export default MissionSimulation;  useEffect(() => {
     }).then((analysis: { outcome?: "COMPLETE" | "FAILED"; summary?: string; problems?: string[]; recommendations?: string[] }) => {
       if (cancelled) return;
       const hardFailure = getMissionFailureReason(metrics, missionStage);
-      const outcome = hardFailure ? "FAILED" : analysis.outcome === "FAILED" ? "FAILED" : "COMPLETE";
+      const outcome = missionFailed || hardFailure ? "FAILED" : analysis.outcome === "FAILED" ? "FAILED" : "COMPLETE";
       const result = {
         outcome,
         summary: analysis.summary || "Mission Control reviewed the final telemetry.",
