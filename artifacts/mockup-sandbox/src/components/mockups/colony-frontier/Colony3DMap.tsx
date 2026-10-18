@@ -1984,11 +1984,11 @@ function Scene({ props }: { props: Props }) {
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.06 + daylight * 0.28} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.10 + daylight * 0.48]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
-      {!mars && <group position={sunPosition} frustumCulled={false}><mesh><sphereGeometry args={[0.82, 32, 24]} /><meshBasicMaterial color={daylight > 0.08 ? "#fff1bb" : "#d8d8cf"} toneMapped={false} /></mesh><mesh><sphereGeometry args={[1.02, 32, 24]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={daylight > 0.08 ? 0.12 : 0.035} depthWrite={false} toneMapped={false} /></mesh></group>}
+      {!mars && <group position={sunPosition} frustumCulled={false}><mesh><sphereGeometry args={[0.34, 40, 32]} /><meshBasicMaterial color={daylight > 0.08 ? "#fff1bb" : "#d8d8cf"} toneMapped={false} /></mesh><mesh><sphereGeometry args={[0.50, 40, 32]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={daylight > 0.08 ? 0.12 : 0.035} depthWrite={false} toneMapped={false} /></mesh></group>}
       {!mars && <group position={[-32, 26, -38]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
-        <mesh><sphereGeometry args={[3.35, 96, 64]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} /></mesh>
-        <mesh scale={1.012}><sphereGeometry args={[3.35, 64, 48]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
-        <mesh scale={1.025}><sphereGeometry args={[3.35, 64, 48]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.11} side={THREE.BackSide} /></mesh>
+        <mesh><sphereGeometry args={[1.55, 96, 64]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} /></mesh>
+        <mesh scale={1.018}><sphereGeometry args={[1.55, 64, 48]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
+        <mesh scale={1.045}><sphereGeometry args={[1.55, 64, 48]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.11} side={THREE.BackSide} /></mesh>
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
@@ -2048,9 +2048,9 @@ function Scene({ props }: { props: Props }) {
       <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
         <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
         {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
-        <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth stays visible from the lunar surface</div>
+        <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth remains visible · daylight and shadows follow the Sun</div>
       </div>
-      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">REAL SKY · Earth remains visible · shadows follow sunlight</div>
+      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">REAL SKY · Earth visible · drag to rotate · right-drag to pan · wheel to zoom</div>
     </div>}
     </div>
   );
