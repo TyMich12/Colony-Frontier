@@ -1,450 +1,167 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowUp, ChevronRight, RotateCcw, ShieldCheck, Zap } from "lucide-react";
-import { clearMissionRuntime, loadPendingMission } from "./missionRuntime";
+import { useEffect, useState } from "react";
+import { ArrowRight, CheckCircle2, Power, Radio, ShieldCheck, Volume2 } from "lucide-react";
+import { loadPendingMission } from "./missionRuntime";
 
-type Phase = "boot" | "ready" | "flight" | "success" | "failure";
-type Telemetry = {
-  oxygen: number;
-  energy: number;
-  pressure: number;
-  temperature: number;
-  radiation: number;
-  acceleration: number;
-  angularAcceleration: number;
-  pitch: number;
-  angularVelocity: number;
-  altitude: number;
-  verticalSpeed: number;
-  elapsed: number;
-  throttle: number;
-  trim: number;
-  electricalLoad: number;
-  oxygenFlow: number;
-  heatBalance: number;
+type Stage = "approach" | "boarding" | "startup" | "launch" | "landing" | "landed" | "outside";
+
+const stageCopy: Record<Stage, { label: string; title: string; detail: string }> = {
+  approach: { label: "PRE-LAUNCH / 01", title: "Crew transfer in progress", detail: "Suit checks complete. Proceed to the launch vehicle." },
+  boarding: { label: "CREW ACCESS / 02", title: "Entering the spacecraft", detail: "Hatch sealed. Cabin pressure and restraints are being verified." },
+  startup: { label: "SYSTEMS BOOT / 03", title: "Powering the vehicle", detail: "Flight computer online · life support nominal · guidance aligned." },
+  launch: { label: "ASCENT / 04", title: "Leaving the launch pad", detail: "Main engines at thrust. Hold position while guidance stabilises." },
+  landing: { label: "ARRIVAL / 05", title: "Lunar descent", detail: "Descent engines active. Landing zone acquired; dust plume detected." },
+  landed: { label: "MISSION SITE / 06", title: "Touchdown confirmed", detail: "Engines shut down. The colony habitat is visible through the forward window." },
+  outside: { label: "SURFACE OPERATIONS / 07", title: "Welcome to the frontier", detail: "Suit integrity confirmed. Transfer to the mission simulation." },
 };
 
-type Factor = {
-  id: keyof Pick<Telemetry, "oxygen" | "energy" | "pressure" | "temperature" | "radiation" | "acceleration" | "angularAcceleration" | "pitch">;
-  label: string;
-  value: number;
-  display: string;
-  severity: "SURVIVAL" | "CRITICAL" | "EXTREME";
-  note: string;
-  position: number;
-};
-
-const G0 = 9.80665;
-const FLIGHT_DURATION = 20;
-function buildDiagnosticText(t: Telemetry): string {
-  const factors = buildFactors(t, false);
-  const status = (id: Factor["id"]) => {
-    const factor = factors.find((item) => item.id === id);
-    if (!factor) return "NO DATA";
-    return factor.severity === "EXTREME" ? "FAIL" : factor.severity === "CRITICAL" ? "WARN" : "PASS";
-  };
-  const validTelemetry = Object.values(t).every((value) => Number.isFinite(value));
-  const yellow = factors.filter((factor) => factor.severity === "CRITICAL").length;
-  const red = factors.filter((factor) => factor.severity === "EXTREME").length;
-  const checksPassed = validTelemetry && red === 0 && yellow < 4;
-  return [
-    "[BOOT] Colony Frontier launch console / build 05.0",
-    "[LINK] Local flight simulation ........... " + (validTelemetry ? "CONNECTED" : "NO DATA"),
-    "[CHECK] Crew oxygen reserve .............. " + status("oxygen"),
-    "[CHECK] Electrical reserve ............... " + status("energy"),
-    "[CHECK] Cabin pressure ................... " + status("pressure"),
-    "[CHECK] Cabin temperature ................ " + status("temperature"),
-    "[CHECK] Radiation exposure ............... " + status("radiation"),
-    "[CHECK] Flight acceleration .............. " + status("acceleration"),
-    "[CHECK] Guidance / pitch error ........... " + status("pitch"),
-    "[CHECK] Control model .................... " + (validTelemetry ? "PASS" : "NO DATA"),
-    "[SUMMARY] " + (factors.length - yellow - red) + " pass; " + yellow + " warning; " + red + " extreme.",
-    "[GO/NO-GO] " + (checksPassed ? "LAUNCH AUTHORISED" : "HOLD — REVIEW RED / INVALID READINGS"),
-    "",
-    "[NOTE] Three at-risk factors = emergency; four or more = mission loss.",
-    "[SYS ] Adjust controls, then re-run checks before ignition.",
-  ].join("\n");
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function classify(value: number, survivalMin: number, survivalMax: number, extremeMin: number, extremeMax: number): Factor["severity"] {
-  if (value < extremeMin || value > extremeMax) return "EXTREME";
-  if (value < survivalMin || value > survivalMax) return "CRITICAL";
-  return "SURVIVAL";
-}
-
-function buildFactors(t: Telemetry, inFlight: boolean): Factor[] {
-  const entries: Array<Omit<Factor, "severity" | "position"> & { limits: [number, number, number, number] }> = [
-    { id: "oxygen", label: "Oxygen reserve", value: t.oxygen, display: `${Math.round(t.oxygen)}%`, note: "usable reserve", limits: [45, 100, 15, 115] },
-    { id: "energy", label: "Electrical reserve", value: t.energy, display: `${Math.round(t.energy)}%`, note: "main bus reserve", limits: [35, 100, 12, 115] },
-    { id: "pressure", label: "Cabin pressure", value: t.pressure, display: `${t.pressure.toFixed(1)} kPa`, note: "target 95–105 kPa", limits: [75, 115, 58, 130] },
-    { id: "temperature", label: "Cabin temperature", value: t.temperature, display: `${t.temperature.toFixed(1)} °C`, note: "target 18–26 °C", limits: [10, 32, -2, 46] },
-    { id: "radiation", label: "Radiation dose", value: t.radiation, display: `${t.radiation.toFixed(2)} mGy`, note: "accumulated dose", limits: [0, 0.65, 0, 1.5] },
-    { id: "acceleration", label: "Linear acceleration", value: t.acceleration, display: `${t.acceleration.toFixed(2)} g`, note: "keep below 3.2 g", limits: [0.2, 3.2, -0.1, 4.2] },
-    { id: "angularAcceleration", label: "Angular acceleration", value: Math.abs(t.angularAcceleration), display: `${Math.abs(t.angularAcceleration).toFixed(1)} °/s²`, note: "limit rapid rotation", limits: [0, 8, 0, 18] },
-    { id: "pitch", label: "Pitch error", value: Math.abs(t.pitch - (inFlight ? targetPitch(t.elapsed) + t.trim : 90 + t.trim)), display: `${Math.abs(t.pitch - (inFlight ? targetPitch(t.elapsed) + t.trim : 90 + t.trim)).toFixed(1)}°`, note: "difference from guidance target", limits: [0, 8, 0, 22] },
-  ];
-
-  return entries.map((entry) => {
-    const [min, max, extremeMin, extremeMax] = entry.limits;
-    let severity = classify(entry.value, min, max, extremeMin, extremeMax);
-    // Radiation is a one-sided dose limit, not a two-sided operating band.
-    if (entry.id === "radiation") {
-      severity = entry.value > 1.0 ? "EXTREME" : entry.value > 0.65 ? "CRITICAL" : "SURVIVAL";
-    }
-    // Angular acceleration is an absolute value and should never be considered out of range on the low side.
-    if (entry.id === "angularAcceleration") {
-      severity = entry.value > 18 ? "EXTREME" : entry.value > 8 ? "CRITICAL" : "SURVIVAL";
-    }
-    let position = 50;
-    if (entry.id === "radiation") {
-      position = entry.value <= 0.65 ? 41 + (entry.value / 0.65) * 18 : entry.value <= 1 ? 59 + ((entry.value - 0.65) / 0.35) * 23 : 82 + Math.min(18, (entry.value - 1) * 36);
-    } else if (entry.id === "angularAcceleration" || entry.id === "pitch") {
-      const upper = entry.id === "pitch" ? 22 : 18;
-      const criticalStart = entry.id === "pitch" ? 8 : 8;
-      position = entry.value <= criticalStart ? 50 + (entry.value / criticalStart) * 9 : entry.value <= upper ? 59 + ((entry.value - criticalStart) / (upper - criticalStart)) * 23 : 82 + Math.min(18, (entry.value - upper) * 2);
-    } else if (entry.value < min) {
-      position = entry.value >= extremeMin
-        ? 18 + ((entry.value - extremeMin) / Math.max(0.001, min - extremeMin)) * 23
-        : Math.max(0, 18 - (extremeMin - entry.value) * 3);
-    } else if (entry.value > max) {
-      position = entry.value <= extremeMax
-        ? 59 + ((entry.value - max) / Math.max(0.001, extremeMax - max)) * 23
-        : Math.min(100, 82 + (entry.value - extremeMax) * 3);
-    } else {
-      position = 41 + ((entry.value - min) / Math.max(0.001, max - min)) * 18;
-    }
-    if (!inFlight && entry.id === "acceleration") severity = "SURVIVAL";
-    return { ...entry, severity, position: clamp(position, 0, 100) };
-  });
-}
-
-function targetPitch(elapsed: number) {
-  if (elapsed < 4) return 88;
-  if (elapsed < 9) return 80 - (elapsed - 4) * 2.2;
-  if (elapsed < 15) return 69 - (elapsed - 9) * 3.1;
-  return 50;
-}
-
-function DonutEnvelope({ risk, label }: { risk: number; label: string }) {
-  const angle = -135 + clamp(risk, 0, 100) * 2.7;
-  return (
-    <div className="relative mx-auto h-44 w-44 shrink-0">
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{ background: "conic-gradient(from 225deg, #d9534f 0deg 38deg, #d6a84c 38deg 91deg, #6ebc91 91deg 179deg, #d6a84c 179deg 232deg, #d9534f 232deg 270deg, transparent 270deg 360deg)" }}
-      />
-      <div className="absolute inset-[14px] rounded-full border border-[#28434a] bg-[#0a171d]" />
-      <div className="absolute inset-0" style={{ transform: `rotate(${angle}deg)` }}>
-        <span className="absolute left-1/2 top-[2px] h-5 w-1 -translate-x-1/2 rounded-full bg-[#f3d18b] shadow-[0_0_12px_rgba(243,209,139,.65)]" />
-      </div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#779b9b]">{label}</span>
-        <span className="mt-1 font-mono text-3xl font-semibold text-[#edf4ec]">{Math.round(risk)}<span className="text-sm text-[#779b9b]">/100</span></span>
-        <span className="mt-1 text-[9px] uppercase tracking-[0.18em] text-[#a5b6ac]">stress index</span>
-      </div>
-    </div>
-  );
-}
-
-function ThresholdBar({ position }: { position: number }) {
-  return (
-    <div className="relative mt-3 h-2 overflow-hidden rounded-sm bg-[#1b3035]">
-      <div className="absolute inset-y-0 left-0 w-[18%] bg-[#d9534f]" />
-      <div className="absolute inset-y-0 left-[18%] w-[23%] bg-[#d6a84c]" />
-      <div className="absolute inset-y-0 left-[41%] w-[18%] bg-[#6ebc91]" />
-      <div className="absolute inset-y-0 left-[59%] w-[23%] bg-[#d6a84c]" />
-      <div className="absolute inset-y-0 right-0 w-[18%] bg-[#d9534f]" />
-      <div className="absolute -top-1 h-4 w-[3px] bg-white shadow-[0_0_7px_rgba(255,255,255,.8)]" style={{ left: `${position}%` }} />
-    </div>
-  );
-}
-
-function RocketScene({ telemetry, phase, critical }: { telemetry: Telemetry; phase: Phase; critical: boolean }) {
-  const rotation = clamp(telemetry.pitch - 90, -50, 12);
-  // Make altitude legible on screen: the vehicle visibly climbs instead of being capped to a tiny 90 px shift.
-  const translateY = phase === "flight" ? -Math.min(telemetry.altitude / 15, 250) : phase === "success" ? -250 : 0;
-  // Pitch trim also changes the visible flight path, matching its effect on the guidance pitch.
-  const translateX = phase === "flight" ? clamp((90 - telemetry.pitch) * 3.2, -120, 120) : 0;
-  return (
-    <div className="absolute inset-0 h-full w-full overflow-hidden border-0 bg-[linear-gradient(180deg,#07121c_0%,#102b37_58%,#1a3435_100%)]">
-      <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(167,202,192,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(167,202,192,.12)_1px,transparent_1px)] [background-size:42px_42px]" />
-      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-label="Planned ascent trajectory">
-        <defs><filter id="trajectoryGlow"><feGaussianBlur stdDeviation="3.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-        <path d="M 500 635 C 510 540, 555 465, 615 385 S 735 230, 835 120" fill="none" stroke="#6ebc91" strokeWidth="3" strokeDasharray="9 8" opacity="0.95" filter="url(#trajectoryGlow)"/>
-        <path d={critical ? "M 615 385 C 650 335, 690 275, 735 230 S 790 165, 835 120" : "M 615 385 C 650 335, 690 275, 735 230 S 790 165, 835 120"} fill="none" stroke={critical ? "#f05252" : "#6ebc91"} strokeWidth="5" strokeDasharray="7 8" opacity={critical ? "1" : "0.5"}/>
-        <circle cx="835" cy="120" r="9" fill={critical ? "#f05252" : "#6ebc91"} stroke="#e9f4e9" strokeWidth="2"/>
-        <text x="850" y="115" fill={critical ? "#ff8888" : "#9be0b7"} fontSize="15" fontFamily="monospace">TARGET TRAJECTORY</text>
-      </svg>
-      <div className="absolute right-7 top-6 h-14 w-14 rounded-full border border-[#9bb9ad]/60 bg-[#b8c9b7]/10 shadow-[0_0_35px_rgba(175,208,187,.12)]" />
-      <div className="absolute bottom-0 left-0 right-0 h-12 border-t border-[#637f72] bg-[#172a27]" />
-      <div className="absolute bottom-12 left-0 right-0 h-5 bg-[linear-gradient(180deg,transparent,rgba(7,16,24,.65))]" />
-      <div className="absolute bottom-[54px] left-[16%] h-10 w-16 border-b border-[#547168] opacity-70" />
-      <div className="absolute bottom-[54px] right-[17%] h-16 w-24 border-b border-[#547168] opacity-60" />
-      <div className="absolute left-[50%] bottom-[12%] w-[clamp(100px,13vw,190px)] transition-transform duration-200 ease-out" style={{ transform: `translate(calc(-50% + ${translateX}px), ${translateY}px) rotate(${rotation}deg)` }}>
-        <svg viewBox="0 0 100 190" className="h-[min(58vh,520px)] w-full drop-shadow-[0_0_28px_rgba(239,182,88,.32)]" role="img" aria-label="2D launch vehicle">
-          <path d="M50 6 C34 25 31 42 31 67 L31 129 L18 154 L34 149 L41 171 L50 160 L59 171 L66 149 L82 154 L69 129 L69 67 C69 42 66 25 50 6Z" fill="#dce3d8" stroke="#91a9a2" strokeWidth="2" />
-          <path d="M50 10 C41 28 41 40 41 52 L59 52 C59 40 59 28 50 10Z" fill="#efb658" />
-          <rect x="39" y="61" width="22" height="31" rx="4" fill="#193b45" stroke="#8db5b4" strokeWidth="2" />
-          <path d="M40 105 H60 V128 H40Z" fill="#b6c7bd" />
-          <path d="M42 171 L50 187 L58 171Z" fill={phase === "flight" ? "#f1a45a" : "#59716f"} />
-          {phase === "flight" && <path d="M44 173 L50 205 L56 173Z" fill="#f3d18b" opacity=".9" style={{ transformOrigin: "50px 173px", transform: `scaleY(${0.6 + telemetry.throttle * 1.8})` }} />}
-        </svg>
-      </div>
-      <div className="absolute left-4 top-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[#9db7ad]">
-        FLIGHT PATH / 2D VIEW
-      </div>
-      <div className="absolute bottom-3 right-4 text-right font-mono text-[10px] text-[#d7e8bd]">
-        <div>ALT {Math.round(telemetry.altitude).toLocaleString()} m</div>
-        <div>V/S {telemetry.verticalSpeed.toFixed(1)} m/s</div>
-      </div>
-      {phase === "success" && <div className="absolute left-4 bottom-4 border border-[#6ebc91] bg-[#0b201c]/90 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#9be0b7]">Ascent stable</div>}
-      {phase === "failure" && <div className="absolute inset-0 grid place-items-center bg-[#260e12]/75 text-sm font-bold uppercase tracking-[0.2em] text-[#ff8a8a]">Flight terminated</div>}
-    </div>
-  );
-}
+const timeline: Stage[] = ["approach", "boarding", "startup", "launch", "landing", "landed"];
 
 export function FlightSequence() {
   const pending = loadPendingMission();
-  const [phase, setPhase] = useState<Phase>("boot");
-  const [terminalText, setTerminalText] = useState("");
-  const [telemetry, setTelemetry] = useState<Telemetry>({
-    oxygen: 94, energy: 91, pressure: 101.3, temperature: 21.5, radiation: 0.08,
-    acceleration: 0, angularAcceleration: 0, pitch: 90, angularVelocity: 0,
-    altitude: 0, verticalSpeed: 0, elapsed: 0, throttle: 0.78, trim: 0,
-    electricalLoad: 0.55, oxygenFlow: 0.35, heatBalance: 0,
-  });
-  const telemetryRef = useRef(telemetry);
-  const diagnosticsTimerRef = useRef<number | null>(null);
-  telemetryRef.current = telemetry;
+  const [stage, setStage] = useState<Stage>("approach");
+  const [bootLines, setBootLines] = useState<string[]>([]);
+  const [manual, setManual] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
-      const key = event.key.toLowerCase();
-      if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "s", "a", "d", "q", "e", "o", "p", "h", "j"].includes(key)) return;
-      event.preventDefault();
-      setTelemetry((old) => {
-        const next = { ...old };
-        if (key === "arrowup" || key === "w") next.throttle = clamp(old.throttle + 0.03, 0.3, 1);
-        if (key === "arrowdown" || key === "s") next.throttle = clamp(old.throttle - 0.03, 0.3, 1);
-        if (key === "arrowleft" || key === "a") next.trim = clamp(old.trim - 1, -18, 18);
-        if (key === "arrowright" || key === "d") next.trim = clamp(old.trim + 1, -18, 18);
-        if (key === "q") next.electricalLoad = clamp(old.electricalLoad - 0.05, 0.2, 1.4);
-        if (key === "e") next.electricalLoad = clamp(old.electricalLoad + 0.05, 0.2, 1.4);
-        if (key === "o") next.oxygenFlow = clamp(old.oxygenFlow - 0.05, 0.1, 1);
-        if (key === "p") next.oxygenFlow = clamp(old.oxygenFlow + 0.05, 0.1, 1);
-        if (key === "h") next.heatBalance = clamp(old.heatBalance - 0.5, -5, 5);
-        if (key === "j") next.heatBalance = clamp(old.heatBalance + 0.5, -5, 5);
-        telemetryRef.current = next;
-        return next;
-      });
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    const diagnosticText = buildDiagnosticText(telemetryRef.current);
+    const lines = [
+      "COLONY FRONTIER FLIGHT SYSTEM v05.0",
+      "Checking crew life-support ........ PASS",
+      "Cabin pressure seal ............... PASS",
+      "Navigation and landing radar ...... ONLINE",
+      "Thermal control loop .............. STABLE",
+      "Guidance computer ................. READY",
+      "Mission uplink .................... CONNECTED",
+      "ALL PRIMARY SYSTEMS NOMINAL",
+    ];
     let index = 0;
-    const timer = window.setInterval(() => {
-      index += 3;
-      setTerminalText(diagnosticText.slice(0, index));
-      if (index >= diagnosticText.length) {
-        window.clearInterval(timer);
-        diagnosticsTimerRef.current = null;
-        setTerminalText(diagnosticText);
-        setPhase("ready");
-      }
-    }, 12);
-    diagnosticsTimerRef.current = timer;
+    let interval: number | undefined;
+    const start = window.setTimeout(() => {
+      setStage("boarding");
+      interval = window.setInterval(() => {
+        setBootLines((old) => {
+          if (index >= lines.length) return old;
+          const next = [...old, lines[index]];
+          index += 1;
+          if (index >= lines.length && interval) window.clearInterval(interval);
+          return next;
+        });
+      }, 520);
+      window.setTimeout(() => setStage((old) => old === "startup" ? old : "startup"), 1500);
+    }, 2600);
     return () => {
-      window.clearInterval(timer);
-      diagnosticsTimerRef.current = null;
+      window.clearTimeout(start);
+      if (interval) window.clearInterval(interval);
     };
   }, []);
 
-  const factors = useMemo(() => buildFactors(telemetry, phase === "flight" || telemetry.elapsed > 0), [telemetry, phase]);
-  const criticalCount = factors.filter((factor) => factor.severity === "CRITICAL").length;
-  const extremeCount = factors.filter((factor) => factor.severity === "EXTREME").length;
-  // Each factor has exactly one severity, so yellow + red counts distinct at-risk factors once.
-  const atRiskCount = criticalCount + extremeCount;
-  const riskIndex = Math.min(100, factors.reduce((total, factor) => total + (factor.severity === "EXTREME" ? 18 : factor.severity === "CRITICAL" ? 9 : 0), 0) + Math.max(0, telemetry.acceleration - 1) * 7 + Math.abs(telemetry.pitch - 90) * 0.3);
-  const readyToLaunch = atRiskCount < 4 && extremeCount === 0;
-
   useEffect(() => {
-    if (phase !== "flight") return;
-    const timer = window.setInterval(() => {
-      const old = telemetryRef.current;
-      const dt = 0.2;
-      const elapsed = old.elapsed + dt;
-      const desiredPitch = targetPitch(elapsed) + old.trim;
-      const angularAcceleration = clamp((desiredPitch - old.pitch) * 0.8 - old.angularVelocity * 1.25, -18, 18);
-      const angularVelocity = clamp(old.angularVelocity + angularAcceleration * dt, -22, 22);
-      const pitch = clamp(old.pitch + angularVelocity * dt, 15, 105);
-      const acceleration = clamp(old.throttle * 3.65 - 0.18, 0.1, 4.1);
-      const verticalSpeed = Math.max(0, old.verticalSpeed + (acceleration * G0 * Math.sin(pitch * Math.PI / 180) - G0 * 0.08) * dt);
-      const altitude = old.altitude + verticalSpeed * dt;
-      const energy = clamp(old.energy - Math.max(0, old.electricalLoad * 1.7 - 0.6) * dt, 0, 110);
-      const oxygen = clamp(old.oxygen - old.oxygenFlow * 0.025 * dt, 0, 110);
-      const pressure = clamp(old.pressure - Math.max(0, 0.3 - old.oxygenFlow) * 0.002 * dt, 0, 140);
-      const temperature = clamp(old.temperature + old.heatBalance * 0.035 * dt - (old.temperature - 21.5) * 0.001, -10, 60);
-      const radiation = old.radiation + 0.0007 * dt;
-      const next = { ...old, elapsed, angularAcceleration, angularVelocity, pitch, acceleration, verticalSpeed, altitude, energy, oxygen, pressure, temperature, radiation };
-      telemetryRef.current = next;
-      setTelemetry(next);
-
-      const nextFactors = buildFactors(next, true);
-      const critical = nextFactors.filter((factor) => factor.severity === "CRITICAL").length;
-      const extreme = nextFactors.filter((factor) => factor.severity === "EXTREME").length;
-      const atRisk = critical + extreme;
-      if (atRisk >= 4) {
-        setPhase("failure");
-        window.clearInterval(timer);
-      } else if (elapsed >= FLIGHT_DURATION) {
-        setPhase("success");
-        window.clearInterval(timer);
-      }
-    }, 200);
-    return () => window.clearInterval(timer);
-  }, [phase]);
-
-  function changeControl(key: "throttle" | "trim" | "electricalLoad" | "oxygenFlow" | "heatBalance", value: number) {
-    setTelemetry((old) => {
-      const next = { ...old, [key]: value };
-      telemetryRef.current = next;
-      return next;
-    });
-  }
-
-  function skipDiagnostics() {
-    if (diagnosticsTimerRef.current !== null) window.clearInterval(diagnosticsTimerRef.current);
-    diagnosticsTimerRef.current = null;
-    const report = buildDiagnosticText(telemetryRef.current);
-    setTerminalText(report);
-    setPhase("ready");
-  }
-
-  function beginFlight() {
-    if (!readyToLaunch) {
-      setTerminalText(buildDiagnosticText(telemetryRef.current));
-      return;
-    }
-    setTelemetry((old) => ({ ...old, elapsed: 0, altitude: 0, verticalSpeed: 0, angularVelocity: 0, angularAcceleration: 0, acceleration: 0 }));
-    setPhase("flight");
-  }
-
-  function retry() {
-    const resetTelemetry: Telemetry = {
-      oxygen: 94, energy: 91, pressure: 101.3, temperature: 21.5, radiation: 0.08,
-      acceleration: 0, angularAcceleration: 0, pitch: 90, angularVelocity: 0,
-      altitude: 0, verticalSpeed: 0, elapsed: 0, throttle: 0.78, trim: 0,
-      electricalLoad: 0.55, oxygenFlow: 0.35, heatBalance: 0,
+    if (stage !== "approach" && stage !== "boarding" && stage !== "startup" && stage !== "launch" && stage !== "landing") return;
+    const next: Partial<Record<Stage, Stage>> = {
+      approach: "boarding",
+      boarding: "startup",
+      startup: "launch",
+      launch: "landing",
+      landing: "landed",
     };
-    telemetryRef.current = resetTelemetry;
-    setTelemetry(resetTelemetry);
-    setTerminalText(buildDiagnosticText(resetTelemetry));
-    setPhase("ready");
-  }
+    const delay = stage === "approach" ? 3600 : stage === "boarding" ? 5000 : stage === "startup" ? 6500 : stage === "launch" ? 6500 : 5500;
+    const timer = window.setTimeout(() => setStage((old) => old === stage ? (next[stage] ?? old) : old), delay);
+    return () => window.clearTimeout(timer);
+  }, [stage]);
 
-  function enterMission() {
-    // The loadout and rewards are already stored by MissionLoadout. Only a verified
-    // successful ascent hands control to the existing colony mission.
-    clearMissionRuntime();
-    window.location.href = "/preview/MissionSimulation";
-  }
+  const stageIndex = timeline.indexOf(stage);
+  const skipAhead = () => {
+    setManual(true);
+    setStage((old) => {
+      if (old === "approach") return "boarding";
+      if (old === "boarding") return "startup";
+      if (old === "startup") return "launch";
+      if (old === "launch") return "landing";
+      return "landed";
+    });
+  };
 
-  const [helpOpen, setHelpOpen] = useState(true);
+  const copy = stageCopy[stage];
+  const isFlight = stage === "launch" || stage === "landing";
+  const isLanded = stage === "landed" || stage === "outside";
 
   return (
-    <div className="fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-[#03090d] text-[#edf4ec] [font-family:Arial,sans-serif]">
-      <style>{`@keyframes cfLaunchFade { from { opacity: 0; } to { opacity: 1; } } @keyframes cfCurtain { from { opacity: 1; } to { opacity: 0; visibility: hidden; } .cf-hud { background: rgba(4,14,19,.88); backdrop-filter: blur(8px); }`}</style>
-      <RocketScene telemetry={telemetry} phase={phase} critical={atRiskCount >= 3 || extremeCount > 0} />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(2,8,12,.55)_100%)]" />
-      <header className="cf-hud absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-[#294148] px-4 py-2.5 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-8 w-8 shrink-0 place-items-center border border-[#526c62] bg-[#10221f]"><span className={`h-2.5 w-2.5 rounded-full ${phase === "failure" ? "bg-[#f05252]" : "bg-[#6ebc91] shadow-[0_0_12px_#6ebc91]"}`} /></span>
-          <div className="min-w-0"><p className="truncate text-[8px] font-bold uppercase tracking-[0.25em] text-[#8aa99a]">Colony-Frontier · Flight Simulator</p><h1 className="truncate text-sm font-black uppercase tracking-[0.12em]">Ascent Operations</h1></div>
+    <main className="relative min-h-screen overflow-hidden bg-[#050b12] text-[#e7f0eb]" style={{ fontFamily: "Arial, sans-serif" }}>
+      <style>{`
+        @keyframes starsDrift { from { transform: translate3d(0,0,0); } to { transform: translate3d(-55px,32px,0); } }
+        @keyframes cabinPulse { 0%,100% { opacity:.4 } 50% { opacity:1 } }
+        @keyframes engineFlicker { 0%,100% { transform:scaleY(.8); opacity:.72 } 50% { transform:scaleY(1.18); opacity:1 } }
+        @keyframes shake { 0%,100% { transform:translate(0,0) } 25% { transform:translate(1px,-1px) } 50% { transform:translate(-1px,1px) } 75% { transform:translate(1px,1px) } }
+        @keyframes dustRoll { from { transform:translateX(-8%) scaleY(.7); opacity:.25 } to { transform:translateX(8%) scaleY(1.2); opacity:.75 } }
+        @keyframes walkIn { from { transform:translateX(-160px) scale(1); opacity:0 } to { transform:translateX(0) scale(.72); opacity:1 } }
+        @keyframes hatchGlow { 0%,100% { box-shadow:0 0 12px #efb65833 } 50% { box-shadow:0 0 35px #efb65899 } }
+        .stars { background-image:radial-gradient(2px 2px at 10% 22%,#d8e9f0 50%,transparent 60%),radial-gradient(1px 1px at 25% 68%,#c2d4e3 50%,transparent 60%),radial-gradient(1px 1px at 67% 31%,#fff 50%,transparent 60%),radial-gradient(2px 2px at 81% 75%,#c9dbe4 50%,transparent 60%),radial-gradient(1px 1px at 92% 18%,#fff 50%,transparent 60%),radial-gradient(1px 1px at 48% 42%,#d6e5ed 50%,transparent 60%); background-size:370px 270px; animation:starsDrift 28s linear infinite; }
+        .rocket-shell { clip-path:polygon(50% 0%,63% 12%,67% 25%,67% 72%,86% 92%,64% 86%,58% 100%,50% 91%,42% 100%,36% 86%,14% 92%,33% 72%,33% 25%,37% 12%); }
+        .hatch { animation:hatchGlow 2.8s ease-in-out infinite; }
+        .scene-shake { animation:shake .16s linear infinite; }
+      `}</style>
+
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(43,93,112,.32),transparent_50%),linear-gradient(180deg,#07111e,#10212a_70%,#080e12)]" />
+      <div className="stars absolute inset-0 opacity-70" />
+      <header className="relative z-20 flex items-center justify-between border-b border-[#334a4c] bg-[#071017]/70 px-5 py-4 backdrop-blur-md md:px-10">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center border border-[#6f8a7d] bg-[#14252b] text-[#efb658]"><Radio size={18} /></div>
+          <div><p className="text-[9px] uppercase tracking-[.32em] text-[#9bb6ac]">Colony Frontier Program</p><p className="mt-1 text-xs font-bold uppercase tracking-[.18em]">Flight operations / {pending?.campaign ?? "Moon"} campaign</p></div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className={`hidden border px-2 py-1 text-[8px] font-bold uppercase tracking-[0.14em] sm:inline-block ${phase === "flight" ? "border-[#efb658] text-[#efb658]" : phase === "failure" ? "border-[#f05252] text-[#ff8888]" : phase === "success" ? "border-[#6ebc91] text-[#9be0b7]" : "border-[#35515a] text-[#a5b6ac]"}`}>{phase === "boot" ? "Diagnostics" : phase === "ready" ? "Ready" : phase === "flight" ? "Ascent live" : phase === "success" ? "Ascent complete" : "Mission lost"}</span>
-          <button type="button" title="Open the flight control guide and keyboard shortcuts" onClick={() => setHelpOpen(true)} className="border border-[#6ebc91] bg-[#10251f] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-[#9be0b7] hover:bg-[#19372c]">? Controls</button>
-        </div>
+        <button onClick={() => setSoundOn((v) => !v)} className="flex items-center gap-2 border border-[#33494c] px-3 py-2 text-[9px] uppercase tracking-[.14em] text-[#a8c0b4]" aria-pressed={soundOn}><Volume2 size={14} /> Audio {soundOn ? "enabled" : "muted"}</button>
       </header>
 
-      <div className="pointer-events-none absolute left-1/2 top-[12%] z-10 -translate-x-1/2 text-center">
-        <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-[#8aa99a] sm:text-[10px]">Mission {pending?.missionNumber ?? "—"} · {pending?.missionTitle ?? "Launch vehicle"}</p>
-        <p className="mt-1 font-mono text-[10px] text-[#9be0b7] sm:text-xs">TARGET TRAJECTORY <span className="text-[#6ebc91]">━ GREEN</span> <span className="ml-2 text-[#ff8888]">━ RED = CRITICAL</span></p>
-      </div>
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-73px)] max-w-[1500px] gap-5 p-4 md:grid-cols-[minmax(0,1fr)_330px] md:p-7">
+        <section className={`relative min-h-[580px] overflow-hidden border border-[#334d51] bg-[#0b1922] ${isFlight ? "scene-shake" : ""}`}>
+          <div className="absolute inset-0" style={{ perspective: "1100px" }}>
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,#06101c_0%,#142d3b_52%,#53635c_100%)]" />
+            <div className="stars absolute inset-0 opacity-60" />
+            <div className="absolute left-[8%] top-[14%] h-24 w-24 rounded-full border border-[#b9cbbd]/40 bg-[#d8d8bd]/10 shadow-[0_0_70px_rgba(204,218,194,.12)]" />
+            <div className="absolute bottom-0 left-0 right-0 h-[29%] border-t border-[#9eb5a2]/25 bg-[linear-gradient(180deg,#5a6255,#202b28_55%,#0c1719)]" style={{ transform: "rotateX(5deg) scale(1.1)", transformOrigin: "bottom" }} />
+            <div className="absolute bottom-[20%] left-0 right-0 h-px bg-[#b5c5aa]/25" />
+            <div className="absolute bottom-[14%] left-[6%] h-12 w-[88%] opacity-40" style={{ background: "repeating-linear-gradient(90deg,transparent 0 45px,#d1d6bf 46px 47px,transparent 48px 90px)" }} />
+            <div className="absolute bottom-[28%] left-[7%] right-[7%] h-[1px] bg-[#b9c9b2]/30" />
 
-      <aside className="cf-hud absolute bottom-3 left-3 z-20 w-[min(31vw,330px)] space-y-2 border border-[#294148] p-3 sm:bottom-5 sm:left-5 sm:p-4">
-        <div className="flex items-center justify-between gap-2"><h2 className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#efb658] sm:text-[10px]">Flight diagnostics</h2><span className="font-mono text-[9px] text-[#8aa99a]">{factors.length} checks</span></div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="border border-[#294148] bg-[#0b1a21] p-2"><p className="text-[8px] uppercase text-[#8aa99a]">At risk</p><p className={`mt-1 text-xl font-bold ${atRiskCount >= 3 ? "text-[#ff8888]" : atRiskCount ? "text-[#efb658]" : "text-[#9be0b7]"}`}>{atRiskCount}</p></div>
-          <div className="border border-[#294148] bg-[#0b1a21] p-2"><p className="text-[8px] uppercase text-[#8aa99a]">Stress index</p><p className="mt-1 text-xl font-bold text-[#edf4ec]">{Math.round(riskIndex)}<span className="text-xs text-[#8aa99a]">/100</span></p></div>
-        </div>
-        <div className="space-y-2">
-          {factors.slice(0,5).map((factor) => <div key={factor.id} className="border-b border-[#1b3035] pb-1.5 last:border-0">
-            <div className="flex items-center justify-between gap-2"><span className="truncate text-[9px] text-[#dce8df]">{factor.label}</span><span className={`shrink-0 font-mono text-[9px] ${factor.severity === "SURVIVAL" ? "text-[#9be0b7]" : factor.severity === "CRITICAL" ? "text-[#efb658]" : "text-[#ff8888]"}`}>{factor.display}</span></div>
-            <div className="relative mt-1 h-2 overflow-hidden rounded-sm bg-[#1b3035]"><div className="absolute inset-y-0 left-0 w-[18%] bg-[#d9534f]"/><div className="absolute inset-y-0 left-[18%] w-[23%] bg-[#d6a84c]"/><div className="absolute inset-y-0 left-[41%] w-[18%] bg-[#6ebc91]"/><div className="absolute inset-y-0 left-[59%] w-[23%] bg-[#d6a84c]"/><div className="absolute inset-y-0 right-0 w-[18%] bg-[#d9534f]"/><div className="absolute -top-0.5 h-3 w-[3px] bg-white" style={{left:`${factor.position}%`}}/></div>
-          </div>)}
-        </div>
-        <p className="text-[8px] leading-relaxed text-[#8aa99a]">Green = within safe limits · amber = warning · red = critical.</p>
-      </aside>
+            {stage === "approach" && <div className="absolute bottom-[23%] left-[18%] z-10" style={{ animation: "walkIn 3s ease-out both" }}><div className="relative h-28 w-12"><div className="absolute left-3 top-0 h-7 w-7 rounded-full border border-[#b6c8c5] bg-[#8fa4a4]" /><div className="absolute left-2 top-7 h-14 w-9 skew-x-[-5deg] rounded-t-xl border border-[#90a8a7] bg-gradient-to-r from-[#364a52] via-[#c4cfca] to-[#53636a]" /><div className="absolute left-0 top-10 h-12 w-3 rotate-12 rounded bg-[#7c9394]" /><div className="absolute left-6 top-16 h-12 w-3 -rotate-6 rounded bg-[#819392]" /><div className="absolute left-2 top-[68px] h-3 w-4 rounded bg-[#c5d0c9]" /></div></div>}
 
-      <aside className="cf-hud absolute bottom-3 right-3 z-20 w-[min(31vw,330px)] space-y-3 border border-[#294148] p-3 sm:bottom-5 sm:right-5 sm:p-4">
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            ["TIME", `${telemetry.elapsed.toFixed(1)} s`],
-            ["ALTITUDE", `${Math.round(telemetry.altitude).toLocaleString()} m`],
-            ["VERTICAL SPEED", `${telemetry.verticalSpeed.toFixed(1)} m/s`],
-            ["PITCH / TARGET", `${telemetry.pitch.toFixed(0)}° / ${(targetPitch(telemetry.elapsed)+telemetry.trim).toFixed(0)}°`],
-          ].map(([label,value])=><div key={label} className="border border-[#294148] bg-[#0b1a21] p-2"><p className="text-[7px] uppercase tracking-[0.12em] text-[#8aa99a] sm:text-[8px]">{label}</p><p className="mt-1 font-mono text-xs text-[#d7e8bd] sm:text-sm">{value}</p></div>)}
-        </div>
-        <div className="flex items-center justify-between"><h2 className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#efb658]">Pilot controls</h2><button type="button" onClick={() => setHelpOpen(true)} className="text-[8px] text-[#9be0b7] underline">What does what?</button></div>
-        <Control label="Throttle" explanation="Thrust and acceleration" value={telemetry.throttle} min={0.3} max={1} step={0.01} display={`${Math.round(telemetry.throttle*100)}%`} onChange={(value)=>changeControl("throttle",value)} />
-        <Control label="Pitch trim" explanation="Corrects the guidance angle" value={telemetry.trim} min={-18} max={18} step={1} display={`${telemetry.trim>0?"+":""}${telemetry.trim}°`} onChange={(value)=>changeControl("trim",value)} />
-        <div className="hidden space-y-2 md:block">
-          <Control label="Electrical load" explanation="Higher uses battery faster" value={telemetry.electricalLoad} min={0.2} max={1.4} step={0.05} display={`${telemetry.electricalLoad.toFixed(2)}×`} onChange={(value)=>changeControl("electricalLoad",value)} />
-          <Control label="Oxygen flow" explanation="Higher flow uses oxygen faster" value={telemetry.oxygenFlow} min={0.1} max={1} step={0.05} display={`${telemetry.oxygenFlow.toFixed(2)}×`} onChange={(value)=>changeControl("oxygenFlow",value)} />
-          <Control label="Cabin heat" explanation="Negative cools; positive heats" value={telemetry.heatBalance} min={-5} max={5} step={0.5} display={`${telemetry.heatBalance>0?"+":""}${telemetry.heatBalance.toFixed(1)}`} onChange={(value)=>changeControl("heatBalance",value)} />
-        </div>
-        {phase === "boot" && <button type="button" onClick={skipDiagnostics} className="w-full border border-[#526c62] px-3 py-2 text-[9px] font-bold uppercase text-[#dce8df]">Skip checks animation</button>}
-        {phase === "ready" && <button type="button" onClick={beginFlight} disabled={!readyToLaunch} className={`w-full px-3 py-3 text-[9px] font-bold uppercase tracking-[0.15em] ${readyToLaunch ? "bg-[#efb658] text-[#172126]" : "cursor-not-allowed bg-[#351316] text-[#ff8888]"}`}>{readyToLaunch ? "▲ Ignite engines" : "Launch blocked · clear red factors"}</button>}
-        {phase === "flight" && <p className="border border-[#efb658]/50 bg-[#241e14] px-3 py-2 text-[9px] uppercase text-[#efb658]">Ascent live · adjust controls</p>}
-        {phase === "failure" && <div className="space-y-2 border border-[#d9534f]/60 bg-[#260e12] p-3"><p className="text-xs font-bold uppercase text-[#ff8888]">Mission lost</p><button type="button" onClick={retry} className="w-full bg-[#efb658] px-3 py-2 text-[9px] font-bold uppercase text-[#172126]">↻ Reset flight</button></div>}
-        {phase === "success" && <div className="space-y-2 border border-[#6ebc91]/60 bg-[#0b201c] p-3"><p className="text-xs font-bold uppercase text-[#9be0b7]">Ascent successful</p><button type="button" onClick={enterMission} className="w-full bg-[#6ebc91] px-3 py-3 text-[9px] font-bold uppercase text-[#071812]">Enter colony mission →</button></div>}
-      </aside>
+            <div className={`absolute bottom-[16%] left-1/2 z-10 w-[min(43%,310px)] -translate-x-1/2 transition-all duration-[1800ms] ${stage === "boarding" || stage === "startup" ? "scale-[1.15]" : stage === "launch" ? "translate-y-[-180px] scale-[.88]" : stage === "landing" ? "translate-y-[-70px] scale-[.9]" : ""}`} style={{ filter: "drop-shadow(0 16px 25px #0009)" }}>
+              <div className="relative mx-auto h-[360px] w-[190px]" style={{ transformStyle: "preserve-3d", transform: "rotateY(-9deg)" }}>
+                <div className="rocket-shell absolute inset-x-[32px] top-0 h-[315px] border-x border-[#e2e8df] bg-gradient-to-r from-[#465a61] via-[#e0e4dc] to-[#66787c]" />
+                <div className="absolute left-[73px] top-[49px] h-[60px] w-[44px] rounded-[48%] border-[5px] border-[#7d8e8d] bg-[radial-gradient(circle_at_35%_30%,#9fd4df,#183b4d_55%,#06131c)] shadow-[0_0_25px_#75c4d933]" />
+                <div className="absolute left-[64px] top-[131px] h-[3px] w-[62px] bg-[#647b7a]" />
+                <div className="absolute left-[64px] top-[143px] h-[3px] w-[62px] bg-[#647b7a]" />
+                <div className="absolute left-[64px] top-[155px] h-[3px] w-[62px] bg-[#647b7a]" />
+                <div className="absolute left-[74px] top-[180px] h-[55px] w-[42px] border border-[#647b7a] bg-[#22363c]" />
+                <div className="absolute bottom-[38px] left-[63px] h-[65px] w-[64px] bg-gradient-to-b from-[#596d71] to-[#111e24]" />
+                <div className="absolute bottom-[7px] left-[72px] h-[38px] w-[46px] rounded-b-xl border border-[#8c9d96] bg-[#17262b]" />
+                {(stage === "launch" || stage === "landing") && <div className="absolute bottom-[-90px] left-[78px] h-[115px] w-[34px] origin-top bg-gradient-to-b from-[#f9f0bb] via-[#f49b43] to-transparent" style={{ animation: "engineFlicker .18s ease-in-out infinite" }} />}
+                {(stage === "boarding" || stage === "startup") && <div className="hatch absolute left-[126px] top-[155px] h-[88px] w-[30px] rounded-r-xl border border-[#efb658] bg-[#15242b]" />}
+              </div>
+            </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 text-center md:block"><p className="font-mono text-[10px] text-[#d7e8bd]">THRUST {Math.round(telemetry.throttle*100)}% · ENERGY {Math.round(telemetry.energy)}% · O₂ {Math.round(telemetry.oxygen)}%</p><p className="mt-1 text-[8px] uppercase tracking-[0.2em] text-[#8aa99a]">Flight path is schematic · maintain green guidance corridor</p></div>
-
-      {helpOpen && <div className="absolute inset-0 z-50 grid place-items-center bg-[#02070b]/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="flight-help-title">
-        <div className="w-full max-w-xl border border-[#6ebc91] bg-[#07151b] p-5 shadow-[0_0_50px_rgba(110,188,145,.16)] sm:p-7">
-          <div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#efb658]">Pilot briefing</p><h2 id="flight-help-title" className="mt-2 text-lg font-black uppercase tracking-[0.12em] sm:text-2xl">How to fly this mission</h2></div><button type="button" aria-label="Close controls guide" onClick={()=>setHelpOpen(false)} className="border border-[#526c62] px-3 py-2 text-sm text-[#dce8df]">✕</button></div>
-          <p className="mt-3 text-xs leading-relaxed text-[#a5b6ac]">Keep the rocket close to the planned trajectory. Green means the guidance path is safe; red means critical flight conditions. Make small adjustments and watch the readings.</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="border border-[#294148] bg-[#0b1a21] p-3"><h3 className="text-[10px] font-bold uppercase text-[#9be0b7]">Movement</h3><p className="mt-2 text-xs leading-relaxed text-[#dce8df]"><b>W / ↑</b> increase throttle<br/><b>S / ↓</b> decrease throttle<br/><b>A / ←</b> pitch trim left<br/><b>D / →</b> pitch trim right</p></div>
-            <div className="border border-[#294148] bg-[#0b1a21] p-3"><h3 className="text-[10px] font-bold uppercase text-[#9be0b7]">Systems</h3><p className="mt-2 text-xs leading-relaxed text-[#dce8df]"><b>Q / E</b> electrical load − / +<br/><b>O / P</b> oxygen flow − / +<br/><b>H / J</b> cabin heat − / +</p></div>
-            <div className="border border-[#294148] bg-[#0b1a21] p-3 sm:col-span-2"><h3 className="text-[10px] font-bold uppercase text-[#efb658]">What the controls do</h3><p className="mt-2 text-xs leading-relaxed text-[#a5b6ac]"><b>Throttle:</b> changes thrust and acceleration. <b>Pitch trim:</b> offsets the target angle. <b>Electrical load:</b> higher settings drain the reserve faster. <b>Oxygen flow:</b> higher settings use oxygen faster and help cabin pressure. <b>Cabin heat:</b> negative cools, positive warms the cabin. Use the side sliders for fine adjustments.</p></div>
+            {stage === "startup" && <div className="absolute inset-0 z-20 bg-[#071017]/55"><div className="absolute left-1/2 top-1/2 w-[min(90%,440px)] -translate-x-1/2 -translate-y-1/2 border border-[#587a74] bg-[#08151d]/95 p-5 shadow-[0_0_70px_#0009]"><p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#efb658]"><Power size={14} /> Flight computer startup</p><div className="space-y-1 font-mono text-[10px] leading-5 text-[#9bd3b1]">{bootLines.slice(-7).map((line) => <p key={line}><span className="text-[#efb658]">&gt;</span> {line}</p>)}</div><div className="mt-4 h-1.5 overflow-hidden bg-[#1e3439]"><div className="h-full bg-[#7bc69b] transition-all duration-500" style={{ width: `${Math.min(100, bootLines.length / 8 * 100)}%` }} /></div></div></div>}
+            {stage === "launch" && <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,transparent_20%,rgba(243,151,61,.16),rgba(245,196,114,.22))]" />}
+            {stage === "landing" && <><div className="absolute inset-x-0 bottom-[12%] z-10 h-32 rounded-[50%] bg-[#b3b8a0]/25 blur-2xl" style={{ animation: "dustRoll 2s ease-in-out infinite alternate" }} /><div className="absolute inset-0 bg-[#b9b8a1]/10" /></>}
+            {isLanded && <div className="absolute bottom-[23%] right-[9%] z-10 w-[31%] min-w-[145px]"><div className="relative h-28 border border-[#b9cbb4] bg-gradient-to-b from-[#8b9e96] to-[#344a49] shadow-[0_0_35px_#c8d8c833]"><div className="absolute inset-x-4 top-3 h-12 border border-[#d1d7c6] bg-[linear-gradient(135deg,#1b4855,#87b9bd_50%,#203c4c)]" /><div className="absolute bottom-0 left-1/2 h-12 w-10 -translate-x-1/2 border-x border-t border-[#aabeb0] bg-[#182a30]" /><div className="absolute -top-3 left-1/2 h-3 w-20 -translate-x-1/2 bg-[#82938b]" /></div><p className="mt-2 text-center text-[8px] uppercase tracking-[.18em] text-[#c6d5c4]">Habitat / Alpha base</p></div>}
+            {stage === "outside" && <div className="absolute inset-0 z-30 bg-[#071017]/30"><div className="absolute bottom-0 left-0 right-0 h-[36%] bg-[linear-gradient(180deg,#b0b19a,#4d5a4c)]" /></div>}
+            <div className="absolute left-4 top-4 z-20 border border-[#58706d] bg-[#071017]/75 px-3 py-2 backdrop-blur"><p className="text-[8px] uppercase tracking-[.2em] text-[#a5bdb2]">Visual flight deck</p><p className="mt-1 font-mono text-[10px] text-[#d9e8d5]">CAM {String(Math.max(1, stageIndex + 1)).padStart(2, "0")} · {stage === "landed" || stage === "outside" ? "SURFACE" : isFlight ? "FLIGHT" : "EXTERNAL"}</p></div>
+            {isLanded && <div className="absolute left-4 bottom-4 z-20 border border-[#719780] bg-[#071710]/80 px-3 py-2 text-[9px] uppercase tracking-[.15em] text-[#a6e0b4]"><CheckCircle2 className="mr-2 inline h-3 w-3" />Touchdown confirmed</div>}
           </div>
-          <button type="button" onClick={()=>setHelpOpen(false)} className="mt-5 w-full bg-[#6ebc91] px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#071812]">Got it · enter flight deck</button>
-        </div>
-      </div>}
-    </div>
-  );
-}
+        </section>
 
-function Control({ label, explanation, value, min, max, step, display, onChange }: { label: string; explanation: string; value: number; min: number; max: number; step: number; display: string; onChange: (value: number) => void }) {
-  return (
-    <label className="mb-4 block last:mb-0">
-      <span className="flex items-center justify-between gap-3 text-[10px] text-[#dce8df]"><span>{label}</span><span className="font-mono text-[#efb658]">{display}</span></span>
-      <span className="mt-1 block text-[9px] leading-relaxed text-[#779b9b]">{explanation}</span>
-      <input aria-label={label} title={explanation} className="mt-2 w-full accent-[#efb658]" type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} />
-      <span className="mt-1 flex justify-between text-[8px] uppercase tracking-[0.12em] text-[#6f8c8b]"><span>{min}</span><span>{max}</span></span>
-    </label>
+        <aside className="flex flex-col border border-[#33494b] bg-[#0a161e]/95 p-5 backdrop-blur">
+          <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.22em] text-[#efb658]"><ShieldCheck size={14} /> Mission sequence</div>
+          <h1 className="mt-5 text-2xl font-semibold uppercase leading-tight tracking-[.07em]">{copy.title}</h1>
+          <p className="mt-3 text-xs leading-6 text-[#9bb4ac]">{copy.detail}</p>
+          <div className="mt-6 space-y-3">{timeline.map((item, index) => <div key={item} className="flex items-center gap-3 text-[9px] uppercase tracking-[.13em]"><span className={`grid h-6 w-6 place-items-center border ${index < stageIndex || (stage === "outside") ? "border-[#78c49a] bg-[#16362b] text-[#a7e6bb]" : index === stageIndex ? "border-[#efb658] bg-[#3b3020] text-[#efb658]" : "border-[#2d4347] text-[#5c7775]"}`}>{index < stageIndex ? "✓" : String(index + 1).padStart(2, "0")}</span><span className={index === stageIndex ? "text-[#f0d9a6]" : index < stageIndex ? "text-[#9bc7a8]" : "text-[#637d7a]"}>{stageCopy[item].title}</span></div>)}</div>
+          <div className="mt-7 border-t border-[#2c4246] pt-4"><div className="flex items-center justify-between text-[9px] uppercase tracking-[.16em] text-[#7f9a96]"><span>Flight telemetry</span><span className="text-[#8ed2a6]">{isLanded ? "STABLE" : stage === "launch" ? "THRUST" : "NOMINAL"}</span></div><div className="mt-3 grid grid-cols-2 gap-2">{[{label:"CABIN",value:stage === "startup" ? "101.3 kPa" : "SEALED"},{label:"LIFE SUPPORT",value:"ONLINE"},{label:"GUIDANCE",value:stage === "launch" ? "ASCENT" : isLanded ? "LANDED" : "TRACK"},{label:"MISSION",value:pending?.missionTitle ?? "MISSION 01"}].map((item) => <div key={item.label} className="border border-[#2b4145] bg-[#0d2026] p-2"><p className="text-[7px] uppercase tracking-[.13em] text-[#718e88]">{item.label}</p><p className="mt-1 truncate font-mono text-[9px] text-[#d4e2d4]">{item.value}</p></div>)}</div></div>
+          <div className="mt-auto pt-6">
+            {stage === "landed" || stage === "outside" ? <button onClick={() => { setStage("outside"); window.setTimeout(() => { window.location.href = "/preview/MissionSimulation"; }, 1100); }} className="flex w-full items-center justify-center gap-2 bg-[#efb658] px-4 py-4 text-[10px] font-black uppercase tracking-[.18em] text-[#172126] transition hover:bg-[#f6ca76]"><ArrowRight size={15} /> Go Outside <ArrowRight size={14} /></button> : <button onClick={skipAhead} className="flex w-full items-center justify-center gap-2 border border-[#4c6665] px-4 py-3 text-[9px] font-bold uppercase tracking-[.15em] text-[#a9c4b8] transition hover:border-[#efb658] hover:text-[#efb658]"><ArrowRight size={14} /> {manual ? "Continue sequence" : "Skip to next sequence"}</button>}
+            <p className="mt-3 text-center text-[8px] leading-4 text-[#647f7c]">Cinematic sequence · no external assets required · mission data stays in your local save.</p>
+          </div>
+        </aside>
+      </div>
+    </main>
   );
 }
 
