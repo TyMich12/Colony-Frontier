@@ -1966,10 +1966,16 @@ function Scene({ props }: { props: Props }) {
   const navigationAccuracy = Math.max(0, Math.min(100, 100 - navigationErrorM)) / 100;
   const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
   const sunAngleDeg = props.lunarNight ? -8 : interpolateSolarProfile(lunarDay).sunAltitudeDeg;
-  const sunAzimuth = (lunarDay / 14) * Math.PI;
+  // Place celestial bodies in the visible, far background of the colony camera. The
+  // old ±36-unit orbit pushed them outside the orthographic camera framing, so the
+  // simulation was technically drawing them but players could not see them.
+  const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
-  const sunHorizontalRadius = 36 * Math.cos(sunAltitudeRad);
-  const sunPosition: [number, number, number] = [Math.cos(sunAzimuth) * sunHorizontalRadius, props.lunarNight ? -12 : Math.max(0.35, 36 * Math.sin(sunAltitudeRad)), Math.sin(sunAzimuth) * sunHorizontalRadius];
+  const sunPosition: [number, number, number] = [
+    -12 + sunProgress * 24,
+    props.lunarNight ? -12 : 2.5 + Math.max(0, Math.sin(sunAltitudeRad)) * 12,
+    -15,
+  ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -1984,11 +1990,15 @@ function Scene({ props }: { props: Props }) {
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.06 + daylight * 0.28} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.10 + daylight * 0.48]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
-      {!mars && <group position={sunPosition} frustumCulled={false}><mesh><sphereGeometry args={[0.34, 40, 32]} /><meshBasicMaterial color={daylight > 0.08 ? "#fff1bb" : "#d8d8cf"} toneMapped={false} /></mesh><mesh><sphereGeometry args={[0.50, 40, 32]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={daylight > 0.08 ? 0.12 : 0.035} depthWrite={false} toneMapped={false} /></mesh></group>}
-      {!mars && <group position={[-32, 26, -38]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
-        <mesh><sphereGeometry args={[1.55, 96, 64]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} /></mesh>
-        <mesh scale={1.018}><sphereGeometry args={[1.55, 64, 48]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
-        <mesh scale={1.045}><sphereGeometry args={[1.55, 64, 48]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.11} side={THREE.BackSide} /></mesh>
+      {!mars && <group position={sunPosition} frustumCulled={false}>
+        <mesh><sphereGeometry args={[0.72, 40, 32]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff1bb"} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[1.12, 40, 32]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={props.lunarNight ? 0.025 : 0.16} depthWrite={false} toneMapped={false} /></mesh>
+      </group>}
+      {!mars && <group position={[-9, 5.5, -13]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
+        {/* Earth is deliberately small and behind the colony, like a distant sky body. */}
+        <mesh><sphereGeometry args={[1.05, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} /></mesh>
+        <mesh scale={1.018}><sphereGeometry args={[1.05, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
+        <mesh scale={1.045}><sphereGeometry args={[1.05, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.14} side={THREE.BackSide} /></mesh>
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
