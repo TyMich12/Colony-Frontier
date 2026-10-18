@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { ContactShadows, Float, Stars } from "@react-three/drei";
+import * as THREE from "three";
 import { ArrowRight, CheckCircle2, Power, Radio, ShieldCheck, Volume2 } from "lucide-react";
 import { loadPendingMission } from "./missionRuntime";
 
@@ -13,8 +16,337 @@ const stageCopy: Record<Stage, { label: string; title: string; detail: string }>
   landed: { label: "MISSION SITE / 06", title: "Touchdown confirmed", detail: "Engines shut down. The colony habitat is visible through the forward window." },
   outside: { label: "SURFACE OPERATIONS / 07", title: "Welcome to the frontier", detail: "Suit integrity confirmed. Transfer to the mission simulation." },
 };
-
 const timeline: Stage[] = ["approach", "boarding", "startup", "launch", "landing", "landed"];
+
+function Rocket({ stage }: { stage: Stage }) {
+  const root = useRef<THREE.Group>(null);
+  const flame = useRef<THREE.Group>(null);
+  const landingGear = useRef<THREE.Group>(null);
+  const launchStart = useRef<number | null>(null);
+  const flameMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: "#ff9b45", transparent: true, opacity: 0.9 }), []);
+  useFrame(({ clock }, delta) => {
+    if (!root.current) return;
+    const t = clock.elapsedTime;
+    if (stage === "launch") {
+      launchStart.current ??= t;
+      root.current.position.y = THREE.MathUtils.damp(root.current.position.y, 2 + Math.min(8, (t - launchStart.current) * 1.25), delta, 1.2);
+      root.current.rotation.z = THREE.MathUtils.damp(root.current.rotation.z, -0.025, delta, 1);
+    } else if (stage === "landing") {
+      root.current.position.y = THREE.MathUtils.damp(root.current.position.y, 0.12, delta, 0.65);
+      root.current.rotation.z = THREE.MathUtils.damp(root.current.rotation.z, 0, delta, 1);
+      launchStart.current = null;
+    } else {
+      root.current.position.y = THREE.MathUtils.damp(root.current.position.y, 0, delta, 2.5);
+      root.current.rotation.z = THREE.MathUtils.damp(root.current.rotation.z, 0, delta, 2);
+      if (stage !== "launch") launchStart.current = null;
+    }
+    if (flame.current) {
+      const active = stage === "launch" || stage === "landing";
+      flame.current.visible = active;
+      flame.current.scale.y = active ? 0.8 + Math.abs(Math.sin(t * 15)) * 0.7 : 0.01;
+      flame.current.scale.x = active ? 0.8 + Math.sin(t * 9) * 0.12 : 0.01;
+    }
+    if (landingGear.current) landingGear.current.visible = stage !== "launch";
+  });
+  return (
+    <group ref={root} position={[1.35, 0, 0]} rotation={[0, 0, 0]}>
+      {/* Main pressure hull: layered metal sections catch the scene lights like real hardware. */}
+      <mesh position={[0, 1.65, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.64, 0.72, 2.75, 48, 1]} />
+        <meshStandardMaterial color="#aab8bd" metalness={0.82} roughness={0.27} />
+      </mesh>
+      <mesh position={[0, 3.13, 0]} rotation={[Math.PI, 0, 0]} castShadow>
+        <coneGeometry args={[0.64, 1.15, 48, 1]} />
+        <meshStandardMaterial color="#d7dedc" metalness={0.72} roughness={0.24} />
+      </mesh>
+      <mesh position={[0, 3.72, 0]} castShadow>
+        <sphereGeometry args={[0.12, 24, 16]} />
+        <meshStandardMaterial color="#f2f0df" metalness={0.25} roughness={0.2} emissive="#b5d8e7" emissiveIntensity={0.35} />
+      </mesh>
+      <mesh position={[0, 2.75, 0.616]} castShadow>
+        <sphereGeometry args={[0.34, 32, 24]} />
+        <meshPhysicalMaterial color="#163b4a" metalness={0.55} roughness={0.12} clearcoat={1} clearcoatRoughness={0.08} />
+      </mesh>
+      <mesh position={[-0.1, 2.83, 0.91]} rotation={[0.1, 0, -0.25]}>
+        <planeGeometry args={[0.11, 0.31]} />
+        <meshBasicMaterial color="#a8e5f3" transparent opacity={0.65} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 0.48, 0.8, 0]}>
+          <mesh position={[side * 0.2, 0, 0]} rotation={[0, 0, -side * 0.15]} castShadow>
+            <boxGeometry args={[0.48, 1.12, 0.18]} />
+            <meshStandardMaterial color="#52646b" metalness={0.72} roughness={0.38} />
+          </mesh>
+          <mesh position={[side * 0.2, 0.25, 0.105]}>
+            <boxGeometry args={[0.26, 0.09, 0.025]} />
+            <meshStandardMaterial color="#e7b86d" metalness={0.35} roughness={0.32} />
+          </mesh>
+        </group>
+      ))}
+      {Array.from({ length: 9 }, (_, i) => (
+        <mesh key={i} position={[0, 2.88 - i * 0.25, 0.638]}>
+          <boxGeometry args={[0.92, 0.025, 0.035]} />
+          <meshStandardMaterial color={i % 2 ? "#687b81" : "#e6c17d"} metalness={0.65} roughness={0.35} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.1, 0]} castShadow>
+        <cylinderGeometry args={[0.52, 0.59, 0.35, 32]} />
+        <meshStandardMaterial color="#394a51" metalness={0.8} roughness={0.3} />
+      </mesh>
+      {[-0.29, 0, 0.29].map((x) => (
+        <group key={x} position={[x, -0.12, 0]}>
+          <mesh>
+            <cylinderGeometry args={[0.12, 0.16, 0.28, 24]} />
+            <meshStandardMaterial color="#1c272d" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, -0.17, 0]}>
+            <cylinderGeometry args={[0.06, 0.1, 0.12, 20]} />
+            <meshBasicMaterial color="#ffb35d" />
+          </mesh>
+        </group>
+      ))}
+      <group ref={flame} position={[0, -0.42, 0]} visible={false}>
+        <mesh material={flameMaterial}>
+          <coneGeometry args={[0.38, 2.25, 32, 1]} />
+        </mesh>
+        <mesh position={[0, -0.48, 0]}>
+          <coneGeometry args={[0.2, 2.1, 24, 1]} />
+          <meshBasicMaterial color="#fff4cf" transparent opacity={0.94} />
+        </mesh>
+        <pointLight position={[0, -0.7, 0]} color="#ff873b" intensity={18} distance={8} />
+      </group>
+      <group ref={landingGear}>
+        {[-1, 1].map((side) => (
+          <group key={side} position={[side * 0.46, 0.1, 0]}>
+            <mesh position={[side * 0.16, -0.2, 0]} rotation={[0, 0, -side * 0.38]}>
+              <cylinderGeometry args={[0.045, 0.055, 0.62, 12]} />
+              <meshStandardMaterial color="#8a999b" metalness={0.8} roughness={0.3} />
+            </mesh>
+            <mesh position={[side * 0.3, -0.48, 0.08]}>
+              <boxGeometry args={[0.3, 0.07, 0.26]} />
+              <meshStandardMaterial color="#59686a" metalness={0.7} roughness={0.4} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+      <pointLight position={[0, 2.6, 1.1]} color="#6ac6e8" intensity={stage === "startup" ? 5 : 1.1} distance={3.5} />
+    </group>
+  );
+}
+
+function Astronaut({ stage }: { stage: Stage }) {
+  const group = useRef<THREE.Group>(null);
+  const visor = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }, delta) => {
+    if (!group.current) return;
+    const walking = stage === "approach" || stage === "boarding";
+    const targetX = stage === "approach" ? -2.45 : stage === "boarding" ? -0.8 : -0.95;
+    group.current.position.x = THREE.MathUtils.damp(group.current.position.x, targetX, delta, walking ? 0.85 : 2.5);
+    group.current.position.y = walking ? Math.abs(Math.sin(clock.elapsedTime * 6)) * 0.045 : 0;
+    group.current.rotation.y = THREE.MathUtils.damp(group.current.rotation.y, stage === "approach" ? -0.15 : 0.65, delta, 2);
+    if (visor.current) (visor.current.material as THREE.MeshStandardMaterial).emissiveIntensity = stage === "startup" ? 0.7 : 0.16;
+  });
+  return (
+    <group ref={group} position={[-3.7, 0, 0.55]} scale={0.78}>
+      <mesh position={[0, 1.03, 0]} castShadow>
+        <sphereGeometry args={[0.27, 32, 24]} />
+        <meshStandardMaterial color="#e5e8e3" roughness={0.28} metalness={0.18} />
+      </mesh>
+      <mesh ref={visor} position={[0, 1.06, 0.22]} castShadow>
+        <sphereGeometry args={[0.195, 32, 24]} />
+        <meshPhysicalMaterial color="#102c3c" metalness={0.65} roughness={0.1} clearcoat={1} emissive="#2b9dc3" emissiveIntensity={0.16} />
+      </mesh>
+      <mesh position={[0, 0.58, 0]} castShadow>
+        <capsuleGeometry args={[0.29, 0.58, 8, 16]} />
+        <meshStandardMaterial color="#d8dfdc" roughness={0.48} metalness={0.1} />
+      </mesh>
+      <mesh position={[0, 0.62, 0.25]}>
+        <boxGeometry args={[0.28, 0.19, 0.035]} />
+        <meshStandardMaterial color="#283f48" metalness={0.45} roughness={0.3} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 0.32, 0.65, 0]}>
+          <mesh position={[side * 0.025, -0.09, 0]} rotation={[0, 0, -side * 0.23]} castShadow>
+            <capsuleGeometry args={[0.09, 0.35, 5, 10]} />
+            <meshStandardMaterial color="#c7d1ce" roughness={0.52} />
+          </mesh>
+          <mesh position={[side * 0.07, -0.32, 0.03]}>
+            <sphereGeometry args={[0.095, 16, 12]} />
+            <meshStandardMaterial color="#263941" metalness={0.35} roughness={0.4} />
+          </mesh>
+        </group>
+      ))}
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 0.14, 0.24, 0]}>
+          <mesh position={[0, -0.17, 0]} castShadow>
+            <capsuleGeometry args={[0.105, 0.38, 5, 10]} />
+            <meshStandardMaterial color="#aebbb8" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, -0.4, 0.07]}>
+            <boxGeometry args={[0.19, 0.12, 0.31]} />
+            <meshStandardMaterial color="#303f45" roughness={0.58} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, 0.62, -0.24]}>
+        <boxGeometry args={[0.32, 0.4, 0.13]} />
+        <meshStandardMaterial color="#52646a" metalness={0.35} roughness={0.48} />
+      </mesh>
+    </group>
+  );
+}
+
+function LunarHabitat() {
+  return (
+    <group position={[4.1, 0, -1.8]}>
+      <mesh position={[0, 0.65, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[1.12, 1.28, 1.3, 48]} />
+        <meshStandardMaterial color="#8a9895" metalness={0.42} roughness={0.44} />
+      </mesh>
+      <mesh position={[0, 1.31, 0]} castShadow>
+        <sphereGeometry args={[1.12, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#c2cbc4" metalness={0.32} roughness={0.38} />
+      </mesh>
+      <mesh position={[0, 0.73, 1.105]}>
+        <boxGeometry args={[1.35, 0.42, 0.055]} />
+        <meshPhysicalMaterial color="#163a4c" metalness={0.48} roughness={0.12} clearcoat={1} />
+      </mesh>
+      {[-0.65, 0.65].map((x) => (
+        <mesh key={x} position={[x, 0.1, 0.15]} castShadow>
+          <cylinderGeometry args={[0.07, 0.09, 0.25, 12]} />
+          <meshStandardMaterial color="#48585b" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.2, -1.4]} rotation={[0.2, 0, -0.18]}>
+        <boxGeometry args={[2.7, 0.04, 0.8]} />
+        <meshStandardMaterial color="#203d50" metalness={0.6} roughness={0.3} />
+      </mesh>
+      {Array.from({ length: 8 }, (_, i) => (
+        <mesh key={i} position={[-1.15 + i * 0.33, 1.23, -1.4]}>
+          <boxGeometry args={[0.27, 0.025, 0.68]} />
+          <meshStandardMaterial color={i % 2 ? "#376e87" : "#4b8195"} metalness={0.4} roughness={0.32} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Terrain() {
+  const rocks = useMemo(() => Array.from({ length: 42 }, (_, i) => ({
+    x: ((i * 37) % 23) - 11,
+    z: -3 + ((i * 19) % 13),
+    scale: 0.08 + ((i * 7) % 18) / 100,
+    rotation: (i * 13) % 3,
+  })), []);
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 0]} receiveShadow>
+        <planeGeometry args={[200, 200, 80, 80]} />
+        <meshStandardMaterial color="#77776d" roughness={1} metalness={0} />
+      </mesh>
+      {rocks.map((rock, i) => (
+        <mesh key={i} position={[rock.x, -0.03 + rock.scale * 0.3, rock.z]} rotation={[rock.rotation, i, rock.rotation * 0.6]} scale={[rock.scale * 1.5, rock.scale, rock.scale]}>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color={i % 3 === 0 ? "#99968a" : "#62665f"} roughness={1} />
+        </mesh>
+      ))}
+      <mesh position={[-4.5, -0.02, -7]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.4, 1.8, 64]} />
+        <meshStandardMaterial color="#393f3e" roughness={1} />
+      </mesh>
+    </group>
+  );
+}
+
+function MoonSky() {
+  const moon = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (moon.current) moon.current.rotation.y = clock.elapsedTime * 0.012;
+  });
+  return (
+    <>
+      <color attach="background" args={["#050913"]} />
+      <fog attach="fog" args={["#111c2a", 13, 34]} />
+      <Stars radius={100} depth={65} count={2400} factor={3} saturation={0.15} fade speed={0.25} />
+      <mesh ref={moon} position={[-7, 7.5, -15]} scale={2.2}>
+        <sphereGeometry args={[1, 64, 48]} />
+        <meshStandardMaterial color="#9aabb4" roughness={0.92} metalness={0.04} />
+      </mesh>
+      <mesh position={[-7, 7.5, -12.7]} scale={2.2}>
+        <sphereGeometry args={[1.005, 48, 32]} />
+        <meshBasicMaterial color="#b7d9ec" transparent opacity={0.09} side={THREE.BackSide} />
+      </mesh>
+      <ambientLight intensity={0.48} />
+      <directionalLight position={[-6, 10, 5]} intensity={3.1} color="#d4e7ff" castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <pointLight position={[3, 5, 4]} intensity={1.1} color="#f2bf87" distance={24} />
+    </>
+  );
+}
+
+function CinematicCamera({ stage }: { stage: Stage }) {
+  const { camera } = useThree();
+  useFrame((_, delta) => {
+    const targets: Record<Stage, { pos: [number, number, number]; look: [number, number, number]; fov: number }> = {
+      approach: { pos: [-1.7, 3.2, 10.8], look: [0, 1.35, 0], fov: 44 },
+      boarding: { pos: [-0.3, 3.0, 8.2], look: [0.8, 1.55, 0], fov: 39 },
+      startup: { pos: [0.15, 2.8, 7.2], look: [1.1, 1.7, 0], fov: 34 },
+      launch: { pos: [-0.5, 5.5, 12], look: [1, 3.5, 0], fov: 43 },
+      landing: { pos: [-0.2, 4.2, 11.5], look: [1, 1.5, 0], fov: 43 },
+      landed: { pos: [0.5, 3.5, 13.5], look: [0.8, 1.1, 0], fov: 48 },
+      outside: { pos: [-2.5, 2.7, 10], look: [0.5, 1.1, 0], fov: 49 },
+    };
+    const target = targets[stage];
+    camera.position.x = THREE.MathUtils.damp(camera.position.x, target.pos[0], delta, 1.3);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, target.pos[1], delta, 1.3);
+    camera.position.z = THREE.MathUtils.damp(camera.position.z, target.pos[2], delta, 1.3);
+    const look = new THREE.Vector3(...target.look);
+    camera.lookAt(look);
+    if ("fov" in camera) {
+      camera.fov = THREE.MathUtils.damp(camera.fov, target.fov, delta, 1.3);
+      camera.updateProjectionMatrix();
+    }
+  });
+  return null;
+}
+
+function Scene({ stage }: { stage: Stage }) {
+  const dust = useRef<THREE.Points>(null);
+  const particles = useMemo(() => {
+    const positions = new Float32Array(420 * 3);
+    for (let i = 0; i < 420; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 22;
+      positions[i * 3 + 1] = Math.random() * 3.4;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 18;
+    }
+    return positions;
+  }, []);
+  useFrame((_, delta) => {
+    if (dust.current && (stage === "landing" || stage === "launch")) {
+      dust.current.rotation.y += delta * 0.12;
+      const mat = dust.current.material as THREE.PointsMaterial;
+      mat.opacity = THREE.MathUtils.damp(mat.opacity, stage === "landing" ? 0.72 : 0.26, delta, 1.4);
+    } else if (dust.current) {
+      (dust.current.material as THREE.PointsMaterial).opacity = THREE.MathUtils.damp((dust.current.material as THREE.PointsMaterial).opacity, 0, delta, 2);
+    }
+  });
+  return (
+    <>
+      <MoonSky />
+      <Terrain />
+      <Rocket stage={stage} />
+      <Astronaut stage={stage} />
+      <LunarHabitat />
+      <points ref={dust}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[particles, 3]} count={particles.length / 3} />
+        </bufferGeometry>
+        <pointsMaterial color="#d2c5a6" size={0.055} transparent opacity={0} depthWrite={false} sizeAttenuation />
+      </points>
+      <ContactShadows position={[0, -0.1, 0]} opacity={0.5} scale={18} blur={2.5} far={5} resolution={512} color="#05070a" />
+      <CinematicCamera stage={stage} />
+    </>
+  );
+}
 
 export function FlightSequence() {
   const pending = loadPendingMission();
@@ -35,28 +367,26 @@ export function FlightSequence() {
       "ALL PRIMARY SYSTEMS NOMINAL",
     ];
     let index = 0;
-    let interval: number | undefined;
     const start = window.setTimeout(() => {
-      setStage("boarding");
-      interval = window.setInterval(() => {
+      setStage((old) => old === "approach" ? "boarding" : old);
+      const interval = window.setInterval(() => {
         setBootLines((old) => {
-          if (index >= lines.length) return old;
+          if (index >= lines.length) {
+            window.clearInterval(interval);
+            return old;
+          }
           const next = [...old, lines[index]];
           index += 1;
-          if (index >= lines.length && interval) window.clearInterval(interval);
+          if (index >= lines.length) window.clearInterval(interval);
           return next;
         });
       }, 520);
-      window.setTimeout(() => setStage((old) => old === "startup" ? old : "startup"), 1500);
     }, 2600);
-    return () => {
-      window.clearTimeout(start);
-      if (interval) window.clearInterval(interval);
-    };
+    return () => window.clearTimeout(start);
   }, []);
 
   useEffect(() => {
-    if (stage !== "approach" && stage !== "boarding" && stage !== "startup" && stage !== "launch" && stage !== "landing") return;
+    if (!["approach", "boarding", "startup", "launch", "landing"].includes(stage)) return;
     const next: Partial<Record<Stage, Stage>> = {
       approach: "boarding",
       boarding: "startup",
@@ -64,7 +394,7 @@ export function FlightSequence() {
       launch: "landing",
       landing: "landed",
     };
-    const delay = stage === "approach" ? 3600 : stage === "boarding" ? 5000 : stage === "startup" ? 6500 : stage === "launch" ? 6500 : 5500;
+    const delay = stage === "approach" ? 4300 : stage === "boarding" ? 5200 : stage === "startup" ? 7800 : stage === "launch" ? 6500 : 6500;
     const timer = window.setTimeout(() => setStage((old) => old === stage ? (next[stage] ?? old) : old), delay);
     return () => window.clearTimeout(timer);
   }, [stage]);
@@ -80,30 +410,13 @@ export function FlightSequence() {
       return "landed";
     });
   };
-
   const copy = stageCopy[stage];
   const isFlight = stage === "launch" || stage === "landing";
   const isLanded = stage === "landed" || stage === "outside";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050b12] text-[#e7f0eb]" style={{ fontFamily: "Arial, sans-serif" }}>
-      <style>{`
-        @keyframes starsDrift { from { transform: translate3d(0,0,0); } to { transform: translate3d(-55px,32px,0); } }
-        @keyframes cabinPulse { 0%,100% { opacity:.4 } 50% { opacity:1 } }
-        @keyframes engineFlicker { 0%,100% { transform:scaleY(.8); opacity:.72 } 50% { transform:scaleY(1.18); opacity:1 } }
-        @keyframes shake { 0%,100% { transform:translate(0,0) } 25% { transform:translate(1px,-1px) } 50% { transform:translate(-1px,1px) } 75% { transform:translate(1px,1px) } }
-        @keyframes dustRoll { from { transform:translateX(-8%) scaleY(.7); opacity:.25 } to { transform:translateX(8%) scaleY(1.2); opacity:.75 } }
-        @keyframes walkIn { from { transform:translateX(-160px) scale(1); opacity:0 } to { transform:translateX(0) scale(.72); opacity:1 } }
-        @keyframes hatchGlow { 0%,100% { box-shadow:0 0 12px #efb65833 } 50% { box-shadow:0 0 35px #efb65899 } }
-        .stars { background-image:radial-gradient(2px 2px at 10% 22%,#d8e9f0 50%,transparent 60%),radial-gradient(1px 1px at 25% 68%,#c2d4e3 50%,transparent 60%),radial-gradient(1px 1px at 67% 31%,#fff 50%,transparent 60%),radial-gradient(2px 2px at 81% 75%,#c9dbe4 50%,transparent 60%),radial-gradient(1px 1px at 92% 18%,#fff 50%,transparent 60%),radial-gradient(1px 1px at 48% 42%,#d6e5ed 50%,transparent 60%); background-size:370px 270px; animation:starsDrift 28s linear infinite; }
-        .rocket-shell { clip-path:polygon(50% 0%,63% 12%,67% 25%,67% 72%,86% 92%,64% 86%,58% 100%,50% 91%,42% 100%,36% 86%,14% 92%,33% 72%,33% 25%,37% 12%); }
-        .hatch { animation:hatchGlow 2.8s ease-in-out infinite; }
-        .scene-shake { animation:shake .16s linear infinite; }
-      `}</style>
-
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(43,93,112,.32),transparent_50%),linear-gradient(180deg,#07111e,#10212a_70%,#080e12)]" />
-      <div className="stars absolute inset-0 opacity-70" />
-      <header className="relative z-20 flex items-center justify-between border-b border-[#334a4c] bg-[#071017]/70 px-5 py-4 backdrop-blur-md md:px-10">
+    <main className="relative min-h-screen overflow-hidden bg-[#050913] text-[#e7f0eb]" style={{ fontFamily: "Arial, sans-serif" }}>
+      <header className="relative z-20 flex items-center justify-between border-b border-[#334a4c] bg-[#071017]/85 px-5 py-4 backdrop-blur-xl md:px-10">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center border border-[#6f8a7d] bg-[#14252b] text-[#efb658]"><Radio size={18} /></div>
           <div><p className="text-[9px] uppercase tracking-[.32em] text-[#9bb6ac]">Colony Frontier Program</p><p className="mt-1 text-xs font-bold uppercase tracking-[.18em]">Flight operations / {pending?.campaign ?? "Moon"} campaign</p></div>
@@ -111,53 +424,27 @@ export function FlightSequence() {
         <button onClick={() => setSoundOn((v) => !v)} className="flex items-center gap-2 border border-[#33494c] px-3 py-2 text-[9px] uppercase tracking-[.14em] text-[#a8c0b4]" aria-pressed={soundOn}><Volume2 size={14} /> Audio {soundOn ? "enabled" : "muted"}</button>
       </header>
 
-      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-73px)] max-w-[1500px] gap-5 p-4 md:grid-cols-[minmax(0,1fr)_330px] md:p-7">
-        <section className={`relative min-h-[580px] overflow-hidden border border-[#334d51] bg-[#0b1922] ${isFlight ? "scene-shake" : ""}`}>
-          <div className="absolute inset-0" style={{ perspective: "1100px" }}>
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,#06101c_0%,#142d3b_52%,#53635c_100%)]" />
-            <div className="stars absolute inset-0 opacity-60" />
-            <div className="absolute left-[8%] top-[14%] h-24 w-24 rounded-full border border-[#b9cbbd]/40 bg-[#d8d8bd]/10 shadow-[0_0_70px_rgba(204,218,194,.12)]" />
-            <div className="absolute bottom-0 left-0 right-0 h-[29%] border-t border-[#9eb5a2]/25 bg-[linear-gradient(180deg,#5a6255,#202b28_55%,#0c1719)]" style={{ transform: "rotateX(5deg) scale(1.1)", transformOrigin: "bottom" }} />
-            <div className="absolute bottom-[20%] left-0 right-0 h-px bg-[#b5c5aa]/25" />
-            <div className="absolute bottom-[14%] left-[6%] h-12 w-[88%] opacity-40" style={{ background: "repeating-linear-gradient(90deg,transparent 0 45px,#d1d6bf 46px 47px,transparent 48px 90px)" }} />
-            <div className="absolute bottom-[28%] left-[7%] right-[7%] h-[1px] bg-[#b9c9b2]/30" />
-
-            {stage === "approach" && <div className="absolute bottom-[23%] left-[18%] z-10" style={{ animation: "walkIn 3s ease-out both" }}><div className="relative h-28 w-12"><div className="absolute left-3 top-0 h-7 w-7 rounded-full border border-[#b6c8c5] bg-[#8fa4a4]" /><div className="absolute left-2 top-7 h-14 w-9 skew-x-[-5deg] rounded-t-xl border border-[#90a8a7] bg-gradient-to-r from-[#364a52] via-[#c4cfca] to-[#53636a]" /><div className="absolute left-0 top-10 h-12 w-3 rotate-12 rounded bg-[#7c9394]" /><div className="absolute left-6 top-16 h-12 w-3 -rotate-6 rounded bg-[#819392]" /><div className="absolute left-2 top-[68px] h-3 w-4 rounded bg-[#c5d0c9]" /></div></div>}
-
-            <div className={`absolute bottom-[16%] left-1/2 z-10 w-[min(43%,310px)] -translate-x-1/2 transition-all duration-[1800ms] ${stage === "boarding" || stage === "startup" ? "scale-[1.15]" : stage === "launch" ? "translate-y-[-180px] scale-[.88]" : stage === "landing" ? "translate-y-[-70px] scale-[.9]" : ""}`} style={{ filter: "drop-shadow(0 16px 25px #0009)" }}>
-              <div className="relative mx-auto h-[360px] w-[190px]" style={{ transformStyle: "preserve-3d", transform: "rotateY(-9deg)" }}>
-                <div className="rocket-shell absolute inset-x-[32px] top-0 h-[315px] border-x border-[#e2e8df] bg-gradient-to-r from-[#465a61] via-[#e0e4dc] to-[#66787c]" />
-                <div className="absolute left-[73px] top-[49px] h-[60px] w-[44px] rounded-[48%] border-[5px] border-[#7d8e8d] bg-[radial-gradient(circle_at_35%_30%,#9fd4df,#183b4d_55%,#06131c)] shadow-[0_0_25px_#75c4d933]" />
-                <div className="absolute left-[64px] top-[131px] h-[3px] w-[62px] bg-[#647b7a]" />
-                <div className="absolute left-[64px] top-[143px] h-[3px] w-[62px] bg-[#647b7a]" />
-                <div className="absolute left-[64px] top-[155px] h-[3px] w-[62px] bg-[#647b7a]" />
-                <div className="absolute left-[74px] top-[180px] h-[55px] w-[42px] border border-[#647b7a] bg-[#22363c]" />
-                <div className="absolute bottom-[38px] left-[63px] h-[65px] w-[64px] bg-gradient-to-b from-[#596d71] to-[#111e24]" />
-                <div className="absolute bottom-[7px] left-[72px] h-[38px] w-[46px] rounded-b-xl border border-[#8c9d96] bg-[#17262b]" />
-                {(stage === "launch" || stage === "landing") && <div className="absolute bottom-[-90px] left-[78px] h-[115px] w-[34px] origin-top bg-gradient-to-b from-[#f9f0bb] via-[#f49b43] to-transparent" style={{ animation: "engineFlicker .18s ease-in-out infinite" }} />}
-                {(stage === "boarding" || stage === "startup") && <div className="hatch absolute left-[126px] top-[155px] h-[88px] w-[30px] rounded-r-xl border border-[#efb658] bg-[#15242b]" />}
-              </div>
-            </div>
-
-            {stage === "startup" && <div className="absolute inset-0 z-20 bg-[#071017]/55"><div className="absolute left-1/2 top-1/2 w-[min(90%,440px)] -translate-x-1/2 -translate-y-1/2 border border-[#587a74] bg-[#08151d]/95 p-5 shadow-[0_0_70px_#0009]"><p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#efb658]"><Power size={14} /> Flight computer startup</p><div className="space-y-1 font-mono text-[10px] leading-5 text-[#9bd3b1]">{bootLines.slice(-7).map((line) => <p key={line}><span className="text-[#efb658]">&gt;</span> {line}</p>)}</div><div className="mt-4 h-1.5 overflow-hidden bg-[#1e3439]"><div className="h-full bg-[#7bc69b] transition-all duration-500" style={{ width: `${Math.min(100, bootLines.length / 8 * 100)}%` }} /></div></div></div>}
-            {stage === "launch" && <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,transparent_20%,rgba(243,151,61,.16),rgba(245,196,114,.22))]" />}
-            {stage === "landing" && <><div className="absolute inset-x-0 bottom-[12%] z-10 h-32 rounded-[50%] bg-[#b3b8a0]/25 blur-2xl" style={{ animation: "dustRoll 2s ease-in-out infinite alternate" }} /><div className="absolute inset-0 bg-[#b9b8a1]/10" /></>}
-            {isLanded && <div className="absolute bottom-[23%] right-[9%] z-10 w-[31%] min-w-[145px]"><div className="relative h-28 border border-[#b9cbb4] bg-gradient-to-b from-[#8b9e96] to-[#344a49] shadow-[0_0_35px_#c8d8c833]"><div className="absolute inset-x-4 top-3 h-12 border border-[#d1d7c6] bg-[linear-gradient(135deg,#1b4855,#87b9bd_50%,#203c4c)]" /><div className="absolute bottom-0 left-1/2 h-12 w-10 -translate-x-1/2 border-x border-t border-[#aabeb0] bg-[#182a30]" /><div className="absolute -top-3 left-1/2 h-3 w-20 -translate-x-1/2 bg-[#82938b]" /></div><p className="mt-2 text-center text-[8px] uppercase tracking-[.18em] text-[#c6d5c4]">Habitat / Alpha base</p></div>}
-            {stage === "outside" && <div className="absolute inset-0 z-30 bg-[#071017]/30"><div className="absolute bottom-0 left-0 right-0 h-[36%] bg-[linear-gradient(180deg,#b0b19a,#4d5a4c)]" /></div>}
-            <div className="absolute left-4 top-4 z-20 border border-[#58706d] bg-[#071017]/75 px-3 py-2 backdrop-blur"><p className="text-[8px] uppercase tracking-[.2em] text-[#a5bdb2]">Visual flight deck</p><p className="mt-1 font-mono text-[10px] text-[#d9e8d5]">CAM {String(Math.max(1, stageIndex + 1)).padStart(2, "0")} · {stage === "landed" || stage === "outside" ? "SURFACE" : isFlight ? "FLIGHT" : "EXTERNAL"}</p></div>
-            {isLanded && <div className="absolute left-4 bottom-4 z-20 border border-[#719780] bg-[#071710]/80 px-3 py-2 text-[9px] uppercase tracking-[.15em] text-[#a6e0b4]"><CheckCircle2 className="mr-2 inline h-3 w-3" />Touchdown confirmed</div>}
-          </div>
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-73px)] max-w-[1600px] gap-5 p-3 md:grid-cols-[minmax(0,1fr)_330px] md:p-6">
+        <section className="relative min-h-[580px] overflow-hidden border border-[#334d51] bg-[#050913] md:min-h-[calc(100vh-120px)]">
+          <Canvas shadows dpr={[1, 1.75]} camera={{ position: [-1.7, 3.2, 10.8], fov: 44 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
+            <Suspense fallback={null}><Scene stage={stage} /></Suspense>
+          </Canvas>
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,13,.34),transparent_18%,transparent_70%,rgba(3,7,13,.36))]" />
+          <div className="absolute left-4 top-4 z-10 border border-[#58706d]/80 bg-[#071017]/75 px-3 py-2 backdrop-blur-md"><p className="text-[8px] uppercase tracking-[.2em] text-[#a5bdb2]">Live 3D flight deck</p><p className="mt-1 font-mono text-[10px] text-[#d9e8d5]">CAM {String(Math.max(1, stageIndex + 1)).padStart(2, "0")} · {isLanded ? "SURFACE" : isFlight ? "FLIGHT" : "EXTERNAL"}</p></div>
+          {stage === "startup" && <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#030910]/45 p-4 backdrop-blur-[2px]"><div className="w-full max-w-[440px] border border-[#587a74] bg-[#08151d]/95 p-5 shadow-[0_0_70px_#0009]"><p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#efb658]"><Power size={14} /> Flight computer startup</p><div className="space-y-1 font-mono text-[10px] leading-5 text-[#9bd3b1]">{bootLines.slice(-7).map((line) => <p key={line}><span className="text-[#efb658]">&gt;</span> {line}</p>)}</div><div className="mt-4 h-1.5 overflow-hidden bg-[#1e3439]"><div className="h-full bg-[#7bc69b] transition-all duration-500" style={{ width: `${Math.min(100, bootLines.length / 8 * 100)}%` }} /></div></div></div>}
+          {isLanded && <div className="absolute bottom-4 left-4 z-10 border border-[#719780] bg-[#071710]/80 px-3 py-2 text-[9px] uppercase tracking-[.15em] text-[#a6e0b4]"><CheckCircle2 className="mr-2 inline h-3 w-3" /> Touchdown confirmed</div>}
+          {isFlight && <div className="pointer-events-none absolute inset-0 animate-pulse bg-[radial-gradient(ellipse_at_bottom,rgba(255,151,68,.14),transparent_58%)]" />}
         </section>
 
         <aside className="flex flex-col border border-[#33494b] bg-[#0a161e]/95 p-5 backdrop-blur">
           <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.22em] text-[#efb658]"><ShieldCheck size={14} /> Mission sequence</div>
           <h1 className="mt-5 text-2xl font-semibold uppercase leading-tight tracking-[.07em]">{copy.title}</h1>
           <p className="mt-3 text-xs leading-6 text-[#9bb4ac]">{copy.detail}</p>
-          <div className="mt-6 space-y-3">{timeline.map((item, index) => <div key={item} className="flex items-center gap-3 text-[9px] uppercase tracking-[.13em]"><span className={`grid h-6 w-6 place-items-center border ${index < stageIndex || (stage === "outside") ? "border-[#78c49a] bg-[#16362b] text-[#a7e6bb]" : index === stageIndex ? "border-[#efb658] bg-[#3b3020] text-[#efb658]" : "border-[#2d4347] text-[#5c7775]"}`}>{index < stageIndex ? "✓" : String(index + 1).padStart(2, "0")}</span><span className={index === stageIndex ? "text-[#f0d9a6]" : index < stageIndex ? "text-[#9bc7a8]" : "text-[#637d7a]"}>{stageCopy[item].title}</span></div>)}</div>
+          <div className="mt-6 space-y-3">{timeline.map((item, index) => <div key={item} className="flex items-center gap-3 text-[9px] uppercase tracking-[.13em]"><span className={`grid h-6 w-6 place-items-center border ${index < stageIndex || stage === "outside" ? "border-[#78c49a] bg-[#16362b] text-[#a7e6bb]" : index === stageIndex ? "border-[#efb658] bg-[#3b3020] text-[#efb658]" : "border-[#2d4347] text-[#5c7775]"}`}>{index < stageIndex ? "✓" : String(index + 1).padStart(2, "0")}</span><span className={index === stageIndex ? "text-[#f0d9a6]" : index < stageIndex ? "text-[#9bc7a8]" : "text-[#637d7a]"}>{stageCopy[item].title}</span></div>)}</div>
           <div className="mt-7 border-t border-[#2c4246] pt-4"><div className="flex items-center justify-between text-[9px] uppercase tracking-[.16em] text-[#7f9a96]"><span>Flight telemetry</span><span className="text-[#8ed2a6]">{isLanded ? "STABLE" : stage === "launch" ? "THRUST" : "NOMINAL"}</span></div><div className="mt-3 grid grid-cols-2 gap-2">{[{label:"CABIN",value:stage === "startup" ? "101.3 kPa" : "SEALED"},{label:"LIFE SUPPORT",value:"ONLINE"},{label:"GUIDANCE",value:stage === "launch" ? "ASCENT" : isLanded ? "LANDED" : "TRACK"},{label:"MISSION",value:pending?.missionTitle ?? "MISSION 01"}].map((item) => <div key={item.label} className="border border-[#2b4145] bg-[#0d2026] p-2"><p className="text-[7px] uppercase tracking-[.13em] text-[#718e88]">{item.label}</p><p className="mt-1 truncate font-mono text-[9px] text-[#d4e2d4]">{item.value}</p></div>)}</div></div>
           <div className="mt-auto pt-6">
             {stage === "landed" || stage === "outside" ? <button onClick={() => { setStage("outside"); window.setTimeout(() => { window.location.href = "/preview/MissionSimulation"; }, 1100); }} className="flex w-full items-center justify-center gap-2 bg-[#efb658] px-4 py-4 text-[10px] font-black uppercase tracking-[.18em] text-[#172126] transition hover:bg-[#f6ca76]"><ArrowRight size={15} /> Go Outside <ArrowRight size={14} /></button> : <button onClick={skipAhead} className="flex w-full items-center justify-center gap-2 border border-[#4c6665] px-4 py-3 text-[9px] font-bold uppercase tracking-[.15em] text-[#a9c4b8] transition hover:border-[#efb658] hover:text-[#efb658]"><ArrowRight size={14} /> {manual ? "Continue sequence" : "Skip to next sequence"}</button>}
-            <p className="mt-3 text-center text-[8px] leading-4 text-[#647f7c]">Cinematic sequence · no external assets required · mission data stays in your local save.</p>
+            <p className="mt-3 text-center text-[8px] leading-4 text-[#647f7c]">Real-time 3D scene · procedural spacecraft · no external model downloads.</p>
           </div>
         </aside>
       </div>
