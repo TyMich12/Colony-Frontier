@@ -976,14 +976,17 @@ function initialMetrics(_selected: Record<string, Tier>): MissionMetrics {
   return { power: 72, battery: LEVEL1_ENVIRONMENT.batteryInitialSOCPercent, oxygen: 88, water: 86, food: 84, temperature: 21, radiation: 10, habitat: 94 };
 }
 
-function getMissionFailureReason(metrics: MissionMetrics): string | null {
-  if (metrics.oxygen <= 1.5) return "Cabin oxygen reserve fell below the minimum safe operating margin.";
-  if (metrics.water <= 1) return "The usable water reserve was exhausted before recovery could be restored.";
-  if (metrics.food <= 1.5) return "Usable food reserves were exhausted before sustainable production or resupply could be restored.";
+function getMissionFailureReason(metrics: MissionMetrics, missionStage = 1): string | null {
+  // Mission 1 is a forgiving tutorial: degraded reserves trigger advice, not instant failure.
+  // Actual failure requires near-exhaustion or an unmistakable crew-safety breach.
+  const tutorial = missionStage === 1;
+  if (metrics.oxygen <= (tutorial ? 0.25 : 1.5)) return "Cabin oxygen reserve fell below the minimum safe operating margin.";
+  if (metrics.water <= (tutorial ? 0.15 : 1)) return "The usable water reserve was exhausted before recovery could be restored.";
+  if (metrics.food <= (tutorial ? 0.25 : 1.5)) return "Usable food reserves were exhausted before sustainable production or resupply could be restored.";
   if (metrics.habitat <= 1) return "Habitat integrity fell below its simulated pressure-boundary limit.";
-  if (metrics.power <= 5 && metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5) return "Generation cannot sustain the colony and the battery has reached its protected 20% reserve; critical electrical demand is no longer being met.";
-  if (metrics.temperature <= 16.05 || metrics.temperature >= 27.95) return "Cabin temperature passed the simulated crew-safe operating envelope.";
-  if (metrics.radiation >= 90) return "Modelled effective dose rate exceeded the emergency shelter threshold.";
+  if (metrics.power <= (tutorial ? 2 : 5) && metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + (tutorial ? 0 : 0.5)) return "Generation cannot sustain the colony and the battery has reached its protected 20% reserve; critical electrical demand is no longer being met.";
+  if (metrics.temperature <= (tutorial ? 16.0 : 16.05) || metrics.temperature >= (tutorial ? 28.0 : 27.95)) return "Cabin temperature passed the simulated crew-safe operating envelope.";
+  if (metrics.radiation >= (tutorial ? 98 : 90)) return "Modelled effective dose rate exceeded the emergency shelter threshold.";
   return null;
 }
 
@@ -2748,7 +2751,7 @@ export function MissionSimulation() {
 
   useEffect(() => {
     if (!pending || missionFailed) return;
-    const reason = getMissionFailureReason(metrics);
+    const reason = getMissionFailureReason(metrics, missionStage);
     if (!reason) return;
 
     setMissionFailureReason(reason);
@@ -3128,7 +3131,11 @@ export function MissionSimulation() {
         const recoverableWaterLDay = Math.min(totalWaterUseLDay, Math.max(0, ratedWaterThroughputLDay));
         const recycledWaterLDay = recoverableWaterLDay * effectiveWaterRecoveryPct / 100;
         const waterLossLDay = totalWaterUseLDay - recycledWaterLDay;
-        const waterDelta = -waterLossLDay * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
+        // Mission balance: water reserve depletion is intentionally gentler so Mission 1 is a fair tutorial.
+        // The displayed engineering readings still report the full physical use/recovery rates; only
+        // the game's reserve-pressure model applies a 0.30 factor to net unrecovered losses.
+        const WATER_RESERVE_LOSS_FACTOR = missionStage === 1 ? 0.22 : 0.45;
+        const waterDelta = -waterLossLDay * WATER_RESERVE_LOSS_FACTOR * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
         const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalPowered = thermalOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
@@ -3263,7 +3270,7 @@ export function MissionSimulation() {
 
     const finalState = loadGameState();
     const alreadyComplete = finalState.completedMissions.includes(pending.missionId);
-    const failReasonAtFinish = getMissionFailureReason(metrics);
+    const failReasonAtFinish = getMissionFailureReason(metrics, missionStage);
     const failedAtFinish = missionFailed || Boolean(failReasonAtFinish);
     const firstTime = !failedAtFinish && !pending.replay && !alreadyComplete;
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
@@ -4612,7 +4619,7 @@ export function MissionSimulation() {
   }
 
   if (results) {
-    const reportFailureReason = missionFailureReason ?? getMissionFailureReason(metrics);
+    const reportFailureReason = missionFailureReason ?? getMissionFailureReason(metrics, missionStage);
     const reportFailed = missionFailed || Boolean(reportFailureReason);
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     const researchBonusXp = pending && !pending.replay ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + tierLevel(pending.selected.science ?? "Foundation") * 20, 0) : 0;
