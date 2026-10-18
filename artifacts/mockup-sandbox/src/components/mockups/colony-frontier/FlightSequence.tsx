@@ -359,8 +359,8 @@ function Scene({ stage }: { stage: Stage }) {
   });
   return (
     <>
-      <MoonSky />
-      <Terrain />
+      <MoonSky stage={stage} />
+      <Terrain stage={stage} />
       <Rocket stage={stage} />
       <Astronaut stage={stage} />
       <LunarHabitat />
