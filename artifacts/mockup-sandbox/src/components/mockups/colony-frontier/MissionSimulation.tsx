@@ -2422,6 +2422,8 @@ export function MissionSimulation() {
   const [results, setResults] = useState(false);
   const [missionFailed, setMissionFailed] = useState(false);
   const [missionFailureReason, setMissionFailureReason] = useState<string | null>(null);
+  const [aiCloseout, setAiCloseout] = useState<{ outcome: "COMPLETE" | "FAILED"; summary: string; problems: string[]; recommendations: string[] } | null>(null);
+  const [aiCloseoutReady, setAiCloseoutReady] = useState(false);
   const eventPointerRef = useRef(
     runtime?.eventsTriggered ?? ((runtime?.resolvedEventIds.length ?? 0) + (runtime?.activeEventId ? 1 : 0)),
   );
@@ -3265,13 +3267,13 @@ export function MissionSimulation() {
   }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
 
   useEffect(() => {
-    if (!results || !pending || completionSavedRef.current) return;
+    if (!results || !pending || !aiCloseoutReady || completionSavedRef.current) return;
     completionSavedRef.current = true;
 
     const finalState = loadGameState();
     const alreadyComplete = finalState.completedMissions.includes(pending.missionId);
     const failReasonAtFinish = getMissionFailureReason(metrics, missionStage);
-    const failedAtFinish = missionFailed || Boolean(failReasonAtFinish);
+    const failedAtFinish = missionFailed || Boolean(failReasonAtFinish) || aiCloseout?.outcome === "FAILED";
     const firstTime = !failedAtFinish && !pending.replay && !alreadyComplete;
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     // Reward clean, useful science more than simply completing many low-quality collection loops.
@@ -3303,7 +3305,7 @@ export function MissionSimulation() {
     saveGameState(nextState);
     clearMissionRuntime();
     clearPendingMission();
-  }, [activeFaults, metrics, missionFailed, pending, results, sampleQuality, sampleStages]);
+  }, [activeFaults, aiCloseout, aiCloseoutReady, metrics, missionFailed, pending, results, sampleQuality, sampleStages]);
 
   const handleEventChoice = (choiceId: string) => {
     if (!activeEvent || !pending || eventResponseRef.current === activeEvent.id) return;
@@ -4620,7 +4622,7 @@ export function MissionSimulation() {
 
   if (results) {
     const reportFailureReason = missionFailureReason ?? getMissionFailureReason(metrics, missionStage);
-    const reportFailed = missionFailed || Boolean(reportFailureReason);
+    const reportFailed = missionFailed || Boolean(reportFailureReason) || aiCloseout?.outcome === "FAILED";
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     const researchBonusXp = pending && !pending.replay ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + tierLevel(pending.selected.science ?? "Foundation") * 20, 0) : 0;
     const unresolvedFaultPenalty = Math.min(0.45, Object.keys(activeFaults).length * 0.1);
@@ -4666,8 +4668,8 @@ export function MissionSimulation() {
             <aside className="space-y-4">
               <div className="border border-[#46595a] bg-[#101f25] p-5">
                 <div className="flex items-center gap-2 text-[#efb658]"><Sparkles className="h-4 w-4" /><p className="text-[9px] font-bold uppercase tracking-[0.22em]">Mission AI analysis</p></div>
-                <p className="mt-3 text-sm leading-6 text-[#c8d7cf]">{getAiAnalysis(metrics, score)}</p>
-                <p className="mt-3 text-[9px] uppercase tracking-[0.13em] text-[#788f8c]">Generated from your resource levels, equipment condition, and decisions.</p>
+                <p className="mt-3 text-sm leading-6 text-[#c8d7cf]">{aiCloseout ? aiCloseout.summary : getAiAnalysis(metrics, score)}</p>
+                {aiCloseout ? <div className="mt-3 space-y-2">{aiCloseout.problems.length > 0 && <div><p className="text-[9px] font-bold uppercase tracking-[0.13em] text-[#ffb1a6]">What went wrong</p><ul className="mt-1 list-disc pl-4 text-[10px] leading-5 text-[#c8d7cf]">{aiCloseout.problems.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}<div><p className="text-[9px] font-bold uppercase tracking-[0.13em] text-[#9bd9cf]">What to do next</p><ul className="mt-1 list-disc pl-4 text-[10px] leading-5 text-[#c8d7cf]">{aiCloseout.recommendations.map((item, index) => <li key={index}>{item}</li>)}</ul></div><p className="text-[9px] uppercase tracking-[0.13em] text-[#788f8c]">ChatGPT Mission Control · {aiCloseoutReady ? "assessment complete" : "analysing telemetry…"}</p></div> : <p className="mt-3 text-[9px] uppercase tracking-[0.13em] text-[#788f8c]">Preparing ChatGPT Mission Control closeout…</p>}
               </div>
               <div className="border border-[#6b5734] bg-[#1b1d18] p-5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#efb658]">Rewards</p>
@@ -5145,4 +5147,56 @@ export function MissionSimulation() {
   );
 }
 
-export default MissionSimulation;
+export default MissionSimulation;  useEffect(() => {
+    if (!results || !pending || aiCloseoutReady) return;
+    let cancelled = false;
+    const payload = {
+      mission: { id: pending.missionId, title: pending.missionTitle, campaign: pending.campaign, number: missionStage },
+      elapsedSeconds: elapsed,
+      metrics,
+      score,
+      decisions,
+      activeFaults: Object.values(activeFaults).map((fault) => ({ system: fault.targetTrackId, title: fault.title, severity: fault.severity })),
+      equipment: Object.entries(buildings).map(([system, state]) => ({ system, condition: state.condition, status: state.status })),
+      selectedSystems: Object.keys(pending.selected),
+    };
+    fetch("/api/mission-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Mission AI service unavailable");
+      return response.json();
+    }).then((analysis: { outcome?: "COMPLETE" | "FAILED"; summary?: string; problems?: string[]; recommendations?: string[] }) => {
+      if (cancelled) return;
+      const hardFailure = getMissionFailureReason(metrics, missionStage);
+      const outcome = hardFailure ? "FAILED" : analysis.outcome === "FAILED" ? "FAILED" : "COMPLETE";
+      const result = {
+        outcome,
+        summary: analysis.summary || "Mission Control reviewed the final telemetry.",
+        problems: Array.isArray(analysis.problems) ? analysis.problems.slice(0, 4) : [],
+        recommendations: Array.isArray(analysis.recommendations) ? analysis.recommendations.slice(0, 4) : [],
+      } as const;
+      setAiCloseout(result);
+      if (result.outcome === "FAILED") {
+        setMissionFailed(true);
+        setMissionFailureReason(hardFailure ?? result.summary);
+      }
+      setAiMessage("ChatGPT Mission Control: " + result.summary);
+      setAiCloseoutReady(true);
+    }).catch(() => {
+      if (cancelled) return;
+      const reason = getMissionFailureReason(metrics, missionStage);
+      const outcome = missionFailed || Boolean(reason) ? "FAILED" : "COMPLETE";
+      setAiCloseout({
+        outcome,
+        summary: "ChatGPT Mission Control could not be reached, so the simulator used its local safety rules for closeout.",
+        problems: reason ? [reason] : [],
+        recommendations: ["Protect water and oxygen reserves.", "Keep solar generation above essential demand.", "Resolve active faults before starting optional work."],
+      });
+      setAiCloseoutReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [activeFaults, aiCloseoutReady, buildings, decisions, elapsed, metrics, missionFailed, missionStage, pending, results, score]);
+
+
