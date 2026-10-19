@@ -1394,26 +1394,26 @@ function MissionTaskRibbon({
     { label: "SITES MAPPED", value: `${surveyedCount} / ${Math.max(1, RESOURCE_NODES[pending.campaign === "mars" ? "MARS" : "MOON"].length)}`, done: surveyedCount > 0 },
   ];
   return (
-    <div className="pointer-events-none absolute right-3 bottom-[58px] z-30 w-[min(88vw,270px)]">
-      <div className="pointer-events-auto overflow-hidden rounded-xl border-2 border-[#d3a84a] bg-[#172026]/92 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="border-b border-[#4d5050] bg-[#101b20] px-3 py-2"><p className="text-[7px] font-black uppercase tracking-[0.15em] text-[#92a6a4]">Simulation Hours</p><p className="mt-0.5 font-mono text-[10px] font-bold text-[#e2f0e8]">Hours: {Math.min(Math.floor(TOTAL_MISSION_SECONDS / 3600), Math.floor(Math.max(0, elapsed) / 3600)).toLocaleString()} / {Math.floor(TOTAL_MISSION_SECONDS / 3600).toLocaleString()}</p><p className="mt-1 text-[7px] font-black uppercase tracking-[0.15em] text-[#f2c960]">Game Day · {dayProgress.toFixed(1)} / 14</p></div>
-        <div className="flex items-center gap-2 border-b border-[#4d5050] bg-[#27363a] px-3 py-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#e2b84f] text-[9px] font-black text-[#20261e]">★</span>
+    <div className="pointer-events-none absolute right-4 bottom-[68px] z-30 w-[min(88vw,286px)]">
+      <div className="pointer-events-auto overflow-hidden border border-[#3a4b4f] bg-[#111a1e]/95 shadow-[0_6px_20px_rgba(0,0,0,0.28)]">
+        <div className="border-b border-[#344347] px-3.5 py-3"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#a6b7b4]">Simulation time</p><Clock className="h-3.5 w-3.5 text-[#b7c4bd]" /></div><p className="mt-1.5 font-mono text-[13px] font-medium text-[#edf1eb]">Hour {Math.min(Math.floor(TOTAL_MISSION_SECONDS / 3600), Math.floor(Math.max(0, elapsed) / 3600)).toLocaleString()} <span className="text-[#788c8b]">/ {Math.floor(TOTAL_MISSION_SECONDS / 3600).toLocaleString()}</span></p><div className="mt-2 flex items-center justify-between text-[9px]"><span className="text-[#91a5a1]">Mission day</span><span className="font-mono text-[#d8c48a]">{dayProgress.toFixed(1)} / 14</span></div></div>
+        <div className="flex items-center gap-2 border-b border-[#344347] bg-[#192529] px-3.5 py-2.5">
+          <span className="flex h-7 w-7 items-center justify-center border border-[#5a604e] bg-[#30362b] text-[11px] text-[#d8c48a]">✦</span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[8px] font-black uppercase tracking-[0.18em] text-[#f4db87]">{pending.missionTitle}</p>
             <p className="text-[7px] uppercase tracking-[0.15em] text-[#92a6a4]">Mission objectives</p>
           </div>
         </div>
-        <div className="space-y-1.5 p-2">
+        <div className="space-y-1 px-2.5 py-2">
           {taskRows.map((task) => (
-            <div key={task.label} className="flex items-center justify-between gap-3 rounded-lg bg-[#0d171c]/75 px-2.5 py-1.5">
+            <div key={task.label} className="flex items-center justify-between gap-3 border-b border-[#29383b] py-2 last:border-b-0">
               <span className={`text-[7px] font-black uppercase tracking-[0.12em] ${task.done ? "text-[#7fe19f]" : "text-[#d8e0da]"}`}>
                 {task.done ? "✓ " : "○ "}{task.label}
               </span>
               <span className={`shrink-0 text-[7px] font-mono font-bold ${task.done ? "text-[#7fe19f]" : "text-[#f2c960]"}`}>{task.value}</span>
             </div>
           ))}
-          <div className="px-1 pt-0.5 text-[7px] uppercase tracking-[0.1em] text-[#728886]">
+          <div className="px-0.5 pt-2 text-[9px] leading-4 text-[#849895]">
             {activeEvent ? `Target: ${activeEvent.trackId.toUpperCase()}` : roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
           </div>
         </div>
@@ -4820,22 +4820,22 @@ export function MissionSimulation() {
         />
 
         {!activeEvent && !dashboardOpen && (
-          <div className="pointer-events-none absolute right-3 top-[58px] z-20 w-[min(92vw,500px)]">
-            <div className="pointer-events-auto overflow-hidden rounded-xl border border-[#41696a] bg-[#08171b]/[0.94] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.38)] backdrop-blur-xl">
-              <div className="mb-1 flex items-center justify-between gap-2 px-0.5">
-                <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-[#b6e6d0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4ce0a1]" />Colony pulse</span>
-                <span className="font-mono text-[8px] font-bold text-[#f0cf69]">STABILITY {Math.round(performance.colonyHealth)}/100</span>
+          <div className="pointer-events-none absolute right-4 top-[68px] z-20 w-[min(92vw,510px)]">
+            <div className="pointer-events-auto overflow-hidden border border-[#394b4e] bg-[#10191d]/95 shadow-[0_6px_20px_rgba(0,0,0,0.25)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#344347] px-3.5 py-2.5">
+                <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.04em] text-[#d7e2dc]"><span className="h-1.5 w-1.5 rounded-full bg-[#85bd99]" />Colony status</span>
+                <span className="text-[9px] text-[#9eafaa]">Stability <strong className="ml-1 font-mono font-medium text-[#e1d19b]">{Math.round(performance.colonyHealth)} / 100</strong></span>
               </div>
-              <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-px bg-[#344347] sm:grid-cols-4">
                 {[
                   { id: "generation", label: "Power generation", value: metrics.power, display: `${electricalReadings.generationKW.toFixed(2)} kW`, icon: <Sun className="h-3 w-3" /> },
                   { id: "demand", label: "Power demand", value: clamp(electricalReadings.consumptionKW / 16 * 100), display: `${electricalReadings.consumptionKW.toFixed(2)} kW`, icon: <Zap className="h-3 w-3" /> },
                   { id: "battery", label: "Battery reserve", value: metrics.battery, display: physicalTelemetry.battery, icon: <BatteryCharging className="h-3 w-3" /> },
                   { id: "batteryFlow", label: "Charging / discharging", value: electricalReadings.batteryFlowKW < 0 ? 80 : electricalReadings.batteryFlowKW > 0 ? 35 : metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? 5 : 50, display: Math.abs(electricalReadings.batteryFlowKW) < 0.01 ? (metrics.battery <= LEVEL1_ENVIRONMENT.batteryMinimumSOCPercent + 0.5 ? "Reserve reached" : "Idle") : electricalReadings.batteryFlowKW < 0 ? `${(-electricalReadings.batteryFlowKW).toFixed(2)} kW charging` : `${electricalReadings.batteryFlowKW.toFixed(2)} kW discharging`, icon: <BatteryCharging className="h-3 w-3" /> },
                 ].map((metric) => (
-                  <button key={metric.id} type="button" aria-expanded={pulseExpandedMetric === metric.id} onClick={() => setPulseExpandedMetric((current) => current === metric.id ? null : metric.id)} className={`min-w-0 rounded-lg border px-1.5 py-1 text-left transition-colors hover:border-[#d7bd6b] ${metric.value < 28 ? "border-[#d75d69] bg-[#321a21]" : metric.value < 55 ? "border-[#806b3d] bg-[#29251a]" : "border-[#274e46] bg-[#102822]"}`}>
+                  <button key={metric.id} type="button" aria-expanded={pulseExpandedMetric === metric.id} onClick={() => setPulseExpandedMetric((current) => current === metric.id ? null : metric.id)} className={`min-w-0 bg-[#141f23] px-2.5 py-2 text-left transition-colors hover:bg-[#1c2a2e] ${metric.value < 28 ? "border-l-2 border-l-[#c66f70]" : metric.value < 55 ? "border-l-2 border-l-[#b59a5b]" : "border-l-2 border-l-[#628f78]"}`}>
                     <div className="flex items-center gap-1 text-[#99c3b3]">{metric.icon}<span className="text-[7px] font-black tracking-[0.04em]">{metric.label}</span><span className="ml-auto text-[8px]">{pulseExpandedMetric === metric.id ? "−" : "+"}</span></div>
-                    <div className="mt-0.5 truncate font-mono text-[10px] font-black leading-4" style={{ color: resourceColor(metric.value) }}>{metric.display}</div>
+                    <div className="mt-1 truncate font-mono text-[11px] font-medium leading-4" style={{ color: resourceColor(metric.value) }}>{metric.display}</div>
                   </button>
                 ))}
               </div>
@@ -4954,16 +4954,16 @@ export function MissionSimulation() {
             <button
               type="button"
               onClick={() => setDashboardOpen((open) => !open)}
-              className="pointer-events-auto absolute right-3 top-3 z-40 flex items-center gap-2 rounded-xl border border-[#526c68] bg-[#0a171c]/[0.94] px-3 py-2.5 text-left shadow-[0_8px_28px_rgba(0,0,0,0.42)] backdrop-blur-md transition hover:border-[#e8c568]"
+              className="pointer-events-auto absolute right-4 top-4 z-40 flex items-center gap-2.5 border border-[#4a5b5d] bg-[#111b1f]/95 px-3.5 py-2.5 text-left shadow-[0_4px_14px_rgba(0,0,0,0.24)] transition-colors hover:border-[#b9a875] hover:bg-[#192629]"
               aria-expanded={dashboardOpen}
               aria-label={dashboardOpen ? "Close systems dashboard" : "Open systems dashboard"}
             >
-              <Gauge className="h-4 w-4 text-[#eac568]" />
-              <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white">Systems</span>
+              <Gauge className="h-4 w-4 text-[#c8bd91]" />
+              <span className="text-[10px] font-semibold tracking-[0.03em] text-[#edf1eb]">Systems</span>
               <span className="font-mono text-[10px] text-[#a8ddb8]">{Math.round(performance.colonyHealth)}%</span>
-              {Object.values(activeOperations).length > 0 && <span className="rounded-full bg-[#1f775a] px-1.5 py-0.5 text-[8px] font-black text-[#d4ffe5] animate-pulse">{Object.values(activeOperations).length} WORK</span>}
+              {Object.values(activeOperations).length > 0 && <span className="border border-[#3b765c] bg-[#173629] px-1.5 py-0.5 text-[8px] font-medium text-[#b9dec6]">{Object.values(activeOperations).length} active</span>}
               {Object.keys(activeFaults).length > 0 && <span className="rounded-full bg-[#d74d59] px-1.5 py-0.5 text-[8px] font-black text-white">{Object.keys(activeFaults).length}!</span>}
-              <span className="text-xs text-[#8eaaa4]">{dashboardOpen ? "−" : "+"}</span>
+              <span className="text-sm text-[#91a5a1]">{dashboardOpen ? "−" : "+"}</span>
             </button>
 
             {dashboardOpen && (
