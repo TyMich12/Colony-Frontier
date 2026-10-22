@@ -350,9 +350,9 @@ function CinematicCamera({ stage }: { stage: Stage }) {
       outside: { pos: [-2.5, 2.7, 10], look: [0.5, 1.1, 0], fov: 49 },
     };
     const target = targets[stage];
-    camera.position.x = THREE.MathUtils.damp(camera.position.x, target.pos[0], delta, 1.3);
-    camera.position.y = THREE.MathUtils.damp(camera.position.y, target.pos[1], delta, 1.3);
-    camera.position.z = THREE.MathUtils.damp(camera.position.z, target.pos[2], delta, 1.3);
+    camera.position.x = THREE.MathUtils.damp(camera.position.x, target.pos[0] + walkOffset.current.x, delta, 1.3);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, target.pos[1] + walkOffset.current.y, delta, 1.3);
+    camera.position.z = THREE.MathUtils.damp(camera.position.z, target.pos[2] + walkOffset.current.z, delta, 1.3);
 
     // Interactive free-look and slow, deliberate movement after touchdown.
     // A/D pan the view; W/S move forward and backward without changing altitude.
@@ -368,8 +368,7 @@ function CinematicCamera({ stage }: { stage: Stage }) {
       lookYaw.current = THREE.MathUtils.damp(lookYaw.current, 0, delta, 2.5);
       walkOffset.current.lerp(new THREE.Vector3(), 1 - Math.exp(-delta * 2));
     }
-    camera.position.add(walkOffset.current);
-    const look = new THREE.Vector3(...target.look);
+    const look = new THREE.Vector3(...target.look).add(walkOffset.current);
     look.x += Math.sin(lookYaw.current) * 5.5;
     look.z -= Math.cos(lookYaw.current) * 2.0;
     look.y += lookPitch.current;
