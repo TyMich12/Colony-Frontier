@@ -338,26 +338,32 @@ function palette(id: string) {
 }
 
 function Foundation({ mars }: { mars: boolean }) {
-  const ground = mars ? "#70483b" : "#55585a";
-  const curb = mars ? "#b4775e" : "#96928a";
+  // Broad, irregular lunar apron instead of a square platform; the natural terrain remains visible around it.
+  const ground = mars ? "#70483b" : "#65625d";
   return (
     <group>
-      <mesh receiveShadow position={[0, -0.205, 0]}>
-        <boxGeometry args={[58, 0.36, 58]} />
-        <meshStandardMaterial color={ground} roughness={0.98} />
+      <mesh receiveShadow position={[0, -0.34, 0]} scale={[1.12, 0.12, 1.12]}>
+        <sphereGeometry args={[36, 96, 48]} />
+        <meshStandardMaterial color={ground} roughness={1} metalness={0.02} />
       </mesh>
-      <mesh receiveShadow position={[0, 0.025, 0]}>
-        <boxGeometry args={[54, 0.11, 54]} />
-        <meshStandardMaterial color={mars ? "#8d5948" : "#74726e"} roughness={0.96} />
+      <mesh receiveShadow position={[0, -0.02, 0]} scale={[1.06, 0.018, 1.06]}>
+        <sphereGeometry args={[33, 96, 48]} />
+        <meshStandardMaterial color={mars ? "#8d5948" : "#77736b"} roughness={0.99} />
       </mesh>
-      <mesh position={[0, 0.105, 0]}>
-        <boxGeometry args={[53, 0.035, 53]} />
-        <meshStandardMaterial color={curb} roughness={0.9} metalness={0.12} />
+      <mesh receiveShadow position={[0, 0.045, 0]} scale={[1.02, 0.008, 1.02]}>
+        <sphereGeometry args={[31.8, 96, 48]} />
+        <meshStandardMaterial color={mars ? "#774b3e" : "#6c6b66"} roughness={0.98} />
       </mesh>
-      <mesh position={[0, 0.132, 0]}>
-        <boxGeometry args={[52, 0.028, 52]} />
-        <meshStandardMaterial color={mars ? "#774b3e" : "#666765"} roughness={0.94} />
-      </mesh>
+      {!mars && Array.from({ length: 24 }, (_, i) => {
+        const angle = (i / 24) * Math.PI * 2;
+        const radius = 30 + (i % 4) * 1.25;
+        return (
+          <mesh key={i} position={[Math.cos(angle) * radius, -0.055, Math.sin(angle) * radius]} rotation={[0, angle, (i % 3 - 1) * 0.09]} scale={[1.4 + (i % 3) * 0.55, 0.18, 0.8 + (i % 2) * 0.4]} receiveShadow>
+            <dodecahedronGeometry args={[1, 1]} />
+            <meshStandardMaterial color={i % 2 ? "#77746d" : "#4f5150"} roughness={1} />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
@@ -2002,9 +2008,11 @@ function Scene({ props }: { props: Props }) {
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
-        <mesh><sphereGeometry args={[0.95, 48, 36]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff1bb"} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[1.55, 48, 36]} /><meshBasicMaterial color="#ffe4a1" transparent opacity={props.lunarNight ? 0.025 : 0.18} depthWrite={false} toneMapped={false} /></mesh>
-        {!props.lunarNight && <mesh><sphereGeometry args={[2.35, 32, 24]} /><meshBasicMaterial color="#ffd87a" transparent opacity={0.035} depthWrite={false} toneMapped={false} /></mesh>}
+        <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.24} depthWrite={false} toneMapped={false} /></mesh>
+        {!props.lunarNight && <mesh><sphereGeometry args={[2.05, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.10} depthWrite={false} toneMapped={false} /></mesh>}
+        {!props.lunarNight && <mesh><sphereGeometry args={[3.2, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.035} depthWrite={false} toneMapped={false} /></mesh>}
+        {!props.lunarNight && <pointLight color="#fff0cf" intensity={2.4} distance={95} decay={1.6} />}
       </group>}
       {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
         {/* Earth is a distant, recognisable blue-white disc, with an apparent diameter
