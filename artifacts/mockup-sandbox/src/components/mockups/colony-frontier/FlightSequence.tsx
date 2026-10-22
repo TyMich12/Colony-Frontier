@@ -313,6 +313,32 @@ function MoonSky({ stage }: { stage: Stage }) {
 }
 function CinematicCamera({ stage }: { stage: Stage }) {
   const { camera } = useThree();
+  const keys = useRef<Record<string, boolean>>({});
+  const lookYaw = useRef(0);
+  const lookPitch = useRef(0);
+  const walkOffset = useRef(new THREE.Vector3());
+  const isInteractiveStage = stage === "landed" || stage === "outside";
+
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (["a", "d", "w", "s"].includes(key)) {
+        keys.current[key] = true;
+        if (isInteractiveStage) event.preventDefault();
+      }
+    };
+    const up = (event: KeyboardEvent) => { keys.current[event.key.toLowerCase()] = false; };
+    const blur = () => { keys.current = {}; };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, [isInteractiveStage]);
+
   useFrame((_, delta) => {
     const targets: Record<Stage, { pos: [number, number, number]; look: [number, number, number]; fov: number }> = {
       approach: { pos: [-1.7, 3.2, 10.8], look: [0, 1.35, 0], fov: 44 },
@@ -327,7 +353,26 @@ function CinematicCamera({ stage }: { stage: Stage }) {
     camera.position.x = THREE.MathUtils.damp(camera.position.x, target.pos[0], delta, 1.3);
     camera.position.y = THREE.MathUtils.damp(camera.position.y, target.pos[1], delta, 1.3);
     camera.position.z = THREE.MathUtils.damp(camera.position.z, target.pos[2], delta, 1.3);
+
+    // Interactive free-look and slow, deliberate movement after touchdown.
+    // A/D pan the view; W/S move forward and backward without changing altitude.
+    if (isInteractiveStage) {
+      const turn = (Number(keys.current["d"]) - Number(keys.current["a"])) * delta * 1.15;
+      const move = (Number(keys.current["w"]) - Number(keys.current["s"])) * delta * 2.6;
+      lookYaw.current = THREE.MathUtils.clamp(lookYaw.current + turn, -1.35, 1.35);
+      const forward = new THREE.Vector3(Math.sin(lookYaw.current), 0, -Math.cos(lookYaw.current));
+      walkOffset.current.addScaledVector(forward, move);
+      walkOffset.current.x = THREE.MathUtils.clamp(walkOffset.current.x, -7, 7);
+      walkOffset.current.z = THREE.MathUtils.clamp(walkOffset.current.z, -4, 7);
+    } else {
+      lookYaw.current = THREE.MathUtils.damp(lookYaw.current, 0, delta, 2.5);
+      walkOffset.current.lerp(new THREE.Vector3(), 1 - Math.exp(-delta * 2));
+    }
+    camera.position.add(walkOffset.current);
     const look = new THREE.Vector3(...target.look);
+    look.x += Math.sin(lookYaw.current) * 5.5;
+    look.z -= Math.cos(lookYaw.current) * 2.0;
+    look.y += lookPitch.current;
     camera.lookAt(look);
     if (camera instanceof THREE.PerspectiveCamera) {
       camera.fov = THREE.MathUtils.damp(camera.fov, target.fov, delta, 1.3);
@@ -461,11 +506,12 @@ export function FlightSequence() {
 
       <div className="relative z-10 mx-auto grid min-h-[calc(100vh-73px)] max-w-[1600px] gap-5 p-3 md:grid-cols-[minmax(0,1fr)_330px] md:p-6">
         <section className={`relative min-h-[580px] overflow-hidden border border-[#54717b] ${stage === "outside" ? "bg-[#a1b1b7]" : "bg-[#050913]"} md:min-h-[calc(100vh-120px)]`}>
-          <Canvas shadows dpr={[1, 1.75]} camera={{ position: [-1.7, 3.2, 10.8], fov: 44 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
+          <Canvas shadows dpr={[1, 2]} camera={{ position: [-1.7, 3.2, 10.8], fov: 44 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
             <Suspense fallback={null}><Scene stage={stage} /></Suspense>
           </Canvas>
           <div className={`pointer-events-none absolute inset-0 ${stage === "outside" ? "bg-[linear-gradient(180deg,rgba(35,58,72,.015),transparent_18%,transparent_70%,rgba(35,58,72,.035))]" : "bg-[linear-gradient(180deg,rgba(3,7,13,.12),transparent_18%,transparent_70%,rgba(3,7,13,.14))"}`} />
           <div className="absolute left-4 top-4 z-10 rounded-sm border border-white/20 bg-[#101820]/65 px-3 py-2.5 shadow-sm backdrop-blur-sm"><p className="text-[8px] font-semibold uppercase tracking-[.18em] text-[#e2d8c5]">Lunar expedition</p><p className="mt-1.5 font-mono text-[10px] tracking-wide text-white/90">CAM {String(Math.max(1, stageIndex + 1)).padStart(2, "0")} · {isLanded ? "SURFACE" : isFlight ? "FLIGHT" : "EXTERNAL"}</p></div>
+          {(stage === "landed" || stage === "outside") && <div className="absolute bottom-4 right-4 z-10 border border-white/25 bg-[#101820]/75 px-3 py-2.5 font-mono text-[9px] leading-5 text-white/90 shadow-sm backdrop-blur-sm"><p className="mb-1 font-sans text-[8px] uppercase tracking-[.18em] text-[#e2d8c5]">Explore the lunar site</p><p><kbd className="border border-white/30 px-1.5 py-0.5">A</kbd> <kbd className="border border-white/30 px-1.5 py-0.5">D</kbd> Look around</p><p><kbd className="border border-white/30 px-1.5 py-0.5">W</kbd> <kbd className="border border-white/30 px-1.5 py-0.5">S</kbd> Move forward / back</p></div>}
           {stage === "startup" && <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#071019]/28 p-4 backdrop-blur-[1px]"><div className="w-full max-w-[440px] border border-white/20 bg-[#111b22]/92 p-5 shadow-xl"><p className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-[#e4c58b]"><Power size={14} /> Flight computer startup</p><div className="space-y-1 font-mono text-[10px] leading-5 text-[#c4dfce]">{bootLines.slice(-7).map((line) => <p key={line}><span className="text-[#efb658]">&gt;</span> {line}</p>)}</div><div className="mt-4 h-1.5 overflow-hidden bg-white/10"><div className="h-full bg-[#b6d2bb] transition-all duration-500" style={{ width: `${Math.min(100, bootLines.length / 8 * 100)}%` }} /></div></div></div>}
           {isLanded && <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 border border-white/20 bg-[#101b20]/75 px-3 py-2.5 text-[9px] font-medium uppercase tracking-[.13em] text-[#e0eadf] shadow-sm backdrop-blur-sm"><CheckCircle2 className="h-3.5 w-3.5 text-[#b9d3b5]" /> Touchdown confirmed</div>}
           {isFlight && <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(255,174,103,.09),transparent_58%)]" />}
