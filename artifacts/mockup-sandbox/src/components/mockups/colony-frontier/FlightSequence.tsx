@@ -505,7 +505,20 @@ export function FlightSequence() {
 
       <div className="relative z-10 mx-auto grid min-h-[calc(100vh-73px)] max-w-[1600px] gap-5 p-3 md:grid-cols-[minmax(0,1fr)_330px] md:p-6">
         <section className={`relative min-h-[580px] overflow-hidden border border-[#54717b] ${stage === "outside" ? "bg-[#a1b1b7]" : "bg-[#050913]"} md:min-h-[calc(100vh-120px)]`}>
-          <Canvas shadows dpr={[1, 2]} camera={{ position: [-1.7, 3.2, 10.8], fov: 44 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
+          <Canvas
+            shadows
+            dpr={[1, 1.5]}
+            camera={{ position: [-1.7, 3.2, 10.8], fov: 44, near: 0.1, far: 250 }}
+            gl={{ antialias: true, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false }}
+            onCreated={({ gl, scene }) => {
+              gl.setClearColor(new THREE.Color("#050913"), 1);
+              gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+              gl.outputColorSpace = THREE.SRGBColorSpace;
+              gl.toneMapping = THREE.ACESFilmicToneMapping;
+              gl.toneMappingExposure = 1.25;
+              scene.background = new THREE.Color("#050913");
+            }}
+          >
             <Suspense fallback={null}><Scene stage={stage} /></Suspense>
           </Canvas>
           <div className={`pointer-events-none absolute inset-0 ${stage === "outside" ? "bg-[linear-gradient(180deg,rgba(35,58,72,.015),transparent_18%,transparent_70%,rgba(35,58,72,.035))]" : "bg-[linear-gradient(180deg,rgba(3,7,13,.12),transparent_18%,transparent_70%,rgba(3,7,13,.14))"}`} />
