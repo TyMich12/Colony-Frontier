@@ -500,11 +500,12 @@ function SolarSystemScene({ focus, progress = 0 }: { focus: SpaceBody; progress?
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; return tex;
   }, []);
   useEffect(() => () => earthTexture.dispose(), [earthTexture]);
-  const marsTransfer = useMemo(() => new THREE.CatmullRomCurve3([
-    new THREE.Vector3(14, 0, 0), new THREE.Vector3(16, 4.5, 0), new THREE.Vector3(19, 5.5, 0), new THREE.Vector3(21, 2.5, 0), new THREE.Vector3(23, 0, 0)
+  // The mission trajectory ends at the Moon, not Mars.
+  const lunarTransfer = useMemo(() => new THREE.CatmullRomCurve3([
+    new THREE.Vector3(14, 0, 0), new THREE.Vector3(14.8, 2.2, 0.5), new THREE.Vector3(15.4, 2.8, 0.2), new THREE.Vector3(16.1, 0.45, 0)
   ]), []);
-  const shipPosition = marsTransfer.getPoint(clamp(progress, 0, 1));
-  const shipDirection = marsTransfer.getTangent(clamp(progress, 0, 1)).normalize();
+  const shipPosition = lunarTransfer.getPoint(clamp(progress, 0, 1));
+  const shipDirection = lunarTransfer.getTangent(clamp(progress, 0, 1)).normalize();
   const target = useMemo(() => ({
     solar: new THREE.Vector3(0,0,0), sun: new THREE.Vector3(0,0,0),
     earth: new THREE.Vector3(14,0,0), moon: new THREE.Vector3(16.1,0,0),
@@ -530,7 +531,7 @@ function SolarSystemScene({ focus, progress = 0 }: { focus: SpaceBody; progress?
     <mesh position={[14,0,0]}><sphereGeometry args={[1.22,48,32]} /><meshBasicMaterial color="#8ccfff" transparent opacity={0.13} side={THREE.BackSide} /></mesh>
     <mesh position={[16.1,0.45,0]}><sphereGeometry args={[0.32,32,24]} /><meshStandardMaterial color="#aaa99e" roughness={1} /></mesh>
     <mesh position={[23,0,0]}><sphereGeometry args={[0.82,48,32]} /><meshStandardMaterial color="#b65f3e" roughness={0.96} /></mesh>
-    <mesh><tubeGeometry args={[marsTransfer, 90, 0.045, 8, false]} /><meshBasicMaterial color="#6ec9ff" transparent opacity={0.55} /></mesh>
+    <mesh><tubeGeometry args={[lunarTransfer, 90, 0.045, 8, false]} /><meshBasicMaterial color="#6ec9ff" transparent opacity={0.65} /></mesh>
     <group position={shipPosition} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), shipDirection)}>
       <mesh><coneGeometry args={[0.19,0.68,12]} /><meshStandardMaterial color="#f4e5c5" metalness={0.72} roughness={0.28} /></mesh>
       <mesh position={[0,-0.32,0]}><cylinderGeometry args={[0.13,0.19,0.22,12]} /><meshBasicMaterial color="#e8a85e" /></mesh>
@@ -598,6 +599,8 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
   const cameraPosition = useRef(new THREE.Vector3(0, 1.72, PAD_APPROACH_DISTANCE - 2.5));
   const lookYaw = useRef(0);
   const lookPitch = useRef(0);
+  const jumpHeight = useRef(0);
+  const jumpVelocity = useRef(0);
   useEffect(() => {
     const canvas = gl.domElement;
     const requestLook = () => {
@@ -703,6 +706,13 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
         onStageChange("outside");
       }
     } else if (s.stage === "outside") {
+      // High, floaty lunar jumps using the Moon's lower gravity.
+      if (k.has(" ") && jumpHeight.current <= 0.001) jumpVelocity.current = 8.8;
+      if (jumpVelocity.current !== 0 || jumpHeight.current > 0) {
+        jumpVelocity.current -= 1.62 * dt;
+        jumpHeight.current = Math.max(0, jumpHeight.current + jumpVelocity.current * dt);
+        if (jumpHeight.current === 0) jumpVelocity.current = 0;
+      }
       const yaw = s.yaw + lookYaw.current;
       const inputLength = Math.hypot(walkInput, strafeInput) || 1;
       const forward = (walkInput / inputLength) * dt * 7.2;
@@ -726,7 +736,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       const yaw = THREE.MathUtils.degToRad(s.heading) + lookYaw.current;
       direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     } else {
-      target = new THREE.Vector3(s.stage === "outside" || s.stage === "entering" ? s.walkX : 0, 1.72, 7 - (s.stage === "outside" || s.stage === "entering" ? s.walkZ : 0));
+      target = new THREE.Vector3(s.stage === "outside" || s.stage === "entering" ? s.walkX : 0, 1.72 + (s.stage === "outside" ? jumpHeight.current : 0), 7 - (s.stage === "outside" || s.stage === "entering" ? s.walkZ : 0));
       const yaw = s.yaw + lookYaw.current;
       direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(lookPitch.current), Math.sin(lookPitch.current), -Math.cos(yaw) * Math.cos(lookPitch.current));
     }
@@ -804,7 +814,7 @@ export function FlightSequence() {
     };
   }, []);
   useEffect(() => {
-    const valid = new Set(["w", "a", "s", "d", "q", "e", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+    const valid = new Set(["w", "a", "s", "d", "q", "e", " ", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
     const down = (e: KeyboardEvent) => { const key = e.key.toLowerCase(); if (valid.has(key)) { e.preventDefault(); keys.current.add(key); } };
     const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
     const clear = () => keys.current.clear();
@@ -960,15 +970,15 @@ export function FlightSequence() {
           <div className="pointer-events-none absolute right-5 top-24 rounded-lg border border-white/10 bg-[#08111c]/70 px-3 py-2 text-right text-[9px] uppercase tracking-[0.15em] text-[#b8c9d7] backdrop-blur-md">Deep space view<br/><span className="text-[#e8c27d]">{spaceFocus === "solar" ? "Solar system overview" : `Focused on ${spaceFocus}`}</span></div>
         </div>}
         {["startup", "ascent", "orbit", "transfer", "landing", "landed", "outside"].includes(stage) && <button onClick={() => void skipToMap()} className="absolute bottom-6 right-5 z-30 border border-[#e5c17d]/60 bg-[#111a1c]/90 px-4 py-3 text-[9px] font-bold uppercase tracking-[0.16em] text-[#f0d49b] shadow-xl backdrop-blur-md transition hover:bg-[#263027]">Skip to colony map <span className="ml-2">→</span></button>}
-        {stage === "approach" && <div className="absolute bottom-7 left-1/2 w-[min(90%,440px)] -translate-x-1/2 border border-white/15 bg-[#0a1315]/75 p-4 text-center backdrop-blur-md"><p className="text-[9px] uppercase tracking-[0.25em] text-[#e6c47f]">Kennedy Space Center · LC-39B · crew access arm · {Math.max(0, Math.ceil(PAD_APPROACH_DISTANCE - telemetry.walkDistance))} m</p><p className="mt-2 text-sm">Walk forward to the spacecraft</p>{xrStatus === "active" ? <p className="mt-3 text-[10px] text-white/65">W/S move · A/D strafe · click the scene and move your mouse to look</p> : <p className="mt-3 flex items-center justify-center gap-2"><Key>W</Key><Key>S</Key><span className="ml-1 mr-2 text-[10px] text-white/60">walk</span><Key>A</Key><Key>D</Key><span className="ml-1 mr-2 text-[10px] text-white/60">sidestep</span><span className="text-[9px] text-white/60">← ↑ ↓ → look</span></p>}<div className="mt-3 h-[2px] bg-white/10"><div className="h-full bg-[#e6c47f]" style={{ width: `${approachProgress * 100}%` }} /></div></div>}
-        {stage === "outside" && <div className="absolute bottom-7 left-1/2 w-[min(90%,440px)] -translate-x-1/2 border border-white/15 bg-[#0a1315]/75 p-4 text-center backdrop-blur-md"><p className="text-[9px] uppercase tracking-[0.25em] text-[#e6c47f]">Habitat airlock · ahead</p><p className="mt-2 text-sm">Walk forward to enter the lunar base</p>{xrStatus === "active" ? <p className="mt-3 text-[10px] text-white/65">W/S move · A/D strafe · move your mouse to look</p> : <p className="mt-3 flex items-center justify-center gap-2"><Key>W</Key><Key>S</Key><span className="ml-1 mr-2 text-[10px] text-white/60">walk</span><Key>A</Key><Key>D</Key><span className="ml-1 mr-2 text-[10px] text-white/60">sidestep</span><span className="text-[9px] text-white/60">← ↑ ↓ → look</span></p>}<div className="mt-3 h-[2px] bg-white/10"><div className="h-full bg-[#e6c47f]" style={{ width: `${surfaceProgress * 100}%` }} /></div></div>}
+        {stage === "approach" && <div className="absolute bottom-7 left-1/2 w-[min(90%,440px)] -translate-x-1/2 border border-white/15 bg-[#0a1315]/75 p-4 text-center backdrop-blur-md"><p className="text-[9px] uppercase tracking-[0.25em] text-[#e6c47f]">Kennedy Space Center · LC-39B · crew access arm · {Math.max(0, Math.ceil(PAD_APPROACH_DISTANCE - telemetry.walkDistance))} m</p><p className="mt-2 text-sm">Walk forward to the spacecraft</p>{xrStatus === "active" ? <p className="mt-3 text-[10px] text-white/65">W/S move · A/D strafe · click the scene and move your mouse to look</p> : <p className="mt-3 flex items-center justify-center gap-2"><Key>W</Key><Key>S</Key><span className="ml-1 mr-2 text-[10px] text-white/60">W forward · S backward</span><Key>A</Key><Key>D</Key><span className="ml-1 mr-2 text-[10px] text-white/60">sidestep</span><span className="text-[9px] text-white/60">← ↑ ↓ → look</span></p>}<div className="mt-3 h-[2px] bg-white/10"><div className="h-full bg-[#e6c47f]" style={{ width: `${approachProgress * 100}%` }} /></div></div>}
+        {stage === "outside" && <div className="absolute bottom-7 left-1/2 w-[min(90%,440px)] -translate-x-1/2 border border-white/15 bg-[#0a1315]/75 p-4 text-center backdrop-blur-md"><p className="text-[9px] uppercase tracking-[0.25em] text-[#e6c47f]">Habitat airlock · ahead</p><p className="mt-2 text-sm">W forward · S backward · A/D strafe · Space to jump</p>{xrStatus === "active" ? <p className="mt-3 text-[10px] text-white/65">W forward · S backward · A/D strafe · Space jump · mouse look</p> : <p className="mt-3 flex items-center justify-center gap-2"><Key>W</Key><Key>S</Key><span className="ml-1 mr-2 text-[10px] text-white/60">walk</span><Key>A</Key><Key>D</Key><span className="ml-1 mr-2 text-[10px] text-white/60">sidestep</span><span className="text-[9px] text-white/60">← ↑ ↓ → look</span></p>}<div className="mt-3 h-[2px] bg-white/10"><div className="h-full bg-[#e6c47f]" style={{ width: `${surfaceProgress * 100}%` }} /></div></div>}
         {stage === "startup" && <div className="absolute bottom-7 left-1/2 flex w-[min(90%,460px)] -translate-x-1/2 flex-col items-center border border-white/15 bg-[#0c1517]/85 p-5 text-center backdrop-blur-lg"><p className="text-[9px] uppercase tracking-[0.24em] text-[#e6c47f]">Crewed lunar transfer vehicle · flight deck</p><p className="mt-2 text-base font-medium">Flight controls ready · launch pad</p><p className="mt-2 max-w-sm text-xs leading-5 text-[#adbbb4]">{xrStatus === "active" ? "Left stick controls throttle; right stick controls attitude. Trigger starts the engines. Turn your head to look around." : "W/S adjust thrust · A/D steer heading · Q/E adjust pitch · arrow keys or mouse look around."}</p><button onClick={launch} className="mt-4 flex items-center gap-2 bg-[#e5c17d] px-5 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#151a16] hover:bg-[#f1d292]"><Rocket size={14} /> Ignite engines</button></div>}
         {stage === "ascent" && <div className="absolute bottom-6 left-5 border border-white/15 bg-[#0d171a]/70 px-4 py-3 backdrop-blur-md"><p className="text-[8px] uppercase tracking-[0.17em] text-[#93aaa0]">Flight controls</p><p className="mt-2 flex items-center gap-1.5"><Key>W</Key><Key>S</Key><span className="ml-1 text-[10px] text-white/75">thrust</span><Key>A</Key><Key>D</Key><span className="ml-1 text-[10px] text-white/75">heading</span><Key>Q</Key><Key>E</Key><span className="ml-1 text-[10px] text-white/75">pitch · arrows look</span></p></div>}
         {stage === "orbit" && <div className="absolute bottom-6 left-1/2 w-[min(90%,480px)] -translate-x-1/2 border border-[#7bc9ac]/30 bg-[#0b191a]/85 p-4 text-center backdrop-blur-lg"><p className="flex items-center justify-center gap-2 text-[9px] uppercase tracking-[0.23em] text-[#99e0bf]"><Check size={13} /> Stable orbit · 160 km</p><p className="mt-2 text-sm">Turn to face the Moon, then set up the transfer burn.</p><p className="mt-2 text-[10px] text-[#afc1b7]">Heading {MOON_HEADING}° · pitch 0° · thrust 82%</p>{xrStatus === "active" ? <p className="mt-2 text-[9px] text-white/55">Right stick · align Moon · left stick · set thrust · trigger · burn</p> : <p className="mt-2 text-[9px] text-white/55"><Key>A</Key> <Key>D</Key> heading <Key>Q</Key> <Key>E</Key> pitch <Key>W</Key> <Key>S</Key> thrust · arrows look</p>}<button disabled={!transferReady} onClick={startBurn} className="mt-4 border border-[#91cbb0]/70 px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.16em] text-[#c1f1d3] enabled:hover:bg-[#17392e] disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/35">{transferReady ? "Start translunar burn" : "Align with lunar guidance"}</button></div>}
         {stage === "transfer" && <div className="absolute bottom-6 left-1/2 w-[min(90%,460px)] -translate-x-1/2 border border-white/15 bg-[#101718]/85 p-4 text-center backdrop-blur-lg"><p className="text-[9px] uppercase tracking-[0.2em] text-[#e6c47f]">Translunar injection · 1 second guided burn</p><p className="mt-2 text-xs text-[#d8e1da]">{transferAligned ? "Trajectory correction nominal. Hold these parameters." : "Flight path drifting — re-align heading, pitch and throttle."}</p><div className="mx-auto mt-3 h-1 w-48 overflow-hidden bg-white/10"><div className="h-full bg-[#e6c47f]" style={{ width: `${clamp(telemetry.transferSeconds / 1, 0, 1) * 100}%` }} /></div></div>}
         {stage === "landing" && <div className="absolute bottom-6 left-1/2 w-[min(92%,490px)] -translate-x-1/2 border border-[#d4b67a]/35 bg-[#101718]/85 p-4 text-center backdrop-blur-lg"><p className="text-[9px] uppercase tracking-[0.2em] text-[#e6c47f]">Powered descent · lunar gravity 1.62 m/s²</p><p className={`mt-2 text-xs ${telemetry.verticalSpeed > 0.004 ? "text-amber-200" : "text-[#e0e8e1]"}`}>{telemetry.verticalSpeed > 0.004 ? "Excess thrust — climbing away from the surface. Reduce throttle." : telemetry.throttle < landingThrottle - 8 ? "Thrust below the landing curve — descent rate increasing." : "Match the guidance cues to settle onto the landing pad."}</p><p className="mt-2 text-[9px] text-white/65">Pitch −88° · vertical rate {Math.round(landingSpeed)} m/s · thrust {Math.round(landingThrottle)}% · touchdown ≤3 m/s</p><p className="mt-2 text-[9px] text-white/55">{xrStatus === "active" ? "Left stick · throttle · right stick · pitch · trigger · confirm" : <><Key>W</Key> <Key>S</Key> throttle <Key>Q</Key> <Key>E</Key> pitch · arrows look</>}</p></div>}
         {stage === "crashed" && <div className="absolute inset-0 flex items-center justify-center bg-[#130c0d]/40 p-5 backdrop-blur-[2px]"><div className="max-w-sm border border-red-200/25 bg-[#141112]/95 p-6 text-center"><TriangleAlert className="mx-auto text-red-300" size={24} /><p className="mt-3 text-[10px] uppercase tracking-[0.2em] text-red-200">Landing envelope exceeded</p><p className="mt-2 text-xs leading-5 text-[#c6b8b5]">The vehicle struck the surface before descent rate and attitude were safe. Restart the approach and follow the landing cues.</p><button onClick={retryLanding} className="mt-4 border border-white/20 px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.16em] text-white/90 hover:bg-white/10">Restart lunar approach</button></div></div>}
-        {stage === "landed" && <div className="absolute bottom-7 left-1/2 w-[min(90%,470px)] -translate-x-1/2 border border-[#8ad3ad]/30 bg-[#0b1918]/85 p-4 text-center backdrop-blur-lg"><p className="flex items-center justify-center gap-2 text-[9px] uppercase tracking-[0.22em] text-[#9ce1bb]"><Check size={13} /> Touchdown · engines safed</p><p className="mt-2 text-sm">Walk forward to leave the spacecraft.</p><p className="mt-2 text-[10px] text-white/55">{xrStatus === "active" ? "Press either controller trigger to exit the lander" : <><Key>W</Key> exit · arrows look around</>}</p></div>}
+        {stage === "landed" && <div className="absolute bottom-7 left-1/2 w-[min(90%,470px)] -translate-x-1/2 border border-[#8ad3ad]/30 bg-[#0b1918]/85 p-4 text-center backdrop-blur-lg"><p className="flex items-center justify-center gap-2 text-[9px] uppercase tracking-[0.22em] text-[#9ce1bb]"><Check size={13} /> Touchdown · engines safed</p><p className="mt-2 text-sm">Walk out onto the Moon. Press Space to jump high in low lunar gravity.</p><p className="mt-2 text-[10px] text-white/55">{xrStatus === "active" ? "Press either controller trigger to exit the lander" : <><Key>W</Key> exit · arrows look around</>}</p></div>}
       </section>
 
       <aside className="relative z-20 hidden min-h-0 flex-col border-t border-white/[0.1] bg-[#0b1214]/95 px-5 py-5 backdrop-blur-2xl md:flex md:border-l md:border-t-0 md:px-6 md:py-7">
