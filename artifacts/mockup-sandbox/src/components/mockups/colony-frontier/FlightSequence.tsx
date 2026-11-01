@@ -484,9 +484,13 @@ function ExternalViewScene({ stage, telemetry }: { stage: Stage; telemetry: Flig
   const landerHeight = altitude * 9;
   useFrame(() => {
     if (rocket) {
-      const focusY = rocketHeight + 31;
-      camera.position.set(98, focusY + 58, 122);
-      camera.lookAt(0, focusY, 0);
+      // Let the launch vehicle climb through the frame. The camera follows only
+      // part of its ascent, rather than locking the rocket in the centre.
+      const cameraRise = rocketHeight * 0.55;
+      const lookRise = rocketHeight * 0.35;
+      const distance = 157 + altitude * 0.22;
+      camera.position.set(distance * 0.62, 89 + cameraRise, distance * 0.78);
+      camera.lookAt(0, 31 + lookRise, 0);
     } else {
       const distance = 18 + landerHeight * 0.8;
       camera.position.set(distance * 0.76, landerHeight + distance * 0.92, distance * 0.86);
