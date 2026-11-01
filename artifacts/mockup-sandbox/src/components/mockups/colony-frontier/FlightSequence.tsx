@@ -718,7 +718,8 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       const forward = (walkInput / inputLength) * dt * 7.2;
       const sideways = (strafeInput / inputLength) * dt * 7.2;
       s.walkX += Math.sin(yaw) * forward + Math.cos(yaw) * sideways;
-      s.walkZ += -Math.cos(yaw) * forward + Math.sin(yaw) * sideways;
+      // Camera faces -Z, so positive forward input must move the player toward -Z in camera space.
+      s.walkZ += Math.cos(yaw) * forward - Math.sin(yaw) * sideways;
       s.walkDistance = clamp(s.walkZ, 0, 17);
       if (s.walkDistance >= 16.4) onStageChange("entering");
     }
