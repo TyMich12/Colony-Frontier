@@ -779,7 +779,9 @@ export function FlightSequence() {
   const [stage, setStage] = useState<Stage>("approach");
   const [telemetry, setTelemetry] = useState<FlightState>(() => ({ ...flight.current }));
   const [xrStatus, setXrStatus] = useState<"checking" | "ready" | "unsupported" | "active">("checking");
-  const [xrError, setXrError] = useState<string | null>(null);\n  const [spaceExplorerOpen, setSpaceExplorerOpen] = useState(false);\n  const [spaceFocus, setSpaceFocus] = useState<SpaceBody>("solar");
+  const [xrError, setXrError] = useState<string | null>(null);
+  const [spaceExplorerOpen, setSpaceExplorerOpen] = useState(false);
+  const [spaceFocus, setSpaceFocus] = useState<SpaceBody>("solar");
   const renderer = useRef<THREE.WebGLRenderer | null>(null);
   const xrSession = useRef<XRSessionHandle | null>(null);
   const overlayRoot = useRef<HTMLElement>(null);
