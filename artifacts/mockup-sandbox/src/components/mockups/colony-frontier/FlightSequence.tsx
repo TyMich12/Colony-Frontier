@@ -598,7 +598,8 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       s.throttle = clamp(s.throttle + throttleInput * dt * 24, 0, 100);
       s.pitch = clamp(s.pitch + pitchInput * dt * 22, 0, 90);
       s.heading = (s.heading + headingInput * dt * 24 + 360) % 360;
-      s.speed = Math.max(0, s.speed + (s.throttle / 100 * 0.06 - 0.015) * dt);
+      // Faster, more responsive prototype ascent so reaching orbit does not take several minutes.
+      s.speed = Math.max(0, s.speed + (s.throttle / 100 * 0.42 - 0.015) * dt);
       s.altitude = Math.max(0, s.altitude + s.speed * Math.sin(THREE.MathUtils.degToRad(s.pitch)) * dt);
       const targetPitch = 90 - clamp(s.altitude / ORBIT_ALTITUDE, 0, 1) * 70;
       if (s.altitude >= ORBIT_ALTITUDE && s.speed >= ORBIT_SPEED && Math.abs(s.pitch - targetPitch) <= 11) {
