@@ -722,8 +722,9 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       s.throttle = clamp(s.throttle + throttleInput * dt * 24, 0, 100);
       s.pitch = clamp(s.pitch + pitchInput * dt * 22, 0, 90);
       s.heading = (s.heading + headingInput * dt * 24 + 360) % 360;
-      // Faster, more responsive prototype ascent so reaching orbit does not take several minutes.
-      s.speed = Math.max(0, s.speed + (s.throttle / 100 * 1.35 - 0.015) * dt);
+      // Longer cinematic lunar ascent: tune acceleration for an approximately 42–44 second climb to orbit.
+      // With the short orbit, transfer and descent phases, touchdown takes about 45 seconds overall.
+      s.speed = Math.max(0, s.speed + (s.throttle / 100 * 0.25 - 0.015) * dt);
       s.altitude = Math.max(0, s.altitude + s.speed * Math.sin(THREE.MathUtils.degToRad(s.pitch)) * dt);
       const targetPitch = 90 - clamp(s.altitude / ORBIT_ALTITUDE, 0, 1) * 70;
       if (s.altitude >= ORBIT_ALTITUDE) {
