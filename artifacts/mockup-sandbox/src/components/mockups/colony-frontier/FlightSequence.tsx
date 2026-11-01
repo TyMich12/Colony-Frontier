@@ -513,7 +513,7 @@ function SolarSystemScene({ focus, progress = 0 }: { focus: SpaceBody; progress?
   useEffect(() => {
     if (!controls.current) return;
     controls.current.target.copy(target);
-    const distance = focus === "solar" ? 70 : focus === "sun" ? 17 : focus === "earth" ? 7 : focus === "moon" ? 3.2 : focus === "mars" ? 6 : focus === "jupiter" ? 10 : 12;
+    const distance = focus === "solar" ? 95 : focus === "sun" ? 17 : focus === "earth" ? 7 : focus === "moon" ? 3.2 : focus === "mars" ? 6 : focus === "jupiter" ? 10 : 12;
     controls.current.object.position.copy(target.clone().add(new THREE.Vector3(distance * 0.35, distance * 0.45, distance)));
     controls.current.update();
   }, [focus, target]);
