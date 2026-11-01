@@ -478,7 +478,7 @@ function LanderVehicle() {
 
 type SpaceBody = "solar" | "sun" | "earth" | "moon" | "mars" | "jupiter" | "saturn";
 
-function SolarSystemScene({ focus }: { focus: SpaceBody }) {
+function SolarSystemScene({ focus, progress = 0 }: { focus: SpaceBody; progress?: number }) {
   const controls = useRef<any>(null);
   const earthTexture = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -500,6 +500,11 @@ function SolarSystemScene({ focus }: { focus: SpaceBody }) {
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; return tex;
   }, []);
   useEffect(() => () => earthTexture.dispose(), [earthTexture]);
+  const marsTransfer = useMemo(() => new THREE.CatmullRomCurve3([
+    new THREE.Vector3(14, 0, 0), new THREE.Vector3(16, 4.5, 0), new THREE.Vector3(19, 5.5, 0), new THREE.Vector3(21, 2.5, 0), new THREE.Vector3(23, 0, 0)
+  ]), []);
+  const shipPosition = marsTransfer.getPoint(clamp(progress, 0, 1));
+  const shipDirection = marsTransfer.getTangent(clamp(progress, 0, 1)).normalize();
   const target = useMemo(() => ({
     solar: new THREE.Vector3(0,0,0), sun: new THREE.Vector3(0,0,0),
     earth: new THREE.Vector3(14,0,0), moon: new THREE.Vector3(16.1,0,0),
@@ -525,6 +530,12 @@ function SolarSystemScene({ focus }: { focus: SpaceBody }) {
     <mesh position={[14,0,0]}><sphereGeometry args={[1.22,48,32]} /><meshBasicMaterial color="#8ccfff" transparent opacity={0.13} side={THREE.BackSide} /></mesh>
     <mesh position={[16.1,0.45,0]}><sphereGeometry args={[0.32,32,24]} /><meshStandardMaterial color="#aaa99e" roughness={1} /></mesh>
     <mesh position={[23,0,0]}><sphereGeometry args={[0.82,48,32]} /><meshStandardMaterial color="#b65f3e" roughness={0.96} /></mesh>
+    <mesh><tubeGeometry args={[marsTransfer, 90, 0.045, 8, false]} /><meshBasicMaterial color="#6ec9ff" transparent opacity={0.55} /></mesh>
+    <group position={shipPosition} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), shipDirection)}>
+      <mesh><coneGeometry args={[0.19,0.68,12]} /><meshStandardMaterial color="#f4e5c5" metalness={0.72} roughness={0.28} /></mesh>
+      <mesh position={[0,-0.32,0]}><cylinderGeometry args={[0.13,0.19,0.22,12]} /><meshBasicMaterial color="#e8a85e" /></mesh>
+      <pointLight color="#72cfff" intensity={2} distance={3} />
+    </group>
     <mesh position={[34,0,0]}><sphereGeometry args={[2.25,48,32]} /><meshStandardMaterial color="#c9a77e" roughness={0.88} /></mesh>
     <mesh position={[34,0,0]}><sphereGeometry args={[2.27,48,32]} /><meshBasicMaterial color="#f1d5a8" transparent opacity={0.1} wireframe /></mesh>
     <group position={[47,0,0]}>
@@ -919,12 +930,12 @@ export function FlightSequence() {
       <section className="relative h-full min-h-0 overflow-hidden">
         <div className="absolute left-5 top-5 flex items-center gap-2 border border-white/15 bg-[#111a1c]/55 px-3 py-2 backdrop-blur-md"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8bd6b1]" /><span className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#dbe4dc]">LIVE · {stage === "approach" || stage === "boarding" ? "KENNEDY SPACE CENTER" : stage === "outside" || stage === "landed" || stage === "entering" ? "LUNAR SURFACE · SOUTH POLE" : "CREW FLIGHT DECK"}</span></div>
         {["ascent", "orbit", "transfer", "landing", "crashed"].includes(stage) && <div className="absolute right-5 top-5 border border-white/15 bg-[#10191b]/65 px-3 py-2 backdrop-blur-md"><p className="text-[8px] uppercase tracking-[0.16em] text-[#98aca2]">Mission elapsed</p><p className="mt-1 font-mono text-sm">{Math.floor(telemetry.elapsedSeconds / 60).toString().padStart(2, "0")}:{Math.floor(telemetry.elapsedSeconds % 60).toString().padStart(2, "0")}<span className="ml-1 text-[9px] text-[#98aca2]">T+</span></p></div>}
-        {["ascent", "landing"].includes(stage) && <div className="absolute right-4 top-16 z-20 w-[min(24vw,220px)] min-w-[132px] overflow-hidden border border-white/20 bg-[#0b1114]/90 shadow-2xl backdrop-blur-md">
+        {["ascent", "orbit", "transfer", "landing"].includes(stage) && <div className="absolute right-4 top-16 z-20 w-[min(24vw,220px)] min-w-[132px] overflow-hidden border border-white/20 bg-[#0b1114]/90 shadow-2xl backdrop-blur-md">
           <button type="button" onClick={() => { setSpaceFocus("solar"); setSpaceExplorerOpen(true); }} className="block w-full text-left">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2"><span className="text-[8px] uppercase tracking-[0.18em] text-[#c5d4cb]">Live space tracker</span><span className="font-mono text-[9px] text-[#edcb87]">{stage === "ascent" ? `${Math.round(telemetry.altitude * 1000)} m AGL` : `${Math.round(telemetry.altitude * 1000)} m TO SURFACE`}</span></div>
             <div className="aspect-[16/10]">
               <Canvas dpr={[1, 1.5]} camera={{ position: [0, 18, 62], fov: 42, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}>
-                <SolarSystemScene focus="solar" />
+                <SolarSystemScene focus="solar" progress={stage === "ascent" ? 0.08 + clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) * 0.18 : stage === "orbit" ? 0.28 : stage === "transfer" ? 0.3 + clamp(telemetry.transferSeconds, 0, 1) * 0.62 : stage === "landing" ? 0.94 : 0.08} />
               </Canvas>
             </div>
             <p className="border-t border-white/10 px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.12em] text-[#e6c47f]">Open interactive 3D universe ↗</p>
@@ -933,7 +944,7 @@ export function FlightSequence() {
         {spaceExplorerOpen && <div className="fixed inset-0 z-[80] bg-[#02050b] text-white">
           <div className="absolute inset-0">
             <Canvas dpr={[1,2]} camera={{ position: [0,18,62], fov: 48, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
-              <SolarSystemScene focus={spaceFocus} />
+              <SolarSystemScene focus={spaceFocus} progress={stage === "ascent" ? 0.08 + clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) * 0.18 : stage === "orbit" ? 0.28 : stage === "transfer" ? 0.3 + clamp(telemetry.transferSeconds, 0, 1) * 0.62 : stage === "landing" ? 0.94 : 0.08} />
             </Canvas>
           </div>
           <header className="absolute left-0 right-0 top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#050b13]/75 px-5 py-4 backdrop-blur-xl">
