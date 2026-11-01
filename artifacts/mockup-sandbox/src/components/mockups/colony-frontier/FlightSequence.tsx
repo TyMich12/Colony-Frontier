@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, Stars } from "@react-three/drei";
+import { ContactShadows, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { ArrowDown, ArrowUp, Check, Compass, Crosshair, Gauge, Glasses, Radio, Rocket, ShieldCheck, Timer, TriangleAlert } from "lucide-react";
 import { loadPendingMission } from "./missionRuntime";
@@ -476,6 +476,66 @@ function LanderVehicle() {
   </group>;
 }
 
+type SpaceBody = "solar" | "sun" | "earth" | "moon" | "mars" | "jupiter" | "saturn";
+
+function SolarSystemScene({ focus }: { focus: SpaceBody }) {
+  const controls = useRef<any>(null);
+  const earthTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024; canvas.height = 512;
+    const ctx = canvas.getContext("2d")!;
+    const ocean = ctx.createLinearGradient(0, 0, 0, 512);
+    ocean.addColorStop(0, "#164a75"); ocean.addColorStop(0.5, "#1476a2"); ocean.addColorStop(1, "#092d55");
+    ctx.fillStyle = ocean; ctx.fillRect(0, 0, 1024, 512);
+    ctx.fillStyle = "#6d9560"; ctx.strokeStyle = "#a2b87b"; ctx.lineWidth = 5;
+    const land = (points: number[][]) => { ctx.beginPath(); points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.closePath(); ctx.fill(); ctx.stroke(); };
+    land([[90,80],[150,45],[220,62],[255,112],[230,150],[200,165],[180,220],[140,205],[115,155]]);
+    land([[205,225],[245,245],[265,300],[245,365],[220,425],[190,385],[180,315]]);
+    land([[420,80],[475,58],[520,80],[555,115],[530,150],[490,155],[470,205],[440,175],[405,135]]);
+    land([[485,180],[535,200],[565,255],[550,335],[520,415],[485,365],[465,285]]);
+    land([[570,85],[650,50],[730,65],[800,105],[845,150],[815,190],[760,170],[720,205],[675,165],[620,175],[585,130]]);
+    land([[760,250],[825,235],[875,270],[850,330],[805,350],[770,315]]);
+    land([[900,80],[945,70],[970,115],[950,145],[915,130]]);
+    ctx.fillStyle = "rgba(240,248,255,.85)"; ctx.fillRect(0,0,1024,20); ctx.fillRect(0,492,1024,20);
+    const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+  }, []);
+  useEffect(() => () => earthTexture.dispose(), [earthTexture]);
+  const target = useMemo(() => ({
+    solar: new THREE.Vector3(0,0,0), sun: new THREE.Vector3(0,0,0),
+    earth: new THREE.Vector3(14,0,0), moon: new THREE.Vector3(16.1,0,0),
+    mars: new THREE.Vector3(23,0,0), jupiter: new THREE.Vector3(34,0,0), saturn: new THREE.Vector3(47,0,0)
+  }[focus]), [focus]);
+  useEffect(() => {
+    if (!controls.current) return;
+    controls.current.target.copy(target);
+    const distance = focus === "solar" ? 70 : focus === "sun" ? 17 : focus === "earth" ? 7 : focus === "moon" ? 3.2 : focus === "mars" ? 6 : focus === "jupiter" ? 10 : 12;
+    controls.current.object.position.copy(target.clone().add(new THREE.Vector3(distance * 0.35, distance * 0.45, distance)));
+    controls.current.update();
+  }, [focus, target]);
+  return <>
+    <color attach="background" args={["#02050d"]} />
+    <ambientLight intensity={0.24} />
+    <pointLight position={[0,0,0]} intensity={180} distance={150} decay={1.5} color="#fff0d0" />
+    <Stars radius={150} depth={100} count={6500} factor={5} saturation={0.15} fade speed={0.15} />
+    <mesh position={[0,0,0]}><sphereGeometry args={[3.1,64,48]} /><meshBasicMaterial color="#ffca68" /></mesh>
+    <mesh position={[0,0,0]}><sphereGeometry args={[3.35,48,32]} /><meshBasicMaterial color="#ff9d38" transparent opacity={0.13} side={THREE.BackSide} /></mesh>
+    <mesh position={[14,0,0]} onClick={(e)=>{e.stopPropagation(); controls.current?.target.set(14,0,0);}}>
+      <sphereGeometry args={[1.18,64,48]} /><meshStandardMaterial map={earthTexture} roughness={0.92} metalness={0.02} />
+    </mesh>
+    <mesh position={[14,0,0]}><sphereGeometry args={[1.22,48,32]} /><meshBasicMaterial color="#8ccfff" transparent opacity={0.13} side={THREE.BackSide} /></mesh>
+    <mesh position={[16.1,0.45,0]}><sphereGeometry args={[0.32,32,24]} /><meshStandardMaterial color="#aaa99e" roughness={1} /></mesh>
+    <mesh position={[23,0,0]}><sphereGeometry args={[0.82,48,32]} /><meshStandardMaterial color="#b65f3e" roughness={0.96} /></mesh>
+    <mesh position={[34,0,0]}><sphereGeometry args={[2.25,48,32]} /><meshStandardMaterial color="#c9a77e" roughness={0.88} /></mesh>
+    <mesh position={[34,0,0]}><sphereGeometry args={[2.27,48,32]} /><meshBasicMaterial color="#f1d5a8" transparent opacity={0.1} wireframe /></mesh>
+    <group position={[47,0,0]}>
+      <mesh><sphereGeometry args={[1.85,48,32]} /><meshStandardMaterial color="#c8b58a" roughness={0.9} /></mesh>
+      <mesh rotation={[Math.PI/2.35,0.15,0]}><torusGeometry args={[3.05,0.42,4,96]} /><meshStandardMaterial color="#b9a27d" roughness={0.85} side={THREE.DoubleSide} /></mesh>
+    </group>
+    {[14,23,34,47].map((r,i)=><mesh key={r} rotation={[Math.PI/2,0,0]}><ringGeometry args={[r-0.012,r+0.012,160]} /><meshBasicMaterial color="#62758c" transparent opacity={0.22} side={THREE.DoubleSide} /></mesh>)}
+    <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.075} enablePan minDistance={2.2} maxDistance={180} zoomSpeed={1.15} rotateSpeed={0.7} />
+  </>;
+}
+
 function ExternalViewScene({ stage, telemetry }: { stage: Stage; telemetry: FlightState }) {
   const { camera } = useThree();
   const rocket = stage === "ascent";
@@ -708,7 +768,7 @@ export function FlightSequence() {
   const [stage, setStage] = useState<Stage>("approach");
   const [telemetry, setTelemetry] = useState<FlightState>(() => ({ ...flight.current }));
   const [xrStatus, setXrStatus] = useState<"checking" | "ready" | "unsupported" | "active">("checking");
-  const [xrError, setXrError] = useState<string | null>(null);
+  const [xrError, setXrError] = useState<string | null>(null);\n  const [spaceExplorerOpen, setSpaceExplorerOpen] = useState(false);\n  const [spaceFocus, setSpaceFocus] = useState<SpaceBody>("solar");
   const renderer = useRef<THREE.WebGLRenderer | null>(null);
   const xrSession = useRef<XRSessionHandle | null>(null);
   const overlayRoot = useRef<HTMLElement>(null);
@@ -859,14 +919,32 @@ export function FlightSequence() {
       <section className="relative h-full min-h-0 overflow-hidden">
         <div className="absolute left-5 top-5 flex items-center gap-2 border border-white/15 bg-[#111a1c]/55 px-3 py-2 backdrop-blur-md"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8bd6b1]" /><span className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#dbe4dc]">LIVE · {stage === "approach" || stage === "boarding" ? "KENNEDY SPACE CENTER" : stage === "outside" || stage === "landed" || stage === "entering" ? "LUNAR SURFACE · SOUTH POLE" : "CREW FLIGHT DECK"}</span></div>
         {["ascent", "orbit", "transfer", "landing", "crashed"].includes(stage) && <div className="absolute right-5 top-5 border border-white/15 bg-[#10191b]/65 px-3 py-2 backdrop-blur-md"><p className="text-[8px] uppercase tracking-[0.16em] text-[#98aca2]">Mission elapsed</p><p className="mt-1 font-mono text-sm">{Math.floor(telemetry.elapsedSeconds / 60).toString().padStart(2, "0")}:{Math.floor(telemetry.elapsedSeconds % 60).toString().padStart(2, "0")}<span className="ml-1 text-[9px] text-[#98aca2]">T+</span></p></div>}
-        {["ascent", "landing"].includes(stage) && <div className="absolute right-4 top-16 z-20 w-[min(24vw,220px)] min-w-[132px] overflow-hidden border border-white/20 bg-[#0b1114]/85 shadow-2xl backdrop-blur-md">
-          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2"><span className="text-[8px] uppercase tracking-[0.18em] text-[#c5d4cb]">External pursuit camera</span><span className="font-mono text-[9px] text-[#edcb87]">{stage === "ascent" ? `${Math.round(telemetry.altitude * 1000)} m AGL` : `${Math.round(telemetry.altitude * 1000)} m TO SURFACE`}</span></div>
-          <div className="aspect-[16/10]">
-            <Canvas dpr={[1, 1.25]} camera={{ position: [98, 89, 122], fov: 34, near: 0.1, far: 1800 }} gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}>
-              <ExternalViewScene stage={stage} telemetry={telemetry} />
+        {["ascent", "landing"].includes(stage) && <div className="absolute right-4 top-16 z-20 w-[min(24vw,220px)] min-w-[132px] overflow-hidden border border-white/20 bg-[#0b1114]/90 shadow-2xl backdrop-blur-md">
+          <button type="button" onClick={() => { setSpaceFocus("solar"); setSpaceExplorerOpen(true); }} className="block w-full text-left">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2"><span className="text-[8px] uppercase tracking-[0.18em] text-[#c5d4cb]">Live space tracker</span><span className="font-mono text-[9px] text-[#edcb87]">{stage === "ascent" ? `${Math.round(telemetry.altitude * 1000)} m AGL` : `${Math.round(telemetry.altitude * 1000)} m TO SURFACE`}</span></div>
+            <div className="aspect-[16/10]">
+              <Canvas dpr={[1, 1.5]} camera={{ position: [0, 18, 62], fov: 42, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}>
+                <SolarSystemScene focus="solar" />
+              </Canvas>
+            </div>
+            <p className="border-t border-white/10 px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.12em] text-[#e6c47f]">Open interactive 3D universe ↗</p>
+          </button>
+        </div>}
+        {spaceExplorerOpen && <div className="fixed inset-0 z-[80] bg-[#02050b] text-white">
+          <div className="absolute inset-0">
+            <Canvas dpr={[1,2]} camera={{ position: [0,18,62], fov: 48, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
+              <SolarSystemScene focus={spaceFocus} />
             </Canvas>
           </div>
-          <p className="border-t border-white/10 px-3 py-1.5 text-[8px] uppercase tracking-[0.12em] text-white/60">{stage === "ascent" ? "Launch vehicle · pad to orbital climb" : "Lander · descent and surface range"}</p>
+          <header className="absolute left-0 right-0 top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#050b13]/75 px-5 py-4 backdrop-blur-xl">
+            <div><p className="text-[9px] uppercase tracking-[0.3em] text-[#9eb6c8]">Colony Frontier · Deep space</p><h2 className="mt-1 text-lg font-semibold tracking-wide">3D Solar System Explorer</h2></div>
+            <button onClick={() => setSpaceExplorerOpen(false)} className="border border-white/25 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] hover:bg-white/10">Close explorer ✕</button>
+          </header>
+          <div className="absolute bottom-5 left-1/2 z-10 flex max-w-[95vw] -translate-x-1/2 flex-wrap justify-center gap-2 rounded-xl border border-white/15 bg-[#08111c]/85 p-3 backdrop-blur-xl">
+            {([["solar","Solar system"],["sun","Sun"],["earth","Earth"],["moon","Moon"],["mars","Mars"],["jupiter","Jupiter"],["saturn","Saturn"]] as [SpaceBody,string][]).map(([id,label])=><button key={id} onClick={()=>setSpaceFocus(id)} className={`border px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.12em] transition ${spaceFocus===id?"border-[#e8c27d] bg-[#8c6934]/35 text-[#ffe0a2]":"border-white/15 text-white/75 hover:bg-white/10"}`}>{label}</button>)}
+          </div>
+          <div className="pointer-events-none absolute bottom-24 left-5 rounded-lg border border-white/10 bg-[#08111c]/70 px-3 py-2 text-[9px] leading-5 text-white/65 backdrop-blur-md">DRAG · rotate view<br/>SCROLL · zoom in / out<br/>RIGHT-DRAG · pan around</div>
+          <div className="pointer-events-none absolute right-5 top-24 rounded-lg border border-white/10 bg-[#08111c]/70 px-3 py-2 text-right text-[9px] uppercase tracking-[0.15em] text-[#b8c9d7] backdrop-blur-md">Deep space view<br/><span className="text-[#e8c27d]">{spaceFocus === "solar" ? "Solar system overview" : `Focused on ${spaceFocus}`}</span></div>
         </div>}
         {["startup", "ascent", "orbit", "transfer", "landing", "landed", "outside"].includes(stage) && <button onClick={() => void skipToMap()} className="absolute bottom-6 right-5 z-30 border border-[#e5c17d]/60 bg-[#111a1c]/90 px-4 py-3 text-[9px] font-bold uppercase tracking-[0.16em] text-[#f0d49b] shadow-xl backdrop-blur-md transition hover:bg-[#263027]">Skip to colony map <span className="ml-2">→</span></button>}
         {stage === "approach" && <div className="absolute bottom-7 left-1/2 w-[min(90%,440px)] -translate-x-1/2 border border-white/15 bg-[#0a1315]/75 p-4 text-center backdrop-blur-md"><p className="text-[9px] uppercase tracking-[0.25em] text-[#e6c47f]">Kennedy Space Center · LC-39B · crew access arm · {Math.max(0, Math.ceil(PAD_APPROACH_DISTANCE - telemetry.walkDistance))} m</p><p className="mt-2 text-sm">Walk forward to the spacecraft</p>{xrStatus === "active" ? <p className="mt-3 text-[10px] text-white/65">W/S move · A/D strafe · click the scene and move your mouse to look</p> : <p className="mt-3 flex items-center justify-center gap-2"><Key>W</Key><Key>S</Key><span className="ml-1 mr-2 text-[10px] text-white/60">walk</span><Key>A</Key><Key>D</Key><span className="ml-1 mr-2 text-[10px] text-white/60">sidestep</span><span className="text-[9px] text-white/60">← ↑ ↓ → look</span></p>}<div className="mt-3 h-[2px] bg-white/10"><div className="h-full bg-[#e6c47f]" style={{ width: `${approachProgress * 100}%` }} /></div></div>}
