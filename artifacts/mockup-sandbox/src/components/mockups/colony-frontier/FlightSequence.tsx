@@ -602,47 +602,33 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       s.speed = Math.max(0, s.speed + (s.throttle / 100 * 0.42 - 0.015) * dt);
       s.altitude = Math.max(0, s.altitude + s.speed * Math.sin(THREE.MathUtils.degToRad(s.pitch)) * dt);
       const targetPitch = 90 - clamp(s.altitude / ORBIT_ALTITUDE, 0, 1) * 70;
-      if (s.altitude >= ORBIT_ALTITUDE && s.speed >= ORBIT_SPEED && Math.abs(s.pitch - targetPitch) <= 11) {
-        s.altitude = ORBIT_ALTITUDE; s.speed = ORBIT_SPEED; s.pitch = 0; s.heading = 0; s.throttle = 0; onStageChange("orbit");
+      if (s.altitude >= ORBIT_ALTITUDE) {
+        s.altitude = ORBIT_ALTITUDE; s.speed = ORBIT_SPEED; s.pitch = 0; s.heading = MOON_HEADING; s.throttle = 82; s.orbitSeconds = 0; onStageChange("orbit");
       }
     } else if (s.stage === "orbit") {
-      s.heading = clamp(s.heading + headingInput * dt * 32, 0, 180);
-      s.pitch = clamp(s.pitch + pitchInput * dt * 22, -30, 30);
-      s.throttle = clamp(s.throttle + throttleInput * dt * 24, 0, 100);
-      if (Math.abs(s.heading - MOON_HEADING) <= 4 && Math.abs(s.pitch) <= 4 && s.throttle >= 76 && s.throttle <= 88) s.orbitSeconds += dt;
-      else s.orbitSeconds = Math.max(0, s.orbitSeconds - dt * 0.8);
-      if (axes.trigger && s.orbitSeconds >= 2) {
-        s.burnStarted = true;
-        s.transferSeconds = 0;
-        onStageChange("transfer");
+      s.heading = MOON_HEADING; s.pitch = 0; s.throttle = 82;
+      s.orbitSeconds += dt;
+      if (s.orbitSeconds >= 1.5) {
+        s.burnStarted = true; s.transferSeconds = 0; onStageChange("transfer");
       }
     } else if (s.stage === "transfer") {
-      s.heading = clamp(s.heading + headingInput * dt * 20, 0, 180);
-      s.pitch = clamp(s.pitch + pitchInput * dt * 18, -30, 30);
-      s.throttle = clamp(s.throttle + throttleInput * dt * 22, 0, 100);
-      if (s.burnStarted) {
-        const aligned = Math.abs(s.heading - MOON_HEADING) <= 7 && Math.abs(s.pitch) <= 7 && s.throttle >= 72;
-        s.transferSeconds = aligned ? s.transferSeconds + dt : Math.max(0, s.transferSeconds - dt * 1.5);
-        if (s.transferSeconds >= 8) {
-          s.altitude = 2.4; s.speed = 0; s.verticalSpeed = -0.032; s.pitch = -80;
-          s.throttle = 54; s.heading = MOON_HEADING; s.burnStarted = false; onStageChange("landing");
-        }
+      s.heading = MOON_HEADING; s.pitch = 0; s.throttle = 82;
+      s.transferSeconds += dt;
+      if (s.transferSeconds >= 3) {
+        s.altitude = 2.4; s.speed = 0; s.verticalSpeed = -0.002; s.pitch = -88;
+        s.throttle = 54; s.heading = MOON_HEADING; s.burnStarted = false; s.boardingSeconds = 0; onStageChange("landing");
       }
     } else if (s.stage === "landing") {
-      s.throttle = clamp(s.throttle + throttleInput * dt * 36, 0, 100);
-      s.pitch = clamp(s.pitch + pitchInput * dt * 18, -100, -55);
-      s.verticalSpeed = clamp(s.verticalSpeed + (s.throttle * 0.03 - 1.62) / 1000 * dt, -0.09, 0.035);
-      s.altitude += s.verticalSpeed * dt;
+      s.boardingSeconds += dt; s.pitch = -88; s.throttle = 54; s.verticalSpeed = -0.002;
+      s.altitude = Math.max(0, 2.4 - s.boardingSeconds * 1.25);
       if (s.altitude <= 0.004) {
-        if (Math.abs(s.verticalSpeed) <= 0.003 && s.verticalSpeed <= 0.002 && Math.abs(s.pitch + 88) <= 8) {
-          s.altitude = 0; s.verticalSpeed = 0; s.throttle = 0; onStageChange("landed");
-        } else { s.altitude = 0; onStageChange("crashed"); }
+        s.altitude = 0; s.verticalSpeed = 0; s.throttle = 0; onStageChange("landed");
       }
     } else if (s.stage === "landed") {
       if (k.has("w") || axes.trigger) {
         s.walkDistance = 0;
         s.walkX = 0;
-        s.walkZ = 0;
+        s.walkZ = 0; s.boardingSeconds = 0;
         onStageChange("outside");
       }
     } else if (s.stage === "outside") {
@@ -768,6 +754,11 @@ export function FlightSequence() {
     });
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    if (stage !== "outside") return;
+    const timer = window.setTimeout(() => changeStage("entering"), 2200);
+    return () => window.clearTimeout(timer);
+  }, [stage, changeStage]);
   useEffect(() => {
     if (stage !== "entering") return;
     const timer = window.setTimeout(() => {
