@@ -28,7 +28,7 @@ const clamp = THREE.MathUtils.clamp;
 const MOON_HEADING = 24;
 const ORBIT_ALTITUDE = 160;
 const ORBIT_SPEED = 7.8;
-const PAD_APPROACH_DISTANCE = 127;
+const PAD_APPROACH_DISTANCE = 42;
 const labels: Record<Stage, string> = {
   approach: "CREW TRANSFER", boarding: "HATCH CYCLE", startup: "FLIGHT SYSTEMS", ascent: "POWERED ASCENT",
   orbit: "EARTH ORBIT", transfer: "TRANSLUNAR INJECTION", landing: "POWERED DESCENT",
@@ -530,8 +530,8 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
     };
     const trackLook = (event: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;
-      lookYaw.current = clamp(lookYaw.current - event.movementX * 0.0022, -1.25, 1.25);
-      lookPitch.current = clamp(lookPitch.current - event.movementY * 0.0018, -0.58, 0.58);
+      lookYaw.current = clamp(lookYaw.current - event.movementX * 0.0028, -Math.PI, Math.PI);
+      lookPitch.current = clamp(lookPitch.current - event.movementY * 0.0024, -0.72, 0.72);
     };
     canvas.addEventListener("click", requestLook);
     window.addEventListener("mousemove", trackLook);
@@ -574,12 +574,13 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
     const throttleInput = Number(k.has("w")) - Number(k.has("s")) + axes.throttle;
     const headingInput = Number(k.has("d")) - Number(k.has("a")) + axes.heading;
     const pitchInput = Number(k.has("e")) - Number(k.has("q")) + axes.pitch;
-    lookYaw.current = clamp(lookYaw.current + (Number(k.has("arrowright")) - Number(k.has("arrowleft"))) * dt * 1.25, -1.25, 1.25);
-    lookPitch.current = clamp(lookPitch.current + (Number(k.has("arrowup")) - Number(k.has("arrowdown"))) * dt * 1.05, -0.58, 0.58);
+    lookYaw.current = clamp(lookYaw.current + (Number(k.has("arrowright")) - Number(k.has("arrowleft"))) * dt * 2.1, -Math.PI, Math.PI);
+    lookPitch.current = clamp(lookPitch.current + (Number(k.has("arrowup")) - Number(k.has("arrowdown"))) * dt * 1.6, -0.72, 0.72);
     if (s.stage === "approach") {
       const yaw = s.yaw + lookYaw.current;
-      const forward = walkInput * dt * 3.2;
-      const sideways = strafeInput * dt * 3.2;
+      const inputLength = Math.hypot(walkInput, strafeInput) || 1;
+      const forward = (walkInput / inputLength) * dt * 9.5;
+      const sideways = (strafeInput / inputLength) * dt * 9.5;
       s.walkX += Math.sin(yaw) * forward + Math.cos(yaw) * sideways;
       s.walkZ += -Math.cos(yaw) * forward + Math.sin(yaw) * sideways;
       s.walkDistance = clamp(PAD_APPROACH_DISTANCE - Math.hypot(s.walkX, s.walkZ + 2.5), 0, PAD_APPROACH_DISTANCE - 3);
@@ -641,8 +642,9 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       }
     } else if (s.stage === "outside") {
       const yaw = s.yaw + lookYaw.current;
-      const forward = walkInput * dt * 2.8;
-      const sideways = strafeInput * dt * 2.8;
+      const inputLength = Math.hypot(walkInput, strafeInput) || 1;
+      const forward = (walkInput / inputLength) * dt * 7.2;
+      const sideways = (strafeInput / inputLength) * dt * 7.2;
       s.walkX += Math.sin(yaw) * forward + Math.cos(yaw) * sideways;
       s.walkZ += -Math.cos(yaw) * forward + Math.sin(yaw) * sideways;
       s.walkDistance = clamp(s.walkZ, 0, 17);
@@ -652,7 +654,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
     let target: THREE.Vector3;
     let direction: THREE.Vector3;
     if (s.stage === "approach" || s.stage === "boarding") {
-      const bob = gl.xr.isPresenting || walkInput === 0 ? 0 : Math.sin(frame.clock.elapsedTime * 9.5) * 0.028;
+      const bob = gl.xr.isPresenting || walkInput === 0 ? 0 : Math.sin(frame.clock.elapsedTime * 12.5) * 0.052;
       target = new THREE.Vector3(s.walkX, 1.72 + bob, s.walkZ);
       const yaw = s.yaw + lookYaw.current;
       direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(lookPitch.current), Math.sin(lookPitch.current), -Math.cos(yaw) * Math.cos(lookPitch.current));
@@ -666,7 +668,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       const yaw = s.yaw + lookYaw.current;
       direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(lookPitch.current), Math.sin(lookPitch.current), -Math.cos(yaw) * Math.cos(lookPitch.current));
     }
-    cameraPosition.current.lerp(target, 1 - Math.exp(-dt * 4));
+    cameraPosition.current.lerp(target, 1 - Math.exp(-dt * 12));
     if (gl.xr.isPresenting) {
       camera.position.set(cameraPosition.current.x, 0, cameraPosition.current.z);
     } else {
@@ -833,7 +835,7 @@ export function FlightSequence() {
   const progress = stage === "approach" ? approachProgress : stage === "ascent" ? clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) : stage === "orbit" ? clamp(telemetry.orbitSeconds / 2, 0, 1) : stage === "transfer" ? clamp(telemetry.transferSeconds / 8, 0, 1) : stage === "landing" ? clamp(1 - telemetry.altitude / 2.4, 0, 1) : stage === "outside" ? surfaceProgress : stage === "landed" ? 1 : 0;
 
   return <main ref={overlayRoot} className="fixed inset-0 z-0 h-dvh w-screen touch-none overflow-hidden overscroll-none bg-[#080e12] text-[#e9eee8]" style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
-    <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 1.5]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.18; }}>
+    <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.18; }}>
       <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} /></Suspense>
     </Canvas>
     <div className={`pointer-events-none fixed inset-0 z-10 bg-black transition-opacity duration-700 ${stage === "boarding" || stage === "entering" ? "opacity-100" : "opacity-0"}`} />
