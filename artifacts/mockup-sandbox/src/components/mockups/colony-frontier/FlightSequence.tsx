@@ -206,13 +206,63 @@ function Habitat() {
   </group>;
 }
 
+function WalkableColonyMap() {
+  const sites = [
+    { id: "WATER PROCESSING", x: -22, z: 18, color: "#4aa6b5", kind: 0 },
+    { id: "RESOURCE EXTRACTION", x: -7, z: 18, color: "#d2a66b", kind: 1 },
+    { id: "ISRU PLANT", x: 7, z: 18, color: "#c2a06b", kind: 2 },
+    { id: "RADIATION SHELTER", x: 22, z: 18, color: "#8ca8b4", kind: 3 },
+    { id: "OXYGEN SYSTEM", x: -22, z: 5, color: "#75c7b0", kind: 4 },
+    { id: "COMMUNICATIONS", x: -11, z: 5, color: "#75b8d4", kind: 5 },
+    { id: "SCIENCE LAB", x: 11, z: -7, color: "#b6a0d6", kind: 6 },
+    { id: "POWER STORAGE", x: 22, z: -7, color: "#d1b36d", kind: 7 },
+    { id: "SOLAR ARRAY", x: -7, z: -18, color: "#438ac0", kind: 8 },
+    { id: "AGRICULTURE", x: 7, z: -18, color: "#80b879", kind: 9 },
+  ];
+  return <group position={[0, 0, -35]}>
+    {/* Same broad square engineered pad and cross-road layout as the playable colony map. */}
+    <mesh receiveShadow position={[0, -0.16, 0]}><boxGeometry args={[58, 0.32, 58]} /><meshStandardMaterial color="#55585a" roughness={0.98} /></mesh>
+    <mesh receiveShadow position={[0, 0.025, 0]}><boxGeometry args={[54, 0.1, 54]} /><meshStandardMaterial color="#74726e" roughness={0.96} /></mesh>
+    <mesh position={[0, 0.09, 0]}><boxGeometry args={[53, 0.025, 53]} /><meshStandardMaterial color="#96928a" roughness={0.9} /></mesh>
+    {[-14, 0, 14].map(x=><mesh key={`v${x}`} position={[x,0.17,0]}><boxGeometry args={[1.05,0.055,51.2]} /><meshStandardMaterial color="#676a6b" roughness={0.98}/></mesh>)}
+    {[-13, -0.6, 13].map(z=><mesh key={`h${z}`} position={[0,0.185,z]}><boxGeometry args={[51.2,0.055,1.05]} /><meshStandardMaterial color="#676a6b" roughness={0.98}/></mesh>)}
+    {sites.map(site=><group key={site.id} position={[site.x,0.22,site.z]}>
+      <mesh position={[0,0,0]}><boxGeometry args={[3.65,0.08,3.65]}/><meshStandardMaterial color="#4f5557" roughness={0.95}/></mesh>
+      <mesh position={[0,0.06,0]}><ringGeometry args={[1.42,1.52,4]}/><meshBasicMaterial color={site.color} transparent opacity={0.75}/></mesh>
+      {site.kind===8 ? <group>{[-1.15,0,1.15].map(x=><group key={x} position={[x,0.9,0]} rotation={[-0.18,0,0.12]}><mesh><boxGeometry args={[0.88,0.06,2.45]}/><meshStandardMaterial color="#17436c" metalness={0.62} roughness={0.28}/></mesh><mesh position={[0,0.04,0]}><boxGeometry args={[0.8,0.012,2.35]}/><meshBasicMaterial color="#438dc4"/></mesh></group>)}</group>
+      : site.kind===5 ? <group><mesh position={[0,1.45,0]}><cylinderGeometry args={[0.045,0.08,2.8,10]}/><meshStandardMaterial color="#aeb8b7" metalness={0.7}/></mesh><mesh position={[0,2.9,0]}><sphereGeometry args={[0.2,16,12]}/><meshBasicMaterial color="#79e3d2" toneMapped={false}/></mesh><mesh position={[0,1.9,0]}><torusGeometry args={[0.55,0.035,8,32]}/><meshStandardMaterial color="#aeb8b7" metalness={0.7}/></mesh></group>
+      : <group>
+        <mesh position={[0,0.75,0]}><boxGeometry args={[site.kind===0?2.45:2.2,1.35,site.kind===0?1.9:2.2]}/><meshStandardMaterial color={site.kind===6?"#82949a":"#9ba6a4"} metalness={0.48} roughness={0.42}/></mesh>
+        <mesh position={[0,1.48,0]}><boxGeometry args={[2.28,0.12,2.28]}/><meshStandardMaterial color="#d0d5cf" metalness={0.55}/></mesh>
+        <mesh position={[0,0.78,1.12]}><boxGeometry args={[0.72,0.72,0.045]}/><meshStandardMaterial color="#15394b" metalness={0.4} roughness={0.2}/></mesh>
+        <mesh position={[0,0.28,0]}><boxGeometry args={[2.5,0.14,2.5]}/><meshStandardMaterial color="#4b5b5c" metalness={0.55}/></mesh>
+      </group>}
+      <mesh position={[0,0.16,1.72]}><boxGeometry args={[1.1,0.035,0.035]}/><meshBasicMaterial color={site.color} toneMapped={false}/></mesh>
+      <pointLight position={[0,1.9,0]} color={site.color} intensity={0.28} distance={4}/>
+    </group>)}
+    {/* Central crew habitat, built as a recognisable multi-module pressure structure. */}
+    <group position={[0,0.25,0]}>
+      <mesh position={[0,0.16,0]}><boxGeometry args={[8.8,0.12,7.2]}/><meshStandardMaterial color="#4f5557"/></mesh>
+      <mesh position={[0,1.55,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[1.08,1.08,5.9,32]}/><meshStandardMaterial color="#9aa6a4" metalness={0.5} roughness={0.36}/></mesh>
+      {[-1,1].map(side=><group key={side} position={[0,0,side*2.05]}><mesh position={[0,1.15,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[0.68,0.68,2.6,24]}/><meshStandardMaterial color="#71858a" metalness={0.42}/></mesh><mesh position={[0,1.15,side*1.3]}><torusGeometry args={[0.65,0.05,8,28]}/><meshStandardMaterial color="#d2d8d2" metalness={0.7}/></mesh></group>)}
+      {[-2,-1,0,1,2].map(x=><mesh key={x} position={[x,1.55,0]} rotation={[0,Math.PI/2,0]}><torusGeometry args={[1.08,0.035,8,32]}/><meshStandardMaterial color="#c4ceca" metalness={0.76}/></mesh>)}
+      <mesh position={[0,1.1,3.02]}><boxGeometry args={[1.25,1.25,0.06]}/><meshStandardMaterial color="#163b4b" metalness={0.45} roughness={0.18}/></mesh>
+      <mesh position={[0,0.48,3.1]}><boxGeometry args={[1.1,0.06,0.05]}/><meshBasicMaterial color="#78e6c2" toneMapped={false}/></mesh>
+      <pointLight position={[0,3.4,0]} color="#79e6c5" intensity={0.75} distance={10}/>
+    </group>
+    {/* Marked access spurs connect every pad to the main lanes, like the strategy map. */}
+    {sites.map(site=><mesh key={`spur-${site.id}`} position={[(site.x+(site.x<0?-14:14))/2,0.19,site.z]}><boxGeometry args={[Math.abs(site.x+(site.x<0?14:-14))+0.1,0.035,0.72]}/><meshStandardMaterial color="#777a78"/></mesh>)}
+  </group>;
+}
+
 function MoonSurface({ stage }: { stage: Stage }) {
   const rocks = useMemo(() => Array.from({ length: 85 }, (_, i) => ({ x: ((i * 43) % 61) - 30, z: -35 + ((i * 29) % 54), size: 0.08 + ((i * 17) % 42) / 100 })), []);
   return <group>
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.15, -5]}><planeGeometry args={[180, 180, 64, 64]} /><meshStandardMaterial color={stage === "outside" || stage === "entering" ? "#aaa79e" : "#77776e"} roughness={1} /></mesh>
     {rocks.map((r, i) => <mesh key={i} position={[r.x, -0.08 + r.size * 0.2, r.z]} rotation={[i * 0.16, i * 0.48, i * 0.09]} scale={[r.size * 1.6, r.size * 0.75, r.size]}><dodecahedronGeometry args={[1, 0]} /><meshStandardMaterial color={i % 3 ? "#85847c" : "#b0a99c"} roughness={1} /></mesh>)}
     {[-7.5, 8].map((x, i) => <mesh key={x} position={[x, -0.02, -13]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[2.2 + i, 2.7 + i, 48]} /><meshStandardMaterial color="#53534e" roughness={1} /></mesh>)}
-    <mesh position={[0, 0.015, -8]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[4.4, 64]} /><meshStandardMaterial color="#929087" roughness={0.94} /></mesh><Habitat />
+    <mesh position={[0, 0.015, -8]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[4.4, 64]} /><meshStandardMaterial color="#929087" roughness={0.94} /></mesh>
+    <WalkableColonyMap />
     <group position={[-4, 0, -2]}>
       <mesh position={[0, 1.5, 0]}><cylinderGeometry args={[0.8, 0.95, 1.8, 8]} /><meshStandardMaterial color="#d4d5cd" metalness={0.48} roughness={0.42} /></mesh>
       <mesh position={[0, 2.55, 0]}><coneGeometry args={[0.8, 0.4, 8]} /><meshStandardMaterial color="#e0dfd5" metalness={0.4} roughness={0.4} /></mesh>
