@@ -7,7 +7,6 @@ import {
   Car,
   Clock,
   Check,
-  CircleDot,
   Cloud,
   Compass,
   Droplets,
@@ -1399,14 +1398,12 @@ function MissionTaskRibbon({
   elapsed,
   resolvedEvents,
   sampleStages,
-  activeEvent,
   roverTask,
 }: {
   pending: PendingMission;
   elapsed: number;
   resolvedEvents: string[];
   sampleStages: Record<string, SampleStage>;
-  activeEvent: MissionEvent | null;
   roverTask: string;
 }) {
   const elapsedDay = Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
@@ -1441,7 +1438,7 @@ function MissionTaskRibbon({
             </div>
           ))}
           <div className="px-0.5 pt-2 text-[9px] leading-4 text-[#849895]">
-            {activeEvent ? `Target: ${activeEvent.trackId.toUpperCase()}` : roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
+            {roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
           </div>
         </div>
       </div>
@@ -1860,6 +1857,27 @@ function BuildingInspector({
             </div>
             <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3c5056] bg-[#0a1317] text-xl text-[#9fb0b3] transition hover:border-[#f0c964] hover:text-white" aria-label="Close building panel">×</button>
           </div>
+          {activeEvent && eventChoices.length > 0 && (
+            <section className="relative mt-3 rounded-xl border border-[#733943] bg-[#21151b] p-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#ff7783]">Facility response</p>
+              <div className="mt-2 grid gap-2">
+                {eventChoices.map((choice, index) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    onClick={() => onEventChoice(choice.id)}
+                    className="rounded-xl border border-[#71404b] bg-[#2a1b22] p-2.5 text-left transition hover:border-[#f4cd6c] hover:bg-[#33222a]"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#ff5367]/15 text-[9px] font-black text-[#ffd875]">{index + 1}</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.04em] text-white">{choice.label}</span>
+                    </span>
+                    <span className="mt-1 block pl-8 text-[9px] leading-4 text-[#c2afb7]">{choice.detail}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           {track.id === "habitat" && (
             <button type="button" onClick={onEnterHabitat} className="relative mt-3 w-full border border-[#78a890]/55 bg-[#15342b] px-3 py-2.5 text-left text-[9px] font-black uppercase tracking-[0.14em] text-[#c5f0d7] transition hover:border-[#d3c27b] hover:bg-[#1d4437]">
               Enter crew habitat · first-person interior
@@ -2122,36 +2140,6 @@ function BuildingInspector({
                 </p>
               )}
             </div>}
-          </section>
-        )}
-
-        {activeEvent && eventChoices.length > 0 && (
-          <section className="border-b border-[#733943] bg-[#21151b] p-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#ff5367]/15 text-[#ff7380]"><CircleDot className="h-4 w-4" /></span>
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#ff7783]">Disaster response required</p>
-                <h3 className="mt-0.5 text-xs font-black uppercase tracking-[0.06em] text-white">{activeEvent.title}</h3>
-              </div>
-            </div>
-            <p className="mt-2 text-[10px] leading-4 text-[#d2bec4]">{activeEvent.summary}</p>
-            <div className="mt-3 grid gap-2">
-              {eventChoices.map((choice, index) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  onClick={() => onEventChoice(choice.id)}
-                  disabled={actionBusy}
-                  className="rounded-xl border border-[#71404b] bg-[#2a1b22] p-2.5 text-left transition hover:border-[#f4cd6c] hover:bg-[#33222a] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#ff5367]/15 text-[9px] font-black text-[#ffd875]">{index + 1}</span>
-                    <span className="text-[10px] font-black uppercase tracking-[0.04em] text-white">{choice.label}</span>
-                  </span>
-                  <span className="mt-1 block pl-8 text-[9px] leading-4 text-[#c2afb7]">{choice.detail}</span>
-                </button>
-              ))}
-            </div>
           </section>
         )}
 
@@ -2907,7 +2895,6 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setOperationResult(null);
-            setAiMessage(`CRITICAL INCIDENT: ${event.title}. The fault is live now; stored power and equipment condition continue to change until you respond.`);
 
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
@@ -4866,7 +4853,10 @@ export function MissionSimulation() {
           }}
           selectedBuildingId={selectedBuildingId}
           habitatInterior={habitatInterior}
-          onCloseInspector={() => setSelectedBuildingId(null)}
+          onCloseInspector={() => {
+            setSelectedBuildingId(null);
+            setSelectedResourceId(null);
+          }}
           onEnterHabitat={() => {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
@@ -4908,7 +4898,7 @@ export function MissionSimulation() {
           speed={manualPaused || activeEvent ? 0 : speed}
         />
 
-        {!activeEvent && !dashboardOpen && (
+        {!dashboardOpen && (
           <div className="pointer-events-none absolute right-4 top-[68px] z-20 w-[min(92vw,510px)]">
             <div className="pointer-events-auto overflow-hidden border border-[#394b4e] bg-[#10191d]/95 shadow-[0_6px_20px_rgba(0,0,0,0.25)]">
               <div className="flex items-center justify-between gap-3 border-b border-[#344347] px-3.5 py-2.5">
@@ -4976,7 +4966,6 @@ export function MissionSimulation() {
           </div>
         )}
 
-        {!activeEvent && (
         <div className="pointer-events-none absolute left-3 bottom-3 z-20 w-[min(86vw,390px)]">
           <div className="rounded-2xl border border-[#3d555b] bg-[#0b1519]/[0.90] px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm">
             <div className="flex items-start gap-2.5">
@@ -4990,9 +4979,6 @@ export function MissionSimulation() {
             </div>
           </div>
         </div>
-
-        )}
-        {!activeEvent && (
         <div className="pointer-events-auto absolute right-3 bottom-3 z-20 flex items-center gap-1.5">
           <button
             type="button"
@@ -5024,22 +5010,14 @@ export function MissionSimulation() {
             </button>
           ))}
         </div>
-
-        )}
-        {!activeEvent && (
         <MissionTaskRibbon
           pending={pending}
           elapsed={elapsed}
           resolvedEvents={resolvedEventIds}
           sampleStages={sampleStages}
-          activeEvent={activeEvent}
           roverTask={roverTask}
         />
-
-        )}
-
-        {!activeEvent && (
-          <>
+        <>
             <button
               type="button"
               onClick={() => setDashboardOpen((open) => !open)}
@@ -5182,9 +5160,8 @@ export function MissionSimulation() {
 
 
           </>
-        )}
 
-        {selectedResource && !activeEvent && (
+        {selectedResource && (
           <ResourceInspector
             node={selectedResource}
             stage={sampleStages[selectedResource.id] ?? (surveyedNodes.includes(selectedResource.id) ? "SURVEYED" : "UNSURVEYED")}
@@ -5201,7 +5178,7 @@ export function MissionSimulation() {
           />
         )}
 
-        {!activeEvent && selectedTrack && selectedTier && !selectedResource && (
+        {selectedTrack && selectedTier && !selectedResource && (
           <BuildingInspector
             track={selectedTrack}
             tier={selectedTier}
@@ -5243,100 +5220,6 @@ export function MissionSimulation() {
           />
         )}
 
-        {activeEvent && (
-          <div className="absolute inset-0 z-[80] grid place-items-center bg-[#05080c]/[0.80] p-3 backdrop-blur-sm sm:p-5">
-            <section className="pointer-events-auto max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-[26px] border-2 border-[#d95363] bg-[#0b1118]/[0.99] shadow-[0_25px_100px_rgba(0,0,0,0.8)]">
-              <header className="sticky top-0 z-10 border-b border-[#733842] bg-gradient-to-r from-[#421c27] via-[#25161e] to-[#15141c] px-5 py-4 sm:px-7">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#c95160] bg-[#6e2634]/40 text-[#ff8088]"><AlertTriangle className="h-6 w-6" /></div>
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#ff858b]">Critical incident · respond now</p>
-                      <h1 className="mt-1 text-lg font-black uppercase tracking-[0.06em] text-white sm:text-2xl">{activeEvent.title}</h1>
-                      <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#d9b4bb]">Affected asset · {(activeTargetTrackId ?? activeEvent.trackId).toUpperCase()} · {environmentLabel}</p>
-                    </div>
-                  </div>
-                  <span className="rounded-full border border-[#ee6e78] bg-[#721f2c]/50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#ffc1c2]">Live fault · {Object.keys(activeFaults).length} active</span>
-                </div>
-                <p className="mt-4 max-w-3xl text-[11px] leading-5 text-[#e4d9df]">{activeEvent.subtitle} {activeEvent.summary}</p>
-                <div className="mt-3 rounded-xl border border-[#7a3543] bg-[#29151d] px-3 py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#ffb6bc]">This is not a cosmetic warning</p>
-                  <p className="mt-1 text-[10px] leading-4 text-[#f0c8cb]">The mission clock, resource simulation and all work timers are PAUSED while you decide. A poor response leaves a persistent fault that will keep degrading its system after you resume.</p>
-                </div>
-              </header>
-
-              <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="space-y-4">
-                  <section className="rounded-2xl border border-[#33484f] bg-[#101e25] p-4">
-                    <div className="flex items-center gap-2 text-[#e8c568]"><Activity className="h-4 w-4" /><p className="text-[9px] font-black uppercase tracking-[0.18em]">Current telemetry</p></div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {[
-                        { label: "Target condition", value: Math.round(buildings[activeTargetTrackId ?? activeEvent.trackId]?.condition ?? 100), display: `${Math.round(buildings[activeTargetTrackId ?? activeEvent.trackId]?.condition ?? 100)}%` },
-                        { label: "Available power", value: metrics.power, display: physicalTelemetry.power },
-                        { label: "Stored energy", value: metrics.battery, display: physicalTelemetry.battery },
-                        { label: "Oxygen reserve", value: metrics.oxygen, display: physicalTelemetry.oxygen },
-                        { label: "Water reserve", value: metrics.water, display: physicalTelemetry.water },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-xl border border-[#2d4248] bg-[#0b171d] p-3">
-                          <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#8fa7ab]">{item.label}</p>
-                          <p className="mt-1 font-mono text-lg font-bold" style={{ color: resourceColor(item.value) }}>{item.display}</p>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#273a40]"><div className="h-full rounded-full" style={{ width: `${clamp(item.value)}%`, background: resourceColor(item.value) }} /></div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  {Object.values(activeOperations).length > 0 && (
-                    <section className="rounded-2xl border border-[#8a7141] bg-[#2a2518] p-4">
-                      <div className="flex items-center gap-2 text-[#f1cf77]"><Pause className="h-4 w-4" /><p className="text-[9px] font-black uppercase tracking-[0.16em]">Work orders safely paused</p></div>
-                      <p className="mt-2 text-[10px] leading-4 text-[#f2e3bf]">{Object.values(activeOperations).length} system job(s) are paused while this decision is open. Their countdowns resume once you choose a response; open each system to inspect its timer.</p>
-                    </section>
-                  )}
-
-                  <section className="rounded-2xl border border-[#33484f] bg-[#101e25] p-4">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#b6c8c4]">Operational consequence</p>
-                    <p className="mt-2 text-[10px] leading-5 text-[#93aaa9]">Use the readings to choose between restoring the system, protecting the rest of the colony, or accepting an operational limitation. No choice is free: power, reserve, time or hardware life may be affected.</p>
-                    {Object.keys(activeFaults).length > 0 && <p className="mt-3 rounded-lg border border-[#7d3b45] bg-[#2b171e] px-3 py-2 text-[9px] text-[#ffb3b6]">{Object.keys(activeFaults).length} unresolved fault(s) are already degrading the colony.</p>}
-                  </section>
-                </div>
-
-                <div className="space-y-4">
-                <section>
-                  <div className="mb-3 flex items-end justify-between gap-3">
-                    <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#ff868e]">Response console</p><h2 className="mt-1 text-base font-black uppercase tracking-[0.07em] text-white">Choose your action</h2></div>
-                    <span className="text-[8px] uppercase tracking-[0.12em] text-[#80989a]">Decision recorded</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    {getEventChoices(activeEvent, pending.selected).map((choice, index) => {
-                      const unsafe = ["ignore", "continue", "defer", "force", "push", "hold", "maintain"].includes(choice.id);
-                      return (
-                        <button
-                          key={choice.id}
-                          type="button"
-                          onClick={() => handleEventChoice(choice.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${unsafe ? "border-[#6a4148] bg-[#21191f] hover:border-[#db727c] hover:bg-[#2d1b23]" : "border-[#385c55] bg-[#142922] hover:border-[#e9c568] hover:bg-[#1d382d]"}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[10px] font-black ${unsafe ? "bg-[#6a2d3a] text-[#ffc4c3]" : "bg-[#d9b654] text-[#1b2119]"}`}>{index + 1}</span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex flex-wrap items-center gap-2">
-                                <span className="text-[11px] font-black uppercase tracking-[0.04em] text-white">{choice.label}</span>
-                                <span className={`rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.1em] ${unsafe ? "bg-[#652c37] text-[#ffb1b5]" : "bg-[#224538] text-[#9ce0b4]"}`}>{unsafe ? "Ongoing risk" : "Mitigation"}</span>
-                              </span>
-                              <span className="mt-1.5 block text-[10px] leading-5 text-[#acbfc0]">{choice.detail}</span>
-                              {unsafe && <span className="mt-2 block text-[9px] font-bold text-[#ff9ba4]">Choosing this leaves a persistent fault that continues draining the affected system.</span>}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
       </main>
     </div>
   );
