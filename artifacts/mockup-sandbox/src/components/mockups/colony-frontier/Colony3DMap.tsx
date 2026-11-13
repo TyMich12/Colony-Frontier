@@ -1857,6 +1857,36 @@ function ColonyRobot({
         <boxGeometry args={[0.27, 0.3, 0.12]} />
         <meshStandardMaterial color="#45575b" metalness={0.62} roughness={0.38} />
       </mesh>
+      {/* Rugged life-support / compute pack with radiator fins and service status lighting. */}
+      <group position={[0, 0.82, -0.285]}>
+        <RoundedBox args={[0.34, 0.34, 0.18]} radius={0.045} smoothness={3}>
+          <meshStandardMaterial color="#34464b" metalness={0.82} roughness={0.3} />
+        </RoundedBox>
+        {[-0.12, -0.06, 0, 0.06, 0.12].map((y) => (
+          <mesh key={y} position={[0, y, -0.098]}>
+            <boxGeometry args={[0.25, 0.018, 0.025]} />
+            <meshStandardMaterial color="#9aa9a2" metalness={0.88} roughness={0.26} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0.02, -0.112]}>
+          <boxGeometry args={[0.12, 0.055, 0.012]} />
+          <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={0.85} />
+        </mesh>
+      </group>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 0.31, 0.82, -0.24]} rotation={[0, 0, side * -0.12]}>
+          <mesh position={[side * 0.11, 0, 0]}>
+            <boxGeometry args={[0.24, 0.29, 0.045]} />
+            <meshStandardMaterial color="#53666a" metalness={0.78} roughness={0.34} />
+          </mesh>
+          {Array.from({ length: 4 }, (_, fin) => (
+            <mesh key={fin} position={[side * 0.11, -0.105 + fin * 0.07, 0.027]}>
+              <boxGeometry args={[0.19, 0.012, 0.012]} />
+              <meshStandardMaterial color="#c0c9bd" metalness={0.86} roughness={0.25} />
+            </mesh>
+          ))}
+        </group>
+      ))}
       {[-0.095, 0.095].map((x) => (
         <mesh key={x} position={[x, 0.78, -0.25]}>
           <cylinderGeometry args={[0.045, 0.045, 0.22, 10]} />
