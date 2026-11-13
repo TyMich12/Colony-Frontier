@@ -1595,20 +1595,32 @@ function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionRe
 
 function Crew({ mars }: { mars: boolean }) {
   const routes: Array<Array<[number,number]>> = [
-    // Long service-road circuits keep the crew visually moving through a much larger settlement.
-    [[-14,13],[-14,5],[-14,-0.6],[-14,-13],[0,-13],[14,-13],[14,-0.6],[14,5],[14,13]],
-    [[14,-18],[14,-13],[25.6,-13],[25.6,-25.6],[14,-25.6],[14,-18]],
-    [[-25.6,13],[-14,13],[-14,-0.6],[-25.6,-0.6],[-25.6,13]],
+    [[-12.2,13],[-12.2,4],[-14,-0.6],[-14,-13],[0,-13],[12.2,-13],[14,-0.6],[14,5],[14,13]],
+    [[14,-18],[12.2,-13],[12.2,-9],[25.6,-9],[25.6,-25.6],[14,-25.6],[14,-18]],
+    [[-25.6,13],[-14,13],[-14,-0.6],[-4.4,-0.6],[-4.4,4],[-4.4,-0.6],[-14,-0.6],[-25.6,-0.6],[-25.6,13]],
+  ];
+  const serviceStops = [
+    [{ waypointIndex: 0, buildingPosition: [-16, 13] as [number, number] }, { waypointIndex: 1, buildingPosition: [-16, 4] as [number, number] }],
+    [{ waypointIndex: 1, buildingPosition: [16, -13] as [number, number] }],
+    [{ waypointIndex: 4, buildingPosition: [-8, 4] as [number, number] }],
   ];
   return (
     <group>
       {Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}
-      {Array.from({ length: 3 }, (_, i) => <ColonyRobot key={`robot-${i}`} route={routes[(i + 1) % routes.length]} index={i} />)}
+      {Array.from({ length: 3 }, (_, i) => <ColonyRobot key={`robot-${i}`} route={routes[i]} index={i} serviceStops={serviceStops[i]} />)}
     </group>
   );
 }
 
-function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: number }) {
+function ColonyRobot({
+  route,
+  index,
+  serviceStops,
+}: {
+  route: Array<[number, number]>;
+  index: number;
+  serviceStops: Array<{ waypointIndex: number; buildingPosition: [number, number] }>;
+}) {
   const ref = useRef<THREE.Group>(null);
   const leftArm = useRef<THREE.Group>(null);
   const rightArm = useRef<THREE.Group>(null);
@@ -1616,27 +1628,84 @@ function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: 
   const rightLeg = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
   const phaseOffset = index * 1.9;
+  const segmentDurations = useMemo(
+    () => route.map(([x, z], segmentIndex) => {
+      const [nextX, nextZ] = route[(segmentIndex + 1) % route.length];
+      const distance = Math.hypot(nextX - x, nextZ - z);
+      const speedVariation = 0.9 + ((index * 17 + segmentIndex * 13) % 7) * 0.09;
+      return Math.max(2.5, distance / speedVariation);
+    }),
+    [index, route],
+  );
+  const serviceDurations = useMemo(
+    () => new Map(serviceStops.map((stop, stopIndex) => [
+      stop.waypointIndex,
+      4 + ((index * 11 + stopIndex * 7) % 5),
+    ])),
+    [index, serviceStops],
+  );
+  const cycleDuration = segmentDurations.reduce((total, duration) => total + duration, 0)
+    + Array.from(serviceDurations.values()).reduce((total, duration) => total + duration, 0);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     if (!ref.current) return;
     const time = clock.getElapsedTime();
-    const p = ((time * 0.11) + index * 0.31) % route.length;
-    const i = Math.floor(p);
-    const f = p - i;
-    const [ax, az] = route[i];
-    const [bx, bz] = route[(i + 1) % route.length];
+    let remaining = (time + index * 19.7) % cycleDuration;
+    let x = route[0][0];
+    let z = route[0][1];
+    let heading = ref.current.rotation.y;
+    let servicing = false;
+    let serviceTarget: [number, number] | null = null;
+
+    for (let segmentIndex = 0; segmentIndex < route.length; segmentIndex += 1) {
+      const [ax, az] = route[segmentIndex];
+      const nextIndex = (segmentIndex + 1) % route.length;
+      const [bx, bz] = route[nextIndex];
+      const travelDuration = segmentDurations[segmentIndex];
+      if (remaining < travelDuration) {
+        const progress = remaining / travelDuration;
+        x = THREE.MathUtils.lerp(ax, bx, progress);
+        z = THREE.MathUtils.lerp(az, bz, progress);
+        heading = Math.atan2(bx - ax, bz - az);
+        break;
+      }
+
+      remaining -= travelDuration;
+      x = bx;
+      z = bz;
+      const dwellDuration = serviceDurations.get(nextIndex);
+      if (dwellDuration !== undefined) {
+        if (remaining < dwellDuration) {
+          servicing = true;
+          serviceTarget = serviceStops.find((stop) => stop.waypointIndex === nextIndex)?.buildingPosition ?? null;
+          if (serviceTarget) heading = Math.atan2(serviceTarget[0] - x, serviceTarget[1] - z);
+          break;
+        }
+        remaining -= dwellDuration;
+      }
+    }
+
+    const gait = Math.sin(time * 3.8 + phaseOffset) * (servicing ? 0.08 : 0.34);
     ref.current.position.set(
-      THREE.MathUtils.lerp(ax, bx, f),
-      -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * 0.018,
-      THREE.MathUtils.lerp(az, bz, f),
+      x,
+      -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * (servicing ? 0.006 : 0.018) - (servicing ? 0.025 : 0),
+      z,
     );
-    ref.current.rotation.y = Math.atan2(bx - ax, bz - az);
-    const gait = Math.sin(time * 3.8 + phaseOffset) * 0.34;
-    if (leftArm.current) leftArm.current.rotation.x = gait * 0.72;
-    if (rightArm.current) rightArm.current.rotation.x = -gait * 0.72;
+    const turn = Math.atan2(Math.sin(heading - ref.current.rotation.y), Math.cos(heading - ref.current.rotation.y));
+    ref.current.rotation.y += turn * Math.min(1, delta * 5);
+    if (leftArm.current) {
+      leftArm.current.rotation.x = THREE.MathUtils.damp(leftArm.current.rotation.x, servicing ? -0.65 + gait : gait * 0.72, 6, delta);
+    }
+    if (rightArm.current) {
+      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.72 + gait : -gait * 0.72, 6, delta);
+      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.22 : 0, 5, delta);
+    }
     if (leftLeg.current) leftLeg.current.rotation.x = -gait;
     if (rightLeg.current) rightLeg.current.rotation.x = gait;
-    if (head.current) head.current.rotation.y = Math.sin(time * 0.7 + phaseOffset) * 0.16;
+    if (head.current) {
+      head.current.rotation.y = Math.sin(time * 0.7 + phaseOffset) * (servicing ? 0.3 : 0.16);
+      head.current.rotation.x = THREE.MathUtils.damp(head.current.rotation.x, servicing ? 0.12 : 0, 4, delta);
+    }
   });
 
   const statusColor = index === 1 ? "#f2bd58" : "#62e4e6";
@@ -2092,7 +2161,7 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 }
 
 function ColonyBuilding({
-  track, tier, runtime, selected, alerted, eventId, position, onClick, mars, nightMode = false
+  track, tier, runtime, selected, alerted, eventId, position, onClick, onInteraction, mars, nightMode = false
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -2102,6 +2171,7 @@ function ColonyBuilding({
   eventId: string | null;
   position: [number, number];
   onClick: () => void;
+  onInteraction?: () => void;
   mars: boolean;
   nightMode?: boolean;
 }) {
@@ -2113,13 +2183,14 @@ function ColonyBuilding({
       rotation={[0, BUILDING_ROTATIONS[track.id] ?? 0, 0]}
       scale={BUILDING_SCALES[track.id] ?? 1.2}
       frustumCulled={false}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onClick={(e) => { e.stopPropagation(); onInteraction?.(); onClick(); }}
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = ""; }}
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
         <BuildingArt id={track.id} accent={tierColor(tier)} />
+        <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
       </group>
       {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
@@ -2634,6 +2705,55 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
 }
 
 type NearbyInteraction = { id: string; label: string; kind: "FACILITY" | "FIELD SITE" | "CABINET" | "AIRLOCK" | "BERTH" | "GALLEY" } | null;
+type InteractionClickState = { current: boolean; requestPending: boolean };
+
+function BuildingSurfaceDetails({ large, accent }: { large: boolean; accent: string }) {
+  const fastenerMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: "#c5cbc4", metalness: 0.82, roughness: 0.3 }),
+    [],
+  );
+  const washerMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: "#414c4e", metalness: 0.55, roughness: 0.62 }),
+    [],
+  );
+  const panelMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: "#26383d", metalness: 0.48, roughness: 0.56 }),
+    [],
+  );
+  const fasteners: Array<[number, number]> = large
+    ? [[-2.82, -2.08], [2.82, -2.08], [-2.82, 2.08], [2.82, 2.08]]
+    : [[-1.12, -0.76], [1.12, -0.76], [-1.12, 0.76], [1.12, 0.76]];
+
+  return (
+    <group>
+      {fasteners.map(([x, z]) => (
+        <group key={`${x}-${z}`} position={[x, large ? 0.335 : 0.365, z]}>
+          <mesh material={washerMaterial}>
+            <cylinderGeometry args={[0.067, 0.067, 0.018, 12]} />
+          </mesh>
+          <mesh position={[0, 0.014, 0]} material={fastenerMaterial}>
+            <cylinderGeometry args={[0.031, 0.031, 0.025, 6]} />
+          </mesh>
+        </group>
+      ))}
+      {!large && (
+        <group position={[0, 0.375, 0.7]}>
+          <RoundedBox args={[0.56, 0.035, 0.25]} radius={0.035} smoothness={3} material={panelMaterial} />
+          <mesh position={[0, 0.022, 0.025]}>
+            <boxGeometry args={[0.32, 0.012, 0.13]} />
+            <meshStandardMaterial color="#52676a" metalness={0.58} roughness={0.46} />
+          </mesh>
+          {[-0.18, 0, 0.18].map((x) => (
+            <mesh key={x} position={[x, 0.034, 0.027]}>
+              <sphereGeometry args={[0.018, 8, 6]} />
+              <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.45} />
+            </mesh>
+          ))}
+        </group>
+      )}
+    </group>
+  );
+}
 
 function WalkControls({
   tracks,
@@ -2653,6 +2773,7 @@ function WalkControls({
   onLockChange,
   onLockError,
   onNearbyChange,
+  interactionClickHandled,
 }: {
   tracks: TechnologyTrack[];
   resourceNodes: MissionResourceNode[];
@@ -2671,6 +2792,7 @@ function WalkControls({
   onLockChange: (locked: boolean) => void;
   onLockError: (message: string) => void;
   onNearbyChange: (target: NearbyInteraction) => void;
+  interactionClickHandled: InteractionClickState;
 }) {
   const { gl, camera } = useThree();
   const keys = useRef(new Set<string>());
@@ -2732,14 +2854,29 @@ function WalkControls({
     const canvas = gl.domElement;
     const requestPointerLock = () => {
       try {
-        void Promise.resolve(canvas.requestPointerLock()).catch(() => {
-          latest.current.onLockError("Mouse capture was denied. Press F or click the scene to try again.");
-        });
+        interactionClickHandled.requestPending = true;
+        void Promise.resolve(canvas.requestPointerLock())
+          .then(() => {
+            interactionClickHandled.requestPending = false;
+            if (interactionClickHandled.current) {
+              if (document.pointerLockElement === canvas) document.exitPointerLock();
+              interactionClickHandled.current = false;
+            }
+          })
+          .catch(() => {
+            interactionClickHandled.requestPending = false;
+            latest.current.onLockError("Mouse capture was denied. Press F or click the scene to try again.");
+          });
       } catch {
+        interactionClickHandled.requestPending = false;
         latest.current.onLockError("Mouse capture is unavailable in this browser context.");
       }
     };
     const handleClick = () => {
+      if (interactionClickHandled.current) {
+        interactionClickHandled.current = false;
+        return;
+      }
       if (document.pointerLockElement !== canvas) requestPointerLock();
     };
     const handlePointerLockChange = () => {
@@ -2808,6 +2945,9 @@ function WalkControls({
             closest = { distance, node };
           }
         }
+        if (closest?.trackId || closest?.node) {
+          if (document.pointerLockElement === canvas) document.exitPointerLock();
+        }
         if (closest?.trackId) latest.current.onSelect(closest.trackId);
         else if (closest?.node) latest.current.onSelectResource(closest.node);
         else latest.current.onCloseInspector();
@@ -2833,7 +2973,7 @@ function WalkControls({
       handlePointerLockCleanup();
       latest.current.onNearbyChange(null);
     };
-  }, [gl]);
+  }, [gl, interactionClickHandled]);
 
   useFrame(({ camera }, delta) => {
     const player = camera as THREE.PerspectiveCamera;
@@ -2954,6 +3094,7 @@ function Scene({ props }: { props: Props }) {
   const firstPersonMode = walkMode || props.habitatInterior;
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
+  const interactionClickHandled = useRef<InteractionClickState>({ current: false, requestPending: false });
   const [nearbyTarget, setNearbyTarget] = useState<NearbyInteraction>(null);
   const [cabinetOpen, setCabinetOpen] = useState(false);
   const [habitatActivity, setHabitatActivity] = useState<"BERTH" | "GALLEY" | null>(null);
@@ -3111,6 +3252,14 @@ function Scene({ props }: { props: Props }) {
             eventId={props.activeEventId}
             position={POSITIONS[track.id] ?? [0, 0]}
             onClick={() => props.onSelect(track.id)}
+            onInteraction={() => {
+              if (!firstPersonMode) return;
+              interactionClickHandled.current.current = true;
+              if (document.pointerLockElement) document.exitPointerLock();
+              window.setTimeout(() => {
+                if (!interactionClickHandled.current.requestPending) interactionClickHandled.current.current = false;
+              }, 0);
+            }}
             mars={mars}
             nightMode={!mars && (props.lunarNight || daylight < 0.18)}
           />
@@ -3159,6 +3308,7 @@ function Scene({ props }: { props: Props }) {
           }}
           onLockError={setPointerLockError}
           onNearbyChange={setNearbyTarget}
+          interactionClickHandled={interactionClickHandled.current}
         />
       ) : (
         <OrbitControls
@@ -3306,12 +3456,12 @@ function Scene({ props }: { props: Props }) {
         )}
       </>
     )}
-    <div className="pointer-events-auto absolute right-4 top-4 z-30 flex flex-row-reverse items-start gap-2">
+    <div className="pointer-events-auto absolute left-3 top-1/2 z-30 flex w-[min(94vw,230px)] -translate-y-1/2 flex-col items-start gap-2">
       {walkMode && !props.habitatInterior && props.tracks.some((track) => track.id === "habitat") && (
         <button
           type="button"
           onClick={props.onEnterHabitat}
-          className="border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
+          className="w-full border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 text-left font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
         >
           Enter habitat
         </button>
@@ -3323,12 +3473,12 @@ function Scene({ props }: { props: Props }) {
           setPointerLocked(false);
           setWalkMode((active) => !active);
         }}
-        className="border border-[#e7c56e]/50 bg-[#10191d]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4d785] shadow-lg backdrop-blur-sm transition hover:border-[#ffe7a0] hover:bg-[#24343a] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full border border-[#e7c56e]/50 bg-[#10191d]/90 px-3 py-2 text-left font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4d785] shadow-lg backdrop-blur-sm transition hover:border-[#ffe7a0] hover:bg-[#24343a] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {props.habitatInterior ? "Habitat interior" : walkMode ? "Colony map" : "Enter first person"}
       </button>
       {firstPersonMode && (
-        <div className="max-w-[min(260px,calc(100vw-180px))] border border-white/15 bg-[#07131c]/90 px-3 py-2 text-right font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
+        <div className="w-full border border-white/15 bg-[#07131c]/90 px-3 py-2 text-left font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
           WASD move · Space jump · mouse look · Shift run
           <br />
           F toggle mouse · E interact / airlock · Esc release mouse
@@ -3343,14 +3493,21 @@ function Scene({ props }: { props: Props }) {
         <span className="absolute left-0 top-1/2 h-px w-3 -translate-y-1/2 bg-white/80" />
       </div>
     )}
-    {!mars && !props.habitatInterior && <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-3">
-      <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
-        <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
-        {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
-        <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth remains visible · daylight and shadows follow the Sun</div>
+    {!props.habitatInterior && (
+      <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[min(94vw,520px)] flex-wrap items-start gap-2">
+        {!mars && (
+          <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
+            <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
+            {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
+            <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth remains visible · daylight and shadows follow the Sun</div>
+          </div>
+        )}
+        <div className="rounded-lg border border-white/15 bg-[#07131c]/70 px-3 py-2 font-mono text-[8px] text-[#b6c9d4] shadow-lg backdrop-blur-sm">
+          <div className="mb-1 font-black tracking-[0.16em] text-[#9bd9cf]">COLONY LINK</div>
+          {firstPersonMode ? "EVA MODE · WASD move · Space jump · E interact" : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
+        </div>
       </div>
-      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">{firstPersonMode ? "EVA MODE · WASD move · Space jump · E interact" : "COLONY MAP · drag to rotate · right-drag to pan · wheel to zoom"}</div>
-    </div>}
+    )}
     </div>
   );
 }
