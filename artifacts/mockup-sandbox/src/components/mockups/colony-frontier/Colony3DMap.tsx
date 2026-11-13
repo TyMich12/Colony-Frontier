@@ -1211,6 +1211,10 @@ function Rover({
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
   const drillRef = useRef<THREE.Group>(null);
+  const sensorSweepRef = useRef<THREE.Group>(null);
+  const toolArmRef = useRef<THREE.Group>(null);
+  const cleaningBrushRef = useRef<THREE.Group>(null);
+  const cargoLightRef = useRef<THREE.MeshStandardMaterial>(null);
   const routeRef = useRef<[number, number][]>([]);
   const routeCursorRef = useRef(0);
   const commandKeyRef = useRef("");
@@ -1251,6 +1255,8 @@ function Rover({
     (target && (isCollecting || isSurveying || task.startsWith("AT SITE "))) ||
     (repairTarget && POSITIONS[repairTarget]),
   );
+  const roverStatusLabel = rerouteNotice ?? (task === "STANDBY" ? null : task);
+  const roverStatusWidth = Math.min(4.8, Math.max(2.1, (roverStatusLabel?.length ?? 0) * 0.095 + 0.55));
 
   // Start at the actual launch coordinate from the first rendered frame. Never rely on an effect
   // to move an origin-positioned (and easily mis-hit) vehicle into view after mount.
@@ -1389,8 +1395,31 @@ function Rover({
     current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
     if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
     if (drillRef.current) {
-      drillRef.current.rotation.y = isCollecting ? clock.getElapsedTime() * 4.5 : 0;
-      drillRef.current.position.y = isCollecting ? 0.14 + (Math.sin(clock.getElapsedTime() * 15) + 1) * 0.035 : 0.14;
+      const working = isCollecting || Boolean(repairTarget);
+      drillRef.current.rotation.y = isCollecting ? clock.getElapsedTime() * 4.5 : repairTarget ? clock.getElapsedTime() * 2.4 : 0;
+      drillRef.current.position.y = working
+        ? -0.12 + Math.sin(clock.getElapsedTime() * 15) * 0.025
+        : 0.14;
+    }
+    if (sensorSweepRef.current) {
+      sensorSweepRef.current.rotation.y = isSurveying ? Math.sin(clock.getElapsedTime() * 1.35) * 0.78 : 0;
+      sensorSweepRef.current.rotation.x = isSurveying ? Math.sin(clock.getElapsedTime() * 2.1) * 0.08 : 0;
+    }
+    if (toolArmRef.current) {
+      const deployed = isCollecting || isCleaning || Boolean(repairTarget);
+      toolArmRef.current.rotation.x = THREE.MathUtils.damp(
+        toolArmRef.current.rotation.x,
+        deployed ? 0.62 + Math.sin(clock.getElapsedTime() * 3.2) * 0.04 : 0,
+        4,
+        delta,
+      );
+    }
+    if (cleaningBrushRef.current) {
+      cleaningBrushRef.current.visible = isCleaning;
+      if (isCleaning) cleaningBrushRef.current.rotation.x = clock.getElapsedTime() * 9;
+    }
+    if (cargoLightRef.current) {
+      cargoLightRef.current.emissiveIntensity = isTransferring ? 0.7 + (Math.sin(clock.getElapsedTime() * 7) + 1) * 0.7 : 0.2;
     }
   });
 
@@ -1479,6 +1508,78 @@ function Rover({
           <meshStandardMaterial color="#49d7ea" emissive="#1a8796" emissiveIntensity={0.8} metalness={0.5} roughness={0.18} />
         </mesh>
       ))}
+      <group ref={sensorSweepRef} position={[-0.53, 0.43, -0.24]}>
+        <mesh position={[0, 0.13, 0]}>
+          <cylinderGeometry args={[0.045, 0.06, 0.27, 10]} />
+          <meshStandardMaterial color="#82918d" metalness={0.78} roughness={0.28} />
+        </mesh>
+        <mesh position={[0, 0.29, 0]}>
+          <RoundedBox args={[0.3, 0.17, 0.23]} radius={0.045} smoothness={3} castShadow>
+            <meshStandardMaterial color="#59686a" metalness={0.64} roughness={0.3} />
+          </RoundedBox>
+        </mesh>
+        <mesh position={[0, 0.29, 0.12]}>
+          <sphereGeometry args={[0.065, 14, 10]} />
+          <meshStandardMaterial color="#63e8f3" emissive="#31c6e8" emissiveIntensity={isSurveying ? 2 : 0.75} toneMapped={false} />
+        </mesh>
+        <mesh position={[0.11, 0.29, 0.12]}>
+          <sphereGeometry args={[0.027, 10, 8]} />
+          <meshStandardMaterial color="#f0c45b" emissive="#c18639" emissiveIntensity={0.8} />
+        </mesh>
+      </group>
+      <group position={[0.48, 0.39, -0.29]}>
+        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.16, 0.16, 0.34, 12]} />
+          <meshStandardMaterial color="#637276" metalness={0.72} roughness={0.3} />
+        </mesh>
+        {[-0.15, 0.15].map((x) => (
+          <mesh key={x} position={[x, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <torusGeometry args={[0.16, 0.026, 6, 16]} />
+            <meshStandardMaterial color="#d7bd72" metalness={0.72} roughness={0.28} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0, 0.18]}>
+          <sphereGeometry args={[0.045, 10, 8]} />
+          <meshStandardMaterial ref={cargoLightRef} color="#6cf0d0" emissive="#32d5ae" emissiveIntensity={0.2} />
+        </mesh>
+      </group>
+      <group ref={toolArmRef} position={[-0.55, 0.2, 0.38]}>
+        <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.11, 0.13, 0.14, 12]} />
+          <meshStandardMaterial color="#6c7d7b" metalness={0.76} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, -0.045, 0.14]} rotation={[0.15, 0, 0]}>
+          <boxGeometry args={[0.12, 0.1, 0.3]} />
+          <meshStandardMaterial color="#a9b5ad" metalness={0.7} roughness={0.32} />
+        </mesh>
+        <mesh position={[0, -0.08, 0.3]}>
+          <sphereGeometry args={[0.085, 12, 10]} />
+          <meshStandardMaterial color="#435659" metalness={0.8} roughness={0.26} />
+        </mesh>
+        <mesh position={[0, -0.1, 0.43]} rotation={[0, 0, Math.PI / 2]}>
+          <torusGeometry args={[0.085, 0.022, 6, 14, Math.PI]} />
+          <meshStandardMaterial color="#d3bd77" metalness={0.76} roughness={0.26} />
+        </mesh>
+        <mesh position={[0, -0.1, 0.5]}>
+          <sphereGeometry args={[0.025, 8, 6]} />
+          <meshStandardMaterial color="#78d8c3" emissive="#38b89f" emissiveIntensity={0.55} />
+        </mesh>
+      </group>
+      <group ref={cleaningBrushRef} position={[0, 0.64, 0.28]} visible={false}>
+        <mesh rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.22, 0.22, 1.02, 16]} />
+          <meshStandardMaterial color="#45585c" metalness={0.62} roughness={0.48} />
+        </mesh>
+        {Array.from({ length: 10 }, (_, index) => {
+          const angle = (index / 10) * Math.PI * 2;
+          return (
+            <mesh key={index} position={[0, Math.cos(angle) * 0.22, Math.sin(angle) * 0.22]}>
+              <boxGeometry args={[0.9, 0.035, 0.035]} />
+              <meshStandardMaterial color={index % 2 ? "#d7c58c" : "#8fa09b"} roughness={0.7} />
+            </mesh>
+          );
+        })}
+      </group>
       <group ref={drillRef} position={[0.48, 0.14, 0.53]} rotation={[0.1, 0, -0.22]}>
         <mesh position={[0, 0.15, 0.18]} rotation={[0.55, 0, 0]}>
           <cylinderGeometry args={[0.045, 0.055, 0.4, 9]} />
@@ -1494,13 +1595,13 @@ function Rover({
         </mesh>
       </group>
       <SelectionRing selected={selected} alerted={alerted} radius={1.34} height={-0.32} />
-      {rerouteNotice && (
+      {roverStatusLabel && (
         <Billboard position={[0, 2.15, 0]} follow frustumCulled={false}>
           <mesh position={[0, 0.02, -0.025]}>
-            <planeGeometry args={[3.8, 0.55]} />
+            <planeGeometry args={[roverStatusWidth, 0.48]} />
             <meshBasicMaterial color="#17212a" transparent opacity={0.94} depthWrite={false} />
           </mesh>
-          <Text frustumCulled={false} fontSize={0.25} color="#ffcf65" outlineWidth={0.03} outlineColor="#171a1c" anchorX="center" anchorY="middle">{rerouteNotice}</Text>
+          <Text frustumCulled={false} fontSize={0.17} color={rerouteNotice ? "#ffcf65" : "#a8edc2"} outlineWidth={0.025} outlineColor="#171a1c" anchorX="center" anchorY="middle">{roverStatusLabel}</Text>
         </Billboard>
       )}
     </group>
@@ -2160,6 +2261,31 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
   );
 }
 
+function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolean }) {
+  const lens = useRef<THREE.MeshStandardMaterial>(null);
+  const light = useRef<THREE.PointLight>(null);
+
+  useFrame(({ clock }) => {
+    const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 9 : 3)) + 1) / 2;
+    if (lens.current) lens.current.emissiveIntensity = urgent ? 0.8 + pulse * 1.8 : 0.45 + pulse * 0.45;
+    if (light.current) light.current.intensity = urgent ? 0.7 + pulse * 1.6 : 0.25 + pulse * 0.35;
+  });
+
+  return (
+    <group>
+      <mesh position={[0, 0.04, 0]} castShadow>
+        <boxGeometry args={[0.24, 0.13, 0.12]} />
+        <meshStandardMaterial color="#263236" metalness={0.65} roughness={0.32} />
+      </mesh>
+      <mesh position={[0, 0.13, 0.01]}>
+        <sphereGeometry args={[0.075, 14, 10]} />
+        <meshStandardMaterial ref={lens} color={color} emissive={color} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+      <pointLight ref={light} position={[0, 0.2, 0.05]} color={color} intensity={1} distance={urgent ? 3.8 : 2.4} decay={2} />
+    </group>
+  );
+}
+
 function ColonyBuilding({
   track, tier, runtime, selected, alerted, eventId, position, onClick, onInteraction, mars, nightMode = false
 }: {
@@ -2177,6 +2303,9 @@ function ColonyBuilding({
 }) {
   const [x, z] = position;
   const p = palette(track.id);
+  const urgent = alerted || runtime.condition < 55;
+  const needsSupervision = !urgent && (runtime.condition < 82 || runtime.status !== "ONLINE");
+  const statusBeaconColor = urgent ? "#ff4052" : needsSupervision ? "#f0c45b" : null;
   return (
     <group
       position={[x, PAD_Y + 0.07, z]}
@@ -2192,6 +2321,15 @@ function ColonyBuilding({
         <BuildingArt id={track.id} accent={tierColor(tier)} />
         <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
       </group>
+      {statusBeaconColor && (
+        <group position={[
+          track.id === "habitat" ? 2.4 : 0.88,
+          track.id === "habitat" ? 0.39 : 0.35,
+          track.id === "habitat" ? 1.92 : 0.86,
+        ]}>
+          <BuildingStatusBeacon color={statusBeaconColor} urgent={urgent} />
+        </group>
+      )}
       {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
           without washing out the dark sky or pretending the Sun is still illuminating it. */}
@@ -2200,12 +2338,10 @@ function ColonyBuilding({
         <pointLight color={p.accent} intensity={track.id === "habitat" ? 1.1 : 0.42} distance={track.id === "habitat" ? 7 : 3.8} decay={2} />
       </group>}
       <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
-      {track.id !== "habitat" && (
-        <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
-          <ringGeometry args={[1.42, 1.54, 40]} />
-          <meshBasicMaterial color={statusColor(runtime.condition)} transparent opacity={0.94} depthWrite={false} toneMapped={false} />
-        </mesh>
-      )}
+      <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
+        <ringGeometry args={track.id === "habitat" ? [2.02, 2.12, 48] : [1.42, 1.54, 40]} />
+        <meshBasicMaterial color={alerted ? "#ff4052" : statusColor(runtime.condition)} transparent opacity={0.94} depthWrite={false} toneMapped={false} />
+      </mesh>
       {(runtime.upgradeLevel ?? 0) > 0 && (
         <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
           <ringGeometry args={[1.62, 1.69, 40]} />
@@ -2220,12 +2356,11 @@ function ColonyBuilding({
           frustumCulled={false}
         >
           <mesh position={[0, -0.04, -0.045]} renderOrder={12}>
-            <planeGeometry args={[Math.max(2.35, Math.min(5.4, track.category.length * 0.19 + 0.7)), alerted ? 0.96 : 0.76]} />
+            <planeGeometry args={[Math.max(2.35, Math.min(5.4, track.category.length * 0.19 + 0.7)), 0.76]} />
             <meshBasicMaterial color="#071117" transparent opacity={0.78} depthWrite={false} toneMapped={false} />
           </mesh>
           <Text frustumCulled={false} position={[0, 0.16, 0]} fontSize={track.id === "habitat" ? 0.48 : 0.36} color={selected ? "#fff0a2" : "#f0f5ef"} outlineWidth={0.035} outlineColor="#11191d" anchorX="center" anchorY="middle">{track.category.toUpperCase()}</Text>
           <Text frustumCulled={false} position={[0, -0.16, 0]} fontSize={0.2} color={tierColor(tier)} outlineWidth={0.025} outlineColor="#11191d" anchorX="center" anchorY="middle">{tier.toUpperCase()}</Text>
-          {alerted && <Text frustumCulled={false} position={[0, -0.43, 0]} fontSize={0.24} color="#ff6974" outlineWidth={0.03} outlineColor="#26171a" anchorX="center" anchorY="middle">EVENT · RESPOND</Text>}
         </Billboard>
 )}
     </group>
@@ -2260,13 +2395,13 @@ function MissionGuide({ mars }: { mars: boolean }) {
         <div style={{fontSize:9,fontWeight:900,letterSpacing:".18em",textTransform:"uppercase",color:"#efc85f"}}>MISSION CONTROL · {mars ? "MARS" : "MOON"}</div>
         <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
           <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable, manage supplies, and complete the mission objectives.
-          <br/><b style={{color:"#e8eee9"}}>2.</b> A disaster opens a response popup and pauses the clock. Choose there first; if a fault remains, open the red-ringed system and run its repair.
+          <br/><b style={{color:"#e8eee9"}}>2.</b> Amber base lights need supervision; a pulsing red base light means immediate action. Open the marked facility to respond.
           <br/><b style={{color:"#e8eee9"}}>3.</b> Walk the compact outpost to inspect each facility. Field sites lie beyond the base; the rover follows its plotted route.
         </div>
         <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
           <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
-          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#f0c45b",marginRight:4}}/>Degraded</span>
-          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#ff6558",marginRight:4}}/>Critical</span>
+          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#f0c45b",marginRight:4}}/>Needs supervision</span>
+          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#ff6558",marginRight:4}}/>Do it now</span>
         </div>
       </div>
     </Html>
@@ -2332,7 +2467,6 @@ function MissionVitalsHUD({
           );
         })}
       </div>
-      {alerted && <p role="status" className="mt-2 rounded-md border border-[#a84450]/70 bg-[#451b24]/80 px-2 py-1.5 text-[8px] font-black uppercase tracking-[0.1em] text-[#ffabb0]">Critical incident · inspect marked facility</p>}
     </aside>
   );
 }
@@ -2959,6 +3093,8 @@ function WalkControls({
   onLockError,
   onNearbyChange,
   interactionClickHandled,
+  selectedBuildingId,
+  selectedResourceId,
 }: {
   tracks: TechnologyTrack[];
   resourceNodes: MissionResourceNode[];
@@ -2978,6 +3114,8 @@ function WalkControls({
   onLockError: (message: string) => void;
   onNearbyChange: (target: NearbyInteraction) => void;
   interactionClickHandled: InteractionClickState;
+  selectedBuildingId: string | null;
+  selectedResourceId: string | null;
 }) {
   const { gl, camera } = useThree();
   const keys = useRef(new Set<string>());
@@ -2990,6 +3128,8 @@ function WalkControls({
   const latest = useRef({
     tracks,
     resourceNodes,
+    selectedBuildingId,
+    selectedResourceId,
     habitatInterior,
     cabinetOpen,
     airlockCycling,
@@ -3009,6 +3149,8 @@ function WalkControls({
   latest.current = {
     tracks,
     resourceNodes,
+    selectedBuildingId,
+    selectedResourceId,
     habitatInterior,
     cabinetOpen,
     airlockCycling,
@@ -3103,7 +3245,11 @@ function WalkControls({
           const berthDistance = Math.hypot(player.x + 2.95, player.z + 1.43);
           const galleyDistance = Math.hypot(player.x - 0.1, player.z + 2.8);
           const airlockDistance = Math.hypot(player.x, player.z - 3.25);
-          if (cabinetDistance < 1.7) latest.current.onToggleCabinet();
+          if (cabinetDistance < 1.7) {
+            const closingCabinet = latest.current.cabinetOpen;
+            latest.current.onToggleCabinet();
+            if (closingCabinet) requestPointerLock();
+          }
           else if (berthDistance < 1.9) latest.current.onActivateHabitatSpot("BERTH");
           else if (galleyDistance < 1.8) latest.current.onActivateHabitatSpot("GALLEY");
           else if (airlockDistance < 1.8) latest.current.onExitHabitat();
@@ -3133,9 +3279,20 @@ function WalkControls({
         if (closest?.trackId || closest?.node) {
           if (document.pointerLockElement === canvas) document.exitPointerLock();
         }
-        if (closest?.trackId) latest.current.onSelect(closest.trackId);
-        else if (closest?.node) latest.current.onSelectResource(closest.node);
-        else latest.current.onCloseInspector();
+        if (closest?.trackId) {
+          const closingInspector = latest.current.selectedBuildingId === closest.trackId;
+          latest.current.onSelect(closest.trackId);
+          if (closingInspector) requestPointerLock();
+        } else if (closest?.node) {
+          const closingInspector = latest.current.selectedResourceId === closest.node.id;
+          if (closingInspector) latest.current.onCloseInspector();
+          else latest.current.onSelectResource(closest.node);
+          if (closingInspector) requestPointerLock();
+        } else {
+          const closingInspector = Boolean(latest.current.selectedBuildingId || latest.current.selectedResourceId);
+          latest.current.onCloseInspector();
+          if (closingInspector) requestPointerLock();
+        }
       }
     };
     const handleKeyUp = (event: KeyboardEvent) => keys.current.delete(event.key.toLowerCase());
@@ -3471,11 +3628,6 @@ function Scene({ props }: { props: Props }) {
         )}
         <Crew mars={mars} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
-        {props.activeEventTrackId && POSITIONS[props.activeEventTrackId] && (
-          <Billboard position={[POSITIONS[props.activeEventTrackId][0], props.activeEventTrackId === "habitat" ? 5.9 : props.activeEventTrackId === "extraction" ? 5.0 : 4.25, POSITIONS[props.activeEventTrackId][1]]} follow frustumCulled={false}>
-            <Text frustumCulled={false} fontSize={0.34} color="#ff6672" outlineWidth={0.045} outlineColor="#26171a" anchorX="center" anchorY="middle">RESPOND HERE</Text>
-          </Billboard>
-        )}
       </group>
         </>
       )}
@@ -3508,6 +3660,8 @@ function Scene({ props }: { props: Props }) {
           onLockError={setPointerLockError}
           onNearbyChange={setNearbyTarget}
           interactionClickHandled={interactionClickHandled.current}
+          selectedBuildingId={props.selectedBuildingId}
+          selectedResourceId={props.selectedResourceId}
         />
       ) : (
         <OrbitControls
