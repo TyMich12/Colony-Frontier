@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Html, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
-import type { BuildingRuntime } from "./missionRuntime";
+import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
@@ -16,46 +16,89 @@ export type MissionResourceNode = {
   description: string;
 };
 
+export type MissionPhysicalReadings = {
+  power: string;
+  battery: string;
+  oxygen: string;
+  water: string;
+  food: string;
+  radiation: string;
+  temperature: string;
+};
+
 type Props = {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
   buildings: Record<string, BuildingRuntime>;
+  metrics: MissionMetrics;
+  physicalReadings: MissionPhysicalReadings;
+  colonyHealth: number;
   selectedBuildingId: string | null;
   elapsed: number;
   lunarNight: boolean;
   environmentLabel: "MOON" | "MARS";
   environmentTitle: string;
+  activeEventId: string | null;
   activeEventTrackId: string | null;
   selectedResourceId: string | null;
   surveyedNodes: string[];
+  habitatInterior: boolean;
   resourceNodes: MissionResourceNode[];
   onSelect: (trackId: string) => void;
+  onCloseInspector: () => void;
   onSelectResource: (node: MissionResourceNode) => void;
+  onExitHabitat: () => void;
+  onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
   roverTargetNodeId: string | null;
   simulationSpeed: number;
 };
 
 export const POSITIONS: Record<string, [number, number]> = {
-  // Wide deployment lanes: players pan across the colony instead of seeing every system as a tight cluster.
+  // Compact service lanes keep the outpost walkable while leaving room for each facility.
   habitat: [0, 0],
-  water: [-22, 18],
-  extraction: [-7, 18],
-  isru: [7, 18],
-  radiation: [22, 18],
-  oxygen: [-22, 5],
-  comms: [-11, 5],
-  maintenance: [11, 5],
-  co2: [-22, -7],
-  grid: [-11, -7],
-  science: [11, -7],
-  battery: [22, -7],
-  thermal: [-22, -18],
-  solar: [-7, -18],
-  agriculture: [7, -18],
-  navigation: [22, -18],
-  rover: [24, -22],
+  water: [-16, 13],
+  extraction: [-5, 13],
+  isru: [5, 13],
+  radiation: [16, 13],
+  oxygen: [-16, 4],
+  comms: [-8, 4],
+  maintenance: [8, 4],
+  co2: [-16, -5],
+  grid: [-8, -5],
+  science: [8, -5],
+  battery: [16, -5],
+  thermal: [-16, -13],
+  solar: [-5, -13],
+  agriculture: [5, -13],
+  navigation: [16, -13],
+  rover: [19, -18],
 };
+
+const BUILDING_SCALES: Record<string, number> = {
+  habitat: 1.35,
+  solar: 2.15,
+  battery: 1.28,
+  oxygen: 1.28,
+  water: 1.28,
+  co2: 1.24,
+  comms: 1.3,
+  navigation: 1.28,
+  radiation: 1.3,
+  science: 1.3,
+  agriculture: 1.4,
+  extraction: 1.4,
+  isru: 1.34,
+  thermal: 1.28,
+  grid: 1.28,
+  maintenance: 1.3,
+  rover: 1.2,
+};
+
+function buildingClearanceRadius(id: string): number {
+  const footprintRadius = id === "habitat" ? 4.4 : id === "rover" ? 1.85 : 1.825;
+  return footprintRadius * (BUILDING_SCALES[id] ?? 1.2) + 0.2;
+}
 
 const BUILDING_ROTATIONS: Record<string, number> = {
   habitat: 0,
@@ -76,9 +119,9 @@ const BUILDING_ROTATIONS: Record<string, number> = {
   maintenance: 0.2,
 };
 
-const ROAD_X = [-14, 0, 14];
-const ROAD_Z = [-13, -0.6, 13];
-const ROAD_EDGE = 25.6;
+const ROAD_X = [-10, 0, 10];
+const ROAD_Z = [-9, -0.6, 9];
+const ROAD_EDGE = 18;
 const PAD_Y = 0.12;
 
 function nodeWorldPosition(node: MissionResourceNode): [number, number] {
@@ -214,7 +257,7 @@ function findRoverPath(
     const wz = z * step;
     const nearBuilding = Object.entries(POSITIONS).some(([id, [bx, bz]]) => {
       if (id === "rover") return false;
-      const radius = id === "habitat" ? 5.1 : id === "solar" ? 3.9 : 3.25;
+      const radius = buildingClearanceRadius(id);
       return Math.hypot(wx - bx, wz - bz) < radius;
     });
     const nearRock = !ignoreAllRocks && ROVER_ROUTE_ROCKS.some((rock) =>
@@ -1848,13 +1891,14 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 }
 
 function ColonyBuilding({
-  track, tier, runtime, selected, alerted, position, onClick, mars, nightMode = false
+  track, tier, runtime, selected, alerted, eventId, position, onClick, mars, nightMode = false
 }: {
   track: TechnologyTrack;
   tier: Tier;
   runtime: BuildingRuntime;
   selected: boolean;
   alerted: boolean;
+  eventId: string | null;
   position: [number, number];
   onClick: () => void;
   mars: boolean;
@@ -1866,6 +1910,7 @@ function ColonyBuilding({
     <group
       position={[x, PAD_Y + 0.07, z]}
       rotation={[0, BUILDING_ROTATIONS[track.id] ?? 0, 0]}
+      scale={BUILDING_SCALES[track.id] ?? 1.2}
       frustumCulled={false}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
@@ -1875,6 +1920,7 @@ function ColonyBuilding({
       <group position={[0, 0.04, 0]} frustumCulled={false}>
         <BuildingArt id={track.id} accent={tierColor(tier)} />
       </group>
+      {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
           without washing out the dark sky or pretending the Sun is still illuminating it. */}
       {nightMode && <group position={[0, track.id === "habitat" ? 3.3 : 1.9, 0]}>
@@ -1943,7 +1989,7 @@ function MissionGuide({ mars }: { mars: boolean }) {
         <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
           <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable, manage supplies, and complete the mission objectives.
           <br/><b style={{color:"#e8eee9"}}>2.</b> A disaster opens a response popup and pauses the clock. Choose there first; if a fault remains, open the red-ringed system and run its repair.
-          <br/><b style={{color:"#e8eee9"}}>3.</b> Field sites sit beyond the outpost: pan the map to find them. The rover follows its plotted route; better Navigation reduces surprise boulder detours.
+          <br/><b style={{color:"#e8eee9"}}>3.</b> Walk the compact outpost to inspect each facility. Field sites lie beyond the base; the rover follows its plotted route.
         </div>
         <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
           <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
@@ -1955,31 +2001,333 @@ function MissionGuide({ mars }: { mars: boolean }) {
   );
 }
 
+function MissionVitalsHUD({
+  metrics,
+  physicalReadings,
+  colonyHealth,
+  alerted,
+}: {
+  metrics: MissionMetrics;
+  physicalReadings: MissionPhysicalReadings;
+  colonyHealth: number;
+  alerted: boolean;
+}) {
+  const temperatureMargin = THREE.MathUtils.clamp(100 - Math.abs(metrics.temperature - 21) * 18, 0, 100);
+  const radiationSafety = THREE.MathUtils.clamp(100 - metrics.radiation * 3.4, 0, 100);
+  const readings = [
+    { label: "O₂ reserve", value: metrics.oxygen, display: physicalReadings.oxygen },
+    { label: "Cabin temperature", value: temperatureMargin, display: physicalReadings.temperature },
+    { label: "Potable water", value: metrics.water, display: physicalReadings.water },
+    { label: "Battery storage", value: metrics.battery, display: physicalReadings.battery },
+    { label: "Power margin", value: metrics.power, display: physicalReadings.power },
+    { label: "Radiation dose", value: radiationSafety, display: physicalReadings.radiation },
+    { label: "Food stores", value: metrics.food, display: physicalReadings.food },
+  ];
+  const colorFor = (value: number) => value < 28 ? "#ff6874" : value < 55 ? "#f0c45b" : "#83e2a8";
+  const healthColor = colorFor(colonyHealth);
+
+  return (
+    <aside aria-label="EVA colony vital signs" className="pointer-events-none absolute left-3 top-24 z-30 w-[min(76vw,276px)] border border-[#75a9a0]/35 bg-[#07151b]/85 p-3 font-mono text-white shadow-[0_12px_34px_rgba(0,0,0,0.42)] backdrop-blur-md">
+      <div className="flex items-center justify-between border-b border-[#51706d]/40 pb-2">
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#86d6c6]">EVA telemetry · colony link</p>
+          <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#aebfba]">Crew life support</p>
+        </div>
+        <span className={`h-2 w-2 rounded-full ${alerted ? "animate-pulse bg-[#ff5868]" : "bg-[#7de4a3]"}`} />
+      </div>
+      <div className="mt-2.5 rounded-lg border border-[#456158]/55 bg-[#0c211d]/80 p-2.5">
+        <div className="flex items-center justify-between gap-2 text-[8px] font-black uppercase tracking-[0.13em]">
+          <span className="text-[#bed0c5]">Colony health</span>
+          <span style={{ color: healthColor }}>{Math.round(colonyHealth)}%</span>
+        </div>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#1d302d]">
+          <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${THREE.MathUtils.clamp(colonyHealth, 0, 100)}%`, backgroundColor: healthColor, boxShadow: `0 0 10px ${healthColor}88` }} />
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {readings.map((reading) => {
+          const color = colorFor(reading.value);
+          return (
+            <div key={reading.label} className={`min-w-0 rounded-md border border-white/[0.08] bg-black/20 px-2 py-1.5 ${reading.label === "Food stores" ? "col-span-2" : ""}`}>
+              <div className="flex items-center justify-between gap-1">
+                <span className="truncate text-[7px] font-bold uppercase tracking-[0.09em] text-[#9db3b0]">{reading.label}</span>
+                <span className="shrink-0 text-[8px] font-bold" style={{ color }}>{reading.display}</span>
+              </div>
+              <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${THREE.MathUtils.clamp(reading.value, 0, 100)}%`, backgroundColor: color }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {alerted && <p role="status" className="mt-2 rounded-md border border-[#a84450]/70 bg-[#451b24]/80 px-2 py-1.5 text-[8px] font-black uppercase tracking-[0.1em] text-[#ffabb0]">Critical incident · inspect marked facility</p>}
+    </aside>
+  );
+}
+
+function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: boolean }) {
+  const particles = useRef<Array<THREE.Mesh | null>>([]);
+  const warningLight = useRef<THREE.PointLight>(null);
+  const count = 18;
+  const pressureLeak = eventId === "habitat-pressure";
+  const regolithEjecta = eventId === "solar-dust" || eventId === "extraction-lock" || eventId === "micrometeoroid-impact";
+  const marsDustFront = mars && eventId === "regional-dust-front";
+  const particlesActive = pressureLeak || regolithEjecta || marsDustFront;
+  const particleColor = pressureLeak ? "#c9f3ff" : mars ? "#a77a5a" : "#cbb894";
+  const warningColor = eventId === "radiation-burst" ? "#bd9cff" : regolithEjecta || marsDustFront ? "#f0a75c" : "#ff4354";
+
+  useFrame(({ clock }) => {
+    const time = clock.getElapsedTime();
+    if (warningLight.current) warningLight.current.intensity = 2.2 + (Math.sin(time * 10) + 1) * 1.4;
+    particles.current.forEach((particle, index) => {
+      if (!particle) return;
+      const phase = (time * 0.72 + index / count) % 1;
+      particle.visible = particlesActive;
+      if (pressureLeak) {
+        const side = index % 2 === 0 ? -1 : 1;
+        particle.position.set(side * (0.18 + phase * 0.48), 0.48 + phase * 1.75, 0.85 + phase * 1.4);
+      } else if (marsDustFront) {
+        particle.position.set(-2.2 + phase * 4.4, 0.22 + Math.sin(index * 2.1 + time * 2) * 0.34, Math.sin(index * 1.7 + time * 1.4) * 2.2);
+      } else if (regolithEjecta) {
+        const angle = index * 2.399;
+        const radius = 0.25 + phase * 2.05;
+        particle.position.set(Math.cos(angle) * radius, 0.12 + Math.sin(phase * Math.PI) * 0.62, Math.sin(angle) * radius);
+      }
+      particle.scale.setScalar(pressureLeak ? 0.55 + phase * 0.85 : 0.35 + (1 - phase) * 0.8);
+    });
+  });
+
+  return (
+    <group>
+      <pointLight ref={warningLight} position={[0, 2.1, 0]} color={warningColor} distance={10} decay={2} />
+      {Array.from({ length: count }, (_, index) => (
+        <mesh key={index} ref={(mesh) => { particles.current[index] = mesh; }} visible={false}>
+          <sphereGeometry args={[pressureLeak ? 0.055 : 0.045, 8, 6]} />
+          <meshStandardMaterial color={particleColor} emissive={particleColor} emissiveIntensity={pressureLeak ? 0.65 : 1.2} transparent opacity={0.82} roughness={0.7} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function HabitatInterior({ cabinetOpen, airlockCycling }: { cabinetOpen: boolean; airlockCycling: boolean }) {
+  const cabinetDoor = useRef<THREE.Group>(null);
+  const pressureLight = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }, delta) => {
+    if (cabinetDoor.current) {
+      cabinetDoor.current.rotation.y = THREE.MathUtils.damp(
+        cabinetDoor.current.rotation.y,
+        cabinetOpen ? -1.2 : 0,
+        7,
+        delta,
+      );
+    }
+    if (pressureLight.current) {
+      const material = pressureLight.current.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = airlockCycling ? 1.1 + (Math.sin(clock.elapsedTime * 8) + 1) * 0.9 : 0.2;
+    }
+  });
+
+  return (
+    <group>
+      <mesh position={[0, -0.16, 0]} receiveShadow>
+        <boxGeometry args={[8.4, 0.32, 8.4]} />
+        <meshStandardMaterial color="#59656a" metalness={0.55} roughness={0.72} />
+      </mesh>
+      <mesh position={[0, 3.28, 0]}>
+        <boxGeometry args={[8.4, 0.24, 8.4]} />
+        <meshStandardMaterial color="#7b8583" metalness={0.48} roughness={0.62} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[-4.18, 1.55, 0]}>
+        <boxGeometry args={[0.24, 3.1, 8.4]} />
+        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[4.18, 1.55, 0]}>
+        <boxGeometry args={[0.24, 3.1, 8.4]} />
+        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 1.55, -4.18]}>
+        <boxGeometry args={[8.4, 3.1, 0.24]} />
+        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
+      </mesh>
+      {[-2.8, -1.4, 0, 1.4, 2.8].map((x) => (
+        <mesh key={x} position={[x, 3.12, 0]}>
+          <boxGeometry args={[0.12, 0.12, 8.2]} />
+          <meshStandardMaterial color="#d0d5cd" metalness={0.72} roughness={0.38} />
+        </mesh>
+      ))}
+      {[-2.5, 2.5].map((x) => (
+        <mesh key={x} position={[x, 1.55, 4.12]}>
+          <boxGeometry args={[3.3, 3.1, 0.22]} />
+          <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+      <mesh position={[0, 2.82, 4.12]}>
+        <boxGeometry args={[1.7, 0.55, 0.22]} />
+        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} />
+      </mesh>
+      <group position={[0, 1.36, 3.98]}>
+        <mesh>
+          <boxGeometry args={[1.55, 2.05, 0.16]} />
+          <meshStandardMaterial color="#44545a" metalness={0.72} roughness={0.32} />
+        </mesh>
+        <mesh position={[0, 0, -0.1]}>
+          <boxGeometry args={[1.12, 1.62, 0.06]} />
+          <meshStandardMaterial color="#829095" metalness={0.62} roughness={0.35} />
+        </mesh>
+        <mesh position={[0.42, 0, -0.17]}>
+          <cylinderGeometry args={[0.12, 0.12, 0.08, 16]} />
+          <meshStandardMaterial color="#d5c27c" metalness={0.78} roughness={0.26} />
+        </mesh>
+      </group>
+      <group position={[2.12, 0, -0.65]}>
+        <mesh position={[0, 1.05, 0]}>
+          <boxGeometry args={[1.18, 1.9, 0.72]} />
+          <meshStandardMaterial color="#9da8a2" metalness={0.42} roughness={0.46} />
+        </mesh>
+        <mesh position={[0, 0.98, 0.39]}>
+          <boxGeometry args={[0.94, 1.55, 0.08]} />
+          <meshStandardMaterial color="#273b40" metalness={0.4} roughness={0.48} />
+        </mesh>
+        <mesh position={[0, 0.98, 0.445]}>
+          <boxGeometry args={[0.035, 1.35, 0.025]} />
+          <meshStandardMaterial color="#79d8bc" emissive="#2b8a73" emissiveIntensity={0.5} />
+        </mesh>
+        <group ref={cabinetDoor} position={[-0.48, 1.03, 0.47]}>
+          <mesh position={[0.48, 0, 0]}>
+            <boxGeometry args={[0.96, 1.62, 0.07]} />
+            <meshStandardMaterial color="#b4bdb4" metalness={0.6} roughness={0.34} />
+          </mesh>
+          <mesh position={[0.82, 0, 0.06]}>
+            <boxGeometry args={[0.035, 0.28, 0.08]} />
+            <meshStandardMaterial color="#e5c773" metalness={0.72} roughness={0.28} />
+          </mesh>
+        </group>
+        <mesh position={[0, 2.04, 0.06]}>
+          <boxGeometry args={[1.28, 0.08, 0.78]} />
+          <meshStandardMaterial color="#c5cdc3" metalness={0.55} roughness={0.4} />
+        </mesh>
+      </group>
+      <group position={[0, 2.98, 0]}>
+        <mesh>
+          <boxGeometry args={[1.55, 0.08, 0.74]} />
+          <meshStandardMaterial color="#dce3da" emissive="#e7f2db" emissiveIntensity={0.55} roughness={0.42} />
+        </mesh>
+        <pointLight position={[0, -0.18, 0]} color="#d9e8d2" intensity={1.35} distance={8} decay={2} />
+      </group>
+      <group position={[0, 2.28, 3.78]}>
+        <mesh>
+          <boxGeometry args={[0.55, 0.38, 0.08]} />
+          <meshStandardMaterial ref={pressureLight} color="#5bd9a3" emissive="#1eaa69" emissiveIntensity={0.2} />
+        </mesh>
+        <mesh position={[0, 0, 0.05]}>
+          <boxGeometry args={[0.38, 0.07, 0.025]} />
+          <meshBasicMaterial color="#d7e5df" />
+        </mesh>
+      </group>
+      <Text position={[0, 2.55, 3.78]} fontSize={0.12} color="#d6e2d9" anchorX="center" anchorY="middle">
+        AIRLOCK · PRESSURE SEAL
+      </Text>
+      <Text position={[2.12, 2.2, -0.2]} fontSize={0.13} color="#dce7dc" anchorX="center" anchorY="middle">
+        CREW STORES
+      </Text>
+    </group>
+  );
+}
+
+type NearbyInteraction = { id: string; label: string; kind: "FACILITY" | "FIELD SITE" | "CABINET" | "AIRLOCK" } | null;
+
 function WalkControls({
   tracks,
   resourceNodes,
+  habitatInterior,
+  cabinetOpen,
+  airlockCycling,
   onSelect,
+  onCloseInspector,
   onSelectResource,
+  onExitHabitat,
+  onToggleCabinet,
   onLockChange,
+  onLockError,
+  onNearbyChange,
 }: {
   tracks: TechnologyTrack[];
   resourceNodes: MissionResourceNode[];
+  habitatInterior: boolean;
+  cabinetOpen: boolean;
+  airlockCycling: boolean;
   onSelect: (trackId: string) => void;
+  onCloseInspector: () => void;
   onSelectResource: (node: MissionResourceNode) => void;
+  onExitHabitat: () => void;
+  onToggleCabinet: () => void;
   onLockChange: (locked: boolean) => void;
+  onLockError: (message: string) => void;
+  onNearbyChange: (target: NearbyInteraction) => void;
 }) {
-  const { gl } = useThree();
+  const { gl, camera } = useThree();
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
   const pitch = useRef(0);
   const playerPosition = useRef(new THREE.Vector3(0, 1.72, 12));
-  const latest = useRef({ tracks, resourceNodes, onSelect, onSelectResource, onLockChange });
-  latest.current = { tracks, resourceNodes, onSelect, onSelectResource, onLockChange };
+  const jumpRequested = useRef(false);
+  const jumpVelocity = useRef(0);
+  const nearbyId = useRef<string | null>(null);
+  const latest = useRef({
+    tracks,
+    resourceNodes,
+    habitatInterior,
+    cabinetOpen,
+    airlockCycling,
+    onSelect,
+    onCloseInspector,
+    onSelectResource,
+    onExitHabitat,
+    onToggleCabinet,
+    onLockChange,
+    onLockError,
+    onNearbyChange,
+  });
+  latest.current = {
+    tracks,
+    resourceNodes,
+    habitatInterior,
+    cabinetOpen,
+    airlockCycling,
+    onSelect,
+    onCloseInspector,
+    onSelectResource,
+    onExitHabitat,
+    onToggleCabinet,
+    onLockChange,
+    onLockError,
+    onNearbyChange,
+  };
+
+  useEffect(() => {
+    const spawnZ = habitatInterior ? 2.2 : 7;
+    camera.position.set(0, habitatInterior ? 1.56 : terrainHeight(0, spawnZ) + 1.72, spawnZ);
+    yaw.current = 0;
+    pitch.current = 0;
+    jumpVelocity.current = 0;
+    keys.current.clear();
+  }, [camera, habitatInterior]);
 
   useEffect(() => {
     const canvas = gl.domElement;
+    const requestPointerLock = () => {
+      try {
+        void Promise.resolve(canvas.requestPointerLock()).catch(() => {
+          latest.current.onLockError("Mouse capture was denied. Press F or click the scene to try again.");
+        });
+      } catch {
+        latest.current.onLockError("Mouse capture is unavailable in this browser context.");
+      }
+    };
     const handleClick = () => {
-      if (document.pointerLockElement !== canvas) void canvas.requestPointerLock();
+      if (document.pointerLockElement !== canvas) requestPointerLock();
     };
     const handlePointerLockChange = () => {
       const locked = document.pointerLockElement === canvas;
@@ -1993,14 +2341,31 @@ function WalkControls({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (key === "f" && !event.repeat) {
+        event.preventDefault();
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
+        else requestPointerLock();
+      }
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(key)) {
         event.preventDefault();
         keys.current.add(key);
       }
+      if (key === " " && !event.repeat) {
+        event.preventDefault();
+        jumpRequested.current = true;
+      }
       if (key === "e" && !event.repeat) {
-        const target = event.target;
-        if (target instanceof HTMLElement && target.closest("button, input, textarea, select")) return;
         const player = playerPosition.current;
+        if (latest.current.habitatInterior) {
+          if (latest.current.airlockCycling) return;
+          const cabinetDistance = Math.hypot(player.x - 2.12, player.z - 0.2);
+          const airlockDistance = Math.hypot(player.x, player.z - 3.25);
+          if (cabinetDistance < 1.7) latest.current.onToggleCabinet();
+          else if (airlockDistance < 1.8) latest.current.onExitHabitat();
+          return;
+        }
         let closest: { distance: number; trackId?: string; node?: MissionResourceNode } | null = null;
         for (const track of latest.current.tracks) {
           const position = POSITIONS[track.id];
@@ -2019,6 +2384,7 @@ function WalkControls({
         }
         if (closest?.trackId) latest.current.onSelect(closest.trackId);
         else if (closest?.node) latest.current.onSelectResource(closest.node);
+        else latest.current.onCloseInspector();
       }
     };
     const handleKeyUp = (event: KeyboardEvent) => keys.current.delete(event.key.toLowerCase());
@@ -2039,6 +2405,7 @@ function WalkControls({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       handlePointerLockCleanup();
+      latest.current.onNearbyChange(null);
     };
   }, [gl]);
 
@@ -2048,43 +2415,134 @@ function WalkControls({
     player.rotation.order = "YXZ";
     player.rotation.set(pitch.current, yaw.current, 0);
 
+    const floorY = habitatInterior ? 1.56 : terrainHeight(player.position.x, player.position.z) + 1.72;
+    if (!habitatInterior && !airlockCycling && jumpRequested.current && player.position.y <= floorY + 0.03) jumpVelocity.current = 2.8;
+    jumpRequested.current = false;
+    if (!airlockCycling) {
+      jumpVelocity.current -= 1.62 * Math.min(delta, 0.05);
+      player.position.y += jumpVelocity.current * Math.min(delta, 0.05);
+      if (player.position.y <= floorY) {
+        player.position.y = floorY;
+        jumpVelocity.current = 0;
+      }
+    } else {
+      keys.current.clear();
+    }
+
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
     const direction = new THREE.Vector3();
-    if (keys.current.has("w") || keys.current.has("arrowup")) direction.add(forward);
-    if (keys.current.has("s") || keys.current.has("arrowdown")) direction.sub(forward);
-    if (keys.current.has("d") || keys.current.has("arrowright")) direction.add(right);
-    if (keys.current.has("a") || keys.current.has("arrowleft")) direction.sub(right);
-    if (direction.lengthSq() === 0) return;
+    if (!airlockCycling) {
+      if (keys.current.has("w") || keys.current.has("arrowup")) direction.add(forward);
+      if (keys.current.has("s") || keys.current.has("arrowdown")) direction.sub(forward);
+      if (keys.current.has("d") || keys.current.has("arrowright")) direction.add(right);
+      if (keys.current.has("a") || keys.current.has("arrowleft")) direction.sub(right);
+    }
+    if (direction.lengthSq() > 0) {
+      direction.normalize();
+      const speed = keys.current.has("shift") ? 7 : 4.5;
+      const distance = speed * Math.min(delta, 0.05);
+      const nextX = player.position.x + direction.x * distance;
+      const nextZ = player.position.z + direction.z * distance;
+      const collides = (x: number, z: number) => {
+        if (habitatInterior) {
+          return Math.abs(x) > 3.88 || Math.abs(z) > 3.88 || (Math.abs(x - 2.12) < 0.78 && Math.abs(z + 0.65) < 0.56);
+        }
+        if (Math.abs(x) > 48 || Math.abs(z) > 48) return true;
+        const nearBuilding = tracks.some((track) => {
+          const position = POSITIONS[track.id];
+          if (!position) return false;
+          const radius = buildingClearanceRadius(track.id);
+          return Math.hypot(x - position[0], z - position[1]) < radius;
+        });
+        return nearBuilding || ROVER_ROUTE_ROCKS.some((rock) => Math.hypot(x - rock.x, z - rock.z) < rock.radius + 0.55);
+      };
 
-    direction.normalize();
-    const speed = keys.current.has("shift") ? 10 : 6;
-    const distance = speed * Math.min(delta, 0.05);
-    const nextX = player.position.x + direction.x * distance;
-    const nextZ = player.position.z + direction.z * distance;
-    const collides = (x: number, z: number) => {
-      if (Math.abs(x) > 48 || Math.abs(z) > 48) return true;
-      const nearBuilding = tracks.some((track) => {
-        const position = POSITIONS[track.id];
-        if (!position) return false;
-        const radius = track.id === "habitat" ? 5.2 : track.id === "solar" ? 3.8 : track.id === "rover" ? 2.2 : 2.6;
-        return Math.hypot(x - position[0], z - position[1]) < radius;
-      });
-      return nearBuilding || ROVER_ROUTE_ROCKS.some((rock) => Math.hypot(x - rock.x, z - rock.z) < rock.radius + 0.55);
-    };
-
-    if (!collides(nextX, player.position.z)) player.position.x = nextX;
-    if (!collides(player.position.x, nextZ)) player.position.z = nextZ;
-    player.position.y = terrainHeight(player.position.x, player.position.z) + 1.72;
+      if (!collides(nextX, player.position.z)) player.position.x = nextX;
+      if (!collides(player.position.x, nextZ)) player.position.z = nextZ;
+    }
+    const updatedFloorY = habitatInterior ? 1.56 : terrainHeight(player.position.x, player.position.z) + 1.72;
+    if (player.position.y <= updatedFloorY) {
+      player.position.y = updatedFloorY;
+      jumpVelocity.current = 0;
+    }
     playerPosition.current.copy(player.position);
+    let nearest: { distance: number; target: Exclude<NearbyInteraction, null> } | null = null;
+    if (habitatInterior) {
+      const cabinetDistance = Math.hypot(player.position.x - 2.12, player.position.z - 0.2);
+      if (cabinetDistance < 1.7) {
+        nearest = { distance: cabinetDistance, target: { id: "supply-cabinet", label: cabinetOpen ? "CREW SUPPLY CABINET · OPEN" : "CREW SUPPLY CABINET", kind: "CABINET" } };
+      }
+      const airlockDistance = Math.hypot(player.position.x, player.position.z - 3.25);
+      if (airlockDistance < 1.8 && (!nearest || airlockDistance < nearest.distance)) {
+        nearest = { distance: airlockDistance, target: { id: "habitat-airlock", label: "HABITAT AIRLOCK", kind: "AIRLOCK" } };
+      }
+    } else {
+      for (const track of tracks) {
+        const position = POSITIONS[track.id];
+        if (!position) continue;
+        const distance = Math.hypot(player.position.x - position[0], player.position.z - position[1]);
+        if (distance < 7.5 && (!nearest || distance < nearest.distance)) {
+          nearest = { distance, target: { id: track.id, label: track.category, kind: "FACILITY" } };
+        }
+      }
+      for (const node of resourceNodes) {
+        const [x, z] = nodeWorldPosition(node);
+        const distance = Math.hypot(player.position.x - x, player.position.z - z);
+        if (distance < 7.5 && (!nearest || distance < nearest.distance)) {
+          nearest = { distance, target: { id: node.id, label: node.label, kind: "FIELD SITE" } };
+        }
+      }
+    }
+    const nextNearbyId = nearest?.target.id ?? null;
+    if (nearbyId.current !== nextNearbyId) {
+      nearbyId.current = nextNearbyId;
+      latest.current.onNearbyChange(nearest?.target ?? null);
+    }
   });
 
   return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 12) + 1.72, 12]} fov={70} near={0.05} far={190} />;
 }
 
 function Scene({ props }: { props: Props }) {
-  const [walkMode, setWalkMode] = useState(false);
+  const [walkMode, setWalkMode] = useState(true);
   const [pointerLocked, setPointerLocked] = useState(false);
+  const [pointerLockError, setPointerLockError] = useState<string | null>(null);
+  const [nearbyTarget, setNearbyTarget] = useState<NearbyInteraction>(null);
+  const [cabinetOpen, setCabinetOpen] = useState(false);
+  const [airlockStatus, setAirlockStatus] = useState<"IDLE" | "PRESSURIZING" | "DEPRESSURIZING" | "PRESSURIZED" | "DEPRESSURIZED">("IDLE");
+  const airlockTimer = useRef<number | null>(null);
+  const airlockCycling = airlockStatus === "PRESSURIZING" || airlockStatus === "DEPRESSURIZING";
+  useEffect(() => () => {
+    if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
+  }, []);
+  const previousHabitatInterior = useRef(props.habitatInterior);
+  useEffect(() => {
+    if (props.habitatInterior && !previousHabitatInterior.current) {
+      if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
+      setCabinetOpen(false);
+      setAirlockStatus("PRESSURIZING");
+      airlockTimer.current = window.setTimeout(() => {
+        setAirlockStatus("PRESSURIZED");
+        airlockTimer.current = null;
+      }, 1800);
+    }
+    previousHabitatInterior.current = props.habitatInterior;
+  }, [props.habitatInterior]);
+  const exitHabitat = () => {
+    if (airlockCycling) return;
+    if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
+    setCabinetOpen(false);
+    setAirlockStatus("DEPRESSURIZING");
+    airlockTimer.current = window.setTimeout(() => {
+      props.onExitHabitat();
+      setAirlockStatus("DEPRESSURIZED");
+      airlockTimer.current = window.setTimeout(() => {
+        setAirlockStatus("IDLE");
+        airlockTimer.current = null;
+      }, 1500);
+    }, 1800);
+  };
   const mars = props.environmentLabel === "MARS";
   const earthTextures = useMemo(() => createEarthTextures(), []);
   const roverTier = props.selected.rover ?? "Foundation";
@@ -2117,6 +2575,11 @@ function Scene({ props }: { props: Props }) {
     skyDistance,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
+  const supplyStations = [
+    { trackId: "oxygen", action: "fallback-oxygen", label: "O₂ reserve", value: props.physicalReadings.oxygen, detail: "Release a finite emergency bottle reserve." },
+    { trackId: "water", action: "fallback-water", label: "Potable water", value: props.physicalReadings.water, detail: "Recover stored condensate through the manual line." },
+    { trackId: "agriculture", action: "fallback-agriculture", label: "Food stores", value: props.physicalReadings.food, detail: "Collect already-mature emergency biomass." },
+  ];
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
@@ -2126,6 +2589,15 @@ function Scene({ props }: { props: Props }) {
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
     >
+      {walkMode && props.habitatInterior ? (
+        <>
+          <color attach="background" args={["#172326"]} />
+          <ambientLight intensity={0.72} color="#dce8df" />
+          <hemisphereLight args={["#e5eee5", "#252c30", 0.72]} />
+          <HabitatInterior cabinetOpen={cabinetOpen} airlockCycling={airlockCycling} />
+        </>
+      ) : (
+        <>
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
@@ -2160,6 +2632,7 @@ function Scene({ props }: { props: Props }) {
             runtime={props.buildings[track.id] ?? { condition: 100, dust: 0, status: "ONLINE" }}
             selected={props.selectedBuildingId === track.id}
             alerted={props.activeEventTrackId === track.id}
+            eventId={props.activeEventId}
             position={POSITIONS[track.id] ?? [0, 0]}
             onClick={() => props.onSelect(track.id)}
             mars={mars}
@@ -2180,13 +2653,29 @@ function Scene({ props }: { props: Props }) {
           </Billboard>
         )}
       </group>
+        </>
+      )}
       {walkMode ? (
         <WalkControls
           tracks={props.tracks}
           resourceNodes={props.resourceNodes}
+          habitatInterior={props.habitatInterior}
+          cabinetOpen={cabinetOpen}
+          airlockCycling={airlockCycling}
           onSelect={props.onSelect}
+          onCloseInspector={props.onCloseInspector}
           onSelectResource={props.onSelectResource}
-          onLockChange={setPointerLocked}
+          onExitHabitat={exitHabitat}
+          onToggleCabinet={() => {
+            if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
+            setCabinetOpen((open) => !open);
+          }}
+          onLockChange={(locked) => {
+            setPointerLocked(locked);
+            if (locked) setPointerLockError(null);
+          }}
+          onLockError={setPointerLockError}
+          onNearbyChange={setNearbyTarget}
         />
       ) : (
         <OrbitControls
@@ -2209,6 +2698,52 @@ function Scene({ props }: { props: Props }) {
         />
       )}
     </Canvas>
+    {walkMode && (
+      <>
+        <MissionVitalsHUD metrics={props.metrics} physicalReadings={props.physicalReadings} colonyHealth={props.colonyHealth} alerted={Boolean(props.activeEventTrackId)} />
+        {nearbyTarget && (
+          <div role="status" className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 translate-y-6 border border-[#d6c17a]/55 bg-[#07151b]/90 px-3 py-1.5 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-[#f3dda0] shadow-lg backdrop-blur-sm">
+            E · {nearbyTarget.kind === "CABINET" ? (cabinetOpen ? "close" : "open") : nearbyTarget.kind === "AIRLOCK" ? "cycle airlock" : "inspect / close"} · {nearbyTarget.label}
+          </div>
+        )}
+        {props.habitatInterior && airlockStatus !== "IDLE" && (
+          <div role="status" className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 border border-[#8cb5a1]/50 bg-[#081719]/95 px-4 py-2 text-center font-mono text-[9px] font-black uppercase tracking-[0.14em] text-[#bcebd2] shadow-lg">
+            {airlockCycling ? <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[#f2ce75]" /> : null}
+            Airlock · {airlockStatus.toLowerCase()}
+            {airlockCycling && <div className="mt-1 text-[8px] font-normal tracking-normal text-[#9fb8ae]">Pressure is changing in the sealed chamber; habitat atmosphere remains contained.</div>}
+          </div>
+        )}
+        {props.habitatInterior && cabinetOpen && (
+          <section aria-label="Crew supply cabinet" className="pointer-events-auto absolute bottom-4 right-4 z-40 w-[min(94vw,360px)] border border-[#729184]/60 bg-[#081518]/[0.97] p-4 font-mono text-white shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-md">
+            <header className="mb-3 flex items-start justify-between gap-3 border-b border-[#37514b] pb-3">
+              <div>
+                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#8ed0b3]">Habitat · crew stores</p>
+                <h2 className="mt-1 text-sm font-black uppercase tracking-[0.1em]">Emergency supply cabinet</h2>
+              </div>
+              <button type="button" onClick={() => setCabinetOpen(false)} aria-label="Close supply cabinet" className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/15 bg-black/20 text-lg text-[#c5d2cd] hover:border-[#f0cf69]">×</button>
+            </header>
+            <div className="grid gap-2">
+              {supplyStations.map((station) => (
+                <button
+                  key={station.trackId}
+                  type="button"
+                  onClick={() => props.onSupplyAction(station.trackId, station.action)}
+                  className="rounded-lg border border-[#34524b] bg-[#10231f] p-2.5 text-left transition hover:border-[#c5b268] hover:bg-[#172d26]"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-black uppercase tracking-[0.08em]">{station.label}</span>
+                    <span className="text-[9px] font-bold text-[#a9e5be]">{station.value}</span>
+                  </span>
+                  <span className="mt-1 block text-[8px] leading-4 text-[#9eb2a9]">{station.detail}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-[8px] leading-4 text-[#829a90]">These are finite emergency recovery procedures, not free resource generation. Mission reserve levels, system installation, cooldowns, and active faults still apply.</p>
+            <p className="mt-2 text-[8px] font-bold uppercase tracking-[0.12em] text-[#d3c27b]">Select a procedure · E closes the cabinet</p>
+          </section>
+        )}
+      </>
+    )}
     <div className="pointer-events-auto absolute right-4 top-4 z-30 flex flex-row-reverse items-start gap-2">
       <button
         type="button"
@@ -2218,14 +2753,15 @@ function Scene({ props }: { props: Props }) {
         }}
         className="border border-[#e7c56e]/50 bg-[#10191d]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4d785] shadow-lg backdrop-blur-sm transition hover:border-[#ffe7a0] hover:bg-[#24343a]"
       >
-        {walkMode ? "Exit walk mode" : "Explore on foot"}
+        {walkMode ? "Colony map" : "Enter first person"}
       </button>
       {walkMode && (
         <div className="max-w-[min(260px,calc(100vw-180px))] border border-white/15 bg-[#07131c]/90 px-3 py-2 text-right font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
-          WASD move · mouse look · Shift run
+          WASD move · Space jump · mouse look · Shift run
           <br />
-          E interact nearby · Esc release mouse
+          F toggle mouse · E interact / close · Esc release mouse
           {!pointerLocked && <><br /><span className="text-[#f4d785]">Click the scene to look around</span></>}
+          {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
         </div>
       )}
     </div>
@@ -2235,13 +2771,13 @@ function Scene({ props }: { props: Props }) {
         <span className="absolute left-0 top-1/2 h-px w-3 -translate-y-1/2 bg-white/80" />
       </div>
     )}
-    {!mars && <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-3">
+    {!mars && !props.habitatInterior && <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-3">
       <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
         <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
         {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
         <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth remains visible · daylight and shadows follow the Sun</div>
       </div>
-      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">REAL SKY · Earth visible · drag to rotate · right-drag to pan · wheel to zoom</div>
+      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">{walkMode ? "EVA MODE · WASD move · Space jump · E interact" : "COLONY MAP · drag to rotate · right-drag to pan · wheel to zoom"}</div>
     </div>}
     </div>
   );

@@ -49,7 +49,7 @@ import {
   type PendingMission,
   type SampleStage,
 } from "./missionRuntime";
-import { Colony3DMap, POSITIONS } from "./Colony3DMap";
+import { Colony3DMap, POSITIONS, type MissionPhysicalReadings } from "./Colony3DMap";
 
 const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
 const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
@@ -1313,6 +1313,9 @@ function IsometricMap({
   tracks,
   selected,
   buildings,
+  metrics,
+  physicalReadings,
+  colonyHealth,
   onSelect,
   selectedBuildingId,
   elapsed,
@@ -1322,14 +1325,22 @@ function IsometricMap({
   activeEventTrackId,
   selectedResourceId,
   surveyedNodes,
+  habitatInterior,
   onSelectResource,
+  onCloseInspector,
+  onExitHabitat,
+  onSupplyAction,
   roverTask,
   roverTargetNodeId,
   speed,
+  activeEventId,
 }: {
   tracks: TechnologyTrack[];
   selected: Record<string, Tier>;
   buildings: Record<string, BuildingRuntime>;
+  metrics: MissionMetrics;
+  physicalReadings: MissionPhysicalReadings;
+  colonyHealth: number;
   onSelect: (trackId: string) => void;
   selectedBuildingId: string | null;
   elapsed: number;
@@ -1339,27 +1350,40 @@ function IsometricMap({
   activeEventTrackId: string | null;
   selectedResourceId: string | null;
   surveyedNodes: string[];
+  habitatInterior: boolean;
   onSelectResource: (node: ResourceNode) => void;
+  onCloseInspector: () => void;
+  onExitHabitat: () => void;
+  onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
   roverTargetNodeId: string | null;
   speed: number;
+  activeEventId: string | null;
 }) {
   return (
     <Colony3DMap
       tracks={tracks}
       selected={selected}
       buildings={buildings}
+      metrics={metrics}
+      physicalReadings={physicalReadings}
+      colonyHealth={colonyHealth}
       selectedBuildingId={selectedBuildingId}
       elapsed={elapsed}
       lunarNight={lunarNight}
       environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
       environmentTitle={environmentTitle}
+      activeEventId={activeEventId}
       activeEventTrackId={activeEventTrackId}
       selectedResourceId={selectedResourceId}
       surveyedNodes={surveyedNodes}
+      habitatInterior={habitatInterior}
       resourceNodes={RESOURCE_NODES[environmentLabel === "MARS" ? "MARS" : "MOON"]}
       onSelect={onSelect}
+      onCloseInspector={onCloseInspector}
       onSelectResource={onSelectResource}
+      onExitHabitat={onExitHabitat}
+      onSupplyAction={onSupplyAction}
       roverTask={roverTask}
       roverTargetNodeId={roverTargetNodeId}
       simulationSpeed={speed}
@@ -1456,6 +1480,7 @@ function BuildingInspector({
   runtime,
   onAction,
   onClose,
+  onEnterHabitat,
   hasMaintenance,
   actionBusy,
   operation,
@@ -1489,6 +1514,7 @@ function BuildingInspector({
   runtime: BuildingRuntime;
   onAction: (action: string) => void;
   onClose: () => void;
+  onEnterHabitat: () => void;
   hasMaintenance: boolean;
   actionBusy: boolean;
   operation: MissionOperation | null;
@@ -1831,6 +1857,11 @@ function BuildingInspector({
             </div>
             <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3c5056] bg-[#0a1317] text-xl text-[#9fb0b3] transition hover:border-[#f0c964] hover:text-white" aria-label="Close building panel">×</button>
           </div>
+          {track.id === "habitat" && (
+            <button type="button" onClick={onEnterHabitat} className="relative mt-3 w-full border border-[#78a890]/55 bg-[#15342b] px-3 py-2.5 text-left text-[9px] font-black uppercase tracking-[0.14em] text-[#c5f0d7] transition hover:border-[#d3c27b] hover:bg-[#1d4437]">
+              Enter crew habitat · first-person interior
+            </button>
+          )}
           <div className="mt-3 rounded-xl border border-[#314e4d] bg-[#0d1d21] px-3 py-2.5">
             <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#87aaa2]">Live output · current tier + retrofit</p>
             <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
@@ -2452,6 +2483,7 @@ export function MissionSimulation() {
   // Never hydrate a completed 14-day snapshot into a fresh active mission.
   const runtime = savedRuntime && savedRuntime.elapsedSeconds < TOTAL_MISSION_SECONDS ? savedRuntime : null;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  const [habitatInterior, setHabitatInterior] = useState(false);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
   const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: 1.10, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
@@ -4798,15 +4830,40 @@ export function MissionSimulation() {
           tracks={selectedTracks}
           selected={pending.selected}
           buildings={buildings}
+          metrics={metrics}
+          physicalReadings={physicalTelemetry}
+          colonyHealth={performance.colonyHealth}
           onSelect={(trackId) => {
             setSelectedResourceId(null);
-            setSelectedBuildingId(trackId);
+            setSelectedBuildingId((current) => current === trackId ? null : trackId);
           }}
           selectedBuildingId={selectedBuildingId}
+          habitatInterior={habitatInterior}
+          onCloseInspector={() => setSelectedBuildingId(null)}
+          onExitHabitat={() => setHabitatInterior(false)}
+          onSupplyAction={(trackId, action) => {
+            if (!pending.selected[trackId]) {
+              setOperationResult(`SUPPLY CABINET LOCKED · The ${trackId.toUpperCase()} system is not deployed in this mission.`);
+              return;
+            }
+            const conflictingOperation = Object.values(activeOperationsRef.current).find(
+              (operation) => operation.targetId === trackId || operation.supportSystems?.includes(trackId),
+            );
+            if (conflictingOperation) {
+              setOperationResult(`SUPPLY CABINET BUSY · ${trackId.toUpperCase()} is committed to ${conflictingOperation.label}.`);
+              return;
+            }
+            if (activeEventId || results) {
+              setOperationResult("SUPPLY CABINET LOCKED · Resolve the active mission state before starting another operation.");
+              return;
+            }
+            handleBuildingAction(trackId, action);
+          }}
           elapsed={elapsed}
           lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2)}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
+          activeEventId={activeEventId}
           activeEventTrackId={activeTargetTrackId}
           selectedResourceId={selectedResourceId}
           surveyedNodes={surveyedNodes}
@@ -5119,6 +5176,11 @@ export function MissionSimulation() {
             runtime={buildings[selectedTrack.id] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 }}
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => setSelectedBuildingId(null)}
+            onEnterHabitat={() => {
+              setSelectedBuildingId(null);
+              setSelectedResourceId(null);
+              setHabitatInterior(true);
+            }}
             hasMaintenance={pending.selected.maintenance !== undefined}
             operation={activeOperations[selectedTrack.id] ?? Object.values(activeOperations).find((job) => job.supportSystems?.includes(selectedTrack.id)) ?? null}
             activeFault={Object.values(activeFaults).find((fault) => fault.targetTrackId === selectedTrack.id) ?? null}
