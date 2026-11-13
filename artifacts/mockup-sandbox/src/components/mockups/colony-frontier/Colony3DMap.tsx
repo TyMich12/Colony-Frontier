@@ -2398,6 +2398,7 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
   const cabinetDoor = useRef<THREE.Group>(null);
   const pressureLight = useRef<THREE.Mesh>(null);
   const innerHatch = useRef<THREE.Group>(null);
+  const ventFan = useRef<THREE.Group>(null);
   const airflowParticles = useRef<Array<THREE.Mesh | null>>([]);
   const airlockCycling = ["SEALING", "PRESSURIZING", "HELMET_REMOVAL", "HELMET_SEAL", "DEPRESSURIZING", "SUIT_CHECK", "OPENING_HATCH"].includes(airlockStatus);
   const airflowActive = airlockStatus === "PRESSURIZING" || airlockStatus === "DEPRESSURIZING";
@@ -2419,6 +2420,7 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
       const open = airlockStatus === "PRESSURIZED" || airlockStatus === "OPENING_HATCH";
       innerHatch.current.position.x = THREE.MathUtils.damp(innerHatch.current.position.x, open ? 1.08 : 0, 7, delta);
     }
+    if (ventFan.current) ventFan.current.rotation.z += delta * (airflowActive ? 5.2 : 1.15);
     airflowParticles.current.forEach((particle, index) => {
       if (!particle) return;
       particle.visible = airflowActive;
@@ -2443,6 +2445,24 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
         <boxGeometry args={[8.4, 0.24, 8.4]} />
         <meshStandardMaterial color="#7b8583" metalness={0.48} roughness={0.62} side={THREE.DoubleSide} />
       </mesh>
+      {/* Replaceable floor panels, recessed guide lighting and ceiling service rails. */}
+      {[-3.1, -1.55, 0, 1.55, 3.1].map((x) => (
+        <group key={x}>
+          <mesh position={[x, 0.012, 0]}><boxGeometry args={[0.018, 0.018, 7.65]} /><meshStandardMaterial color="#26383c" metalness={0.78} roughness={0.32} /></mesh>
+          <mesh position={[x + (x === 0 ? 0.18 : 0), 3.105, 0]}><boxGeometry args={[0.035, 0.025, 7.75]} /><meshStandardMaterial color="#8eaaa3" metalness={0.72} roughness={0.28} emissive="#315d57" emissiveIntensity={0.18} /></mesh>
+        </group>
+      ))}
+      {[-2.75, 2.75].map((x) => (
+        <group key={x}>
+          <mesh position={[x, 3.08, 0]}><boxGeometry args={[0.62, 0.055, 7.8]} /><meshStandardMaterial color="#d5ddd2" metalness={0.38} roughness={0.42} emissive="#b7d5c7" emissiveIntensity={0.3} /></mesh>
+          <pointLight position={[x, 2.82, 0]} color="#c8e7df" intensity={0.72} distance={9} decay={2} />
+        </group>
+      ))}
+      {Array.from({ length: 9 }, (_, index) => (
+        <mesh key={index} position={[-3.45 + (index % 3) * 3.45, 3.02, -2.8 + Math.floor(index / 3) * 2.8]}>
+          <boxGeometry args={[0.82, 0.055, 0.58]} /><meshStandardMaterial color="#45575b" metalness={0.78} roughness={0.34} />
+        </mesh>
+      ))}
       <mesh position={[-4.18, 1.55, 0]}>
         <boxGeometry args={[0.24, 3.1, 8.4]} />
         <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
@@ -2669,11 +2689,17 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
         </mesh>
       </group>
       <group position={[0, 2.98, 0]}>
-        <mesh>
-          <boxGeometry args={[1.55, 0.08, 0.74]} />
-          <meshStandardMaterial color="#dce3da" emissive="#e7f2db" emissiveIntensity={0.55} roughness={0.42} />
-        </mesh>
+        <mesh><boxGeometry args={[1.55, 0.08, 0.74]} /><meshStandardMaterial color="#dce3da" emissive="#e7f2db" emissiveIntensity={0.55} roughness={0.42} /></mesh>
         <pointLight position={[0, -0.18, 0]} color="#d9e8d2" intensity={1.35} distance={8} decay={2} />
+      </group>
+      <group position={[3.91, 2.12, 1.45]} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh position={[0, 0, -0.08]}><cylinderGeometry args={[0.53, 0.53, 0.16, 32]} /><meshStandardMaterial color="#34464b" metalness={0.86} roughness={0.28} /></mesh>
+        <mesh position={[0, 0, 0.015]}><torusGeometry args={[0.49, 0.055, 12, 40]} /><meshStandardMaterial color="#9baaa3" metalness={0.84} roughness={0.22} /></mesh>
+        <group ref={ventFan}>
+          {[0, 1, 2, 3].map((blade) => <mesh key={blade} rotation={[0, 0, blade * Math.PI / 2]} position={[0.18, 0.1, 0.07]}><boxGeometry args={[0.48, 0.13, 0.045]} /><meshStandardMaterial color="#71858a" metalness={0.82} roughness={0.26} /></mesh>)}
+          <mesh position={[0, 0, 0.12]}><sphereGeometry args={[0.12, 20, 16]} /><meshStandardMaterial color="#d0d8cc" metalness={0.86} roughness={0.2} /></mesh>
+        </group>
+        <pointLight position={[0, 0, 0.32]} color="#83d8c7" intensity={0.28} distance={2.4} />
       </group>
       <group position={[0, 2.28, 3.78]}>
         <mesh>
@@ -2694,12 +2720,171 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
       <Text position={[-2.95, 1.08, -1.43]} fontSize={0.12} color="#dce7dc" anchorX="center" anchorY="middle">
         CREW BERTH
       </Text>
+      <HabitatExpansion />
       {Array.from({ length: 18 }, (_, index) => (
         <mesh key={index} ref={(mesh) => { airflowParticles.current[index] = mesh; }} visible={false}>
           <sphereGeometry args={[0.035, 8, 6]} />
           <meshBasicMaterial color="#c4f4ff" transparent opacity={0.72} toneMapped={false} />
         </mesh>
       ))}
+    </group>
+  );
+}
+
+/** Additional pressurised crew modules connected to the existing habitat airlock. */
+function HabitatExpansion() {
+  const rooms = [
+    { x: -5.55, z: 7, title: "CREW QUARTERS · 4 BERTHS", accent: "#79d9d0" },
+    { x: 5.55, z: 7, title: "MEDICAL BAY · FIRST AID", accent: "#8bd6b0" },
+    { x: -5.55, z: 13, title: "HYDROPONICS · FOOD GROWTH", accent: "#83d98b" },
+    { x: 5.55, z: 13, title: "EXERCISE & SCIENCE LAB", accent: "#8bc8ed" },
+  ];
+  const wall = "#87918e";
+  return (
+    <group>
+      <mesh position={[0, -0.16, 11]} receiveShadow>
+        <boxGeometry args={[3.8, 0.32, 14.2]} />
+        <meshStandardMaterial color="#59656a" metalness={0.55} roughness={0.72} />
+      </mesh>
+      <mesh position={[0, 3.28, 11]}>
+        <boxGeometry args={[3.8, 0.2, 14.2]} />
+        <meshStandardMaterial color="#7b8583" metalness={0.48} roughness={0.62} side={THREE.DoubleSide} />
+      </mesh>
+      {[-1.9, 1.9].map((x) => [4.1, 9.5, 10.5, 15.8].map((z, i) => (
+        <mesh key={x + ":" + z} position={[x, 1.55, z + (i === 0 || i === 3 ? 0.9 : 0)]}>
+          <boxGeometry args={[0.2, 3.1, i === 0 || i === 3 ? 1.8 : 1.0]} />
+          <meshStandardMaterial color={wall} metalness={0.42} roughness={0.62} />
+        </mesh>
+      )))}
+      <mesh position={[0, 1.55, 18.1]}>
+        <boxGeometry args={[3.8, 3.1, 0.22]} />
+        <meshStandardMaterial color={wall} metalness={0.42} roughness={0.62} />
+      </mesh>
+      {rooms.map((room, index) => {
+        const side = room.x < 0 ? -1 : 1;
+        return (
+          <group key={room.title}>
+            <mesh position={[room.x, -0.16, room.z]} receiveShadow>
+              <boxGeometry args={[7.3, 0.32, 4.8]} />
+              <meshStandardMaterial color="#59656a" metalness={0.5} roughness={0.75} />
+            </mesh>
+            <mesh position={[room.x, 3.28, room.z]}>
+              <boxGeometry args={[7.3, 0.2, 4.8]} />
+              <meshStandardMaterial color="#7b8583" metalness={0.48} roughness={0.62} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh position={[side * 9.2, 1.55, room.z]}>
+              <boxGeometry args={[0.22, 3.1, 4.8]} />
+              <meshStandardMaterial color={wall} metalness={0.42} roughness={0.62} />
+            </mesh>
+            {[-2.3, 2.3].map((dz) => (
+              <mesh key={dz} position={[room.x, 1.55, room.z + dz]}>
+                <boxGeometry args={[7.3, 3.1, 0.22]} />
+                <meshStandardMaterial color={wall} metalness={0.42} roughness={0.62} />
+              </mesh>
+            ))}
+            <mesh position={[room.x, 2.94, room.z]}>
+              <boxGeometry args={[2.0, 0.12, 0.55]} />
+              <meshStandardMaterial color={room.accent} emissive={room.accent} emissiveIntensity={0.55} />
+            </mesh>
+            <pointLight position={[room.x, 2.55, room.z]} color={room.accent} intensity={0.75} distance={8} />
+            <Text position={[room.x, 2.65, room.z - 1.92]} fontSize={0.16} color={room.accent} anchorX="center" anchorY="middle">{room.title}</Text>
+            {index === 0 && (
+              <group position={[room.x, 0, room.z]}>
+                {[-1.35, 1.35].map((x) => [-0.95, 0.95].map((z) => (
+                  <group key={x + ":" + z} position={[x, 0, z]}>
+                    <RoundedBox args={[1.55, 0.2, 1.85]} radius={0.08} position={[0, 0.48, 0]}>
+                      <meshStandardMaterial color="#53636a" metalness={0.5} roughness={0.48} />
+                    </RoundedBox>
+                    <RoundedBox args={[1.42, 0.22, 1.7]} radius={0.1} position={[0, 0.69, 0]}>
+                      <meshStandardMaterial color="#d0d8ce" roughness={0.9} />
+                    </RoundedBox>
+                    <mesh position={[0, 1.35, -0.72]}>
+                      <boxGeometry args={[1.5, 1.25, 0.1]} />
+                      <meshStandardMaterial color="#45565c" metalness={0.45} roughness={0.55} />
+                    </mesh>
+                  </group>
+                )))}
+                <Text position={[0, 2.12, 1.95]} fontSize={0.12} color="#c6d9cd" anchorX="center">PERSONAL LOCKERS</Text>
+              </group>
+            )}
+            {index === 1 && (
+              <group position={[room.x, 0, room.z]}>
+                {[-1.25, 1.25].map((x) => (
+                  <group key={x} position={[x, 0, 0.45]}>
+                    <RoundedBox args={[1.6, 0.42, 2.0]} radius={0.12} position={[0, 0.42, 0]}>
+                      <meshStandardMaterial color="#e0e5df" roughness={0.8} />
+                    </RoundedBox>
+                    <mesh position={[0, 1.25, -0.72]}>
+                      <boxGeometry args={[1.65, 1.15, 0.12]} />
+                      <meshStandardMaterial color="#344a52" metalness={0.45} roughness={0.35} />
+                    </mesh>
+                    <mesh position={[0, 1.25, -0.64]}>
+                      <boxGeometry args={[1.35, 0.82, 0.025]} />
+                      <meshBasicMaterial color="#174c56" />
+                    </mesh>
+                  </group>
+                ))}
+                <Text position={[0, 1.95, -1.85]} fontSize={0.12} color="#d6e2d9" anchorX="center">DIAGNOSTICS · TELEMEDICINE</Text>
+              </group>
+            )}
+            {index === 2 && (
+              <group position={[room.x, 0, room.z]}>
+                {[-2.1, 0, 2.1].map((x) => (
+                  <group key={x} position={[x, 0, 0.25]}>
+                    <mesh position={[0, 0.72, 0]}>
+                      <boxGeometry args={[1.45, 0.42, 2.7]} />
+                      <meshStandardMaterial color="#536b59" metalness={0.28} roughness={0.7} />
+                    </mesh>
+                    {[-0.8, 0, 0.8].map((z) => (
+                      <mesh key={z} position={[0, 1.0, z]}>
+                        <sphereGeometry args={[0.28, 12, 8]} />
+                        <meshStandardMaterial color="#55a86c" roughness={0.9} />
+                      </mesh>
+                    ))}
+                    <mesh position={[0, 1.22, -1.18]}>
+                      <boxGeometry args={[1.5, 0.08, 0.08]} />
+                      <meshStandardMaterial color="#a5d98d" emissive="#4c9b54" emissiveIntensity={0.4} />
+                    </mesh>
+                  </group>
+                ))}
+                <Text position={[0, 2.05, -1.85]} fontSize={0.12} color="#c6e6c4" anchorX="center">NUTRIENT & WATER RECYCLING</Text>
+              </group>
+            )}
+            {index === 3 && (
+              <group position={[room.x, 0, room.z]}>
+                <group position={[-1.55, 0, 0.2]}>
+                  <mesh position={[0, 0.8, 0]}>
+                    <boxGeometry args={[1.0, 1.5, 2.1]} />
+                    <meshStandardMaterial color="#45545b" metalness={0.6} roughness={0.38} />
+                  </mesh>
+                  <mesh position={[0, 1.62, 0]}>
+                    <boxGeometry args={[1.1, 0.08, 2.2]} />
+                    <meshStandardMaterial color="#79c9d4" emissive="#2e8797" emissiveIntensity={0.45} />
+                  </mesh>
+                </group>
+                <group position={[1.45, 0, -0.35]}>
+                  <mesh position={[0, 0.82, 0]}>
+                    <boxGeometry args={[2.2, 0.12, 0.9]} />
+                    <meshStandardMaterial color="#87918e" metalness={0.6} roughness={0.35} />
+                  </mesh>
+                  <mesh position={[0, 1.48, -0.34]}>
+                    <boxGeometry args={[1.7, 1.15, 0.08]} />
+                    <meshStandardMaterial color="#233b46" metalness={0.55} roughness={0.3} />
+                  </mesh>
+                  <mesh position={[0, 1.48, -0.28]}>
+                    <boxGeometry args={[1.48, 0.92, 0.025]} />
+                    <meshBasicMaterial color="#123f50" />
+                  </mesh>
+                </group>
+                <Text position={[0, 2.05, -1.85]} fontSize={0.12} color="#c6d9ed" anchorX="center">WORKSTATION · RESEARCH</Text>
+              </group>
+            )}
+          </group>
+        );
+      })}
+      <Text position={[0, 2.7, 11]} fontSize={0.16} color="#d5e7df" anchorX="center" anchorY="middle">
+        HABITAT MODULES · CREW ACCESS
+      </Text>
     </group>
   );
 }
@@ -2982,7 +3167,7 @@ function WalkControls({
     player.rotation.set(pitch.current, yaw.current, 0);
 
     const floorY = habitatInterior ? 1.56 : terrainHeight(player.position.x, player.position.z) + 1.72;
-    if (!habitatInterior && !airlockCycling && jumpRequested.current && player.position.y <= floorY + 0.03) jumpVelocity.current = 2.8;
+    if (!airlockCycling && jumpRequested.current && player.position.y <= floorY + 0.03) jumpVelocity.current = habitatInterior ? 1.9 : 2.8;
     jumpRequested.current = false;
     if (!airlockCycling && !crewSleeping) {
       jumpVelocity.current -= 1.62 * Math.min(delta, 0.05);
@@ -3012,8 +3197,16 @@ function WalkControls({
       const nextZ = player.position.z + direction.z * distance;
       const collides = (x: number, z: number) => {
         if (habitatInterior) {
-          return Math.abs(x) > 3.88
-            || Math.abs(z) > 3.88
+          const outsideStation = Math.abs(x) > 9.05 || z < -3.88 || z > 17.85;
+          const corridorWall = Math.abs(x) > 1.45 && Math.abs(x) < 2.15 && (
+            (z > 4.1 && z < 5.9) || (z > 9.0 && z < 11.0) || (z > 15.8 && z < 17.6)
+          );
+          const roomDivider = Math.abs(x) > 2.0 && z > 9.35 && z < 10.65;
+          const roomEndWalls = Math.abs(x) > 2.0 && (
+            (z > 4.35 && z < 4.72) || (z > 9.25 && z < 9.62)
+            || (z > 10.38 && z < 10.75) || (z > 15.25 && z < 15.62)
+          );
+          return outsideStation || corridorWall || roomDivider || roomEndWalls
             || (Math.abs(x - 2.12) < 0.78 && Math.abs(z + 0.65) < 0.56)
             || (x > -3.8 && x < -2.05 && z > -2.92 && z < 0.08)
             || (x > -2.16 && x < -1.6 && z > -2.72 && z < -0.18)
@@ -3202,9 +3395,15 @@ function Scene({ props }: { props: Props }) {
     <Canvas
       orthographic
       shadows
-      dpr={[1, 1.35]}
+      dpr={[1, 2]}
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
-      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
+      onCreated={({ gl }) => {
+        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        gl.outputColorSpace = THREE.SRGBColorSpace;
+        gl.shadowMap.enabled = true;
+        gl.shadowMap.type = THREE.PCFSoftShadowMap;
+      }}
     >
       {firstPersonMode && props.habitatInterior ? (
         <>
@@ -3218,7 +3417,7 @@ function Scene({ props }: { props: Props }) {
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
-      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[4096, 4096]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
         <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.24} depthWrite={false} toneMapped={false} /></mesh>
@@ -3504,7 +3703,7 @@ function Scene({ props }: { props: Props }) {
         )}
         <div className="rounded-lg border border-white/15 bg-[#07131c]/70 px-3 py-2 font-mono text-[8px] text-[#b6c9d4] shadow-lg backdrop-blur-sm">
           <div className="mb-1 font-black tracking-[0.16em] text-[#9bd9cf]">COLONY LINK</div>
-          {firstPersonMode ? "EVA MODE · WASD move · Space jump · E interact" : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
+          {firstPersonMode ? "EVA MODE · Arrow keys / WASD move · mouse look · Space jump · E interact" : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
         </div>
       </div>
     )}
