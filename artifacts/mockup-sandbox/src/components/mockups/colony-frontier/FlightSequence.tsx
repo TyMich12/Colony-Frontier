@@ -914,7 +914,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
     {surface && <><mesh position={[12, 17, -55]} scale={1.1}><sphereGeometry args={[1, 40, 30]} /><meshBasicMaterial color="#fff0cc" toneMapped={false} /></mesh><mesh position={[0, 0.4, -70]}><sphereGeometry args={[8, 48, 36]} /><meshStandardMaterial color="#23639a" roughness={0.8} emissive="#102b48" emissiveIntensity={0.45} /></mesh><mesh position={[0, 0.4, -70]} scale={1.08}><sphereGeometry args={[8, 32, 24]} /><meshBasicMaterial color="#65baff" transparent opacity={0.12} side={THREE.BackSide} depthWrite={false} /></mesh><MoonSurface stage={stage} /></>}
     <ambientLight intensity={atmospheric ? 0.72 : surface ? 0.42 : 0.25} />
     <hemisphereLight args={atmospheric ? ["#d7edff", "#817b67", 1.1] : ["#c7dcff", "#31353c", 0.46]} />
-    <directionalLight position={[-34, 25, -90]} intensity={atmospheric ? 2.15 : surface ? 2.3 : 1.2} color={atmospheric ? "#fff3d8" : "#e8efff"} castShadow shadow-mapSize={[4096, 4096]} shadow-camera-near={1} shadow-camera-far={260} shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} shadow-bias={-0.00012} />
+    <directionalLight position={[-34, 25, -90]} intensity={atmospheric ? 2.15 : surface ? 2.3 : 1.2} color={atmospheric ? "#fff3d8" : "#e8efff"} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={260} shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} shadow-bias={-0.00012} />
     <pointLight position={[0, 3, 1]} intensity={stage === "landing" ? 1.5 : 0.45} color="#f3c187" distance={12} />
     <ContactShadows position={[0, -0.14, -2]} opacity={surface ? 0.42 : 0.23} scale={26} blur={2.6} far={7} resolution={512} color="#07090d" />
   </>;
@@ -1074,7 +1074,7 @@ export function FlightSequence() {
   const progress = stage === "approach" ? approachProgress : stage === "ascent" ? clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) : stage === "orbit" ? clamp(telemetry.orbitSeconds / 2, 0, 1) : stage === "transfer" ? clamp(telemetry.transferSeconds / 1, 0, 1) : stage === "landing" ? clamp(1 - telemetry.altitude / 2.4, 0, 1) : stage === "outside" ? surfaceProgress : stage === "landed" ? 1 : 0;
 
   return <main ref={overlayRoot} className="fixed inset-0 z-0 h-dvh w-screen touch-none overflow-hidden overscroll-none bg-[#080e12] text-[#e9eee8]" style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
-    <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false, stencil: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.12; gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap; }}>
+    <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 1]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false, stencil: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.12; gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap; }}>
       <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} playFootstep={playFootstep} /></Suspense>
     </Canvas>
     <div className={`pointer-events-none fixed inset-0 z-10 bg-black transition-opacity duration-700 ${stage === "boarding" ? "opacity-20" : stage === "entering" ? "opacity-100" : "opacity-0"}`} />
@@ -1099,7 +1099,7 @@ export function FlightSequence() {
           <button type="button" onClick={() => { setSpaceFocus("solar"); setSpaceExplorerOpen(true); }} className="block w-full text-left">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2"><span className="text-[8px] uppercase tracking-[0.18em] text-[#c5d4cb]">Live space tracker</span><span className="font-mono text-[9px] text-[#edcb87]">{stage === "ascent" ? `${Math.round(telemetry.altitude * 1000)} m AGL` : `${Math.round(telemetry.altitude * 1000)} m TO SURFACE`}</span></div>
             <div className="aspect-[16/10]">
-              <Canvas dpr={[1, 1.5]} camera={{ position: [0, 18, 62], fov: 42, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}>
+              <Canvas dpr={[1, 1]} camera={{ position: [0, 18, 62], fov: 42, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}>
                 <SolarSystemScene focus="solar" progress={stage === "ascent" ? 0.08 + clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) * 0.18 : stage === "orbit" ? 0.28 : stage === "transfer" ? 0.3 + clamp(telemetry.transferSeconds, 0, 1) * 0.62 : stage === "landing" ? 0.94 : 0.08} />
               </Canvas>
             </div>
@@ -1108,7 +1108,7 @@ export function FlightSequence() {
         </div>}
         {spaceExplorerOpen && <div className="fixed inset-0 z-[80] bg-[#02050b] text-white">
           <div className="absolute inset-0">
-            <Canvas dpr={[1,2]} camera={{ position: [0,18,62], fov: 48, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
+            <Canvas dpr={[1,1]} camera={{ position: [0,18,62], fov: 48, near: 0.1, far: 500 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
               <SolarSystemScene focus={spaceFocus} progress={stage === "ascent" ? 0.08 + clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) * 0.18 : stage === "orbit" ? 0.28 : stage === "transfer" ? 0.3 + clamp(telemetry.transferSeconds, 0, 1) * 0.62 : stage === "landing" ? 0.94 : 0.08} />
             </Canvas>
           </div>

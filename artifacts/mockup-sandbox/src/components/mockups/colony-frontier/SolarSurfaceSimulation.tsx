@@ -29,7 +29,7 @@ function SunLight({ elevation }: { elevation: number }) {
       intensity={3.2}
       color="#fff6ec"
       castShadow
-      shadow-mapSize={[2048, 2048]}
+      shadow-mapSize={[1024, 1024]}
       shadow-bias={-0.0004}
       shadow-camera-near={1}
       shadow-camera-far={140}
@@ -122,7 +122,7 @@ function SolarScene({
   return (
     <Canvas
       shadows
-      dpr={[1, 1.25]}
+      dpr={[1, 1]}
       camera={{ position: [24, 14, 24], fov: 42, near: 0.1, far: 400 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
     >
