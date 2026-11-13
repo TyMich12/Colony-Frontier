@@ -4,6 +4,7 @@ import { ContactShadows, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { ArrowDown, ArrowUp, Check, Compass, Crosshair, Gauge, Glasses, Radio, Rocket, ShieldCheck, Timer, TriangleAlert } from "lucide-react";
 import { loadPendingMission } from "./missionRuntime";
+import { useSoundSystem } from "./_shared/SoundSystem";
 
 type Stage = "approach" | "boarding" | "startup" | "ascent" | "orbit" | "transfer" | "landing" | "crashed" | "landed" | "outside" | "entering";
 type FlightState = {
@@ -641,9 +642,10 @@ function ExternalViewScene({ stage, telemetry }: { stage: Stage; telemetry: Flig
   </>;
 }
 
-function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
+function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFootstep }: {
   flight: MutableRefObject<FlightState>; keys: MutableRefObject<Set<string>>;
   stage: Stage; onStageChange: (stage: Stage) => void; onTelemetry: (state: FlightState) => void;
+  playFootstep: (surface: "pad" | "lunar") => void;
 }) {
   const { camera, gl } = useThree();
   const cameraPosition = useRef(new THREE.Vector3(0, 1.72, PAD_APPROACH_DISTANCE - 2.5));
@@ -651,6 +653,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
   const lookPitch = useRef(0);
   const jumpHeight = useRef(0);
   const jumpVelocity = useRef(0);
+  const footstepTimer = useRef(0);
   useEffect(() => {
     const canvas = gl.domElement;
     const requestLook = () => {
@@ -699,6 +702,18 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
     }
     const walkInput = Number(k.has("w")) - Number(k.has("s")) + axes.walk;
     const strafeInput = Number(k.has("d")) - Number(k.has("a"));
+    const walking = (s.stage === "approach" || s.stage === "outside")
+      && (Math.abs(walkInput) > 0.1 || Math.abs(strafeInput) > 0.1)
+      && (s.stage !== "outside" || jumpHeight.current < 0.1);
+    if (walking) {
+      footstepTimer.current += dt * Math.min(1, Math.hypot(walkInput, strafeInput));
+      if (footstepTimer.current >= 0.38) {
+        footstepTimer.current %= 0.38;
+        playFootstep(s.stage === "outside" ? "lunar" : "pad");
+      }
+    } else {
+      footstepTimer.current = 0;
+    }
     const throttleInput = Number(k.has("w")) - Number(k.has("s")) + axes.throttle;
     const headingInput = Number(k.has("d")) - Number(k.has("a")) + axes.heading;
     const pitchInput = Number(k.has("e")) - Number(k.has("q")) + axes.pitch;
@@ -835,6 +850,7 @@ function Stat({ label, value, unit, accent = false }: { label: string; value: st
 }
 
 export function FlightSequence() {
+  const { playFootstep, setEngineSound } = useSoundSystem();
   const pending = loadPendingMission();
   const flight = useRef(makeFlight());
   const keys = useRef(new Set<string>());
@@ -853,6 +869,15 @@ export function FlightSequence() {
     setStage(next);
   }, []);
   const updateTelemetry = useCallback((state: FlightState) => setTelemetry({ ...state }), []);
+  const engineThrottle = stage === "startup"
+    ? 0.12
+    : ["ascent", "transfer", "landing"].includes(stage)
+      ? telemetry.throttle / 100
+      : 0;
+  useEffect(() => {
+    setEngineSound(engineThrottle);
+  }, [engineThrottle, setEngineSound]);
+  useEffect(() => () => setEngineSound(0), [setEngineSound]);
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
@@ -974,7 +999,7 @@ export function FlightSequence() {
 
   return <main ref={overlayRoot} className="fixed inset-0 z-0 h-dvh w-screen touch-none overflow-hidden overscroll-none bg-[#080e12] text-[#e9eee8]" style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
     <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.18; }}>
-      <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} /></Suspense>
+      <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} playFootstep={playFootstep} /></Suspense>
     </Canvas>
     <div className={`pointer-events-none fixed inset-0 z-10 bg-black transition-opacity duration-700 ${stage === "boarding" || stage === "entering" ? "opacity-100" : "opacity-0"}`} />
     {stage === "boarding" && <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center"><p className="animate-pulse text-xs uppercase tracking-[0.4em] text-white/70">Crew hatch cycling</p></div>}

@@ -26,6 +26,7 @@ import {
   ProgressBar,
   SectionLabel,
 } from "./_shared/GameShell";
+import { SoundSettings } from "./_shared/SoundSystem";
 
 const routes = {
   moon: "/preview/CampaignMapRefresh",
@@ -373,7 +374,7 @@ export function MainMenu() {
           aria-modal="true"
           aria-labelledby="settings-title"
         >
-          <div className="w-full max-w-lg border border-[#52655b] bg-[#08171f] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto border border-[#52655b] bg-[#08171f] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-9">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 text-[#efb658]">
                 <SlidersHorizontal className="h-5 w-5" />
@@ -403,6 +404,10 @@ export function MainMenu() {
             <p className="mt-4 text-sm leading-7 text-[#a8bbb1]">
               Manage your local campaign data and program preferences.
             </p>
+
+            <div className="mt-7">
+              <SoundSettings />
+            </div>
 
             <div className="mt-7 border border-[#3e5550] bg-[#101f23] p-5">
               <div className="flex items-center justify-between gap-4">

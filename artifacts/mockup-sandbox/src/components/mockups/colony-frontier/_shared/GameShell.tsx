@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ChevronRight,
@@ -6,9 +6,11 @@ import {
   Cpu,
   Home,
   Map,
+  Volume2,
   Settings,
 } from "lucide-react";
 import { loadGameState } from "../gameState";
+import { SoundSettings } from "./SoundSystem";
 
 type ScreenKey = "menu" | "campaign" | "lab" | "loadout";
 
@@ -42,6 +44,7 @@ export function GameShell({
   children: ReactNode;
 }) {
   const gameState = loadGameState();
+  const [showSoundSettings, setShowSoundSettings] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#071018] text-[#edf4ec] [font-family:Arial,sans-serif]">
@@ -75,13 +78,23 @@ export function GameShell({
               </span>
             </div>
 
-            <a
-              href={routes.menu}
-              className="grid h-9 w-9 place-items-center border border-[#284047] text-[#88a3a2] transition hover:border-[#b3c98f] hover:text-[#d7e8bd]"
-              aria-label="Return to command"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </a>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSoundSettings(true)}
+                className="grid h-9 w-9 place-items-center border border-[#284047] text-[#88a3a2] transition hover:border-[#b3c98f] hover:text-[#d7e8bd]"
+                aria-label="Open audio settings"
+              >
+                <Volume2 className="h-4 w-4" />
+              </button>
+              <a
+                href={routes.menu}
+                className="grid h-9 w-9 place-items-center border border-[#284047] text-[#88a3a2] transition hover:border-[#b3c98f] hover:text-[#d7e8bd]"
+                aria-label="Return to command"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </a>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 border-t border-[#1d343b] bg-[#08151c]/90">
@@ -169,6 +182,35 @@ export function GameShell({
             ))}
           </div>
         </nav>
+
+        {showSoundSettings && (
+          <div
+            className="fixed inset-0 z-50 grid place-items-center bg-[#050d12]/85 p-5 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="audio-settings-title"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setShowSoundSettings(false);
+            }}
+          >
+            <div className="w-full max-w-lg border border-[#52655b] bg-[#08171f] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 id="audio-settings-title" className="text-sm font-bold uppercase tracking-[0.18em] text-[#efb658]">
+                  Sound settings
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowSoundSettings(false)}
+                  aria-label="Close sound settings"
+                  className="text-[#78938f] transition hover:text-[#f0f1dc]"
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              </div>
+              <SoundSettings />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
