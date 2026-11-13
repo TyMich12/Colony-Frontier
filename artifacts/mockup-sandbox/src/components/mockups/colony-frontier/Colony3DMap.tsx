@@ -3002,7 +3002,7 @@ function WalkControls({
     player.rotation.set(pitch.current, yaw.current, 0);
 
     const floorY = habitatInterior ? 1.56 : terrainHeight(player.position.x, player.position.z) + 1.72;
-    if (!habitatInterior && !airlockCycling && jumpRequested.current && player.position.y <= floorY + 0.03) jumpVelocity.current = 2.8;
+    if (!airlockCycling && jumpRequested.current && player.position.y <= floorY + 0.03) jumpVelocity.current = habitatInterior ? 1.9 : 2.8;
     jumpRequested.current = false;
     if (!airlockCycling && !crewSleeping) {
       jumpVelocity.current -= 1.62 * Math.min(delta, 0.05);
@@ -3033,12 +3033,15 @@ function WalkControls({
       const collides = (x: number, z: number) => {
         if (habitatInterior) {
           const outsideStation = Math.abs(x) > 9.05 || z < -3.88 || z > 17.85;
+          const corridorWall = Math.abs(x) > 1.45 && Math.abs(x) < 2.15 && (
+            (z > 4.1 && z < 5.9) || (z > 9.0 && z < 11.0) || (z > 15.8 && z < 17.6)
+          );
           const roomDivider = Math.abs(x) > 2.0 && z > 9.35 && z < 10.65;
           const roomEndWalls = Math.abs(x) > 2.0 && (
             (z > 4.35 && z < 4.72) || (z > 9.25 && z < 9.62)
             || (z > 10.38 && z < 10.75) || (z > 15.25 && z < 15.62)
           );
-          return outsideStation || roomDivider || roomEndWalls
+          return outsideStation || corridorWall || roomDivider || roomEndWalls
             || (Math.abs(x - 2.12) < 0.78 && Math.abs(z + 0.65) < 0.56)
             || (x > -3.8 && x < -2.05 && z > -2.92 && z < 0.08)
             || (x > -2.16 && x < -1.6 && z > -2.72 && z < -0.18)
@@ -3226,7 +3229,7 @@ function Scene({ props }: { props: Props }) {
     <Canvas
       orthographic
       shadows
-      dpr={[1, 1.35]}
+      dpr={[1, 2]}
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
     >
