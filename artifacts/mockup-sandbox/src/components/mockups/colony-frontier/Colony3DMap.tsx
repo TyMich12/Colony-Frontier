@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Billboard, Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Billboard, Html, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime } from "./missionRuntime";
@@ -1955,7 +1955,136 @@ function MissionGuide({ mars }: { mars: boolean }) {
   );
 }
 
+function WalkControls({
+  tracks,
+  resourceNodes,
+  onSelect,
+  onSelectResource,
+  onLockChange,
+}: {
+  tracks: TechnologyTrack[];
+  resourceNodes: MissionResourceNode[];
+  onSelect: (trackId: string) => void;
+  onSelectResource: (node: MissionResourceNode) => void;
+  onLockChange: (locked: boolean) => void;
+}) {
+  const { gl } = useThree();
+  const keys = useRef(new Set<string>());
+  const yaw = useRef(0);
+  const pitch = useRef(0);
+  const playerPosition = useRef(new THREE.Vector3(0, 1.72, 12));
+  const latest = useRef({ tracks, resourceNodes, onSelect, onSelectResource, onLockChange });
+  latest.current = { tracks, resourceNodes, onSelect, onSelectResource, onLockChange };
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handleClick = () => {
+      if (document.pointerLockElement !== canvas) void canvas.requestPointerLock();
+    };
+    const handlePointerLockChange = () => {
+      const locked = document.pointerLockElement === canvas;
+      keys.current.clear();
+      latest.current.onLockChange(locked);
+    };
+    const handleMouseMove = (event: MouseEvent) => {
+      if (document.pointerLockElement !== canvas) return;
+      yaw.current -= event.movementX * 0.0022;
+      pitch.current = THREE.MathUtils.clamp(pitch.current - event.movementY * 0.0022, -1.25, 1.25);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(key)) {
+        event.preventDefault();
+        keys.current.add(key);
+      }
+      if (key === "e" && !event.repeat) {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.closest("button, input, textarea, select")) return;
+        const player = playerPosition.current;
+        let closest: { distance: number; trackId?: string; node?: MissionResourceNode } | null = null;
+        for (const track of latest.current.tracks) {
+          const position = POSITIONS[track.id];
+          if (!position) continue;
+          const distance = Math.hypot(player.x - position[0], player.z - position[1]);
+          if (distance < 7.5 && (!closest || distance < closest.distance)) {
+            closest = { distance, trackId: track.id };
+          }
+        }
+        for (const node of latest.current.resourceNodes) {
+          const [x, z] = nodeWorldPosition(node);
+          const distance = Math.hypot(player.x - x, player.z - z);
+          if (distance < 7.5 && (!closest || distance < closest.distance)) {
+            closest = { distance, node };
+          }
+        }
+        if (closest?.trackId) latest.current.onSelect(closest.trackId);
+        else if (closest?.node) latest.current.onSelectResource(closest.node);
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => keys.current.delete(event.key.toLowerCase());
+    const handlePointerLockCleanup = () => {
+      if (document.pointerLockElement === canvas) document.exitPointerLock();
+      latest.current.onLockChange(false);
+    };
+
+    canvas.addEventListener("click", handleClick);
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
+    document.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      canvas.removeEventListener("click", handleClick);
+      document.removeEventListener("pointerlockchange", handlePointerLockChange);
+      document.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      handlePointerLockCleanup();
+    };
+  }, [gl]);
+
+  useFrame(({ camera }, delta) => {
+    const player = camera as THREE.PerspectiveCamera;
+    playerPosition.current.copy(player.position);
+    player.rotation.order = "YXZ";
+    player.rotation.set(pitch.current, yaw.current, 0);
+
+    const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
+    const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
+    const direction = new THREE.Vector3();
+    if (keys.current.has("w") || keys.current.has("arrowup")) direction.add(forward);
+    if (keys.current.has("s") || keys.current.has("arrowdown")) direction.sub(forward);
+    if (keys.current.has("d") || keys.current.has("arrowright")) direction.add(right);
+    if (keys.current.has("a") || keys.current.has("arrowleft")) direction.sub(right);
+    if (direction.lengthSq() === 0) return;
+
+    direction.normalize();
+    const speed = keys.current.has("shift") ? 10 : 6;
+    const distance = speed * Math.min(delta, 0.05);
+    const nextX = player.position.x + direction.x * distance;
+    const nextZ = player.position.z + direction.z * distance;
+    const collides = (x: number, z: number) => {
+      if (Math.abs(x) > 48 || Math.abs(z) > 48) return true;
+      const nearBuilding = tracks.some((track) => {
+        const position = POSITIONS[track.id];
+        if (!position) return false;
+        const radius = track.id === "habitat" ? 5.2 : track.id === "solar" ? 3.8 : track.id === "rover" ? 2.2 : 2.6;
+        return Math.hypot(x - position[0], z - position[1]) < radius;
+      });
+      return nearBuilding || ROVER_ROUTE_ROCKS.some((rock) => Math.hypot(x - rock.x, z - rock.z) < rock.radius + 0.55);
+    };
+
+    if (!collides(nextX, player.position.z)) player.position.x = nextX;
+    if (!collides(player.position.x, nextZ)) player.position.z = nextZ;
+    player.position.y = terrainHeight(player.position.x, player.position.z) + 1.72;
+    playerPosition.current.copy(player.position);
+  });
+
+  return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 12) + 1.72, 12]} fov={70} near={0.05} far={190} />;
+}
+
 function Scene({ props }: { props: Props }) {
+  const [walkMode, setWalkMode] = useState(false);
+  const [pointerLocked, setPointerLocked] = useState(false);
   const mars = props.environmentLabel === "MARS";
   const earthTextures = useMemo(() => createEarthTextures(), []);
   const roverTier = props.selected.rover ?? "Foundation";
@@ -2051,25 +2180,61 @@ function Scene({ props }: { props: Props }) {
           </Billboard>
         )}
       </group>
-      <OrbitControls
-        enableRotate
-        enablePan
-        enableZoom
-        enableDamping
-        dampingFactor={0.075}
-        screenSpacePanning
-        rotateSpeed={0.55}
-        panSpeed={1.0}
-        minPolarAngle={0.12}
-        maxPolarAngle={Math.PI / 2.02}
-        minZoom={10}
-        maxZoom={48}
-        zoomSpeed={0.85}
-        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
-        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-        target={[0, 0, 0]}
-      />
+      {walkMode ? (
+        <WalkControls
+          tracks={props.tracks}
+          resourceNodes={props.resourceNodes}
+          onSelect={props.onSelect}
+          onSelectResource={props.onSelectResource}
+          onLockChange={setPointerLocked}
+        />
+      ) : (
+        <OrbitControls
+          enableRotate
+          enablePan
+          enableZoom
+          enableDamping
+          dampingFactor={0.075}
+          screenSpacePanning
+          rotateSpeed={0.55}
+          panSpeed={1.0}
+          minPolarAngle={0.12}
+          maxPolarAngle={Math.PI / 2.02}
+          minZoom={10}
+          maxZoom={48}
+          zoomSpeed={0.85}
+          mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
+          touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+          target={[0, 0, 0]}
+        />
+      )}
     </Canvas>
+    <div className="pointer-events-auto absolute right-4 top-4 z-30 flex flex-row-reverse items-start gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setPointerLocked(false);
+          setWalkMode((active) => !active);
+        }}
+        className="border border-[#e7c56e]/50 bg-[#10191d]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4d785] shadow-lg backdrop-blur-sm transition hover:border-[#ffe7a0] hover:bg-[#24343a]"
+      >
+        {walkMode ? "Exit walk mode" : "Explore on foot"}
+      </button>
+      {walkMode && (
+        <div className="max-w-[min(260px,calc(100vw-180px))] border border-white/15 bg-[#07131c]/90 px-3 py-2 text-right font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
+          WASD move · mouse look · Shift run
+          <br />
+          E interact nearby · Esc release mouse
+          {!pointerLocked && <><br /><span className="text-[#f4d785]">Click the scene to look around</span></>}
+        </div>
+      )}
+    </div>
+    {walkMode && pointerLocked && (
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-3 w-3 -translate-x-1/2 -translate-y-1/2">
+        <span className="absolute left-1/2 top-0 h-3 w-px -translate-x-1/2 bg-white/80" />
+        <span className="absolute left-0 top-1/2 h-px w-3 -translate-y-1/2 bg-white/80" />
+      </div>
+    )}
     {!mars && <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-3">
       <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
         <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>

@@ -3,8 +3,8 @@ type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/colony-frontier/CampaignMap.tsx": () => import("../components/mockups/colony-frontier/CampaignMap.tsx"),
   "./components/mockups/colony-frontier/CampaignMapRefresh.tsx": () => import("../components/mockups/colony-frontier/CampaignMapRefresh.tsx"),
-  "./components/mockups/colony-frontier/FlightSequence.tsx": () => import("../components/mockups/colony-frontier/FlightSequence.tsx"),
   "./components/mockups/colony-frontier/Colony3DMap.tsx": () => import("../components/mockups/colony-frontier/Colony3DMap.tsx"),
+  "./components/mockups/colony-frontier/FlightSequence.tsx": () => import("../components/mockups/colony-frontier/FlightSequence.tsx"),
   "./components/mockups/colony-frontier/MainMenu.tsx": () => import("../components/mockups/colony-frontier/MainMenu.tsx"),
   "./components/mockups/colony-frontier/MissionLoadout.tsx": () => import("../components/mockups/colony-frontier/MissionLoadout.tsx"),
   "./components/mockups/colony-frontier/MissionSimulation.tsx": () => import("../components/mockups/colony-frontier/MissionSimulation.tsx"),
