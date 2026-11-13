@@ -3490,23 +3490,37 @@ function WalkControls({
 }
 
 function HelmetFlashlight({ enabled }: { enabled: boolean }) {
-  const { camera } = useThree();
+  const { camera, scene } = useThree();
+  const targetRef = useRef<THREE.Object3D | null>(null);
+  const direction = useMemo(() => new THREE.Vector3(), []);
+  const cameraPosition = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
     if (!enabled) return;
 
     const light = new THREE.SpotLight(0xffe6ad, 28, 30, Math.PI / 7, 0.55, 1.3);
     const target = new THREE.Object3D();
-    target.position.set(0, 0, -1);
     camera.add(light);
-    camera.add(target);
+    scene.add(target);
     light.target = target;
+    targetRef.current = target;
 
     return () => {
       camera.remove(light);
-      camera.remove(target);
+      scene.remove(target);
+      targetRef.current = null;
     };
-  }, [camera, enabled]);
+  }, [camera, enabled, scene]);
+
+  useFrame(() => {
+    const target = targetRef.current;
+    if (!enabled || !target) return;
+    camera.updateMatrixWorld();
+    camera.getWorldPosition(cameraPosition);
+    camera.getWorldDirection(direction);
+    target.position.copy(cameraPosition).addScaledVector(direction, 20);
+    target.updateMatrixWorld();
+  });
 
   return null;
 }
