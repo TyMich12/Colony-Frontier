@@ -4759,6 +4759,7 @@ export function MissionSimulation() {
   if (results) {
     const reportFailureReason = missionFailureReason ?? getMissionFailureReason(metrics, missionStage);
     const reportFailed = missionFailed || Boolean(reportFailureReason) || aiCloseout?.outcome === "FAILED";
+    const missionGrade = reportFailed ? "F" : score >= 95 ? "S" : score >= 85 ? "A" : score >= 72 ? "B" : score >= 58 ? "C" : "D";
     const analysedSampleIds = Object.entries(sampleStages).filter(([, stage]) => stage === "ANALYSED").map(([id]) => id);
     const researchBonusXp = pending && !pending.replay ? analysedSampleIds.reduce((sum, id) => sum + 80 + Math.round((sampleQuality[id] ?? 60) * 0.8) + tierLevel(pending.selected.science ?? "Foundation") * 20, 0) : 0;
     const unresolvedFaultPenalty = Math.min(0.45, Object.keys(activeFaults).length * 0.1);
@@ -4776,14 +4777,37 @@ export function MissionSimulation() {
     ];
 
     return (
-      <div className="min-h-screen bg-[#050b10] px-5 py-8 text-[#e9f0e5]">
-        <div className="mx-auto max-w-6xl border border-[#3c5e59] bg-[#08151b] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-          <div className="border-b border-[#304b4b] bg-[#0d252a] px-6 py-5">
-            <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${reportFailed ? "text-[#ff858b]" : "text-[#8fc9a0]"}`}>{reportFailed ? "Mission failed · safety limit exceeded" : "Mission complete"}</p>
-            <h1 className="mt-2 text-3xl font-semibold uppercase tracking-[0.13em] text-[#f1f4e8]">{pending.missionTitle}</h1>
-            <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-[#708b88]">{reportFailed ? (reportFailureReason ?? "Critical colony metric fell below its safe operating limit.") : "14 simulated days survived"} · {pending.replay ? "Replay operation" : "First deployment"}</p>
+      <div className="min-h-screen overflow-y-auto bg-[radial-gradient(ellipse_at_50%_-12%,rgba(62,142,132,.24),transparent_58%),linear-gradient(180deg,#07141a,#05090e_68%)] px-4 py-6 text-[#e9f0e5] sm:px-6 sm:py-10">
+        <div className={`mx-auto max-w-6xl overflow-hidden rounded-3xl border bg-[#08151b]/95 shadow-[0_30px_100px_rgba(0,0,0,0.65)] ${reportFailed ? "border-[#844951]/75" : "border-[#3c7168]/70"}`}>
+          <style>{`
+            @keyframes debrief-arrive {
+              from { opacity: 0; transform: translateY(14px) scale(.99); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+          `}</style>
+          <div className={`relative overflow-hidden border-b px-5 py-7 sm:px-8 sm:py-9 ${reportFailed ? "border-[#6f3a43] bg-gradient-to-br from-[#351e25] via-[#172127] to-[#101a20]" : "border-[#304b4b] bg-gradient-to-br from-[#173e3b] via-[#10292d] to-[#0d171e]"}`} style={{ animation: "debrief-arrive 650ms cubic-bezier(.2,.8,.2,1) both" }}>
+            <div className={`pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full blur-3xl ${reportFailed ? "bg-[#e25768]/15" : "bg-[#54d8b0]/15"}`} />
+            <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+              <div className="flex items-start gap-4">
+                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border shadow-lg ${reportFailed ? "border-[#ce737c]/50 bg-[#421f29] text-[#ff9096]" : "border-[#70d2a4]/40 bg-[#12392f] text-[#90e9b5]"}`}>
+                  {reportFailed ? <AlertTriangle className="h-7 w-7" /> : <Check className="h-7 w-7" />}
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${reportFailed ? "text-[#ff858b]" : "text-[#8fe0ad]"}`}>{reportFailed ? "Mission failed · safety limit exceeded" : "Mission complete · crew debrief"}</p>
+                  <h1 className="mt-2 text-2xl font-black uppercase tracking-[0.08em] text-[#f1f4e8] sm:text-4xl">{pending.missionTitle}</h1>
+                  <p className="mt-2 max-w-2xl text-[10px] leading-5 text-[#a6bbb4]">{reportFailed ? (reportFailureReason ?? "Critical colony metric fell below its safe operating limit.") : "14 simulated days survived"} <span className="text-[#66817c]">· {pending.replay ? "Replay operation" : "First deployment"}</span></p>
+                </div>
+              </div>
+              <div className={`flex items-center gap-4 self-start rounded-2xl border px-5 py-3 md:self-auto ${reportFailed ? "border-[#8b5054]/50 bg-[#1c171d]/75" : "border-[#4d8271]/50 bg-[#0d211f]/75"}`}>
+                <div className={`text-5xl font-black leading-none ${reportFailed ? "text-[#ff818b]" : "text-[#c7f09c]"}`}>{missionGrade}</div>
+                <div className="border-l border-white/10 pl-4">
+                  <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#78918c]">Mission grade</p>
+                  <p className="mt-1 font-mono text-lg font-bold text-[#eef1df]">{Math.round(score)}<span className="text-xs text-[#809894]"> / 100</span></p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-5 p-6 lg:grid-cols-[1fr_360px]">
+          <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[1fr_360px]">
             <section className="space-y-3">
               {checks.map(([label, complete]) => (
                 <div key={label} className="flex items-center justify-between border border-[#29434a] bg-[#0d2027] px-4 py-3">

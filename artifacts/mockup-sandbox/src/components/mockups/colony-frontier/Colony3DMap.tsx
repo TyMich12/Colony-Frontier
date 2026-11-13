@@ -521,15 +521,8 @@ function Beacon({ color, active, height = 2.1 }: { color: string; active: boolea
   );
 }
 
-function BuildingArt({ id, accent, hatchOpen = false }: { id: string; accent: string; hatchOpen?: boolean }) {
-  const outerHatch = useRef<THREE.Group>(null);
+function BuildingArt({ id, accent }: { id: string; accent: string }) {
   const p = palette(id);
-
-  useFrame((_, delta) => {
-    if (outerHatch.current) {
-      outerHatch.current.rotation.y = THREE.MathUtils.damp(outerHatch.current.rotation.y, hatchOpen ? -1.35 : 0, 5, delta);
-    }
-  });
 
   if (id === "habitat") {
     return (
@@ -618,7 +611,7 @@ function BuildingArt({ id, accent, hatchOpen = false }: { id: string; accent: st
           <RoundedBox args={[1.25, 0.82, 0.88]} radius={0.14} smoothness={4} castShadow>
             <meshStandardMaterial color="#465b61" metalness={0.48} roughness={0.44} />
           </RoundedBox>
-          <group ref={outerHatch} position={[-0.31, 0.02, 0.49]}>
+          <group position={[-0.31, 0.02, 0.49]}>
             <RoundedBox args={[0.62, 0.53, 0.08]} radius={0.055} smoothness={4} position={[0.31, 0, 0]}>
               <meshStandardMaterial color="#1a303a" metalness={0.34} roughness={0.28} />
             </RoundedBox>
@@ -1663,6 +1656,27 @@ function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: 
         <boxGeometry args={[0.19, 0.035, 0.018]} />
         <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.35} />
       </mesh>
+      {[-0.09, -0.045, 0, 0.045, 0.09].map((x) => (
+        <mesh key={x} position={[x, 0.55, 0.132]}>
+          <boxGeometry args={[0.018, 0.065, 0.012]} />
+          <meshStandardMaterial color="#b4c0b5" metalness={0.78} roughness={0.32} />
+        </mesh>
+      ))}
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 0.205, 0.88, 0]}>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.095, 0.095, 0.08, 16]} />
+            <meshStandardMaterial color="#46585c" metalness={0.84} roughness={0.25} />
+          </mesh>
+          <mesh position={[0, 0, 0.02]}>
+            <torusGeometry args={[0.072, 0.014, 6, 14]} />
+            <meshStandardMaterial color="#d3bd77" metalness={0.8} roughness={0.24} />
+          </mesh>
+          <RoundedBox args={[0.14, 0.2, 0.06]} radius={0.035} smoothness={3} position={[side * 0.04, 0.035, 0.09]}>
+            <meshStandardMaterial color="#b2bdb4" metalness={0.62} roughness={0.36} />
+          </RoundedBox>
+        </group>
+      ))}
       {[-0.13, 0.13].map((x) => (
         <mesh key={x} position={[x, 0.91, 0.025]} rotation={[0, 0, x * 1.4]}>
           <boxGeometry args={[0.08, 0.14, 0.12]} />
@@ -1690,10 +1704,18 @@ function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: 
         <RoundedBox args={[0.3, 0.16, 0.035]} radius={0.06} smoothness={4} position={[0, -0.015, 0.162]}>
           <meshStandardMaterial color="#14272e" metalness={0.38} roughness={0.2} />
         </RoundedBox>
-        {[-0.075, 0.075].map((x) => (
-          <mesh key={x} position={[x, -0.01, 0.184]}>
-            <sphereGeometry args={[0.028, 12, 8]} />
-            <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.6} />
+        <mesh position={[0, -0.01, 0.19]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.07, 0.07, 0.022, 20]} />
+          <meshStandardMaterial color="#74898c" metalness={0.82} roughness={0.24} />
+        </mesh>
+        <mesh position={[0, -0.01, 0.207]}>
+          <sphereGeometry args={[0.045, 16, 12]} />
+          <meshPhysicalMaterial color="#53d8ed" emissive="#16748a" emissiveIntensity={0.9} roughness={0.12} metalness={0.12} clearcoat={1} />
+        </mesh>
+        {[-0.12, 0.12].map((x) => (
+          <mesh key={x} position={[x, 0.08, 0.17]}>
+            <sphereGeometry args={[0.018, 8, 6]} />
+            <meshStandardMaterial color="#e3b65d" emissive="#b98537" emissiveIntensity={0.5} />
           </mesh>
         ))}
         <mesh position={[0, 0.19, 0]}>
@@ -1714,6 +1736,14 @@ function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: 
           <mesh position={[side * 0.09, -0.27, 0]}>
             <sphereGeometry args={[0.07, 12, 10]} />
             <meshStandardMaterial color="#4d6062" metalness={0.74} roughness={0.28} />
+          </mesh>
+          <mesh position={[side * 0.09, -0.27, 0.055]}>
+            <torusGeometry args={[0.054, 0.012, 6, 12]} />
+            <meshStandardMaterial color="#d3bd77" metalness={0.82} roughness={0.24} />
+          </mesh>
+          <mesh position={[side * 0.08, -0.32, -0.045]} rotation={[0.28, 0, side * 0.12]}>
+            <cylinderGeometry args={[0.018, 0.018, 0.22, 8]} />
+            <meshStandardMaterial color="#ccd2c7" metalness={0.82} roughness={0.25} />
           </mesh>
           <mesh position={[side * 0.08, -0.37, 0.015]}>
             <capsuleGeometry args={[0.052, 0.13, 4, 8]} />
@@ -1741,9 +1771,17 @@ function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: 
             <sphereGeometry args={[0.065, 10, 8]} />
             <meshStandardMaterial color="#44565a" metalness={0.74} roughness={0.28} />
           </mesh>
+          <mesh position={[0, -0.24, 0.048]}>
+            <torusGeometry args={[0.05, 0.012, 6, 12]} />
+            <meshStandardMaterial color="#d1bb76" metalness={0.82} roughness={0.24} />
+          </mesh>
           <mesh position={[0, -0.35, 0]}>
             <capsuleGeometry args={[0.05, 0.14, 4, 8]} />
             <meshStandardMaterial color="#aab5ac" metalness={0.62} roughness={0.36} />
+          </mesh>
+          <mesh position={[0, -0.32, -0.045]} rotation={[0.22, 0, 0]}>
+            <cylinderGeometry args={[0.015, 0.015, 0.18, 8]} />
+            <meshStandardMaterial color="#d0d5c9" metalness={0.84} roughness={0.24} />
           </mesh>
           <RoundedBox args={[0.16, 0.09, 0.24]} radius={0.035} smoothness={3} position={[0, -0.45, 0.045]}>
             <meshStandardMaterial color="#344347" metalness={0.56} roughness={0.54} />
@@ -2054,7 +2092,7 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 }
 
 function ColonyBuilding({
-  track, tier, runtime, selected, alerted, eventId, position, onClick, mars, nightMode = false, habitatHatchOpen = false
+  track, tier, runtime, selected, alerted, eventId, position, onClick, mars, nightMode = false
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -2066,7 +2104,6 @@ function ColonyBuilding({
   onClick: () => void;
   mars: boolean;
   nightMode?: boolean;
-  habitatHatchOpen?: boolean;
 }) {
   const [x, z] = position;
   const p = palette(track.id);
@@ -2082,7 +2119,7 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} hatchOpen={habitatHatchOpen} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} />
       </group>
       {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
@@ -2308,7 +2345,7 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
       material.emissiveIntensity = airlockCycling ? 1.1 + (Math.sin(clock.elapsedTime * 8) + 1) * 0.9 : 0.2;
     }
     if (innerHatch.current) {
-      const open = airlockStatus === "PRESSURIZED";
+      const open = airlockStatus === "PRESSURIZED" || airlockStatus === "OPENING_HATCH";
       innerHatch.current.position.x = THREE.MathUtils.damp(innerHatch.current.position.x, open ? 1.08 : 0, 7, delta);
     }
     airflowParticles.current.forEach((particle, index) => {
@@ -2343,10 +2380,68 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
         <boxGeometry args={[0.24, 3.1, 8.4]} />
         <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 1.55, -4.18]}>
-        <boxGeometry args={[8.4, 3.1, 0.24]} />
-        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
+      <mesh position={[0, 0.38, -4.18]}>
+        <boxGeometry args={[8.4, 0.76, 0.24]} />
+        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} />
       </mesh>
+      <mesh position={[0, 3.0, -4.18]}>
+        <boxGeometry args={[8.4, 0.68, 0.24]} />
+        <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} />
+      </mesh>
+      {[-3.13, 3.13].map((x) => (
+        <mesh key={x} position={[x, 1.95, -4.18]}>
+          <boxGeometry args={[2.14, 2.38, 0.24]} />
+          <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} />
+        </mesh>
+      ))}
+      <group position={[0, 1.95, -4.02]}>
+        <mesh>
+          <boxGeometry args={[4.0, 2.16, 0.13]} />
+          <meshStandardMaterial color="#22353d" metalness={0.78} roughness={0.24} />
+        </mesh>
+        <mesh position={[0, 0, -0.075]}>
+          <boxGeometry args={[3.64, 1.82, 0.018]} />
+          <meshBasicMaterial color="#020815" toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 0, -0.055]}>
+          <sphereGeometry args={[0.57, 32, 24]} />
+          <meshStandardMaterial color="#3c82b4" emissive="#143859" emissiveIntensity={0.42} roughness={0.84} />
+        </mesh>
+        <mesh position={[0.21, 0.12, -0.045]} scale={[1.015, 1.015, 1.015]}>
+          <sphereGeometry args={[0.57, 24, 18, 0, Math.PI * 2, 0.1, Math.PI * 0.72]} />
+          <meshStandardMaterial color="#76a86d" roughness={0.92} />
+        </mesh>
+        {Array.from({ length: 48 }, (_, index) => {
+          const x = (((index * 37) % 97) / 97 - 0.5) * 3.48;
+          const y = (((index * 61) % 89) / 89 - 0.5) * 1.68;
+          const size = index % 7 === 0 ? 0.034 : 0.018;
+          return (
+            <mesh key={index} position={[x, y, -0.035]}>
+              <sphereGeometry args={[size, 6, 5]} />
+              <meshBasicMaterial color={index % 9 === 0 ? "#a5dcff" : "#eef5ff"} toneMapped={false} />
+            </mesh>
+          );
+        })}
+        <mesh position={[0, 0, 0.08]}>
+          <boxGeometry args={[3.72, 1.88, 0.055]} />
+          <meshPhysicalMaterial color="#8dc4d0" transparent opacity={0.12} roughness={0.12} metalness={0.1} clearcoat={1} depthWrite={false} />
+        </mesh>
+        {[-1.88, 1.88].map((x) => (
+          <mesh key={x} position={[x, 0, 0.12]}>
+            <boxGeometry args={[0.12, 2.22, 0.18]} />
+            <meshStandardMaterial color="#bec9be" metalness={0.72} roughness={0.27} />
+          </mesh>
+        ))}
+        {[-1.04, 1.04].map((y) => (
+          <mesh key={y} position={[0, y, 0.12]}>
+            <boxGeometry args={[3.86, 0.12, 0.18]} />
+            <meshStandardMaterial color="#bec9be" metalness={0.72} roughness={0.27} />
+          </mesh>
+        ))}
+        <Text position={[0, -1.29, 0.13]} fontSize={0.12} color="#c9ded8" anchorX="center" anchorY="middle">
+          OBSERVATION WINDOW · EARTH IN VIEW
+        </Text>
+      </group>
       <group position={[-2.95, 0, -1.43]}>
         <RoundedBox args={[1.48, 0.24, 2.48]} radius={0.1} smoothness={4} position={[0, 0.26, 0]}>
           <meshStandardMaterial color="#56666a" metalness={0.45} roughness={0.5} />
@@ -2367,6 +2462,19 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
         </mesh>
         <pointLight position={[0.6, 1.3, -0.82]} color="#e8e9c8" intensity={0.35} distance={2.2} />
       </group>
+      <group position={[-1.88, 1.2, -1.45]}>
+        <mesh>
+          <boxGeometry args={[0.1, 2.4, 2.55]} />
+          <meshStandardMaterial color="#526369" metalness={0.52} roughness={0.48} transparent opacity={0.86} />
+        </mesh>
+        <mesh position={[0.06, 0.05, 0]}>
+          <boxGeometry args={[0.025, 2.25, 0.045]} />
+          <meshStandardMaterial color="#6ee3d1" emissive="#2aa997" emissiveIntensity={0.5} />
+        </mesh>
+      </group>
+      <Text position={[-2.98, 2.05, 0.28]} rotation={[0, 0, 0]} fontSize={0.13} color="#c6d9cd" anchorX="center" anchorY="middle">
+        SLEEPING QUARTERS
+      </Text>
       <group position={[1.58, 0, -3.55]}>
         <RoundedBox args={[3.55, 0.78, 0.62]} radius={0.09} smoothness={4} position={[0, 0.42, 0]}>
           <meshStandardMaterial color="#8c9991" metalness={0.48} roughness={0.44} />
@@ -2416,6 +2524,32 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
           <boxGeometry args={[3.3, 3.1, 0.22]} />
           <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
         </mesh>
+      ))}
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 4.02, 1.9, -0.35]} rotation={[0, side * Math.PI / 2, 0]}>
+          <mesh position={[0, 0, -0.08]}>
+            <circleGeometry args={[0.7, 32]} />
+            <meshBasicMaterial color="#030916" toneMapped={false} />
+          </mesh>
+          <mesh position={[0.16, 0.06, -0.025]}>
+            <sphereGeometry args={[0.31, 20, 16]} />
+            <meshStandardMaterial color={side < 0 ? "#cb8061" : "#4388b6"} emissive={side < 0 ? "#693f38" : "#173955"} emissiveIntensity={0.35} roughness={0.86} />
+          </mesh>
+          {Array.from({ length: 10 }, (_, index) => {
+            const x = (((index * 17) % 29) / 29 - 0.5) * 1.15;
+            const y = (((index * 11) % 23) / 23 - 0.5) * 1.15;
+            return (
+              <mesh key={index} position={[x, y, 0]}>
+                <sphereGeometry args={[0.018, 6, 5]} />
+                <meshBasicMaterial color="#edf5ff" toneMapped={false} />
+              </mesh>
+            );
+          })}
+          <mesh position={[0, 0, 0.04]}>
+            <torusGeometry args={[0.7, 0.11, 10, 36]} />
+            <meshStandardMaterial color="#aebbb2" metalness={0.82} roughness={0.24} />
+          </mesh>
+        </group>
       ))}
       <mesh position={[0, 2.82, 4.12]}>
         <boxGeometry args={[1.7, 0.55, 0.22]} />
@@ -2499,7 +2633,7 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
   );
 }
 
-type NearbyInteraction = { id: string; label: string; kind: "FACILITY" | "FIELD SITE" | "CABINET" | "AIRLOCK" } | null;
+type NearbyInteraction = { id: string; label: string; kind: "FACILITY" | "FIELD SITE" | "CABINET" | "AIRLOCK" | "BERTH" | "GALLEY" } | null;
 
 function WalkControls({
   tracks,
@@ -2507,10 +2641,13 @@ function WalkControls({
   habitatInterior,
   cabinetOpen,
   airlockCycling,
+  crewSleeping,
   onSelect,
   onCloseInspector,
   onSelectResource,
   onEnterHabitat,
+  onActivateHabitatSpot,
+  onWake,
   onExitHabitat,
   onToggleCabinet,
   onLockChange,
@@ -2522,10 +2659,13 @@ function WalkControls({
   habitatInterior: boolean;
   cabinetOpen: boolean;
   airlockCycling: boolean;
+  crewSleeping: boolean;
   onSelect: (trackId: string) => void;
   onCloseInspector: () => void;
   onSelectResource: (node: MissionResourceNode) => void;
   onEnterHabitat: () => void;
+  onActivateHabitatSpot: (spot: "BERTH" | "GALLEY") => void;
+  onWake: () => void;
   onExitHabitat: () => void;
   onToggleCabinet: () => void;
   onLockChange: (locked: boolean) => void;
@@ -2546,10 +2686,13 @@ function WalkControls({
     habitatInterior,
     cabinetOpen,
     airlockCycling,
+    crewSleeping,
     onSelect,
     onCloseInspector,
     onSelectResource,
     onEnterHabitat,
+    onActivateHabitatSpot,
+    onWake,
     onExitHabitat,
     onToggleCabinet,
     onLockChange,
@@ -2562,10 +2705,13 @@ function WalkControls({
     habitatInterior,
     cabinetOpen,
     airlockCycling,
+    crewSleeping,
     onSelect,
     onCloseInspector,
     onSelectResource,
     onEnterHabitat,
+    onActivateHabitatSpot,
+    onWake,
     onExitHabitat,
     onToggleCabinet,
     onLockChange,
@@ -2625,11 +2771,19 @@ function WalkControls({
       }
       if (key === "e" && !event.repeat) {
         const player = playerPosition.current;
+        if (latest.current.crewSleeping) {
+          latest.current.onWake();
+          return;
+        }
         if (latest.current.habitatInterior) {
           if (latest.current.airlockCycling) return;
           const cabinetDistance = Math.hypot(player.x - 2.12, player.z - 0.2);
+          const berthDistance = Math.hypot(player.x + 2.95, player.z + 1.43);
+          const galleyDistance = Math.hypot(player.x - 0.1, player.z + 2.8);
           const airlockDistance = Math.hypot(player.x, player.z - 3.25);
           if (cabinetDistance < 1.7) latest.current.onToggleCabinet();
+          else if (berthDistance < 1.9) latest.current.onActivateHabitatSpot("BERTH");
+          else if (galleyDistance < 1.8) latest.current.onActivateHabitatSpot("GALLEY");
           else if (airlockDistance < 1.8) latest.current.onExitHabitat();
           return;
         }
@@ -2690,7 +2844,7 @@ function WalkControls({
     const floorY = habitatInterior ? 1.56 : terrainHeight(player.position.x, player.position.z) + 1.72;
     if (!habitatInterior && !airlockCycling && jumpRequested.current && player.position.y <= floorY + 0.03) jumpVelocity.current = 2.8;
     jumpRequested.current = false;
-    if (!airlockCycling) {
+    if (!airlockCycling && !crewSleeping) {
       jumpVelocity.current -= 1.62 * Math.min(delta, 0.05);
       player.position.y += jumpVelocity.current * Math.min(delta, 0.05);
       if (player.position.y <= floorY) {
@@ -2704,7 +2858,7 @@ function WalkControls({
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
     const direction = new THREE.Vector3();
-    if (!airlockCycling) {
+    if (!airlockCycling && !crewSleeping) {
       if (keys.current.has("w") || keys.current.has("arrowup")) direction.add(forward);
       if (keys.current.has("s") || keys.current.has("arrowdown")) direction.sub(forward);
       if (keys.current.has("d") || keys.current.has("arrowright")) direction.add(right);
@@ -2722,6 +2876,7 @@ function WalkControls({
             || Math.abs(z) > 3.88
             || (Math.abs(x - 2.12) < 0.78 && Math.abs(z + 0.65) < 0.56)
             || (x > -3.8 && x < -2.05 && z > -2.92 && z < 0.08)
+            || (x > -2.16 && x < -1.6 && z > -2.72 && z < -0.18)
             || (x > -0.3 && x < 3.5 && z > -4.02 && z < -3.1);
         }
         if (Math.abs(x) > 48 || Math.abs(z) > 48) return true;
@@ -2749,6 +2904,14 @@ function WalkControls({
       const cabinetDistance = Math.hypot(player.position.x - 2.12, player.position.z - 0.2);
       if (cabinetDistance < 1.7) {
         nearest = { distance: cabinetDistance, target: { id: "supply-cabinet", label: cabinetOpen ? "CREW SUPPLY CABINET · OPEN" : "CREW SUPPLY CABINET", kind: "CABINET" } };
+      }
+      const berthDistance = Math.hypot(player.position.x + 2.95, player.position.z + 1.43);
+      if (berthDistance < 1.9 && (!nearest || berthDistance < nearest.distance)) {
+        nearest = { distance: berthDistance, target: { id: "crew-berth", label: "CREW BERTH · SLEEP", kind: "BERTH" } };
+      }
+      const galleyDistance = Math.hypot(player.position.x - 0.1, player.position.z + 2.8);
+      if (galleyDistance < 1.8 && (!nearest || galleyDistance < nearest.distance)) {
+        nearest = { distance: galleyDistance, target: { id: "habitat-galley", label: "GALLEY · CREW STATION", kind: "GALLEY" } };
       }
       const airlockDistance = Math.hypot(player.position.x, player.position.z - 3.25);
       if (airlockDistance < 1.8 && (!nearest || airlockDistance < nearest.distance)) {
@@ -2788,21 +2951,33 @@ function WalkControls({
 
 function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
+  const firstPersonMode = walkMode || props.habitatInterior;
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
   const [nearbyTarget, setNearbyTarget] = useState<NearbyInteraction>(null);
   const [cabinetOpen, setCabinetOpen] = useState(false);
+  const [habitatActivity, setHabitatActivity] = useState<"BERTH" | "GALLEY" | null>(null);
+  const crewSleeping = props.habitatInterior && habitatActivity === "BERTH";
   const [airlockStatus, setAirlockStatus] = useState<AirlockStatus>("IDLE");
   const airlockTimer = useRef<number | null>(null);
   const airlockCycling = ["SEALING", "PRESSURIZING", "HELMET_REMOVAL", "HELMET_SEAL", "DEPRESSURIZING", "SUIT_CHECK", "OPENING_HATCH"].includes(airlockStatus);
+  useEffect(() => {
+    if (props.habitatInterior) setWalkMode(true);
+  }, [props.habitatInterior]);
   useEffect(() => () => {
     if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
   }, []);
+  useEffect(() => {
+    if (!crewSleeping) return;
+    const wakeTimer = window.setTimeout(() => setHabitatActivity(null), 8000);
+    return () => window.clearTimeout(wakeTimer);
+  }, [crewSleeping]);
   const previousHabitatInterior = useRef(props.habitatInterior);
   useEffect(() => {
     if (props.habitatInterior && !previousHabitatInterior.current) {
       if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
       setCabinetOpen(false);
+      setHabitatActivity(null);
       setAirlockStatus("SEALING");
       airlockTimer.current = window.setTimeout(() => {
         setAirlockStatus("PRESSURIZING");
@@ -2821,6 +2996,7 @@ function Scene({ props }: { props: Props }) {
     if (airlockCycling) return;
     if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
     setCabinetOpen(false);
+    setHabitatActivity(null);
     setAirlockStatus("SEALING");
     airlockTimer.current = window.setTimeout(() => {
       setAirlockStatus("HELMET_SEAL");
@@ -2889,7 +3065,7 @@ function Scene({ props }: { props: Props }) {
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
     >
-      {walkMode && props.habitatInterior ? (
+      {firstPersonMode && props.habitatInterior ? (
         <>
           <color attach="background" args={["#172326"]} />
           <ambientLight intensity={0.72} color="#dce8df" />
@@ -2937,7 +3113,6 @@ function Scene({ props }: { props: Props }) {
             onClick={() => props.onSelect(track.id)}
             mars={mars}
             nightMode={!mars && (props.lunarNight || daylight < 0.18)}
-            habitatHatchOpen={airlockStatus === "DEPRESSURIZED"}
           />
         ))}
         {props.tracks.some((track) => track.id === "rover") && (
@@ -2956,17 +3131,23 @@ function Scene({ props }: { props: Props }) {
       </group>
         </>
       )}
-      {walkMode ? (
+      {firstPersonMode ? (
         <WalkControls
           tracks={props.tracks}
           resourceNodes={props.resourceNodes}
           habitatInterior={props.habitatInterior}
           cabinetOpen={cabinetOpen}
           airlockCycling={airlockCycling}
+          crewSleeping={crewSleeping}
           onSelect={props.onSelect}
           onCloseInspector={props.onCloseInspector}
           onSelectResource={props.onSelectResource}
           onEnterHabitat={props.onEnterHabitat}
+          onActivateHabitatSpot={(spot) => {
+            setHabitatActivity(spot);
+            if (document.pointerLockElement) document.exitPointerLock();
+          }}
+          onWake={() => setHabitatActivity(null)}
           onExitHabitat={exitHabitat}
           onToggleCabinet={() => {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
@@ -3000,15 +3181,59 @@ function Scene({ props }: { props: Props }) {
         />
       )}
     </Canvas>
-    {walkMode && (
+    {firstPersonMode && (
       <>
         <MissionVitalsHUD metrics={props.metrics} physicalReadings={props.physicalReadings} colonyHealth={props.colonyHealth} alerted={Boolean(props.activeEventTrackId)} />
         {nearbyTarget && (
           <div role="status" className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 translate-y-6 border border-[#d6c17a]/55 bg-[#07151b]/90 px-3 py-1.5 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-[#f3dda0] shadow-lg backdrop-blur-sm">
-            E · {nearbyTarget.kind === "CABINET" ? (cabinetOpen ? "close" : "open") : nearbyTarget.kind === "AIRLOCK" ? "cycle airlock" : "inspect / close"} · {nearbyTarget.label}
+            E · {nearbyTarget.kind === "CABINET" ? (cabinetOpen ? "close" : "open") : nearbyTarget.kind === "AIRLOCK" ? "cycle airlock" : nearbyTarget.kind === "BERTH" ? "sleep" : nearbyTarget.kind === "GALLEY" ? "use galley" : "inspect / close"} · {nearbyTarget.label}
           </div>
         )}
-        {airlockStatus !== "IDLE" && (
+        {props.habitatInterior && crewSleeping && (
+          <section aria-label="Crew sleep cycle" className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center bg-[#02060b]/75 p-5 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-[#77b7bf]/45 bg-[#07151c]/95 p-6 text-center font-mono shadow-[0_0_70px_rgba(75,158,188,.18)]">
+              <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#7ed8dd]">Crew berth · sleep cycle</p>
+              <h2 className="mt-3 text-xl font-black uppercase tracking-[0.1em] text-[#e7f2e7]">Resting in orbit</h2>
+              <p className="mt-2 text-[10px] leading-5 text-[#9cb5b6]">The habitat is quiet. Earth and the stars drift past the observation window while the crew sleeps.</p>
+              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#1d3037]">
+                <div className="h-full origin-left rounded-full bg-gradient-to-r from-[#5dc9cf] to-[#e6c982]" style={{ animation: "crew-sleep-progress 8s linear forwards" }} />
+              </div>
+              <button type="button" onClick={() => setHabitatActivity(null)} className="mt-5 w-full rounded-lg border border-[#6cb7aa]/50 bg-[#12332c] px-4 py-3 text-[9px] font-black uppercase tracking-[0.16em] text-[#c5f0d7] transition hover:border-[#d3c27b] hover:bg-[#1d4437]">
+                Wake up · E
+              </button>
+              <style>{`@keyframes crew-sleep-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }`}</style>
+            </div>
+          </section>
+        )}
+        {props.habitatInterior && habitatActivity === "GALLEY" && (
+          <section aria-label="Habitat galley" className="pointer-events-auto absolute bottom-4 left-1/2 z-40 w-[min(94vw,420px)] -translate-x-1/2 rounded-2xl border border-[#73988c]/55 bg-[#081719]/[0.97] p-4 font-mono text-white shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-md">
+            <header className="mb-3 flex items-start justify-between gap-3 border-b border-[#37514b] pb-3">
+              <div>
+                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#8ed0b3]">Habitat · common room</p>
+                <h2 className="mt-1 text-sm font-black uppercase tracking-[0.1em]">Galley & crew station</h2>
+              </div>
+              <button type="button" onClick={() => setHabitatActivity(null)} aria-label="Close galley" className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/15 bg-black/20 text-lg text-[#c5d2cd] hover:border-[#f0cf69]">×</button>
+            </header>
+            <p className="text-[9px] leading-4 text-[#9eb2a9]">Check the shared stores before preparing a meal. Supplies remain tied to the mission inventory.</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { label: "Food", value: props.physicalReadings.food },
+                { label: "Water", value: props.physicalReadings.water },
+                { label: "Cabin", value: props.physicalReadings.temperature },
+              ].map((item) => (
+                <div key={item.label} className="rounded-lg border border-[#34524b] bg-[#10231f] px-2 py-2">
+                  <p className="text-[7px] font-bold uppercase tracking-[0.12em] text-[#8ca9a0]">{item.label}</p>
+                  <p className="mt-1 text-[10px] font-black text-[#c8efd7]">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => { setHabitatActivity(null); setCabinetOpen(true); }} className="mt-3 w-full rounded-lg border border-[#729184]/60 bg-[#16352c] px-3 py-2.5 text-left text-[9px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] transition hover:border-[#d3c27b]">
+              Open crew supplies
+            </button>
+            <p className="mt-2 text-[8px] text-[#829a90]">E or × returns to the room.</p>
+          </section>
+        )}
+        {props.habitatInterior && airlockStatus !== "IDLE" && (
           <div role="status" className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 border border-[#8cb5a1]/50 bg-[#081719]/95 px-4 py-2 text-center font-mono text-[9px] font-black uppercase tracking-[0.14em] text-[#bcebd2] shadow-lg">
             {airlockCycling ? <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[#f2ce75]" /> : null}
             Airlock · {airlockStatus.replaceAll("_", " ").toLowerCase()}
@@ -3025,7 +3250,7 @@ function Scene({ props }: { props: Props }) {
             </div>
           </div>
         )}
-        {(airlockStatus === "HELMET_REMOVAL" || airlockStatus === "HELMET_SEAL") && (
+        {props.habitatInterior && (airlockStatus === "HELMET_REMOVAL" || airlockStatus === "HELMET_SEAL") && (
           <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center overflow-hidden">
             <style>{`
               @keyframes habitat-visor-lift {
@@ -3082,27 +3307,37 @@ function Scene({ props }: { props: Props }) {
       </>
     )}
     <div className="pointer-events-auto absolute right-4 top-4 z-30 flex flex-row-reverse items-start gap-2">
+      {walkMode && !props.habitatInterior && props.tracks.some((track) => track.id === "habitat") && (
+        <button
+          type="button"
+          onClick={props.onEnterHabitat}
+          className="border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
+        >
+          Enter habitat
+        </button>
+      )}
       <button
         type="button"
+        disabled={props.habitatInterior}
         onClick={() => {
           setPointerLocked(false);
           setWalkMode((active) => !active);
         }}
-        className="border border-[#e7c56e]/50 bg-[#10191d]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4d785] shadow-lg backdrop-blur-sm transition hover:border-[#ffe7a0] hover:bg-[#24343a]"
+        className="border border-[#e7c56e]/50 bg-[#10191d]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4d785] shadow-lg backdrop-blur-sm transition hover:border-[#ffe7a0] hover:bg-[#24343a] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {walkMode ? "Colony map" : "Enter first person"}
+        {props.habitatInterior ? "Habitat interior" : walkMode ? "Colony map" : "Enter first person"}
       </button>
-      {walkMode && (
+      {firstPersonMode && (
         <div className="max-w-[min(260px,calc(100vw-180px))] border border-white/15 bg-[#07131c]/90 px-3 py-2 text-right font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
           WASD move · Space jump · mouse look · Shift run
           <br />
-          F toggle mouse · E interact / close · Esc release mouse
+          F toggle mouse · E interact / airlock · Esc release mouse
           {!pointerLocked && <><br /><span className="text-[#f4d785]">Click the scene to look around</span></>}
           {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
         </div>
       )}
     </div>
-    {walkMode && pointerLocked && (
+    {firstPersonMode && pointerLocked && (
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-3 w-3 -translate-x-1/2 -translate-y-1/2">
         <span className="absolute left-1/2 top-0 h-3 w-px -translate-x-1/2 bg-white/80" />
         <span className="absolute left-0 top-1/2 h-px w-3 -translate-y-1/2 bg-white/80" />
@@ -3114,7 +3349,7 @@ function Scene({ props }: { props: Props }) {
         {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
         <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth remains visible · daylight and shadows follow the Sun</div>
       </div>
-      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">{walkMode ? "EVA MODE · WASD move · Space jump · E interact" : "COLONY MAP · drag to rotate · right-drag to pan · wheel to zoom"}</div>
+      <div className="rounded-lg border border-white/15 bg-[#07131c]/55 px-2 py-2 text-[8px] font-mono text-[#b6c9d4] backdrop-blur-sm">{firstPersonMode ? "EVA MODE · WASD move · Space jump · E interact" : "COLONY MAP · drag to rotate · right-drag to pan · wheel to zoom"}</div>
     </div>}
     </div>
   );
