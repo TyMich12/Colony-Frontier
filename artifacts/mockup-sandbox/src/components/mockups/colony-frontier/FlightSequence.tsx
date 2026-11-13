@@ -55,14 +55,24 @@ const details: Record<Stage, string> = {
   entering: "Pressurising the airlock and handing off to the surface mission simulation.",
 };
 
-function LaunchVehicle({ position = [0, 0, -2.5], scale = [3, 6, 3], stage = "approach" }: {
-  position?: [number, number, number]; scale?: [number, number, number]; stage?: Stage;
+function LaunchVehicle({ position = [0, 0, -2.5], scale = [3, 6, 3], stage = "approach", boardingProgress = 0 }: {
+  position?: [number, number, number]; scale?: [number, number, number]; stage?: Stage; boardingProgress?: number;
 }) {
   const exhaust = useRef<THREE.Group>(null);
+  const crewHatch = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
-    if (!exhaust.current) return;
-    exhaust.current.visible = stage === "ascent";
-    exhaust.current.scale.y = 1.2 + Math.sin(clock.elapsedTime * 18) * 0.12;
+    if (exhaust.current) {
+      const burn = stage === "ascent";
+      const pulse = 1 + Math.sin(clock.elapsedTime * 23) * 0.075 + Math.sin(clock.elapsedTime * 41) * 0.035;
+      exhaust.current.visible = burn;
+      exhaust.current.scale.set(1 + (pulse - 1) * 0.32, 1.2 * pulse, 1 + (pulse - 1) * 0.32);
+      exhaust.current.rotation.y = Math.sin(clock.elapsedTime * 7) * 0.025;
+    }
+    if (crewHatch.current) {
+      const t = THREE.MathUtils.clamp(boardingProgress, 0, 1);
+      const smooth = t * t * (3 - 2 * t);
+      crewHatch.current.rotation.y = -smooth * 1.34;
+    }
   });
   return <group position={position} scale={scale}>
     <mesh position={[0, 5.3, 0]} castShadow><cylinderGeometry args={[0.72, 0.8, 8.8, 48]} /><meshStandardMaterial color="#e6e9e3" metalness={0.52} roughness={0.34} /></mesh>
@@ -79,9 +89,27 @@ function LaunchVehicle({ position = [0, 0, -2.5], scale = [3, 6, 3], stage = "ap
       {Array.from({ length: 10 }, (_, i) => <mesh key={i} position={[0, 1.3 + i * 0.68, 0.018]}><sphereGeometry args={[0.045, 8, 8]} /><meshStandardMaterial color="#c5c7be" metalness={0.72} roughness={0.3} /></mesh>)}
     </group>)}
     <mesh position={[0, 0.34, 0]} castShadow><cylinderGeometry args={[0.88, 0.98, 0.65, 40]} /><meshStandardMaterial color="#59666a" metalness={0.8} roughness={0.3} /></mesh>
+    <group position={[0, 0.48, 0.79]}>
+      <mesh position={[0, 0, -0.055]}><boxGeometry args={[0.72, 0.78, 0.12]} /><meshStandardMaterial color="#273b42" metalness={0.82} roughness={0.28} /></mesh>
+      <mesh position={[0, 0, 0.018]}><boxGeometry args={[0.58, 0.64, 0.025]} /><meshStandardMaterial color="#07151b" emissive="#123c48" emissiveIntensity={0.35} roughness={0.2} /></mesh>
+      <mesh position={[0, 0, 0.04]}><boxGeometry args={[0.12, 0.48, 0.018]} /><meshBasicMaterial color="#70d7c6" toneMapped={false} /></mesh>
+      <pointLight position={[0, 0, 0.3]} color="#6ed9ca" intensity={0.55} distance={3} />
+      <group ref={crewHatch} position={[-0.34, 0, 0.1]}>
+        <mesh position={[0.34, 0, 0]} castShadow><boxGeometry args={[0.72, 0.82, 0.1]} /><meshStandardMaterial color="#aab7b5" metalness={0.86} roughness={0.24} /></mesh>
+        <mesh position={[0.34, 0, 0.06]}><boxGeometry args={[0.58, 0.68, 0.025]} /><meshPhysicalMaterial color="#173e4b" metalness={0.62} roughness={0.12} clearcoat={1} /></mesh>
+        <mesh position={[0.61, 0, 0.09]}><cylinderGeometry args={[0.035, 0.035, 0.18, 12]} /><meshStandardMaterial color="#d4b36b" metalness={0.82} roughness={0.24} /></mesh>
+      </group>
+    </group>
     {[-0.44, 0, 0.44].map((x) => <group key={x} position={[x, 0, 0]}><mesh position={[0, -0.48, 0]}><cylinderGeometry args={[0.18, 0.26, 0.42, 20]} /><meshStandardMaterial color="#303a3d" metalness={0.65} /></mesh></group>)}
     <group ref={exhaust} position={[0, -0.82, 0]} visible={false}>
-      {[-0.44, 0, 0.44].map((x, i) => <mesh key={x} position={[x, -0.55 - (i === 1 ? 0.25 : 0), 0]} rotation={[0, 0, Math.PI]}><coneGeometry args={[i === 1 ? 0.28 : 0.2, i === 1 ? 1.8 : 1.35, 20]} /><meshBasicMaterial color={i === 1 ? "#fff0a6" : "#ff9c4d"} toneMapped={false} /></mesh>)}
+      {[-0.44, 0, 0.44].map((x, i) => (
+        <group key={x} position={[x, -0.12, 0]}>
+          <mesh rotation={[0, 0, Math.PI]}><cylinderGeometry args={[0.15, 0.23, 0.38, 24, 1, true]} /><meshStandardMaterial color="#303b3e" metalness={0.88} roughness={0.24} side={THREE.DoubleSide} /></mesh>
+          <mesh position={[0, -0.68 - (i === 1 ? 0.18 : 0), 0]} rotation={[0, 0, Math.PI]}><coneGeometry args={[i === 1 ? 0.3 : 0.22, i === 1 ? 2.0 : 1.55, 28]} /><meshBasicMaterial color={i === 1 ? "#fff4c4" : "#ff9c4d"} toneMapped={false} /></mesh>
+          <mesh position={[0, -0.7, 0]} rotation={[0, 0, Math.PI]}><coneGeometry args={[i === 1 ? 0.16 : 0.11, i === 1 ? 1.7 : 1.25, 20]} /><meshBasicMaterial color="#e9f7ff" transparent opacity={0.82} toneMapped={false} depthWrite={false} /></mesh>
+        </group>
+      ))}
+      <pointLight position={[0, -0.55, 0]} color="#ff9c55" intensity={stage === "ascent" ? 7.5 : 0} distance={18} decay={2} />
     </group>
     {[-1, 1].map((side) => <mesh key={side} position={[side * 0.72, 1.2, 0]} rotation={[0, 0, -side * 0.18]}><boxGeometry args={[0.68, 1.9, 0.2]} /><meshStandardMaterial color="#b84c38" metalness={0.4} roughness={0.42} /></mesh>)}
     <mesh position={[0, 11.01, 0]}><coneGeometry args={[0.21, 0.09, 48]} /><meshStandardMaterial color="#3a4647" metalness={0.78} roughness={0.3} /></mesh>
@@ -730,7 +758,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
       if (Math.hypot(s.walkX, s.walkZ + 2.5) <= 3.2) { s.boardingSeconds = 0; onStageChange("boarding"); }
     } else if (s.stage === "boarding") {
       s.boardingSeconds += dt;
-      if (s.boardingSeconds >= 1.25) onStageChange("startup");
+      if (s.boardingSeconds >= 3.8) onStageChange("startup");
     } else if (s.stage === "startup" && axes.trigger) {
       s.throttle = 68; s.pitch = 90; s.altitude = 0; s.speed = 0; onStageChange("ascent");
     } else if (s.stage === "ascent") {
@@ -792,11 +820,21 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
     const cockpit = ["startup", "ascent", "orbit", "transfer", "landing", "crashed"].includes(s.stage);
     let target: THREE.Vector3;
     let direction: THREE.Vector3;
-    if (s.stage === "approach" || s.stage === "boarding") {
+    if (s.stage === "approach") {
       const bob = gl.xr.isPresenting || walkInput === 0 ? 0 : Math.sin(frame.clock.elapsedTime * 12.5) * 0.052;
       target = new THREE.Vector3(s.walkX, 1.72 + bob, s.walkZ);
       const yaw = s.yaw + lookYaw.current;
       direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(lookPitch.current), Math.sin(lookPitch.current), -Math.cos(yaw) * Math.cos(lookPitch.current));
+    } else if (s.stage === "boarding") {
+      const t = clamp(s.boardingSeconds / 3.8, 0, 1);
+      const smooth = t * t * (3 - 2 * t);
+      const hatch = new THREE.Vector3(0, 2.45, -0.05);
+      const cockpitEntry = new THREE.Vector3(0, 1.7, 4.2);
+      if (smooth < 0.48) target = new THREE.Vector3(s.walkX, 1.72, s.walkZ).lerp(hatch, smooth / 0.48);
+      else target = hatch.clone().lerp(cockpitEntry, (smooth - 0.48) / 0.52);
+      const lookTarget = smooth < 0.48 ? hatch : cockpitEntry;
+      direction = lookTarget.sub(target).normalize();
+      if (direction.lengthSq() < 0.001) direction.set(0, 0, -1);
     } else if (cockpit) {
       target = new THREE.Vector3(0, 1.7, 4.2);
       const pitch = lookPitch.current + (s.stage === "landing" ? THREE.MathUtils.degToRad(-20) : 0);
@@ -827,7 +865,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
     {stage !== "startup" &&     <fog attach="fog" args={[atmospheric ? "#a7d5e9" : "#131a20", 38, atmospheric ? 420 : 140]} />}
     {!atmospheric && <Stars radius={130} depth={90} count={3200} factor={4} saturation={0.12} fade speed={0.15} />}
     {atmospheric && <><mesh position={[-34, 25, -90]} scale={3}><sphereGeometry args={[1, 32, 24]} /><meshBasicMaterial color="#fff5d9" toneMapped={false} /></mesh><mesh position={[-34, 25, -90]} scale={4.1}><sphereGeometry args={[1, 24, 16]} /><meshBasicMaterial color="#ffc56f" transparent opacity={0.11} side={THREE.BackSide} depthWrite={false} /></mesh></>}
-    {launchPad && <><LaunchComplex /><LaunchVehicle stage={stage} /></>}
+    {launchPad && <><LaunchComplex /><LaunchVehicle stage={stage} boardingProgress={flight.current.boardingSeconds / 3.8} /></>}
     {cockpit && <>
       {["orbit", "transfer"].includes(stage) || (stage === "ascent" && flight.current.altitude >= 45) ? <Earth altitude={flight.current.altitude} /> : null}
       <MoonApproach stage={stage} flight={flight.current} />
@@ -838,7 +876,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
     {surface && <><mesh position={[12, 17, -55]} scale={1.1}><sphereGeometry args={[1, 40, 30]} /><meshBasicMaterial color="#fff0cc" toneMapped={false} /></mesh><mesh position={[0, 0.4, -70]}><sphereGeometry args={[8, 48, 36]} /><meshStandardMaterial color="#23639a" roughness={0.8} emissive="#102b48" emissiveIntensity={0.45} /></mesh><mesh position={[0, 0.4, -70]} scale={1.08}><sphereGeometry args={[8, 32, 24]} /><meshBasicMaterial color="#65baff" transparent opacity={0.12} side={THREE.BackSide} depthWrite={false} /></mesh><MoonSurface stage={stage} /></>}
     <ambientLight intensity={atmospheric ? 0.72 : surface ? 0.42 : 0.25} />
     <hemisphereLight args={atmospheric ? ["#d7edff", "#817b67", 1.1] : ["#c7dcff", "#31353c", 0.46]} />
-    <directionalLight position={[-34, 25, -90]} intensity={atmospheric ? 2.15 : surface ? 2.3 : 1.2} color={atmospheric ? "#fff3d8" : "#e8efff"} castShadow />
+    <directionalLight position={[-34, 25, -90]} intensity={atmospheric ? 2.15 : surface ? 2.3 : 1.2} color={atmospheric ? "#fff3d8" : "#e8efff"} castShadow shadow-mapSize={[4096, 4096]} shadow-camera-near={1} shadow-camera-far={260} shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} shadow-bias={-0.00012} />
     <pointLight position={[0, 3, 1]} intensity={stage === "landing" ? 1.5 : 0.45} color="#f3c187" distance={12} />
     <ContactShadows position={[0, -0.14, -2]} opacity={surface ? 0.42 : 0.23} scale={26} blur={2.6} far={7} resolution={512} color="#07090d" />
   </>;
@@ -998,8 +1036,13 @@ export function FlightSequence() {
   const progress = stage === "approach" ? approachProgress : stage === "ascent" ? clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) : stage === "orbit" ? clamp(telemetry.orbitSeconds / 2, 0, 1) : stage === "transfer" ? clamp(telemetry.transferSeconds / 1, 0, 1) : stage === "landing" ? clamp(1 - telemetry.altitude / 2.4, 0, 1) : stage === "outside" ? surfaceProgress : stage === "landed" ? 1 : 0;
 
   return <main ref={overlayRoot} className="fixed inset-0 z-0 h-dvh w-screen touch-none overflow-hidden overscroll-none bg-[#080e12] text-[#e9eee8]" style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
+<<<<<<< HEAD
     <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.18; }}>
       <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} playFootstep={playFootstep} /></Suspense>
+=======
+    <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false, stencil: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.12; gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap; }}>
+      <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} /></Suspense>
+>>>>>>> 6bb30051191268b0ade6f94e00f4a82d92e095b7
     </Canvas>
     <div className={`pointer-events-none fixed inset-0 z-10 bg-black transition-opacity duration-700 ${stage === "boarding" || stage === "entering" ? "opacity-100" : "opacity-0"}`} />
     {stage === "boarding" && <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center"><p className="animate-pulse text-xs uppercase tracking-[0.4em] text-white/70">Crew hatch cycling</p></div>}
