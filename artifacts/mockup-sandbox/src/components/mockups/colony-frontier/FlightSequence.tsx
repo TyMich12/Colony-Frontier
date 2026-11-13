@@ -89,6 +89,27 @@ function LaunchVehicle({ position = [0, 0, -2.5], scale = [3, 6, 3], stage = "ap
       {Array.from({ length: 10 }, (_, i) => <mesh key={i} position={[0, 1.3 + i * 0.68, 0.018]}><sphereGeometry args={[0.045, 8, 8]} /><meshStandardMaterial color="#c5c7be" metalness={0.72} roughness={0.3} /></mesh>)}
     </group>)}
     <mesh position={[0, 0.34, 0]} castShadow><cylinderGeometry args={[0.88, 0.98, 0.65, 40]} /><meshStandardMaterial color="#59666a" metalness={0.8} roughness={0.3} /></mesh>
+    {/* Square-section crew ladder with anti-slip rungs, leading to the hatch. */}
+    <group position={[0, 0, 0.92]}>
+      {[-0.16, 0.16].map((x) => (
+        <mesh key={x} position={[x, 0.265, 0]} castShadow>
+          <boxGeometry args={[0.035, 0.53, 0.045]} />
+          <meshStandardMaterial color="#788783" metalness={0.88} roughness={0.24} />
+        </mesh>
+      ))}
+      {Array.from({ length: 9 }, (_, i) => (
+        <mesh key={i} position={[0, 0.025 + i * 0.06, 0.008]} castShadow>
+          <boxGeometry args={[0.34, 0.025, 0.055]} />
+          <meshStandardMaterial color={i % 2 ? "#b6c1b8" : "#d7a94f"} metalness={0.82} roughness={0.3} />
+        </mesh>
+      ))}
+      {[-0.205, 0.205].map((x) => (
+        <mesh key={x} position={[x, 0.27, 0.005]}>
+          <boxGeometry args={[0.035, 0.58, 0.07]} />
+          <meshStandardMaterial color="#c3ccc2" metalness={0.76} roughness={0.28} />
+        </mesh>
+      ))}
+    </group>
     <group position={[0, 0.48, 0.79]}>
       <mesh position={[0, 0, -0.055]}><boxGeometry args={[0.72, 0.78, 0.12]} /><meshStandardMaterial color="#273b42" metalness={0.82} roughness={0.28} /></mesh>
       <mesh position={[0, 0, 0.018]}><boxGeometry args={[0.58, 0.64, 0.025]} /><meshStandardMaterial color="#07151b" emissive="#123c48" emissiveIntensity={0.35} roughness={0.2} /></mesh>
@@ -681,6 +702,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
   const lookPitch = useRef(0);
   const jumpHeight = useRef(0);
   const jumpVelocity = useRef(0);
+  const jumpWasHeld = useRef(false);
   const footstepTimer = useRef(0);
   useEffect(() => {
     const canvas = gl.domElement;
@@ -730,6 +752,16 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
     }
     const walkInput = Number(k.has("w")) - Number(k.has("s")) + axes.walk;
     const strafeInput = Number(k.has("d")) - Number(k.has("a"));
+    const jumpPressed = k.has(" ") && !jumpWasHeld.current;
+    jumpWasHeld.current = k.has(" ");
+    if (jumpPressed && (s.stage === "approach" || s.stage === "outside") && jumpHeight.current <= 0.001) {
+      jumpVelocity.current = s.stage === "outside" ? 8.8 : 4.6;
+    }
+    if (s.stage === "approach" && (jumpVelocity.current !== 0 || jumpHeight.current > 0)) {
+      jumpVelocity.current -= 9.81 * dt;
+      jumpHeight.current = Math.max(0, jumpHeight.current + jumpVelocity.current * dt);
+      if (jumpHeight.current === 0) jumpVelocity.current = 0;
+    }
     const walking = (s.stage === "approach" || s.stage === "outside")
       && (Math.abs(walkInput) > 0.1 || Math.abs(strafeInput) > 0.1)
       && (s.stage !== "outside" || jumpHeight.current < 0.1);
@@ -801,7 +833,6 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
       }
     } else if (s.stage === "outside") {
       // High, floaty lunar jumps using the Moon's lower gravity.
-      if (k.has(" ") && jumpHeight.current <= 0.001) jumpVelocity.current = 8.8;
       if (jumpVelocity.current !== 0 || jumpHeight.current > 0) {
         jumpVelocity.current -= 1.62 * dt;
         jumpHeight.current = Math.max(0, jumpHeight.current + jumpVelocity.current * dt);
@@ -822,7 +853,7 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
     let direction: THREE.Vector3;
     if (s.stage === "approach") {
       const bob = gl.xr.isPresenting || walkInput === 0 ? 0 : Math.sin(frame.clock.elapsedTime * 12.5) * 0.052;
-      target = new THREE.Vector3(s.walkX, 1.72 + bob, s.walkZ);
+      target = new THREE.Vector3(s.walkX, 1.72 + bob + jumpHeight.current, s.walkZ);
       const yaw = s.yaw + lookYaw.current;
       direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(lookPitch.current), Math.sin(lookPitch.current), -Math.cos(yaw) * Math.cos(lookPitch.current));
     } else if (s.stage === "boarding") {
@@ -830,8 +861,15 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry, playFoot
       const smooth = t * t * (3 - 2 * t);
       const hatch = new THREE.Vector3(0, 2.45, -0.05);
       const cockpitEntry = new THREE.Vector3(0, 1.7, 4.2);
-      if (smooth < 0.48) target = new THREE.Vector3(s.walkX, 1.72, s.walkZ).lerp(hatch, smooth / 0.48);
-      else target = hatch.clone().lerp(cockpitEntry, (smooth - 0.48) / 0.52);
+      if (smooth < 0.48) {
+        const climb = smooth / 0.48;
+        target = new THREE.Vector3(s.walkX, 1.72, s.walkZ).lerp(hatch, climb);
+        target.y += Math.sin(climb * Math.PI) * 0.12;
+      } else {
+        const interiorProgress = (smooth - 0.48) / 0.52;
+        target = hatch.clone().lerp(cockpitEntry, interiorProgress);
+        target.y += Math.sin(interiorProgress * Math.PI) * 0.08;
+      }
       const lookTarget = smooth < 0.48 ? hatch : cockpitEntry;
       direction = lookTarget.sub(target).normalize();
       if (direction.lengthSq() < 0.001) direction.set(0, 0, -1);
@@ -1036,15 +1074,11 @@ export function FlightSequence() {
   const progress = stage === "approach" ? approachProgress : stage === "ascent" ? clamp(telemetry.altitude / ORBIT_ALTITUDE, 0, 1) : stage === "orbit" ? clamp(telemetry.orbitSeconds / 2, 0, 1) : stage === "transfer" ? clamp(telemetry.transferSeconds / 1, 0, 1) : stage === "landing" ? clamp(1 - telemetry.altitude / 2.4, 0, 1) : stage === "outside" ? surfaceProgress : stage === "landed" ? 1 : 0;
 
   return <main ref={overlayRoot} className="fixed inset-0 z-0 h-dvh w-screen touch-none overflow-hidden overscroll-none bg-[#080e12] text-[#e9eee8]" style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
-<<<<<<< HEAD
-    <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.18; }}>
-      <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} playFootstep={playFootstep} /></Suspense>
-=======
     <Canvas className="!fixed !inset-0 !h-full !w-full" shadows dpr={[1, 2]} camera={{ position: [0, 1.72, PAD_APPROACH_DISTANCE - 2.5], fov: 70, near: 0.1, far: 700 }} gl={{ antialias: true, alpha: false, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false, stencil: false }} onCreated={({ gl }) => { renderer.current = gl; gl.xr.enabled = true; gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.12; gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap; }}>
-      <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} /></Suspense>
->>>>>>> 6bb30051191268b0ade6f94e00f4a82d92e095b7
+      <Suspense fallback={null}><FlightScene flight={flight} keys={keys} stage={stage} onStageChange={changeStage} onTelemetry={updateTelemetry} playFootstep={playFootstep} /></Suspense>
     </Canvas>
-    <div className={`pointer-events-none fixed inset-0 z-10 bg-black transition-opacity duration-700 ${stage === "boarding" || stage === "entering" ? "opacity-100" : "opacity-0"}`} />
+    </Canvas>
+    <div className={`pointer-events-none fixed inset-0 z-10 bg-black transition-opacity duration-700 ${stage === "boarding" ? "opacity-20" : stage === "entering" ? "opacity-100" : "opacity-0"}`} />
     {stage === "boarding" && <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center"><p className="animate-pulse text-xs uppercase tracking-[0.4em] text-white/70">Crew hatch cycling</p></div>}
     <header className="relative z-20 flex h-[68px] shrink-0 items-center justify-between border-b border-white/[0.09] bg-[#081116]/70 px-5 backdrop-blur-xl md:px-9">
       <div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center border border-[#6f857b]/70 bg-[#17241f]/80 text-[#ebc783]"><Rocket size={17} /></div><div><p className="text-[9px] uppercase tracking-[0.27em] text-[#91a79d]">Colony Frontier · Flight operations</p><p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.13em]">{pending?.missionTitle ?? "Lunar expedition"}</p></div></div>
