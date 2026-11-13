@@ -2327,6 +2327,7 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
   const cabinetDoor = useRef<THREE.Group>(null);
   const pressureLight = useRef<THREE.Mesh>(null);
   const innerHatch = useRef<THREE.Group>(null);
+  const ventFan = useRef<THREE.Group>(null);
   const airflowParticles = useRef<Array<THREE.Mesh | null>>([]);
   const airlockCycling = ["SEALING", "PRESSURIZING", "HELMET_REMOVAL", "HELMET_SEAL", "DEPRESSURIZING", "SUIT_CHECK", "OPENING_HATCH"].includes(airlockStatus);
   const airflowActive = airlockStatus === "PRESSURIZING" || airlockStatus === "DEPRESSURIZING";
@@ -2348,6 +2349,7 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
       const open = airlockStatus === "PRESSURIZED" || airlockStatus === "OPENING_HATCH";
       innerHatch.current.position.x = THREE.MathUtils.damp(innerHatch.current.position.x, open ? 1.08 : 0, 7, delta);
     }
+    if (ventFan.current) ventFan.current.rotation.z += delta * (airflowActive ? 5.2 : 1.15);
     airflowParticles.current.forEach((particle, index) => {
       if (!particle) return;
       particle.visible = airflowActive;
@@ -2372,6 +2374,34 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
         <boxGeometry args={[8.4, 0.24, 8.4]} />
         <meshStandardMaterial color="#7b8583" metalness={0.48} roughness={0.62} side={THREE.DoubleSide} />
       </mesh>
+      {/* Replaceable floor panels, recessed guide lighting and ceiling service rails. */}
+      {[-3.1, -1.55, 0, 1.55, 3.1].map((x) => (
+        <group key={x}>
+          <mesh position={[x, 0.012, 0]}>
+            <boxGeometry args={[0.018, 0.018, 7.65]} />
+            <meshStandardMaterial color="#26383c" metalness={0.78} roughness={0.32} />
+          </mesh>
+          <mesh position={[x + (x === 0 ? 0.18 : 0), 3.105, 0]}>
+            <boxGeometry args={[0.035, 0.025, 7.75]} />
+            <meshStandardMaterial color="#8eaaa3" metalness={0.72} roughness={0.28} emissive="#315d57" emissiveIntensity={0.18} />
+          </mesh>
+        </group>
+      ))}
+      {[-2.75, 2.75].map((x) => (
+        <group key={x}>
+          <mesh position={[x, 3.08, 0]}>
+            <boxGeometry args={[0.62, 0.055, 7.8]} />
+            <meshStandardMaterial color="#d5ddd2" metalness={0.38} roughness={0.42} emissive="#b7d5c7" emissiveIntensity={0.3} />
+          </mesh>
+          <pointLight position={[x, 2.82, 0]} color="#c8e7df" intensity={0.72} distance={9} decay={2} />
+        </group>
+      ))}
+      {Array.from({ length: 9 }, (_, index) => (
+        <mesh key={index} position={[-3.45 + (index % 3) * 3.45, 3.02, -2.8 + Math.floor(index / 3) * 2.8]}>
+          <boxGeometry args={[0.82, 0.055, 0.58]} />
+          <meshStandardMaterial color="#45575b" metalness={0.78} roughness={0.34} />
+        </mesh>
+      ))}
       <mesh position={[-4.18, 1.55, 0]}>
         <boxGeometry args={[0.24, 3.1, 8.4]} />
         <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
@@ -2603,6 +2633,29 @@ function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean;
           <meshStandardMaterial color="#dce3da" emissive="#e7f2db" emissiveIntensity={0.55} roughness={0.42} />
         </mesh>
         <pointLight position={[0, -0.18, 0]} color="#d9e8d2" intensity={1.35} distance={8} decay={2} />
+      </group>
+      <group position={[3.91, 2.12, 1.45]} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh position={[0, 0, -0.08]}>
+          <cylinderGeometry args={[0.53, 0.53, 0.16, 32]} />
+          <meshStandardMaterial color="#34464b" metalness={0.86} roughness={0.28} />
+        </mesh>
+        <mesh position={[0, 0, 0.015]}>
+          <torusGeometry args={[0.49, 0.055, 12, 40]} />
+          <meshStandardMaterial color="#9baaa3" metalness={0.84} roughness={0.22} />
+        </mesh>
+        <group ref={ventFan}>
+          {[0, 1, 2, 3].map((blade) => (
+            <mesh key={blade} rotation={[0, 0, blade * Math.PI / 2]} position={[0.18, 0.1, 0.07]}>
+              <boxGeometry args={[0.48, 0.13, 0.045]} />
+              <meshStandardMaterial color="#71858a" metalness={0.82} roughness={0.26} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0, 0.12]}>
+            <sphereGeometry args={[0.12, 20, 16]} />
+            <meshStandardMaterial color="#d0d8cc" metalness={0.86} roughness={0.2} />
+          </mesh>
+        </group>
+        <pointLight position={[0, 0, 0.32]} color="#83d8c7" intensity={0.28} distance={2.4} />
       </group>
       <group position={[0, 2.28, 3.78]}>
         <mesh>
@@ -3231,7 +3284,13 @@ function Scene({ props }: { props: Props }) {
       shadows
       dpr={[1, 2]}
       camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
-      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, depth: true }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
+      onCreated={({ gl }) => {
+        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        gl.outputColorSpace = THREE.SRGBColorSpace;
+        gl.shadowMap.enabled = true;
+        gl.shadowMap.type = THREE.PCFSoftShadowMap;
+      }}
     >
       {firstPersonMode && props.habitatInterior ? (
         <>
@@ -3245,7 +3304,7 @@ function Scene({ props }: { props: Props }) {
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
-      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-near={1} shadow-camera-far={150} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[4096, 4096]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
         <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.24} depthWrite={false} toneMapped={false} /></mesh>
