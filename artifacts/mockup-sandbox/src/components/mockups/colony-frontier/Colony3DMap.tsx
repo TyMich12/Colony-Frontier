@@ -3077,6 +3077,7 @@ function BuildingSurfaceDetails({ large, accent }: { large: boolean; accent: str
 function WalkControls({
   tracks,
   resourceNodes,
+  paused,
   habitatInterior,
   cabinetOpen,
   airlockCycling,
@@ -3089,6 +3090,7 @@ function WalkControls({
   onWake,
   onExitHabitat,
   onToggleCabinet,
+  onToggleFlashlight,
   onLockChange,
   onLockError,
   onNearbyChange,
@@ -3098,6 +3100,7 @@ function WalkControls({
 }: {
   tracks: TechnologyTrack[];
   resourceNodes: MissionResourceNode[];
+  paused: boolean;
   habitatInterior: boolean;
   cabinetOpen: boolean;
   airlockCycling: boolean;
@@ -3110,6 +3113,7 @@ function WalkControls({
   onWake: () => void;
   onExitHabitat: () => void;
   onToggleCabinet: () => void;
+  onToggleFlashlight: () => void;
   onLockChange: (locked: boolean) => void;
   onLockError: (message: string) => void;
   onNearbyChange: (target: NearbyInteraction) => void;
@@ -3128,6 +3132,7 @@ function WalkControls({
   const latest = useRef({
     tracks,
     resourceNodes,
+    paused,
     selectedBuildingId,
     selectedResourceId,
     habitatInterior,
@@ -3145,10 +3150,12 @@ function WalkControls({
     onLockChange,
     onLockError,
     onNearbyChange,
+    onToggleFlashlight,
   });
   latest.current = {
     tracks,
     resourceNodes,
+    paused,
     selectedBuildingId,
     selectedResourceId,
     habitatInterior,
@@ -3166,6 +3173,7 @@ function WalkControls({
     onLockChange,
     onLockError,
     onNearbyChange,
+    onToggleFlashlight,
   };
 
   useEffect(() => {
@@ -3200,6 +3208,7 @@ function WalkControls({
       }
     };
     const handleClick = () => {
+      if (latest.current.paused) return;
       if (interactionClickHandled.current) {
         interactionClickHandled.current = false;
         return;
@@ -3212,7 +3221,7 @@ function WalkControls({
       latest.current.onLockChange(locked);
     };
     const handleMouseMove = (event: MouseEvent) => {
-      if (document.pointerLockElement !== canvas) return;
+      if (latest.current.paused || document.pointerLockElement !== canvas) return;
       yaw.current -= event.movementX * 0.0022;
       pitch.current = THREE.MathUtils.clamp(pitch.current - event.movementY * 0.0022, -1.25, 1.25);
     };
@@ -3220,10 +3229,11 @@ function WalkControls({
       const key = event.key.toLowerCase();
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (latest.current.paused) return;
       if (key === "f" && !event.repeat) {
         event.preventDefault();
-        if (document.pointerLockElement === canvas) document.exitPointerLock();
-        else requestPointerLock();
+        latest.current.onToggleFlashlight();
+        return;
       }
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(key)) {
         event.preventDefault();
@@ -3316,6 +3326,12 @@ function WalkControls({
       latest.current.onNearbyChange(null);
     };
   }, [gl, interactionClickHandled]);
+
+  useEffect(() => {
+    keys.current.clear();
+    jumpRequested.current = false;
+    if (paused && document.pointerLockElement === gl.domElement) document.exitPointerLock();
+  }, [gl, paused]);
 
   useFrame(({ camera }, delta) => {
     const player = camera as THREE.PerspectiveCamera;
@@ -3439,9 +3455,33 @@ function WalkControls({
   return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 12) + 1.72, 12]} fov={70} near={0.05} far={190} />;
 }
 
+function HelmetFlashlight({ enabled }: { enabled: boolean }) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const light = new THREE.SpotLight(0xffe6ad, 28, 30, Math.PI / 7, 0.55, 1.3);
+    const target = new THREE.Object3D();
+    target.position.set(0, 0, -1);
+    camera.add(light);
+    camera.add(target);
+    light.target = target;
+
+    return () => {
+      camera.remove(light);
+      camera.remove(target);
+    };
+  }, [camera, enabled]);
+
+  return null;
+}
+
 function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
   const firstPersonMode = walkMode || props.habitatInterior;
+  const paused = props.simulationSpeed === 0;
+  const [flashlightOn, setFlashlightOn] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
   const interactionClickHandled = useRef<InteractionClickState>({ current: false, requestPending: false });
@@ -3550,6 +3590,7 @@ function Scene({ props }: { props: Props }) {
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
+      frameloop={paused ? "never" : "always"}
       orthographic
       shadows
       dpr={[1, 2]}
@@ -3635,6 +3676,7 @@ function Scene({ props }: { props: Props }) {
         <WalkControls
           tracks={props.tracks}
           resourceNodes={props.resourceNodes}
+          paused={paused}
           habitatInterior={props.habitatInterior}
           cabinetOpen={cabinetOpen}
           airlockCycling={airlockCycling}
@@ -3653,6 +3695,7 @@ function Scene({ props }: { props: Props }) {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
             setCabinetOpen((open) => !open);
           }}
+          onToggleFlashlight={() => setFlashlightOn((active) => !active)}
           onLockChange={(locked) => {
             setPointerLocked(locked);
             if (locked) setPointerLockError(null);
@@ -3683,6 +3726,7 @@ function Scene({ props }: { props: Props }) {
           target={[0, 0, 0]}
         />
       )}
+      {firstPersonMode && <HelmetFlashlight enabled={flashlightOn} />}
     </Canvas>
     {firstPersonMode && (
       <>
@@ -3834,7 +3878,7 @@ function Scene({ props }: { props: Props }) {
         <div className="w-full border border-white/15 bg-[#07131c]/90 px-3 py-2 text-left font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
           WASD move · Space jump · mouse look · Shift run
           <br />
-          F toggle mouse · E interact / airlock · Esc release mouse
+          F flashlight {flashlightOn ? "ON" : "OFF"} · E interact / airlock · Esc pause
           {!pointerLocked && <><br /><span className="text-[#f4d785]">Click the scene to look around</span></>}
           {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
         </div>
@@ -3857,7 +3901,7 @@ function Scene({ props }: { props: Props }) {
         )}
         <div className="rounded-lg border border-white/15 bg-[#07131c]/70 px-3 py-2 font-mono text-[8px] text-[#b6c9d4] shadow-lg backdrop-blur-sm">
           <div className="mb-1 font-black tracking-[0.16em] text-[#9bd9cf]">COLONY LINK</div>
-          {firstPersonMode ? "EVA MODE · Arrow keys / WASD move · mouse look · Space jump · E interact" : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
+          {firstPersonMode ? `EVA MODE · Arrow keys / WASD move · mouse look · Space jump · F flashlight ${flashlightOn ? "ON" : "OFF"} · E interact` : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
         </div>
       </div>
     )}

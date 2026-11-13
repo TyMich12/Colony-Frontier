@@ -2818,13 +2818,19 @@ export function MissionSimulation() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setSelectedBuildingId(null);
-      setSelectedResourceId(null);
+      if (event.key !== "Escape" || event.repeat) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      if (!manualPaused) {
+        setSelectedBuildingId(null);
+        setSelectedResourceId(null);
+      }
+      setManualPaused(!manualPaused);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [manualPaused]);
 
 
   useEffect(() => {
@@ -4897,6 +4903,37 @@ export function MissionSimulation() {
           roverTargetNodeId={roverTargetNodeId}
           speed={manualPaused || activeEvent ? 0 : speed}
         />
+
+        {manualPaused && (
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mission-pause-title"
+            className="pointer-events-auto absolute inset-0 z-[70] flex items-center justify-center bg-[#02070b]/80 p-5 backdrop-blur-md"
+          >
+            <div className="w-full max-w-md border border-[#71806b]/70 bg-[#0b171b] p-7 text-center shadow-[0_24px_90px_rgba(0,0,0,0.7)]">
+              <Pause className="mx-auto h-7 w-7 text-[#efb658]" />
+              <p className="mt-4 text-[9px] font-black uppercase tracking-[0.3em] text-[#91aaa2]">Mission control</p>
+              <h2 id="mission-pause-title" className="mt-2 text-2xl font-black uppercase tracking-[0.16em] text-[#edf4ec]">Game paused</h2>
+              <p className="mt-3 text-xs leading-5 text-[#9db0aa]">
+                Mission time, active work orders, and colony movement are suspended.
+              </p>
+              <div className="mt-5 border-y border-[#263d42] py-3 text-[9px] leading-5 text-[#9db0aa]">
+                WASD move · Space jump · F flashlight · E interact
+                <br />
+                Press Esc to resume
+              </div>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setManualPaused(false)}
+                className="mt-6 inline-flex items-center justify-center gap-2 border border-[#efb658]/70 bg-[#efb658] px-5 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-[#17201b] transition hover:bg-[#f5ca76]"
+              >
+                <Play className="h-4 w-4" /> Resume mission
+              </button>
+            </div>
+          </section>
+        )}
 
         {!dashboardOpen && (
           <div className="pointer-events-none absolute right-4 top-[68px] z-20 w-[min(92vw,510px)]">
