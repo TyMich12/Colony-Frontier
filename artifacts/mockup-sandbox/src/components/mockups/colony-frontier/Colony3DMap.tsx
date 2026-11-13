@@ -47,6 +47,7 @@ type Props = {
   onSelect: (trackId: string) => void;
   onCloseInspector: () => void;
   onSelectResource: (node: MissionResourceNode) => void;
+  onEnterHabitat: () => void;
   onExitHabitat: () => void;
   onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
@@ -520,8 +521,15 @@ function Beacon({ color, active, height = 2.1 }: { color: string; active: boolea
   );
 }
 
-function BuildingArt({ id, accent }: { id: string; accent: string }) {
+function BuildingArt({ id, accent, hatchOpen = false }: { id: string; accent: string; hatchOpen?: boolean }) {
+  const outerHatch = useRef<THREE.Group>(null);
   const p = palette(id);
+
+  useFrame((_, delta) => {
+    if (outerHatch.current) {
+      outerHatch.current.rotation.y = THREE.MathUtils.damp(outerHatch.current.rotation.y, hatchOpen ? -1.35 : 0, 5, delta);
+    }
+  });
 
   if (id === "habitat") {
     return (
@@ -532,7 +540,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         </RoundedBox>
         <mesh position={[0, 0.335, 0]}>
           <boxGeometry args={[5.96, 0.045, 4.5]} />
-          <meshStandardMaterial color="#a1aaa2" metalness={0.68} roughness={0.34} />
+          <meshStandardMaterial color="#a1aaa2" metalness={0.68} roughness={0.34} emissive="#536d69" emissiveIntensity={0.18} />
         </mesh>
 
         {/* Main cylindrical pressure hull and reinforced end bulkheads. */}
@@ -598,7 +606,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
                   <meshStandardMaterial color="#d2c995" metalness={0.64} roughness={0.32} />
                 </RoundedBox>
                 <RoundedBox args={[0.41, 0.27, 0.085]} radius={0.05} smoothness={4} position={[0, 0, side * 0.04]}>
-                  <meshPhysicalMaterial color="#65d2e2" emissive="#164c61" emissiveIntensity={0.2} roughness={0.18} metalness={0.18} clearcoat={0.8} />
+                  <meshPhysicalMaterial color="#65d2e2" emissive="#247b8c" emissiveIntensity={0.55} roughness={0.18} metalness={0.18} clearcoat={0.8} />
                 </RoundedBox>
               </group>
             ))}
@@ -610,15 +618,21 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
           <RoundedBox args={[1.25, 0.82, 0.88]} radius={0.14} smoothness={4} castShadow>
             <meshStandardMaterial color="#465b61" metalness={0.48} roughness={0.44} />
           </RoundedBox>
-          <RoundedBox args={[0.62, 0.53, 0.08]} radius={0.055} smoothness={4} position={[0, 0.02, 0.49]}>
-            <meshStandardMaterial color="#1a303a" metalness={0.34} roughness={0.28} />
-          </RoundedBox>
-          <RoundedBox args={[0.43, 0.35, 0.04]} radius={0.04} smoothness={3} position={[0, 0.03, 0.545]}>
-            <meshStandardMaterial color="#324b52" metalness={0.3} roughness={0.32} />
-          </RoundedBox>
+          <group ref={outerHatch} position={[-0.31, 0.02, 0.49]}>
+            <RoundedBox args={[0.62, 0.53, 0.08]} radius={0.055} smoothness={4} position={[0.31, 0, 0]}>
+              <meshStandardMaterial color="#1a303a" metalness={0.34} roughness={0.28} />
+            </RoundedBox>
+            <RoundedBox args={[0.43, 0.35, 0.04]} radius={0.04} smoothness={3} position={[0.31, 0.01, 0.055]}>
+              <meshStandardMaterial color="#324b52" metalness={0.3} roughness={0.32} />
+            </RoundedBox>
+            <mesh position={[0.54, 0.01, 0.09]}>
+              <torusGeometry args={[0.055, 0.012, 6, 14]} />
+              <meshStandardMaterial color="#d5c27c" metalness={0.78} roughness={0.26} />
+            </mesh>
+          </group>
           <mesh position={[0, 0.27, 0.58]}>
             <boxGeometry args={[0.34, 0.04, 0.02]} />
-            <meshStandardMaterial color="#f7d47c" emissive="#ba842f" emissiveIntensity={0.9} />
+            <meshStandardMaterial color="#f7d47c" emissive="#ffbd4a" emissiveIntensity={2.2} />
           </mesh>
           {[-0.53, 0.53].map((x) => (
             <mesh key={x} position={[x, 0.0, 0.44]}>
@@ -697,6 +711,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
           <boxGeometry args={[0.5, 0.11, 0.45]} />
           <meshStandardMaterial color="#37484b" metalness={0.48} roughness={0.42} />
         </mesh>
+        <pointLight position={[0, 1.35, 3.1]} color="#62e6ed" intensity={2.2} distance={7} decay={2} />
         <Beacon color={accent} active={false} height={4.05} />
       </group>
     );
@@ -1592,7 +1607,155 @@ function Crew({ mars }: { mars: boolean }) {
     [[14,-18],[14,-13],[25.6,-13],[25.6,-25.6],[14,-25.6],[14,-18]],
     [[-25.6,13],[-14,13],[-14,-0.6],[-25.6,-0.6],[-25.6,13]],
   ];
-  return <group>{Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}</group>;
+  return (
+    <group>
+      {Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}
+      {Array.from({ length: 3 }, (_, i) => <ColonyRobot key={`robot-${i}`} route={routes[(i + 1) % routes.length]} index={i} />)}
+    </group>
+  );
+}
+
+function ColonyRobot({ route, index }: { route: Array<[number, number]>; index: number }) {
+  const ref = useRef<THREE.Group>(null);
+  const leftArm = useRef<THREE.Group>(null);
+  const rightArm = useRef<THREE.Group>(null);
+  const leftLeg = useRef<THREE.Group>(null);
+  const rightLeg = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
+  const phaseOffset = index * 1.9;
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const time = clock.getElapsedTime();
+    const p = ((time * 0.11) + index * 0.31) % route.length;
+    const i = Math.floor(p);
+    const f = p - i;
+    const [ax, az] = route[i];
+    const [bx, bz] = route[(i + 1) % route.length];
+    ref.current.position.set(
+      THREE.MathUtils.lerp(ax, bx, f),
+      -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * 0.018,
+      THREE.MathUtils.lerp(az, bz, f),
+    );
+    ref.current.rotation.y = Math.atan2(bx - ax, bz - az);
+    const gait = Math.sin(time * 3.8 + phaseOffset) * 0.34;
+    if (leftArm.current) leftArm.current.rotation.x = gait * 0.72;
+    if (rightArm.current) rightArm.current.rotation.x = -gait * 0.72;
+    if (leftLeg.current) leftLeg.current.rotation.x = -gait;
+    if (rightLeg.current) rightLeg.current.rotation.x = gait;
+    if (head.current) head.current.rotation.y = Math.sin(time * 0.7 + phaseOffset) * 0.16;
+  });
+
+  const statusColor = index === 1 ? "#f2bd58" : "#62e4e6";
+  return (
+    <group ref={ref} scale={1.18}>
+      <mesh position={[0, 0.43, 0]}>
+        <cylinderGeometry args={[0.17, 0.2, 0.14, 12]} />
+        <meshStandardMaterial color="#35454a" metalness={0.76} roughness={0.3} />
+      </mesh>
+      <RoundedBox args={[0.39, 0.4, 0.25]} radius={0.08} smoothness={4} position={[0, 0.68, 0]} castShadow>
+        <meshStandardMaterial color="#7f9290" metalness={0.66} roughness={0.34} />
+      </RoundedBox>
+      <RoundedBox args={[0.29, 0.17, 0.04]} radius={0.035} smoothness={3} position={[0, 0.69, 0.143]}>
+        <meshStandardMaterial color="#22353b" metalness={0.44} roughness={0.28} />
+      </RoundedBox>
+      <mesh position={[0, 0.71, 0.17]}>
+        <boxGeometry args={[0.19, 0.035, 0.018]} />
+        <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.35} />
+      </mesh>
+      {[-0.13, 0.13].map((x) => (
+        <mesh key={x} position={[x, 0.91, 0.025]} rotation={[0, 0, x * 1.4]}>
+          <boxGeometry args={[0.08, 0.14, 0.12]} />
+          <meshStandardMaterial color="#c0c8bd" metalness={0.58} roughness={0.42} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.78, -0.18]}>
+        <boxGeometry args={[0.27, 0.3, 0.12]} />
+        <meshStandardMaterial color="#45575b" metalness={0.62} roughness={0.38} />
+      </mesh>
+      {[-0.095, 0.095].map((x) => (
+        <mesh key={x} position={[x, 0.78, -0.25]}>
+          <cylinderGeometry args={[0.045, 0.045, 0.22, 10]} />
+          <meshStandardMaterial color="#a6b0a7" metalness={0.72} roughness={0.28} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.12, 0]}>
+        <cylinderGeometry args={[0.055, 0.075, 0.11, 12]} />
+        <meshStandardMaterial color="#d2bd77" metalness={0.72} roughness={0.26} />
+      </mesh>
+      <group ref={head} position={[0, 1.29, 0]}>
+        <RoundedBox args={[0.38, 0.3, 0.31]} radius={0.12} smoothness={5} castShadow>
+          <meshStandardMaterial color="#b4beb5" metalness={0.64} roughness={0.3} />
+        </RoundedBox>
+        <RoundedBox args={[0.3, 0.16, 0.035]} radius={0.06} smoothness={4} position={[0, -0.015, 0.162]}>
+          <meshStandardMaterial color="#14272e" metalness={0.38} roughness={0.2} />
+        </RoundedBox>
+        {[-0.075, 0.075].map((x) => (
+          <mesh key={x} position={[x, -0.01, 0.184]}>
+            <sphereGeometry args={[0.028, 12, 8]} />
+            <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.6} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0.19, 0]}>
+          <cylinderGeometry args={[0.018, 0.025, 0.18, 8]} />
+          <meshStandardMaterial color="#7c8b87" metalness={0.76} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, 0.29, 0]}>
+          <sphereGeometry args={[0.035, 10, 8]} />
+          <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.2} />
+        </mesh>
+      </group>
+      {[-1, 1].map((side) => (
+        <group key={side} ref={side < 0 ? leftArm : rightArm} position={[side * 0.26, 0.84, 0]}>
+          <mesh position={[side * 0.055, -0.13, 0]}>
+            <capsuleGeometry args={[0.065, 0.17, 4, 8]} />
+            <meshStandardMaterial color="#aeb9b1" metalness={0.55} roughness={0.4} />
+          </mesh>
+          <mesh position={[side * 0.09, -0.27, 0]}>
+            <sphereGeometry args={[0.07, 12, 10]} />
+            <meshStandardMaterial color="#4d6062" metalness={0.74} roughness={0.28} />
+          </mesh>
+          <mesh position={[side * 0.08, -0.37, 0.015]}>
+            <capsuleGeometry args={[0.052, 0.13, 4, 8]} />
+            <meshStandardMaterial color="#899b96" metalness={0.6} roughness={0.36} />
+          </mesh>
+          <mesh position={[side * 0.08, -0.45, 0.035]}>
+            <boxGeometry args={[0.12, 0.09, 0.12]} />
+            <meshStandardMaterial color="#35484c" metalness={0.7} roughness={0.3} />
+          </mesh>
+          {[-1, 1].map((finger) => (
+            <mesh key={finger} position={[side * 0.08 + finger * 0.035, -0.5, 0.075]}>
+              <cylinderGeometry args={[0.012, 0.012, 0.075, 6]} />
+              <meshStandardMaterial color="#c0c9bd" metalness={0.76} roughness={0.28} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {[-1, 1].map((side) => (
+        <group key={side} ref={side < 0 ? leftLeg : rightLeg} position={[side * 0.105, 0.43, 0]}>
+          <mesh position={[0, -0.12, 0]}>
+            <capsuleGeometry args={[0.065, 0.18, 4, 8]} />
+            <meshStandardMaterial color="#899995" metalness={0.58} roughness={0.42} />
+          </mesh>
+          <mesh position={[0, -0.24, 0]}>
+            <sphereGeometry args={[0.065, 10, 8]} />
+            <meshStandardMaterial color="#44565a" metalness={0.74} roughness={0.28} />
+          </mesh>
+          <mesh position={[0, -0.35, 0]}>
+            <capsuleGeometry args={[0.05, 0.14, 4, 8]} />
+            <meshStandardMaterial color="#aab5ac" metalness={0.62} roughness={0.36} />
+          </mesh>
+          <RoundedBox args={[0.16, 0.09, 0.24]} radius={0.035} smoothness={3} position={[0, -0.45, 0.045]}>
+            <meshStandardMaterial color="#344347" metalness={0.56} roughness={0.54} />
+          </RoundedBox>
+        </group>
+      ))}
+      <mesh position={[0.21, 0.59, 0.03]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.055, 0.012, 6, 12]} />
+        <meshStandardMaterial color="#d3bd77" metalness={0.82} roughness={0.24} />
+      </mesh>
+    </group>
+  );
 }
 
 function CrewMember({ route, index, mars }: { route: Array<[number, number]>; index: number; mars: boolean }) {
@@ -1891,7 +2054,7 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 }
 
 function ColonyBuilding({
-  track, tier, runtime, selected, alerted, eventId, position, onClick, mars, nightMode = false
+  track, tier, runtime, selected, alerted, eventId, position, onClick, mars, nightMode = false, habitatHatchOpen = false
 }: {
   track: TechnologyTrack;
   tier: Tier;
@@ -1903,6 +2066,7 @@ function ColonyBuilding({
   onClick: () => void;
   mars: boolean;
   nightMode?: boolean;
+  habitatHatchOpen?: boolean;
 }) {
   const [x, z] = position;
   const p = palette(track.id);
@@ -1918,7 +2082,7 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} hatchOpen={habitatHatchOpen} />
       </group>
       {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
@@ -2110,9 +2274,25 @@ function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: bool
   );
 }
 
-function HabitatInterior({ cabinetOpen, airlockCycling }: { cabinetOpen: boolean; airlockCycling: boolean }) {
+type AirlockStatus =
+  | "IDLE"
+  | "SEALING"
+  | "PRESSURIZING"
+  | "HELMET_REMOVAL"
+  | "HELMET_SEAL"
+  | "DEPRESSURIZING"
+  | "SUIT_CHECK"
+  | "OPENING_HATCH"
+  | "PRESSURIZED"
+  | "DEPRESSURIZED";
+
+function HabitatInterior({ cabinetOpen, airlockStatus }: { cabinetOpen: boolean; airlockStatus: AirlockStatus }) {
   const cabinetDoor = useRef<THREE.Group>(null);
   const pressureLight = useRef<THREE.Mesh>(null);
+  const innerHatch = useRef<THREE.Group>(null);
+  const airflowParticles = useRef<Array<THREE.Mesh | null>>([]);
+  const airlockCycling = ["SEALING", "PRESSURIZING", "HELMET_REMOVAL", "HELMET_SEAL", "DEPRESSURIZING", "SUIT_CHECK", "OPENING_HATCH"].includes(airlockStatus);
+  const airflowActive = airlockStatus === "PRESSURIZING" || airlockStatus === "DEPRESSURIZING";
 
   useFrame(({ clock }, delta) => {
     if (cabinetDoor.current) {
@@ -2127,6 +2307,22 @@ function HabitatInterior({ cabinetOpen, airlockCycling }: { cabinetOpen: boolean
       const material = pressureLight.current.material as THREE.MeshStandardMaterial;
       material.emissiveIntensity = airlockCycling ? 1.1 + (Math.sin(clock.elapsedTime * 8) + 1) * 0.9 : 0.2;
     }
+    if (innerHatch.current) {
+      const open = airlockStatus === "PRESSURIZED";
+      innerHatch.current.position.x = THREE.MathUtils.damp(innerHatch.current.position.x, open ? 1.08 : 0, 7, delta);
+    }
+    airflowParticles.current.forEach((particle, index) => {
+      if (!particle) return;
+      particle.visible = airflowActive;
+      const phase = (clock.elapsedTime * 0.68 + index / airflowParticles.current.length) % 1;
+      const progress = airlockStatus === "DEPRESSURIZING" ? phase : 1 - phase;
+      particle.position.set(
+        Math.sin(index * 2.4) * 0.48,
+        0.58 + (index % 5) * 0.34 + Math.sin(clock.elapsedTime * 3 + index) * 0.08,
+        1.08 + progress * 2.25,
+      );
+      particle.scale.setScalar(0.65 + Math.sin(phase * Math.PI) * 0.6);
+    });
   });
 
   return (
@@ -2151,6 +2347,64 @@ function HabitatInterior({ cabinetOpen, airlockCycling }: { cabinetOpen: boolean
         <boxGeometry args={[8.4, 3.1, 0.24]} />
         <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} side={THREE.DoubleSide} />
       </mesh>
+      <group position={[-2.95, 0, -1.43]}>
+        <RoundedBox args={[1.48, 0.24, 2.48]} radius={0.1} smoothness={4} position={[0, 0.26, 0]}>
+          <meshStandardMaterial color="#56666a" metalness={0.45} roughness={0.5} />
+        </RoundedBox>
+        <RoundedBox args={[1.34, 0.28, 2.28]} radius={0.12} smoothness={5} position={[0, 0.49, 0]}>
+          <meshStandardMaterial color="#b4c0b5" roughness={0.92} />
+        </RoundedBox>
+        <RoundedBox args={[0.78, 0.16, 0.48]} radius={0.1} smoothness={5} position={[0, 0.69, -0.79]}>
+          <meshStandardMaterial color="#e0e3d5" roughness={0.96} />
+        </RoundedBox>
+        <mesh position={[0, 0.11, 0.68]}>
+          <boxGeometry args={[1.28, 0.16, 0.55]} />
+          <meshStandardMaterial color="#46565a" metalness={0.58} roughness={0.42} />
+        </mesh>
+        <mesh position={[0.6, 1.55, -0.95]}>
+          <boxGeometry args={[0.22, 0.36, 0.08]} />
+          <meshStandardMaterial color="#dce4d5" emissive="#d4e5bb" emissiveIntensity={0.45} />
+        </mesh>
+        <pointLight position={[0.6, 1.3, -0.82]} color="#e8e9c8" intensity={0.35} distance={2.2} />
+      </group>
+      <group position={[1.58, 0, -3.55]}>
+        <RoundedBox args={[3.55, 0.78, 0.62]} radius={0.09} smoothness={4} position={[0, 0.42, 0]}>
+          <meshStandardMaterial color="#8c9991" metalness={0.48} roughness={0.44} />
+        </RoundedBox>
+        <RoundedBox args={[3.62, 0.1, 0.7]} radius={0.04} smoothness={3} position={[0, 0.85, 0]}>
+          <meshStandardMaterial color="#d0d4c8" metalness={0.52} roughness={0.32} />
+        </RoundedBox>
+        <RoundedBox args={[0.72, 0.08, 0.42]} radius={0.08} smoothness={4} position={[-0.78, 0.91, -0.02]}>
+          <meshStandardMaterial color="#56696a" metalness={0.55} roughness={0.3} />
+        </RoundedBox>
+        <mesh position={[-0.78, 0.98, 0.02]}>
+          <ringGeometry args={[0.13, 0.17, 24]} />
+          <meshStandardMaterial color="#9aa9a0" metalness={0.72} roughness={0.26} />
+        </mesh>
+        <mesh position={[-0.78, 1.08, 0.06]}>
+          <cylinderGeometry args={[0.025, 0.025, 0.2, 8]} />
+          <meshStandardMaterial color="#9aa9a0" metalness={0.76} roughness={0.25} />
+        </mesh>
+        <mesh position={[0.15, 0.94, 0.02]}>
+          <boxGeometry args={[0.55, 0.035, 0.42]} />
+          <meshStandardMaterial color="#15272b" metalness={0.32} roughness={0.28} />
+        </mesh>
+        <mesh position={[0.15, 0.97, 0.02]}>
+          <boxGeometry args={[0.42, 0.018, 0.28]} />
+          <meshStandardMaterial color="#db9f54" emissive="#b96c2d" emissiveIntensity={0.45} />
+        </mesh>
+        <mesh position={[1.23, 1.36, -0.13]}>
+          <boxGeometry args={[1.95, 0.82, 0.22]} />
+          <meshStandardMaterial color="#a6b0a7" metalness={0.42} roughness={0.38} />
+        </mesh>
+        <mesh position={[1.23, 1.36, 0.0]}>
+          <boxGeometry args={[1.64, 0.58, 0.04]} />
+          <meshStandardMaterial color="#35484c" metalness={0.4} roughness={0.42} />
+        </mesh>
+        <Text position={[0, 1.8, 0.03]} fontSize={0.12} color="#c6d9cd" anchorX="center" anchorY="middle">
+          GALLEY · WATER · FOOD
+        </Text>
+      </group>
       {[-2.8, -1.4, 0, 1.4, 2.8].map((x) => (
         <mesh key={x} position={[x, 3.12, 0]}>
           <boxGeometry args={[0.12, 0.12, 8.2]} />
@@ -2167,7 +2421,7 @@ function HabitatInterior({ cabinetOpen, airlockCycling }: { cabinetOpen: boolean
         <boxGeometry args={[1.7, 0.55, 0.22]} />
         <meshStandardMaterial color="#87918e" metalness={0.4} roughness={0.65} />
       </mesh>
-      <group position={[0, 1.36, 3.98]}>
+      <group ref={innerHatch} position={[0, 1.36, 3.98]}>
         <mesh>
           <boxGeometry args={[1.55, 2.05, 0.16]} />
           <meshStandardMaterial color="#44545a" metalness={0.72} roughness={0.32} />
@@ -2232,6 +2486,15 @@ function HabitatInterior({ cabinetOpen, airlockCycling }: { cabinetOpen: boolean
       <Text position={[2.12, 2.2, -0.2]} fontSize={0.13} color="#dce7dc" anchorX="center" anchorY="middle">
         CREW STORES
       </Text>
+      <Text position={[-2.95, 1.08, -1.43]} fontSize={0.12} color="#dce7dc" anchorX="center" anchorY="middle">
+        CREW BERTH
+      </Text>
+      {Array.from({ length: 18 }, (_, index) => (
+        <mesh key={index} ref={(mesh) => { airflowParticles.current[index] = mesh; }} visible={false}>
+          <sphereGeometry args={[0.035, 8, 6]} />
+          <meshBasicMaterial color="#c4f4ff" transparent opacity={0.72} toneMapped={false} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -2247,6 +2510,7 @@ function WalkControls({
   onSelect,
   onCloseInspector,
   onSelectResource,
+  onEnterHabitat,
   onExitHabitat,
   onToggleCabinet,
   onLockChange,
@@ -2261,6 +2525,7 @@ function WalkControls({
   onSelect: (trackId: string) => void;
   onCloseInspector: () => void;
   onSelectResource: (node: MissionResourceNode) => void;
+  onEnterHabitat: () => void;
   onExitHabitat: () => void;
   onToggleCabinet: () => void;
   onLockChange: (locked: boolean) => void;
@@ -2284,6 +2549,7 @@ function WalkControls({
     onSelect,
     onCloseInspector,
     onSelectResource,
+    onEnterHabitat,
     onExitHabitat,
     onToggleCabinet,
     onLockChange,
@@ -2299,6 +2565,7 @@ function WalkControls({
     onSelect,
     onCloseInspector,
     onSelectResource,
+    onEnterHabitat,
     onExitHabitat,
     onToggleCabinet,
     onLockChange,
@@ -2309,7 +2576,7 @@ function WalkControls({
   useEffect(() => {
     const spawnZ = habitatInterior ? 2.2 : 7;
     camera.position.set(0, habitatInterior ? 1.56 : terrainHeight(0, spawnZ) + 1.72, spawnZ);
-    yaw.current = 0;
+    yaw.current = habitatInterior ? Math.PI : 0;
     pitch.current = 0;
     jumpVelocity.current = 0;
     keys.current.clear();
@@ -2364,6 +2631,11 @@ function WalkControls({
           const airlockDistance = Math.hypot(player.x, player.z - 3.25);
           if (cabinetDistance < 1.7) latest.current.onToggleCabinet();
           else if (airlockDistance < 1.8) latest.current.onExitHabitat();
+          return;
+        }
+        const airlockDistance = Math.hypot(player.x, player.z - 4.45);
+        if (airlockDistance < 1.8) {
+          latest.current.onEnterHabitat();
           return;
         }
         let closest: { distance: number; trackId?: string; node?: MissionResourceNode } | null = null;
@@ -2446,12 +2718,17 @@ function WalkControls({
       const nextZ = player.position.z + direction.z * distance;
       const collides = (x: number, z: number) => {
         if (habitatInterior) {
-          return Math.abs(x) > 3.88 || Math.abs(z) > 3.88 || (Math.abs(x - 2.12) < 0.78 && Math.abs(z + 0.65) < 0.56);
+          return Math.abs(x) > 3.88
+            || Math.abs(z) > 3.88
+            || (Math.abs(x - 2.12) < 0.78 && Math.abs(z + 0.65) < 0.56)
+            || (x > -3.8 && x < -2.05 && z > -2.92 && z < 0.08)
+            || (x > -0.3 && x < 3.5 && z > -4.02 && z < -3.1);
         }
         if (Math.abs(x) > 48 || Math.abs(z) > 48) return true;
         const nearBuilding = tracks.some((track) => {
           const position = POSITIONS[track.id];
           if (!position) return false;
+          if (track.id === "habitat" && Math.abs(x - position[0]) < 1.35 && z - position[1] > 3.3 && z - position[1] < 6.4) return false;
           const radius = buildingClearanceRadius(track.id);
           return Math.hypot(x - position[0], z - position[1]) < radius;
         });
@@ -2478,10 +2755,15 @@ function WalkControls({
         nearest = { distance: airlockDistance, target: { id: "habitat-airlock", label: "HABITAT AIRLOCK", kind: "AIRLOCK" } };
       }
     } else {
+      const exteriorAirlockDistance = Math.hypot(player.position.x, player.position.z - 4.45);
+      if (exteriorAirlockDistance < 1.8) {
+        nearest = { distance: exteriorAirlockDistance, target: { id: "habitat-airlock", label: "HABITAT AIRLOCK", kind: "AIRLOCK" } };
+      }
       for (const track of tracks) {
         const position = POSITIONS[track.id];
         if (!position) continue;
         const distance = Math.hypot(player.position.x - position[0], player.position.z - position[1]);
+        if (track.id === "habitat" && exteriorAirlockDistance < 1.8) continue;
         if (distance < 7.5 && (!nearest || distance < nearest.distance)) {
           nearest = { distance, target: { id: track.id, label: track.category, kind: "FACILITY" } };
         }
@@ -2510,9 +2792,9 @@ function Scene({ props }: { props: Props }) {
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
   const [nearbyTarget, setNearbyTarget] = useState<NearbyInteraction>(null);
   const [cabinetOpen, setCabinetOpen] = useState(false);
-  const [airlockStatus, setAirlockStatus] = useState<"IDLE" | "PRESSURIZING" | "DEPRESSURIZING" | "PRESSURIZED" | "DEPRESSURIZED">("IDLE");
+  const [airlockStatus, setAirlockStatus] = useState<AirlockStatus>("IDLE");
   const airlockTimer = useRef<number | null>(null);
-  const airlockCycling = airlockStatus === "PRESSURIZING" || airlockStatus === "DEPRESSURIZING";
+  const airlockCycling = ["SEALING", "PRESSURIZING", "HELMET_REMOVAL", "HELMET_SEAL", "DEPRESSURIZING", "SUIT_CHECK", "OPENING_HATCH"].includes(airlockStatus);
   useEffect(() => () => {
     if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
   }, []);
@@ -2521,11 +2803,17 @@ function Scene({ props }: { props: Props }) {
     if (props.habitatInterior && !previousHabitatInterior.current) {
       if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
       setCabinetOpen(false);
-      setAirlockStatus("PRESSURIZING");
+      setAirlockStatus("SEALING");
       airlockTimer.current = window.setTimeout(() => {
-        setAirlockStatus("PRESSURIZED");
-        airlockTimer.current = null;
-      }, 1800);
+        setAirlockStatus("PRESSURIZING");
+        airlockTimer.current = window.setTimeout(() => {
+          setAirlockStatus("HELMET_REMOVAL");
+          airlockTimer.current = window.setTimeout(() => {
+            setAirlockStatus("PRESSURIZED");
+            airlockTimer.current = null;
+          }, 900);
+        }, 2200);
+      }, 900);
     }
     previousHabitatInterior.current = props.habitatInterior;
   }, [props.habitatInterior]);
@@ -2533,15 +2821,27 @@ function Scene({ props }: { props: Props }) {
     if (airlockCycling) return;
     if (airlockTimer.current !== null) window.clearTimeout(airlockTimer.current);
     setCabinetOpen(false);
-    setAirlockStatus("DEPRESSURIZING");
+    setAirlockStatus("SEALING");
     airlockTimer.current = window.setTimeout(() => {
-      props.onExitHabitat();
-      setAirlockStatus("DEPRESSURIZED");
+      setAirlockStatus("HELMET_SEAL");
       airlockTimer.current = window.setTimeout(() => {
-        setAirlockStatus("IDLE");
-        airlockTimer.current = null;
-      }, 1500);
-    }, 1800);
+        setAirlockStatus("DEPRESSURIZING");
+        airlockTimer.current = window.setTimeout(() => {
+          setAirlockStatus("SUIT_CHECK");
+          airlockTimer.current = window.setTimeout(() => {
+            setAirlockStatus("OPENING_HATCH");
+            airlockTimer.current = window.setTimeout(() => {
+              props.onExitHabitat();
+              setAirlockStatus("DEPRESSURIZED");
+              airlockTimer.current = window.setTimeout(() => {
+                setAirlockStatus("IDLE");
+                airlockTimer.current = null;
+              }, 1500);
+            }, 900);
+          }, 1100);
+        }, 2400);
+      }, 900);
+    }, 800);
   };
   const mars = props.environmentLabel === "MARS";
   const earthTextures = useMemo(() => createEarthTextures(), []);
@@ -2594,7 +2894,7 @@ function Scene({ props }: { props: Props }) {
           <color attach="background" args={["#172326"]} />
           <ambientLight intensity={0.72} color="#dce8df" />
           <hemisphereLight args={["#e5eee5", "#252c30", 0.72]} />
-          <HabitatInterior cabinetOpen={cabinetOpen} airlockCycling={airlockCycling} />
+          <HabitatInterior cabinetOpen={cabinetOpen} airlockStatus={airlockStatus} />
         </>
       ) : (
         <>
@@ -2637,6 +2937,7 @@ function Scene({ props }: { props: Props }) {
             onClick={() => props.onSelect(track.id)}
             mars={mars}
             nightMode={!mars && (props.lunarNight || daylight < 0.18)}
+            habitatHatchOpen={airlockStatus === "DEPRESSURIZED"}
           />
         ))}
         {props.tracks.some((track) => track.id === "rover") && (
@@ -2665,6 +2966,7 @@ function Scene({ props }: { props: Props }) {
           onSelect={props.onSelect}
           onCloseInspector={props.onCloseInspector}
           onSelectResource={props.onSelectResource}
+          onEnterHabitat={props.onEnterHabitat}
           onExitHabitat={exitHabitat}
           onToggleCabinet={() => {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
@@ -2706,11 +3008,46 @@ function Scene({ props }: { props: Props }) {
             E · {nearbyTarget.kind === "CABINET" ? (cabinetOpen ? "close" : "open") : nearbyTarget.kind === "AIRLOCK" ? "cycle airlock" : "inspect / close"} · {nearbyTarget.label}
           </div>
         )}
-        {props.habitatInterior && airlockStatus !== "IDLE" && (
+        {airlockStatus !== "IDLE" && (
           <div role="status" className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 border border-[#8cb5a1]/50 bg-[#081719]/95 px-4 py-2 text-center font-mono text-[9px] font-black uppercase tracking-[0.14em] text-[#bcebd2] shadow-lg">
             {airlockCycling ? <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[#f2ce75]" /> : null}
-            Airlock · {airlockStatus.toLowerCase()}
-            {airlockCycling && <div className="mt-1 text-[8px] font-normal tracking-normal text-[#9fb8ae]">Pressure is changing in the sealed chamber; habitat atmosphere remains contained.</div>}
+            Airlock · {airlockStatus.replaceAll("_", " ").toLowerCase()}
+            <div className="mt-1 text-[8px] font-normal tracking-normal text-[#9fb8ae]">
+              {airlockStatus === "SEALING" && "Inner hatch sealed · suit and pressure seals checking."}
+              {airlockStatus === "PRESSURIZING" && "Clean habitat air entering the chamber · helmet may be removed when green."}
+              {airlockStatus === "HELMET_REMOVAL" && "Pressure equalized · releasing helmet seals inside the habitat."}
+              {airlockStatus === "HELMET_SEAL" && "Helmet donned · locking the neck ring and checking suit pressure."}
+              {airlockStatus === "PRESSURIZED" && "Pressure equalized · inner hatch unlocked · helmet off inside."}
+              {airlockStatus === "DEPRESSURIZING" && "Air is drawn from the chamber into the habitat recovery system."}
+              {airlockStatus === "SUIT_CHECK" && "Outer hatch locked · helmet seal and life support verified."}
+              {airlockStatus === "OPENING_HATCH" && "Pressure safe · outer hatch opening for EVA."}
+              {airlockStatus === "DEPRESSURIZED" && "Outer hatch open · suit sealed · EVA clearance granted."}
+            </div>
+          </div>
+        )}
+        {(airlockStatus === "HELMET_REMOVAL" || airlockStatus === "HELMET_SEAL") && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center overflow-hidden">
+            <style>{`
+              @keyframes habitat-visor-lift {
+                from { transform: translateY(0); opacity: .9; }
+                to { transform: translateY(-110%); opacity: 0; }
+              }
+              @keyframes habitat-visor-seat {
+                from { transform: translateY(-110%); opacity: 0; }
+                to { transform: translateY(0); opacity: .9; }
+              }
+            `}</style>
+            <div
+              className="absolute inset-3 rounded-[22%] border-[5px] border-[#9fc4c8]/70 shadow-[inset_0_0_80px_rgba(114,201,220,.18),0_0_28px_rgba(123,216,224,.24)]"
+              style={{
+                background: "radial-gradient(ellipse at 50% 44%, rgba(16,44,55,.24), rgba(3,12,17,.82))",
+                animation: airlockStatus === "HELMET_REMOVAL" ? "habitat-visor-lift 900ms ease-in forwards" : "habitat-visor-seat 900ms ease-out forwards",
+              }}
+            />
+            <div className="relative rounded border border-[#8cb5a1]/60 bg-[#081719]/90 px-5 py-3 text-center font-mono text-[9px] font-black uppercase tracking-[0.16em] text-[#c5f0d7] shadow-xl backdrop-blur">
+              <span className="block text-[#7ce2d2]">Suit automation</span>
+              {airlockStatus === "HELMET_REMOVAL" ? "Helmet seals released" : "Helmet sealed · suit checked"}
+            </div>
           </div>
         )}
         {props.habitatInterior && cabinetOpen && (

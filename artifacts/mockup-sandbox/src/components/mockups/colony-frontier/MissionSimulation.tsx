@@ -1328,6 +1328,7 @@ function IsometricMap({
   habitatInterior,
   onSelectResource,
   onCloseInspector,
+  onEnterHabitat,
   onExitHabitat,
   onSupplyAction,
   roverTask,
@@ -1353,6 +1354,7 @@ function IsometricMap({
   habitatInterior: boolean;
   onSelectResource: (node: ResourceNode) => void;
   onCloseInspector: () => void;
+  onEnterHabitat: () => void;
   onExitHabitat: () => void;
   onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
@@ -1382,6 +1384,7 @@ function IsometricMap({
       onSelect={onSelect}
       onCloseInspector={onCloseInspector}
       onSelectResource={onSelectResource}
+      onEnterHabitat={onEnterHabitat}
       onExitHabitat={onExitHabitat}
       onSupplyAction={onSupplyAction}
       roverTask={roverTask}
@@ -4840,6 +4843,11 @@ export function MissionSimulation() {
           selectedBuildingId={selectedBuildingId}
           habitatInterior={habitatInterior}
           onCloseInspector={() => setSelectedBuildingId(null)}
+          onEnterHabitat={() => {
+            setSelectedBuildingId(null);
+            setSelectedResourceId(null);
+            setHabitatInterior(true);
+          }}
           onExitHabitat={() => setHabitatInterior(false)}
           onSupplyAction={(trackId, action) => {
             if (!pending.selected[trackId]) {
