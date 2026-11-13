@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+import { DustParticles } from "./solar-surface/dust-particles";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
@@ -25,6 +26,8 @@ export type MissionPhysicalReadings = {
   radiation: string;
   temperature: string;
 };
+
+export const COLONY_WORLD_SCALE = 1.35;
 
 type Props = {
   tracks: TechnologyTrack[];
@@ -125,7 +128,7 @@ const ROAD_Z = [-9, -0.6, 9];
 const ROAD_EDGE = 18;
 const PAD_Y = 0.12;
 
-function nodeWorldPosition(node: MissionResourceNode): [number, number] {
+export function nodeWorldPosition(node: MissionResourceNode): [number, number] {
   return [(node.x - 500) / 22, (node.y - 300) / 10];
 }
 
@@ -521,7 +524,7 @@ function Beacon({ color, active, height = 2.1 }: { color: string; active: boolea
   );
 }
 
-function BuildingArt({ id, accent }: { id: string; accent: string }) {
+function BuildingArt({ id, accent, dust = 0 }: { id: string; accent: string; dust?: number }) {
   const p = palette(id);
 
   if (id === "habitat") {
@@ -720,6 +723,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
         {[-0.85, 0.85].map((x) => (
           <group key={x} position={[x, 0.82, 0]}>
             <mesh rotation={[0.18, 0, 0]} castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} /></mesh>
+            {dust > 0 && <mesh position={[0, 0.039, 0]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.99, 0.012, 1.57]} /><meshStandardMaterial color="#bd8c63" transparent opacity={Math.min(0.78, dust / 100 * 0.78)} roughness={1} depthWrite={false} /></mesh>}
             {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
             {[-0.47, 0, 0.47].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.018, 0.015, 1.53]} /><meshStandardMaterial color="#6c9fb3" /></mesh>)}
             {[-0.8, 0.8].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.06, 0.04, 0.04]} /><meshStandardMaterial color="#b3beb9" metalness={0.75} /></mesh>)}
@@ -1374,7 +1378,7 @@ function Rover({
             // One colony-map unit represents approximately one metre. Convert the rated
             // safe traverse speed from km/h to m/s; simulation speed accelerates both travel
             // and the corresponding timed field-operation clock.
-            const baseSpeedMps = Math.max(0, traverseSpeedKmh / 3.6);
+            const baseSpeedMps = Math.max(0, traverseSpeedKmh / 3.6 / COLONY_WORLD_SCALE);
             const simRate = Math.min(4, Math.max(0.5, simulationSpeed));
             const terrainSampleDistance = Math.min(0.75, distance);
             const terrainAheadHeight = terrainHeight(current.x + (dx / distance) * terrainSampleDistance, current.z + (dz / distance) * terrainSampleDistance);
@@ -2318,7 +2322,7 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} dust={runtime.dust} />
         <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
       </group>
       {statusBeaconColor && (
@@ -3364,7 +3368,7 @@ function WalkControls({
     }
     if (direction.lengthSq() > 0) {
       direction.normalize();
-      const speed = keys.current.has("shift") ? 7 : 4.5;
+      const speed = (keys.current.has("shift") ? 7 : 4.5) / (habitatInterior ? 1 : COLONY_WORLD_SCALE);
       const distance = speed * Math.min(delta, 0.05);
       const nextX = player.position.x + direction.x * distance;
       const nextZ = player.position.z + direction.z * distance;
@@ -3594,7 +3598,7 @@ function Scene({ props }: { props: Props }) {
       orthographic
       shadows
       dpr={[1, 2]}
-      camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
+      camera={{ position: [48, 56, 48], zoom: 20.5, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
       onCreated={({ gl }) => {
         gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -3632,6 +3636,8 @@ function Scene({ props }: { props: Props }) {
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
+      {mars && props.activeEventId === "regional-dust-front" && <DustParticles kind="mars" dust={Math.max(28, props.buildings.solar?.dust ?? 0)} />}
+      <group scale={COLONY_WORLD_SCALE}>
       <RoverRockField mars={mars} />
       <Foundation mars={mars} />
       <group frustumCulled={false}>
@@ -3670,9 +3676,11 @@ function Scene({ props }: { props: Props }) {
         <Crew mars={mars} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
       </group>
+      </group>
         </>
       )}
       {firstPersonMode ? (
+        <group scale={props.habitatInterior ? 1 : COLONY_WORLD_SCALE}>
         <WalkControls
           tracks={props.tracks}
           resourceNodes={props.resourceNodes}
@@ -3706,6 +3714,7 @@ function Scene({ props }: { props: Props }) {
           selectedBuildingId={props.selectedBuildingId}
           selectedResourceId={props.selectedResourceId}
         />
+        </group>
       ) : (
         <OrbitControls
           enableRotate
