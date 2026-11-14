@@ -3,5 +3,5 @@ main = "worker.ts"
 compatibility_date = "2026-11-14"
 
 [vars]
-# Set this to the exact deployed game origin before production use.
-ALLOWED_ORIGIN = "https://your-game-domain.example"
+# Local development origins. Replace with the exact production origin(s) before deployment.
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"

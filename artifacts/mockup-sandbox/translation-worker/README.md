@@ -1,12 +1,13 @@
 # Colony Frontier translation service
 
-The game UI uses Google Cloud Translation through a Cloudflare Worker. The Google API key stays on the server and is never shipped to the browser.
+The game uses Google Cloud Translation through a Cloudflare Worker. The Google API key stays on the server and is never shipped to the browser.
 
 ## 1. Configure Google Cloud
 
 1. Create or select a Google Cloud project.
-2. Enable **Cloud Translation API** and configure billing.
-3. Create an API key. Restrict it to the Cloud Translation API.
+2. Enable **Cloud Translation API (Basic v2)**.
+3. Configure billing and check Google's current pricing/free allowance.
+4. Create an API key and restrict it to the Cloud Translation API.
 
 ## 2. Deploy the Cloudflare Worker
 
@@ -17,22 +18,29 @@ npx wrangler secret put GOOGLE_TRANSLATE_API_KEY
 npx wrangler deploy
 ```
 
-Paste the Google API key when Wrangler prompts for it. Then edit `ALLOWED_ORIGIN` in `wrangler.toml` to the exact origin hosting Colony Frontier and deploy again.
+Paste the Google API key when Wrangler prompts for it.
+
+The included `wrangler.toml` allows local Vite origins at `localhost:5173` and `127.0.0.1:5173`. Before production, change `ALLOWED_ORIGINS` to the exact origin(s) hosting Colony Frontier, then deploy again. Do not use `*` for a public production deployment.
 
 ## 3. Point the game at the Worker
 
-Set the Vite environment variable `VITE_TRANSLATION_API_URL` to the deployed Worker URL plus `/` (for example, `https://colony-frontier-translation.example.workers.dev/`), or configure a same-origin `/api/translate` reverse proxy to the Worker.
+Create `.env.local` in the Vite project root (the folder containing `package.json`):
 
-For a local Vite environment, add that variable to `.env.local` in `artifacts/mockup-sandbox`, then restart the dev server.
+```env
+VITE_TRANSLATION_API_URL=https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev
+```
+
+Do not put the Google API key in `.env.local` or any `VITE_` variable. Vite variables are exposed to the browser. Restart the Vite dev server after changing `.env.local`.
 
 ## Included behaviour
 
-- Language selector is available on every preview screen.
-- Selected language is saved in local storage.
-- Visible UI text, including dynamically appearing mission warnings and response options, is translated in batches.
-- Repeated strings are cached locally to reduce API usage.
+- The language picker searches Google's language list, loaded from the Cloud Translation API through the Worker.
+- The selected language is saved in local storage.
+- Visible UI text, including dynamically appearing mission warnings and response options, is translated.
+- Text nodes are sent in batches of up to 40 strings to reduce request overhead.
+- Repeated strings are cached in the browser to reduce API usage.
 - English is the source language and is not sent to Google.
 
-## Notes
+## Important
 
-Google Cloud Translation is a paid API after any applicable free allowance. The translation UI cannot contact Google until the Worker is deployed and its URL is configured. Technical identifiers, code samples, and some text embedded in images are intentionally not translated.
+Google Cloud Translation is an online service and may incur charges after any applicable free allowance. Translation will not work until the Worker is deployed, its Google API key is configured, and `VITE_TRANSLATION_API_URL` is set. Technical identifiers, code samples, and some text embedded in images are intentionally not translated.

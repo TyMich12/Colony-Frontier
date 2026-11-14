@@ -9,93 +9,165 @@ import {
   type ReactNode,
 } from "react";
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "es", label: "Español" },
-  { code: "fr", label: "Français" },
-  { code: "de", label: "Deutsch" },
-  { code: "ar", label: "العربية" },
-  { code: "hi", label: "हिन्दी" },
-  { code: "zh", label: "中文" },
-  { code: "ja", label: "日本語" },
-  { code: "pt", label: "Português" },
-  { code: "ru", label: "Русский" },
-] as const;
-
-type LanguageCode = (typeof LANGUAGES)[number]["code"];
+type LanguageOption = { code: string; name: string };
 type TranslationStatus =
   | "idle"
-  | "checking"
-  | "downloading"
+  | "loading-languages"
   | "ready"
-  | "unsupported"
+  | "not-configured"
   | "error";
 
 type TranslationContextValue = {
-  language: LanguageCode;
+  language: string;
   supported: boolean;
   status: TranslationStatus;
   progress: number;
-  availability: TranslatorAvailability | null;
-  setLanguage: (language: LanguageCode) => void;
+  availability: null;
+  setLanguage: (language: string) => void;
   translate: (text: string) => Promise<string>;
 };
 
 const TranslationContext = createContext<TranslationContextValue | null>(null);
 
 const LANGUAGE_KEY = "colony-frontier-language";
+const API_URL = (import.meta.env.VITE_TRANSLATION_API_URL ?? "").trim().replace(/\/+$/, "");
+const FALLBACK_LANGUAGES: LanguageOption[] = [
+  { code: "en", name: "English" },
+  { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "ar", name: "Arabic" },
+  { code: "hi", name: "Hindi" },
+  { code: "zh-CN", name: "Chinese (Simplified)" },
+  { code: "zh-TW", name: "Chinese (Traditional)" },
+  { code: "ja", name: "Japanese" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+];
+
 const translationCache = new Map<string, string>();
 const pendingTranslations = new Map<string, Promise<string>>();
 
-function getSavedLanguage(): LanguageCode {
+function getSavedLanguage(): string {
   try {
-    const saved = localStorage.getItem(LANGUAGE_KEY);
-    return LANGUAGES.some((item) => item.code === saved)
-      ? (saved as LanguageCode)
-      : "en";
+    return localStorage.getItem(LANGUAGE_KEY) || "en";
   } catch {
     return "en";
   }
 }
 
-export function TranslationProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<LanguageCode>("en");
-  const [supported, setSupported] = useState(
-    () => typeof window !== "undefined" && !!window.Translator,
-  );
-  const [status, setStatus] = useState<TranslationStatus>("idle");
-  const [progress, setProgress] = useState(0);
-  const [availability, setAvailability] =
-    useState<TranslatorAvailability | null>(null);
+async function readError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: string };
+    return body.error || `Translation service returned ${response.status}.`;
+  } catch {
+    return `Translation service returned ${response.status}.`;
+  }
+}
 
-  const translatorRef = useRef<BrowserTranslator | null>(null);
-  const requestIdRef = useRef(0);
-  const originalsRef = useRef(new WeakMap<Text, string>());
-  const translatedRef = useRef(new WeakMap<Text, string>());
+async function requestTranslations(
+  texts: string[],
+  target: string,
+): Promise<string[]> {
+  if (!API_URL) throw new Error("Google Cloud Translation is not configured.");
+
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      q: texts,
+      source: "en",
+      target,
+      format: "text",
+    }),
+  });
+
+  if (!response.ok) throw new Error(await readError(response));
+
+  const result = (await response.json()) as {
+    translations?: Array<{ translatedText?: string }>;
+  };
+  return (result.translations ?? []).map((item) => item.translatedText ?? "");
+}
+
+export function TranslationProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<string>(getSavedLanguage);
+  const [languages, setLanguages] = useState<LanguageOption[]>(FALLBACK_LANGUAGES);
+  const [status, setStatus] = useState<TranslationStatus>(
+    API_URL ? "loading-languages" : "not-configured",
+  );
+  const [search, setSearch] = useState("");
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setSupported(!!window.Translator);
+    if (!API_URL) return;
+
+    let active = true;
+    void fetch(`${API_URL}/languages?target=en`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await readError(response));
+        return (await response.json()) as {
+          languages?: Array<{ code?: string; language?: string; name?: string }>;
+        };
+      })
+      .then((result) => {
+        if (!active) return;
+        const received = (result.languages ?? [])
+          .filter((item) => (item.code || item.language) && item.name)
+          .map((item) => ({
+            code: (item.code || item.language)!,
+            name: item.name!,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (!received.some((item) => item.code === "en")) {
+          received.unshift({ code: "en", name: "English" });
+        }
+        if (received.length) setLanguages(received);
+        setStatus("ready");
+      })
+      .catch((error: unknown) => {
+        console.error("Colony Frontier could not load Google's language list:", error);
+        if (active) setStatus("error");
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const translate = useCallback(async (text: string): Promise<string> => {
-    const translator = translatorRef.current;
-    if (language === "en" || !translator || !text.trim()) return text;
+  useEffect(() => {
+    if (!languageMenuOpen) return;
 
-    const key = language + ":" + text;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setLanguageMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [languageMenuOpen]);
+
+  const translate = useCallback(async (text: string): Promise<string> => {
+    if (language === "en" || !text.trim() || !API_URL) return text;
+
+    const key = `${language}:${text}`;
     const cached = translationCache.get(key);
     if (cached !== undefined) return cached;
 
     const pending = pendingTranslations.get(key);
     if (pending) return pending;
 
-    const task = translator
-      .translate(text)
-      .then((result) => {
-        translationCache.set(key, result);
-        return result;
+    const task = requestTranslations([text], language)
+      .then((results) => {
+        const translated = results[0] || text;
+        translationCache.set(key, translated);
+        return translated;
       })
       .catch((error: unknown) => {
-        console.error("Colony Frontier local translation failed:", error);
+        console.error("Colony Frontier translation failed:", error);
         setStatus("error");
         return text;
       })
@@ -107,94 +179,24 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     return task;
   }, [language]);
 
-  const setLanguage = useCallback((next: LanguageCode) => {
-    const requestId = ++requestIdRef.current;
+  const chooseLanguage = (next: string) => {
+    setLanguageState(next);
+    setSearch("");
+    setLanguageMenuOpen(false);
+    translationCache.clear();
 
-    if (next === "en") {
-      translatorRef.current = null;
-      setLanguageState("en");
-      setStatus("idle");
-      setProgress(0);
-      setAvailability(null);
-      try {
-        localStorage.setItem(LANGUAGE_KEY, "en");
-      } catch {
-        // Language selection still works when storage is unavailable.
-      }
-      return;
-    }
-
-    const api = window.Translator;
-    if (!api) {
-      setSupported(false);
-      setStatus("unsupported");
-      return;
-    }
-
-    const options = {
-      sourceLanguage: "en",
-      targetLanguage: next,
-    };
-
-    setStatus("checking");
-    setProgress(0);
-    setAvailability(null);
-
-    // Call create synchronously inside the player's selection event.
-    // Do not await availability() first: downloadable models require
-    // transient user activation for create().
-    let creation: Promise<BrowserTranslator>;
     try {
-      creation = api.create({
-        ...options,
-        monitor(monitor) {
-          monitor.addEventListener("downloadprogress", (event) => {
-            if (requestId !== requestIdRef.current) return;
-            setStatus("downloading");
-            setProgress(Math.round(event.loaded * 100));
-          });
-        },
-      });
-    } catch (error) {
-      console.error("Could not start the local translator:", error);
-      setStatus("error");
-      return;
+      localStorage.setItem(LANGUAGE_KEY, next);
+    } catch {
+      // The language still works for this session if storage is unavailable.
     }
 
-    // Availability is still checked and exposed to the UI, but it does not
-    // delay create() and therefore cannot consume the click's user activation.
-    void api.availability(options).then((result) => {
-      if (requestId === requestIdRef.current) {
-        setAvailability(result);
-        if (result === "unavailable") setStatus("unsupported");
-      }
-    }).catch(() => {
-      if (requestId === requestIdRef.current) setAvailability("unavailable");
-    });
-
-    void creation.then((translator) => {
-      if (requestId !== requestIdRef.current) return;
-
-      translatorRef.current = translator;
-      setLanguageState(next);
-      setStatus("ready");
-      setProgress(100);
-      try {
-        localStorage.setItem(LANGUAGE_KEY, next);
-      } catch {
-        // Language selection still works when storage is unavailable.
-      }
-    }).catch((error: unknown) => {
-      if (requestId !== requestIdRef.current) return;
-      console.error("Colony Frontier could not load this language:", error);
-      setStatus("error");
-      setProgress(0);
-    });
-  }, []);
+    setStatus(API_URL ? "ready" : "not-configured");
+  };
 
   useEffect(() => {
-    const originals = originalsRef.current;
-    const translated = translatedRef.current;
+    const originals = new WeakMap<Text, string>();
+    const translated = new WeakMap<Text, string>();
     let disposed = false;
     let scheduled = false;
     let running = false;
@@ -258,26 +260,50 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       pendingNodes.clear();
 
       try {
-        for (const node of nodes) {
-          if (disposed || !node.isConnected) continue;
+        // Google Cloud Translation accepts multiple q values in one request.
+        for (let start = 0; start < nodes.length; start += 40) {
+          const batch = nodes.slice(start, start + 40);
+          const items = batch.map((node) => {
+            const original = originals.get(node) ?? node.nodeValue ?? "";
+            const leading = original.match(/^\s*/)?.[0] ?? "";
+            const trailing = original.match(/\s*$/)?.[0] ?? "";
+            const core = original.slice(
+              leading.length,
+              original.length - trailing.length || undefined,
+            );
+            return { node, original, leading, trailing, core };
+          });
 
-          const original = originals.get(node) ?? node.nodeValue ?? "";
-          const leading = original.match(/^\s*/)?.[0] ?? "";
-          const trailing = original.match(/\s*$/)?.[0] ?? "";
-          const core = original.slice(
-            leading.length,
-            original.length - trailing.length || undefined,
+          const translatable = items.filter((item) => item.core.length >= 2);
+          const uncached = translatable.filter(
+            (item) => !translationCache.has(`${language}:${item.core}`),
           );
+          const uniqueTexts = [...new Set(uncached.map((item) => item.core))];
 
-          if (core.length < 2) continue;
+          if (uniqueTexts.length) {
+            try {
+              const results = await requestTranslations(uniqueTexts, language);
+              uniqueTexts.forEach((text, index) => {
+                const value = results[index];
+                if (value) translationCache.set(`${language}:${text}`, value);
+              });
+            } catch (error) {
+              console.error("Colony Frontier batch translation failed:", error);
+              setStatus("error");
+            }
+          }
 
-          const result = await translate(core);
-          if (disposed || !node.isConnected) continue;
-          if ((node.nodeValue ?? "") !== original || result === core) continue;
+          for (const item of translatable) {
+            if (disposed || !item.node.isConnected) continue;
+            if ((item.node.nodeValue ?? "") !== item.original) continue;
 
-          const next = leading + result + trailing;
-          translated.set(node, next);
-          node.nodeValue = next;
+            const result = translationCache.get(`${language}:${item.core}`);
+            if (result === undefined) continue;
+
+            const next = item.leading + result + item.trailing;
+            translated.set(item.node, next);
+            item.node.nodeValue = next;
+          }
         }
       } finally {
         running = false;
@@ -285,7 +311,7 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Restore original English text before applying a different language.
+    // Restore the original English before applying the newly selected language.
     for (const node of eligibleTextNodes(document.body)) {
       const previousTranslation = translated.get(node);
       if (previousTranslation !== undefined && node.nodeValue === previousTranslation) {
@@ -293,10 +319,10 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       }
       translated.delete(node);
       originals.set(node, node.nodeValue ?? "");
-      if (language !== "en") pendingNodes.add(node);
+      if (language !== "en" && API_URL) pendingNodes.add(node);
     }
 
-    if (language === "en") return;
+    if (language === "en" || !API_URL) return;
 
     const observer = new MutationObserver((records) => {
       for (const record of records) {
@@ -322,26 +348,36 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       disposed = true;
       observer.disconnect();
     };
-  }, [language, translate]);
+  }, [language]);
+
+  const filteredLanguages = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return languages;
+    return languages.filter(
+      (item) =>
+        item.name.toLocaleLowerCase().includes(query) ||
+        item.code.toLocaleLowerCase().includes(query),
+    );
+  }, [languages, search]);
+
+  const selectedLanguage = languages.find((item) => item.code === language);
+  const statusLabel = {
+    idle: "",
+    "loading-languages": "Loading Google language list…",
+    ready: "",
+    "not-configured": "Configure the Google Cloud Worker to enable translation",
+    error: "Translation service unavailable — original text is shown",
+  }[status];
 
   const context = useMemo<TranslationContextValue>(() => ({
     language,
-    supported,
+    supported: Boolean(API_URL),
     status,
-    progress,
-    availability,
-    setLanguage,
+    progress: 0,
+    availability: null,
+    setLanguage: chooseLanguage,
     translate,
-  }), [language, supported, status, progress, availability, setLanguage, translate]);
-
-  const statusLabel = {
-    idle: "",
-    checking: "Preparing local translator…",
-    downloading: `Downloading language pack: ${progress}%`,
-    ready: "Local translation ready",
-    unsupported: "Offline translation unavailable on this browser or device",
-    error: "Translation failed — English text will be shown",
-  }[status];
+  }), [language, status, translate]);
 
   return (
     <TranslationContext.Provider value={context}>
@@ -351,37 +387,78 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
         data-no-translate="true"
       >
         <label
-          htmlFor="colony-frontier-language"
+          htmlFor="colony-frontier-language-search"
           className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#a9c1b6]"
         >
           Language
         </label>
-        <select
-          id="colony-frontier-language"
-          value={language}
-          onChange={(event) => setLanguage(event.target.value as LanguageCode)}
-          className="max-w-[145px] bg-[#10252b] text-[11px] text-[#edf4ec] outline-none"
-          aria-label="Choose game language"
-        >
-          {LANGUAGES.map((item) => (
-            <option key={item.code} value={item.code}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        {status === "downloading" && (
-          <div className="h-1 w-16 overflow-hidden bg-[#29434a]" aria-label={statusLabel}>
+        <div className="relative" ref={menuRef}>
+          <input
+            id="colony-frontier-language-search"
+            type="text"
+            role="combobox"
+            aria-label="Search game languages"
+            aria-expanded={languageMenuOpen}
+            aria-controls="colony-frontier-language-options"
+            aria-autocomplete="list"
+            autoComplete="off"
+            value={languageMenuOpen ? search : (selectedLanguage?.name ?? language)}
+            onFocus={() => {
+              setLanguageMenuOpen(true);
+              setSearch("");
+            }}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setLanguageMenuOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setLanguageMenuOpen(false);
+                setSearch("");
+              }
+              if (event.key === "Enter" && filteredLanguages[0]) {
+                chooseLanguage(filteredLanguages[0].code);
+              }
+            }}
+            className="w-[150px] border border-[#496267] bg-[#10252b] px-2 py-1 text-[11px] text-[#edf4ec] outline-none focus:border-[#efb658]"
+            placeholder="Search languages…"
+          />
+          {languageMenuOpen && (
             <div
-              className="h-full bg-[#efb658] transition-all"
-              style={{ width: progress + "%" }}
-            />
-          </div>
-        )}
+              id="colony-frontier-language-options"
+              role="listbox"
+              className="absolute right-0 top-full mt-1 max-h-64 w-[220px] overflow-y-auto border border-[#496267] bg-[#08171f] py-1 shadow-xl"
+            >
+              {filteredLanguages.length ? filteredLanguages.map((item) => (
+                <button
+                  key={item.code}
+                  type="button"
+                  role="option"
+                  aria-selected={item.code === language}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => chooseLanguage(item.code)}
+                  className={`block w-full px-3 py-2 text-left text-[11px] ${
+                    item.code === language
+                      ? "bg-[#203a3f] text-[#efb658]"
+                      : "text-[#edf4ec] hover:bg-[#173039]"
+                  }`}
+                >
+                  <span>{item.name}</span>
+                  <span className="float-right text-[#8da69e]">{item.code}</span>
+                </button>
+              )) : (
+                <div className="px-3 py-2 text-[11px] text-[#9eb0aa]">
+                  No matching languages
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         {statusLabel && (
           <span
             role="status"
             className="hidden max-w-[210px] text-[9px] text-[#efb658] sm:inline"
-            title={availability ? `Language pack: ${availability}` : undefined}
+            title={statusLabel}
           >
             {statusLabel}
           </span>
