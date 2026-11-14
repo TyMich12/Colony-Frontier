@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -46,6 +46,8 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     return LANGUAGES.some((item) => item.code === saved) ? saved as LanguageCode : "en";
   });
   const [status, setStatus] = useState("");
+  const originalsRef = useRef(new WeakMap<Text, string>());
+  const translatedRef = useRef(new WeakMap<Text, string>());
   const context = useMemo(() => ({
     language,
     setLanguage: (next: LanguageCode) => {
@@ -55,13 +57,8 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   }), [language]);
 
   useEffect(() => {
-    if (language === "en") {
-      setStatus("");
-      return;
-    }
-
-    const originals = new WeakMap<Text, string>();
-    const translated = new WeakMap<Text, string>();
+    const originals = originalsRef.current;
+    const translated = translatedRef.current;
     let disposed = false;
     let scheduled = false;
     let running = false;
@@ -167,7 +164,11 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       }
       translated.delete(node);
       originals.set(node, node.nodeValue ?? "");
-      pending.add(node);
+      if (language !== "en") pending.add(node);
+    }
+    if (language === "en") {
+      setStatus("");
+      return;
     }
 
     const observer = new MutationObserver((records) => {
