@@ -3572,7 +3572,7 @@ function HelmetFlashlight() {
   const direction = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
-    const light = new THREE.SpotLight(0xffe6ad, 24, 36, Math.PI / 7, 0.62, 1.3);
+    const light = new THREE.SpotLight(0xffe6ad, 500, 60, Math.PI / 9, 0.45, 2);
     const target = new THREE.Object3D();
     camera.add(light);
     light.position.set(0, -0.08, -0.05);
@@ -3606,6 +3606,9 @@ function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
   const firstPersonMode = walkMode || props.habitatInterior;
   const [flashlightOn, setFlashlightOn] = useState(false);
+  const toggleFlashlight = () => {
+    if (props.lunarNight && firstPersonMode) setFlashlightOn((active) => !active);
+  };
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
   const interactionClickHandled = useRef<InteractionClickState>({ current: false, requestPending: false });
@@ -3813,9 +3816,7 @@ function Scene({ props }: { props: Props }) {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
             setCabinetOpen((open) => !open);
           }}
-          onToggleFlashlight={() => {
-            if (props.lunarNight && firstPersonMode) setFlashlightOn((active) => !active);
-          }}
+          onToggleFlashlight={toggleFlashlight}
           onLockChange={(locked) => {
             setPointerLocked(locked);
             if (locked) setPointerLockError(null);
@@ -4008,13 +4009,27 @@ function Scene({ props }: { props: Props }) {
         {props.habitatInterior ? "Habitat interior" : walkMode ? "Colony map" : "Enter first person"}
       </button>
       {firstPersonMode && (
-        <div className="w-full border border-white/15 bg-[#07131c]/90 px-3 py-2 text-left font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
-          WASD move · Space jump · mouse look · Shift run
-          <br />
-          F flashlight · E inspect / interact · Esc show mouse
-          {!pointerLocked && <><br /><span className="text-[#f4d785]">WASD still moves · click scene to capture look</span></>}
-          {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
-        </div>
+        <>
+          {props.lunarNight && (
+            <button
+              type="button"
+              onClick={toggleFlashlight}
+              aria-pressed={flashlightOn}
+              aria-label={flashlightOn ? "Turn off helmet flashlight" : "Turn on helmet flashlight"}
+              className={`flex w-full items-center justify-between border px-3 py-2 text-left font-mono text-[9px] font-black uppercase tracking-[0.12em] shadow-lg transition ${flashlightOn ? "border-[#f2d783]/70 bg-[#382f1a]/95 text-[#ffe9a7]" : "border-[#7192a1]/50 bg-[#07131c]/90 text-[#c5d8df] hover:border-[#d5c579]"}`}
+            >
+              <span>Helmet flashlight</span>
+              <span className="flex items-center gap-2"><kbd className="border border-current/40 px-1.5 py-0.5">F</kbd>{flashlightOn ? "ON" : "OFF"}</span>
+            </button>
+          )}
+          <div className="w-full border border-white/15 bg-[#07131c]/90 px-3 py-2 text-left font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
+            WASD move · Space jump · mouse look · Shift run
+            <br />
+            F flashlight (at night) · E inspect / interact · Esc show mouse
+            {!pointerLocked && <><br /><span className="text-[#f4d785]">WASD still moves · click scene to capture look</span></>}
+            {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
+          </div>
+        </>
       )}
     </div>
     {firstPersonMode && pointerLocked && (
