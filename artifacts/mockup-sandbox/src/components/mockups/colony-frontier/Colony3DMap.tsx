@@ -5,7 +5,6 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
-import { DustParticles } from "./solar-surface/dust-particles";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
@@ -3686,7 +3685,6 @@ function Scene({ props }: { props: Props }) {
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
-      {mars && props.activeEventId === "regional-dust-front" && <DustParticles kind="mars" dust={Math.max(28, props.buildings.solar?.dust ?? 0)} />}
       <group scale={COLONY_WORLD_SCALE}>
       <RoverRockField mars={mars} />
       <Foundation mars={mars} />

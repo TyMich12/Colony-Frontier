@@ -20,7 +20,7 @@ import {
   type SolarTier,
   type TerrainKind,
 } from "./state";
-import { makeCellEmissiveTexture, makeSolarCellTexture, makeDustTexture } from "./textures";
+import { makeCellEmissiveTexture, makeSolarCellTexture } from "./textures";
 
 
 const CLEAN = new THREE.Color("#ffffff");
@@ -32,7 +32,6 @@ interface FarmProps {
   tier: SolarTier;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
-  dustGenerationKey: number;
 }
 
 export function SolarFarm({
@@ -43,14 +42,9 @@ export function SolarFarm({
   tier,
   onComponentSelect,
   selectedComponentName,
-  dustGenerationKey,
 }: FarmProps) {
   const cellMap = useMemo(() => makeSolarCellTexture(), []);
   const cellEmissive = useMemo(() => makeCellEmissiveTexture(), []);
-  const dustTexture = useMemo(
-    () => makeDustTexture(terrain, 512, Math.floor(Math.random() * 0x7fffffff)),
-    [terrain],
-  );
 
   const pvMaterial = useMemo(
     () =>
@@ -63,24 +57,7 @@ export function SolarFarm({
         roughness: 0.32,
         color: CLEAN.clone(),
       }),
-    [cellMap, cellEmissive, dustTexture, terrain],
-  );
-
-  const dustMaterial = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map: dustTexture,
-        color: "#ffffff",
-        roughness: 1,
-        metalness: 0,
-        transparent: true,
-        alphaTest: 0.01,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1,
-      }),
-    [dustTexture],
+    [cellMap, cellEmissive],
   );
 
   const frameMaterial = useMemo(
@@ -107,14 +84,6 @@ export function SolarFarm({
     solarLive.deploy = THREE.MathUtils.damp(solarLive.deploy, deployTarget, 2.2, delta);
     solarLive.dust = THREE.MathUtils.damp(solarLive.dust, dust, 3, delta);
 
-    const dustFrac = Math.max(0, Math.min(100, solarLive.dust)) / 100;
-    // Visual density is intentionally nonlinear and separate from the power model:
-    // a little dust is patchy, while severe accumulation quickly becomes a thick, visually dominant deposit.
-    dustMaterial.opacity =
-      dustFrac <= 0
-        ? 0
-        : Math.min(1, 0.01 + Math.pow(dustFrac, 0.52) * 0.99);
-    dustMaterial.alphaTest = 0.01;
     const dustRemaining = dustRemainingFraction(terrain, solarLive.dust);
     const dustCoverage = dustCoverageFraction(solarLive.dust);
     const surfaceIrradiance = surfaceIrradianceForTerrain(terrain, sunElevation);
@@ -164,7 +133,7 @@ export function SolarFarm({
 
   return (
     <group scale={INSTALLATION_LINEAR_SCALE[terrain]}>
-      <CentralHub dust={dust} terrain={terrain} onSelect={onComponentSelect} selectedComponentName={selectedComponentName} />
+      <CentralHub onSelect={onComponentSelect} selectedComponentName={selectedComponentName} />
       {Array.from({ length: 4 }, (_, i) => (
         <PanelWing
           key={i}
@@ -172,10 +141,6 @@ export function SolarFarm({
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
           boomMaterial={boomMaterial}
-          dustMaterial={dustMaterial}
-          terrain={terrain}
-          wingIndex={i}
-          dustGenerationKey={dustGenerationKey}
           onSelect={onComponentSelect}
           selectedComponentName={selectedComponentName}
         />

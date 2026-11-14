@@ -5,7 +5,6 @@ import * as THREE from "three";
 import { ArrowLeft, ArrowRight, Moon, Power, Sparkles, Sun, Wind, Gauge } from "lucide-react";
 import { SolarFarm } from "./solar-surface/solar-farm";
 import { Terrain, Rocks } from "./solar-surface/terrain";
-import { DustParticles } from "./solar-surface/dust-particles";
 import {
   CELL_EFFICIENCY,
   solarLive,
@@ -108,14 +107,12 @@ function SolarScene({
   tier,
   onComponentSelect,
   selectedComponentName,
-  dustGenerationKey,
 }: {
   terrain: TerrainKind;
   dust: number;
   sun: number;
   deployed: boolean;
   tier: SolarTier;
-  dustGenerationKey: number;
   onComponentSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }) {
@@ -143,13 +140,11 @@ function SolarScene({
           sunElevation={sun}
           terrain={terrain}
           tier={tier}
-          dustGenerationKey={dustGenerationKey}
           onComponentSelect={onComponentSelect}
           selectedComponentName={selectedComponentName}
         />
         <Terrain kind={terrain} />
         <Rocks kind={terrain} />
-        <DustParticles kind={terrain} dust={dust} />
       </group>
 
       <OrbitControls
@@ -170,7 +165,6 @@ export function SolarSurfaceSimulation({ tier }: Props) {
   const [deployed, setDeployed] = useState(false);
   const [terrain, setTerrain] = useState<TerrainKind>("moon");
   const [dust, setDust] = useState(0);
-  const [dustGenerationKey, setDustGenerationKey] = useState(0);
   const [autoDust, setAutoDust] = useState(false);
   const [sun, setSun] = useState(32);
   const [selectedComponent, setSelectedComponent] = useState<{
@@ -279,7 +273,6 @@ export function SolarSurfaceSimulation({ tier }: Props) {
           sun={sun}
           deployed={deployed}
           tier={tier}
-          dustGenerationKey={dustGenerationKey}
           onComponentSelect={(name, role, explanation) => setSelectedComponent({ name, role, explanation })}
           selectedComponentName={selectedComponent?.name ?? null}
         />
@@ -357,7 +350,6 @@ export function SolarSurfaceSimulation({ tier }: Props) {
             type="button"
             onClick={() => {
               setDust(0);
-              setDustGenerationKey((value) => value + 1);
               setAutoDust(false);
             }}
             className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10"
