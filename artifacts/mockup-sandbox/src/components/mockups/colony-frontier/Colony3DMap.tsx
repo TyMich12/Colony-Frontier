@@ -103,6 +103,27 @@ function buildingClearanceRadius(id: string): number {
   return footprintRadius * (BUILDING_SCALES[id] ?? 1.2) + 0.2;
 }
 
+function keepPathAwayFromBuildings(position: [number, number], clearance: number): [number, number] {
+  let x = position[0];
+  let z = position[1];
+
+  for (const [id, [bx, bz]] of Object.entries(POSITIONS)) {
+    if (id === "rover") continue;
+    const radius = buildingClearanceRadius(id) + clearance;
+    const dx = x - bx;
+    const dz = z - bz;
+    const distance = Math.hypot(dx, dz);
+    if (distance === 0 || distance >= radius) continue;
+    const push = (radius - distance) * 0.52;
+    const nx = dx / distance;
+    const nz = dz / distance;
+    x += nx * push;
+    z += nz * push;
+  }
+
+  return [x, z];
+}
+
 const BUILDING_ROTATIONS: Record<string, number> = {
   habitat: 0,
   solar: 0.2,
@@ -1616,10 +1637,10 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
   const haloRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    const pulse = alerted ? 1 + (Math.sin(t * 5.2) + 1) * 0.055 : selected ? 1.025 : 1;
+    const pulse = alerted ? 1 + (Math.sin(t * 4.1) + 1) * 0.04 : selected ? 1.02 : 1;
     if (ref.current) ref.current.scale.set(pulse, pulse, pulse);
     if (haloRef.current && alerted) {
-      const glow = 0.1 + (Math.sin(t * 4.1) + 1) * 0.045;
+      const glow = 0.08 + (Math.sin(t * 3.4) + 1) * 0.028;
       const material = haloRef.current.material as THREE.MeshBasicMaterial;
       material.opacity = glow;
     }
@@ -1639,7 +1660,7 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
             <ringGeometry args={[radius + 0.10, radius + 0.18, 72]} />
             <meshBasicMaterial color="#ff4b61" transparent opacity={0.95} depthWrite={false} toneMapped={false} />
           </mesh>
-          <pointLight position={[0, height + 0.28, 0]} color="#ff1f3c" intensity={3.2} distance={Math.max(4.5, radius * 2.8)} decay={2} />
+          <pointLight position={[0, height + 0.28, 0]} color="#ff1f3c" intensity={1.2} distance={Math.max(4.5, radius * 2.4)} decay={2} />
         </>
       )}
       <mesh ref={ref} position={[0, height + 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}>
@@ -1789,11 +1810,12 @@ function ColonyRobot({
       }
     }
 
+    const safePosition = keepPathAwayFromBuildings([x, z], 0.8);
     const gait = Math.sin(time * 3.8 + phaseOffset) * (servicing ? 0.08 : 0.34);
     ref.current.position.set(
-      x,
+      safePosition[0],
       -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * (servicing ? 0.006 : 0.018) - (servicing ? 0.025 : 0),
-      z,
+      safePosition[1],
     );
     const turn = Math.atan2(Math.sin(heading - ref.current.rotation.y), Math.cos(heading - ref.current.rotation.y));
     ref.current.rotation.y += turn * Math.min(1, delta * 5);
@@ -2017,7 +2039,8 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
     const [bx, bz] = route[(i + 1) % route.length];
     const x = THREE.MathUtils.lerp(ax, bx, f);
     const z = THREE.MathUtils.lerp(az, bz, f);
-    ref.current.position.set(x, -0.176 + Math.abs(Math.sin(time * 3.4 + phaseOffset)) * 0.012, z);
+    const safePosition = keepPathAwayFromBuildings([x, z], 0.55);
+    ref.current.position.set(safePosition[0], -0.176 + Math.abs(Math.sin(time * 3.4 + phaseOffset)) * 0.012, safePosition[1]);
     ref.current.rotation.y = Math.atan2(bx - ax, bz - az);
 
     // Slower, weightier EVA gait rather than a twitchy robot walk.
@@ -2299,9 +2322,9 @@ function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolea
   const light = useRef<THREE.PointLight>(null);
 
   useFrame(({ clock }) => {
-    const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 9 : 3)) + 1) / 2;
-    if (lens.current) lens.current.emissiveIntensity = urgent ? 0.8 + pulse * 1.8 : 0.45 + pulse * 0.45;
-    if (light.current) light.current.intensity = urgent ? 0.7 + pulse * 1.6 : 0.25 + pulse * 0.35;
+    const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 6 : 2.4)) + 1) / 2;
+    if (lens.current) lens.current.emissiveIntensity = urgent ? 0.65 + pulse * 1.1 : 0.35 + pulse * 0.3;
+    if (light.current) light.current.intensity = urgent ? 0.42 + pulse * 0.85 : 0.18 + pulse * 0.2;
   });
 
   return (
@@ -2507,7 +2530,7 @@ function MissionVitalsHUD({
 function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: boolean }) {
   const particles = useRef<Array<THREE.Mesh | null>>([]);
   const warningLight = useRef<THREE.PointLight>(null);
-  const count = 18;
+  const count = 10;
   const pressureLeak = eventId === "habitat-pressure";
   const regolithEjecta = eventId === "solar-dust" || eventId === "extraction-lock" || eventId === "micrometeoroid-impact";
   const marsDustFront = mars && eventId === "regional-dust-front";
@@ -2517,7 +2540,7 @@ function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: bool
 
   useFrame(({ clock }) => {
     const time = clock.getElapsedTime();
-    if (warningLight.current) warningLight.current.intensity = 2.2 + (Math.sin(time * 10) + 1) * 1.4;
+    if (warningLight.current) warningLight.current.intensity = 1.15 + (Math.sin(time * 8.5) + 1) * 0.9;
     particles.current.forEach((particle, index) => {
       if (!particle) return;
       const phase = (time * 0.72 + index / count) % 1;
@@ -2538,7 +2561,7 @@ function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: bool
 
   return (
     <group>
-      <pointLight ref={warningLight} position={[0, 2.1, 0]} color={warningColor} distance={10} decay={2} />
+      <pointLight ref={warningLight} position={[0, 2.1, 0]} color={warningColor} distance={8} decay={2} />
       {Array.from({ length: count }, (_, index) => (
         <mesh key={index} ref={(mesh) => { particles.current[index] = mesh; }} visible={false}>
           <sphereGeometry args={[pressureLeak ? 0.055 : 0.045, 8, 6]} />
