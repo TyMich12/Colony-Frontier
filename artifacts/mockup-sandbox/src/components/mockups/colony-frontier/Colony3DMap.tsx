@@ -359,30 +359,49 @@ function palette(id: string) {
 function Foundation({ mars }: { mars: boolean }) {
   const ground = mars ? "#70483b" : "#55585a";
   const curb = mars ? "#b4775e" : "#96928a";
+  const foundationGeometry = useMemo(() => createRoundedSlabGeometry(86, 13, 0.36), []);
+  const deckGeometry = useMemo(() => createRoundedSlabGeometry(82, 11, 0.11), []);
+  const curbGeometry = useMemo(() => createRoundedSlabGeometry(81, 10, 0.035), []);
+  const surfaceGeometry = useMemo(() => createRoundedSlabGeometry(80, 9, 0.028), []);
   return (
     <group>
-      <mesh receiveShadow position={[0, -0.205, 0]}>
-        <RoundedBox args={[86, 0.36, 86]} radius={1.4} smoothness={5}>
-          <meshStandardMaterial color={ground} roughness={0.98} />
-        </RoundedBox>
+      <mesh geometry={foundationGeometry} receiveShadow position={[0, -0.385, 0]}>
+        <meshStandardMaterial color={ground} roughness={0.98} />
       </mesh>
-      <mesh receiveShadow position={[0, 0.025, 0]}>
-        <RoundedBox args={[82, 0.11, 82]} radius={1.05} smoothness={5}>
-          <meshStandardMaterial color={mars ? "#8d5948" : "#74726e"} roughness={0.96} />
-        </RoundedBox>
+      <mesh geometry={deckGeometry} receiveShadow position={[0, -0.03, 0]}>
+        <meshStandardMaterial color={mars ? "#8d5948" : "#74726e"} roughness={0.96} />
       </mesh>
-      <mesh position={[0, 0.105, 0]}>
-        <RoundedBox args={[81, 0.035, 81]} radius={0.8} smoothness={5}>
-          <meshStandardMaterial color={curb} roughness={0.9} metalness={0.12} />
-        </RoundedBox>
+      <mesh geometry={curbGeometry} position={[0, 0.0875, 0]}>
+        <meshStandardMaterial color={curb} roughness={0.9} metalness={0.12} />
       </mesh>
-      <mesh position={[0, 0.132, 0]}>
-        <RoundedBox args={[80, 0.028, 80]} radius={0.55} smoothness={5}>
-          <meshStandardMaterial color={mars ? "#774b3e" : "#666765"} roughness={0.94} />
-        </RoundedBox>
+      <mesh geometry={surfaceGeometry} position={[0, 0.118, 0]}>
+        <meshStandardMaterial color={mars ? "#774b3e" : "#666765"} roughness={0.94} />
       </mesh>
     </group>
   );
+}
+
+function createRoundedSlabGeometry(size: number, cornerRadius: number, thickness: number) {
+  const half = size / 2;
+  const radius = Math.min(cornerRadius, half);
+  const shape = new THREE.Shape();
+  shape.moveTo(-half + radius, -half);
+  shape.lineTo(half - radius, -half);
+  shape.quadraticCurveTo(half, -half, half, -half + radius);
+  shape.lineTo(half, half - radius);
+  shape.quadraticCurveTo(half, half, half - radius, half);
+  shape.lineTo(-half + radius, half);
+  shape.quadraticCurveTo(-half, half, -half, half - radius);
+  shape.lineTo(-half, -half + radius);
+  shape.quadraticCurveTo(-half, -half, -half + radius, -half);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: false,
+    curveSegments: 8,
+  });
+  geometry.rotateX(-Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function Road({
@@ -469,9 +488,8 @@ function Pad({ position, size, mars, accent, baseY = 0 }: { position: [number, n
   return (
     <group position={[x, baseY, z]}>
       <mesh receiveShadow>
-        <RoundedBox args={[size, 0.08, size]} radius={Math.min(0.28, size * 0.08)} smoothness={5}>
-          <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
-        </RoundedBox>
+        <cylinderGeometry args={[size / 2, size / 2, 0.08, 48]} />
+        <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
       </mesh>
       <mesh position={[0, 0.046, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[size * 0.43, size * 0.46, 64]} />
@@ -1717,7 +1735,7 @@ function ColonyRobot({
         const dx = waypoint[0] - position[0];
         const dz = waypoint[1] - position[1];
         const distance = Math.hypot(dx, dz);
-        const move = Math.min(distance, Math.max(0, delta) * 2.4);
+        const move = Math.min(distance, Math.max(0, delta) * 1.15);
         if (distance > 0.001) {
           position[0] += dx / distance * move;
           position[1] += dz / distance * move;
@@ -1739,18 +1757,18 @@ function ColonyRobot({
       ref.current.rotation.y += turn * Math.min(1, delta * 3);
     }
 
-    const gait = Math.sin(time * 3.8 + phaseOffset) * (servicing ? 0.08 : moving ? 0.34 : 0.035);
+    const gait = Math.sin(time * 2.8 + phaseOffset) * (servicing ? 0.08 : moving ? 0.34 : 0.035);
     ref.current.position.set(
       position[0],
-      -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * (moving ? 0.018 : 0.006) - (servicing ? 0.025 : 0),
+      -0.17 + Math.abs(Math.sin(time * 2.8 + phaseOffset)) * (moving ? 0.018 : 0.006) - (servicing ? 0.025 : 0),
       position[1],
     );
     if (leftArm.current) {
       leftArm.current.rotation.x = THREE.MathUtils.damp(leftArm.current.rotation.x, servicing ? -0.55 + gait : gait * 0.72, 6, delta);
     }
     if (rightArm.current) {
-      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.82 + Math.sin(time * 5) * 0.18 : -gait * 0.72, 6, delta);
-      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.28 + Math.sin(time * 4) * 0.08 : 0, 5, delta);
+      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.82 + Math.sin(time * 3.2) * 0.18 : -gait * 0.72, 6, delta);
+      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.28 + Math.sin(time * 2.6) * 0.08 : 0, 5, delta);
     }
     if (leftLeg.current) leftLeg.current.rotation.x = -gait;
     if (rightLeg.current) rightLeg.current.rotation.x = gait;
