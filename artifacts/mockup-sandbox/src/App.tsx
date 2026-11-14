@@ -1,7 +1,6 @@
 import { Component, useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
-import { SoundSystemProvider } from "./components/mockups/colony-frontier/_shared/SoundSystem";
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
@@ -143,9 +142,7 @@ function PreviewRenderer({
 
   return (
     <PreviewErrorBoundary>
-      <SoundSystemProvider>
-        <Component />
-      </SoundSystemProvider>
+      <Component />
     </PreviewErrorBoundary>
   );
 }

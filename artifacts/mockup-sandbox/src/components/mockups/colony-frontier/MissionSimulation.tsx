@@ -48,7 +48,7 @@ import {
   type PendingMission,
   type SampleStage,
 } from "./missionRuntime";
-import { Colony3DMap, COLONY_WORLD_SCALE, nodeWorldPosition, POSITIONS, type MissionPhysicalReadings } from "./Colony3DMap";
+import { Colony3DMap, POSITIONS, type MissionPhysicalReadings } from "./Colony3DMap";
 
 const TOTAL_MISSION_SECONDS = LEVEL1_ENVIRONMENT.missionDurationSeconds;
 const GAME_TIME_ACCELERATION = LEVEL1_ENVIRONMENT.gameTimeAcceleration;
@@ -790,7 +790,6 @@ function describeRepairOptionOutcome(
   option: RepairOption,
   tierIndex: number,
   currentDust: number,
-  currentCondition: number,
 ): string[] {
   const value = getRepairEffectValue(option, tierIndex);
   const lines = [describeRepairOutcome(systemId, option.metric, option.unit, value, currentDust)];
@@ -800,11 +799,6 @@ function describeRepairOptionOutcome(
   if (option.tertiary && typeof option.tertiary.values[tierIndex] === "number") {
     lines.push(describeRepairOutcome(systemId, option.tertiary.metric, option.tertiary.unit, option.tertiary.values[tierIndex] as number, currentDust));
   }
-  const conditionGain = Math.min(
-    option.category === "Standalone" ? 5 : option.category === "Enhanced" ? 7 : option.category === "Dual" ? 9 : 12,
-    Math.max(0, 100 - currentCondition),
-  );
-  lines.push(`Machine health: +${conditionGain} points${conditionGain === 0 ? " (already at 100%)" : ""}.`);
   return lines;
 }
 
@@ -1849,7 +1843,7 @@ function BuildingInspector({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
-      <div className="pointer-events-auto max-h-[86vh] w-[min(96vw,760px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
+      <div className="pointer-events-auto max-h-[84vh] w-[min(94vw,520px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
         <div className="relative overflow-hidden border-b border-[#30454b] bg-gradient-to-r from-[#172b32] via-[#152329] to-[#111a1f] px-5 py-4">
           <div className="absolute right-[-30px] top-[-40px] h-32 w-32 rounded-full bg-[#f4c75e]/[0.06] blur-2xl" />
           <div className="relative flex items-start gap-3">
@@ -2055,7 +2049,7 @@ function BuildingInspector({
               <div className="min-w-0 flex-1">
                 <p className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeFault ? "text-[#ff9aa2]" : "text-[#8dd9b7]"}`}>{activeFault ? "Unresolved equipment fault" : "Preventative service & repair"}</p>
                 <h3 className="mt-1 text-[11px] font-black uppercase text-white">{activeFault?.title ?? "System recovery procedures"}</h3>
-                {activeFault ? <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)}× · {activeFault.remainingSeconds > 0 ? `${Math.ceil(activeFault.remainingSeconds)}s before the next escalation` : "escalation window expired"}. This fault remains until the procedure restores the relevant function and verification finishes.</p> :                 <p className="mt-1 text-[9px] leading-4 text-[#a5c8be]">Pick how much help to use. More helper systems can make the repair stronger, but need more energy and time.</p>}
+                {activeFault ? <p className="mt-1 text-[9px] leading-4 text-[#dcbac1]">Severity {activeFault.severity.toFixed(1)}× · {activeFault.remainingSeconds > 0 ? `${Math.ceil(activeFault.remainingSeconds)}s before the next escalation` : "escalation window expired"}. This fault remains until the procedure restores the relevant function and verification finishes.</p> : <p className="mt-1 text-[9px] leading-4 text-[#a5c8be]">Choose one of the four categories below to compare effects, activation energy and duration. Standalone procedures require no optional support systems.</p>}
                 {activeFault && typeof remainingRepairGap === "number" && track.id !== "solar" && track.id !== "maintenance" && <p className="mt-2 text-[8px] font-bold leading-4 text-[#ffcb8d]">Remaining performance shortfall: {formatRating(remainingRepairGap)} {repairOptions.find((option) => option.metric === primaryRepairMetric)?.unit ?? ""}. A partial repair leaves the fault active; choose another category/procedure to finish recovery.</p>}
               </div>
             </div>
@@ -2070,7 +2064,7 @@ function BuildingInspector({
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => {
                   const count = repairOptions.filter((option) => option.category === category).length;
-                  const label = category === "Standalone" ? "By itself" : category === "Enhanced" ? "One helper" : category === "Dual" ? "Two helpers" : "Three helpers";
+                  const label = category === "Dual" ? "Dual-System" : category === "Integrated" ? "Fully Integrated" : category;
                   return (
                     <button
                       key={category}
@@ -2089,10 +2083,10 @@ function BuildingInspector({
               </div>
               <div className="rounded-lg border border-[#2e4c51] bg-[#0a1a20] px-3 py-2">
                 <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#d5e9df]">
-                  {repairCategory === "Standalone" ? "By itself · no helper system needed" :
-                    repairCategory === "Enhanced" ? "One helper · use one other system" :
-                    repairCategory === "Dual" ? "Two helpers · both listed systems are needed" :
-                    "Three helpers · the biggest repair and health boost"}
+                  {repairCategory === "Standalone" ? "Standalone · no optional support required" :
+                    repairCategory === "Enhanced" ? "Enhanced · one support system required" :
+                    repairCategory === "Dual" ? "Dual-system · both listed support systems required" :
+                    "Fully integrated · all three support systems required"}
                 </p>
                 <p className="mt-1 text-[8px] leading-4 text-[#86a6a1]">
                   Values shown are limited by the lowest technology tier among the target and required support systems. Exact effects, costs, and blockers are shown on each procedure.
@@ -2101,7 +2095,7 @@ function BuildingInspector({
               {repairOptions.filter((option) => option.category === repairCategory).map((option) => {
                 const blockers = getBlockers(track.id, `repair:${option.id}`);
                 const tierIndex = effectiveRepairTierIndex(tier, option.requiredSystems, selected);
-                const outcomeLines = describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust, runtime.condition);
+                const outcomeLines = describeRepairOptionOutcome(track.id, option, tierIndex, runtime.dust);
                 const supportLabels = option.requiredSystemNames.length ? option.requiredSystemNames.join(" + ") : "None — standalone";
                 return (
                   <button
@@ -2824,19 +2818,13 @@ export function MissionSimulation() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.repeat) return;
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
-      event.preventDefault();
-      if (!manualPaused) {
-        setSelectedBuildingId(null);
-        setSelectedResourceId(null);
-      }
-      setManualPaused(!manualPaused);
+      if (event.key !== "Escape") return;
+      setSelectedBuildingId(null);
+      setSelectedResourceId(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [manualPaused]);
+  }, []);
 
 
   useEffect(() => {
@@ -3957,13 +3945,15 @@ export function MissionSimulation() {
     const navigationTimeFactor = clamp(1 + navigationErrorM / 100, 1, 1.5);
     const roverTimeFactor = hasRover && roverRatedSpeed > 0 ? clamp(roverRatedSpeed / Math.max(0.1, roverEffectiveSpeed) * navigationTimeFactor, 1, 5) : 1;
     const extractionFactor = hasExtraction ? repairCapabilityFraction("extraction", pending.selected, buildings) : 1;
-    const [nodeWorldX, nodeWorldZ] = nodeWorldPosition(node);
-    const [roverStartX, roverStartZ] = roverTaskTarget ? nodeWorldPosition(roverTaskTarget) : POSITIONS.rover;
+    const nodeWorldX = (node.x - 500) / 22;
+    const nodeWorldZ = (node.y - 300) / 10;
+    const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : 24;
+    const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : -22;
     const roverTravelToNodeSeconds = hasRover && roverEffectiveSpeed > 0.1
-      ? Math.hypot(nodeWorldX - roverStartX, nodeWorldZ - roverStartZ) * COLONY_WORLD_SCALE * 1.5 / (roverEffectiveSpeed / 3.6)
+      ? Math.hypot(nodeWorldX - roverStartX, nodeWorldZ - roverStartZ) * 1.5 / (roverEffectiveSpeed / 3.6)
       : 0;
     const roverTravelToBaseSeconds = hasRover && roverEffectiveSpeed > 0.1
-      ? Math.hypot(nodeWorldX - POSITIONS.rover[0], nodeWorldZ - POSITIONS.rover[1]) * COLONY_WORLD_SCALE * 1.5 / (roverEffectiveSpeed / 3.6)
+      ? Math.hypot(nodeWorldX, nodeWorldZ) * 1.5 / (roverEffectiveSpeed / 3.6)
       : 0;
     const fieldBatteryCapacityKWh = Math.max(1, ratedBatteryCapacityKWh(pending.selected, buildings));
     const batteryPercentForEnergy = (energyKWh: number) => Math.max(0, energyKWh) / fieldBatteryCapacityKWh * 100;
@@ -4121,13 +4111,14 @@ export function MissionSimulation() {
       const roverSpeedGap = buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
       const roverTravelSpeedKmh = Math.max(0, roverRatedSpeed - roverSpeedGap) * clamp(buildings.rover?.condition ?? 100, 0, 100) / 100;
       const repairPosition = POSITIONS[repairTargetId] ?? [0, 0];
-      const [roverStartX, roverStartZ] = roverTaskTarget ? nodeWorldPosition(roverTaskTarget) : POSITIONS.rover;
+      const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : 24;
+      const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : -22;
       if (roverCanAssist && roverTravelSpeedKmh <= 0.1) {
         setOperationResult("REPAIR HELD · The supporting rover cannot traverse at its current condition. Restore mobility before selecting a rover-assisted procedure.");
         return;
       }
       const roverTravelSeconds = roverCanAssist
-        ? Math.hypot(repairPosition[0] - roverStartX, repairPosition[1] - roverStartZ) * COLONY_WORLD_SCALE * 1.5 / (roverTravelSpeedKmh / 3.6)
+        ? Math.hypot(repairPosition[0] - roverStartX, repairPosition[1] - roverStartZ) * 1.5 / (roverTravelSpeedKmh / 3.6)
         : 0;
       const durationSeconds = baseDurationSeconds + roverTravelSeconds;
       const totalRepairEnergyKWh = selectedRepair.energyKWh + (roverCanAssist ? 2.0 * roverTravelSeconds / 3600 : 0);
@@ -4733,18 +4724,11 @@ export function MissionSimulation() {
   const performance = useMemo(() => {
     const tempScore = clamp(100 - Math.abs(metrics.temperature - 21) * 18);
     const radiationScore = clamp(100 - metrics.radiation * 3.4);
-    const resourceHealth = (metrics.power + metrics.battery + metrics.oxygen + metrics.water + metrics.food + metrics.habitat + tempScore + radiationScore) / 8;
-    const deployedSystems = Object.entries(buildings).filter(([id]) =>
-      id !== "maintenance" && id !== "rover" && Boolean(pending?.selected[id]),
-    );
-    const facilityCondition = deployedSystems.length
-      ? deployedSystems.reduce((total, [, building]) => total + clamp(building.condition, 0, 100), 0) / deployedSystems.length
-      : 100;
-    const colonyHealth = Math.round(resourceHealth * 0.8 + facilityCondition * 0.2);
+    const colonyHealth = Math.round((metrics.power + metrics.battery + metrics.oxygen + metrics.water + metrics.food + metrics.habitat + tempScore + radiationScore) / 8);
     const decisionQuality = clamp(score);
     const researchOpportunity = pending?.selected.science !== undefined || decisions.some((decision) => decision.eventId === "science-anomaly") || Object.values(sampleStages).some((stage) => stage === "ANALYSED");
-    return { colonyHealth, decisionQuality, researchOpportunity, radiationScore, facilityCondition: Math.round(facilityCondition), resourceHealth: Math.round(resourceHealth) };
-  }, [buildings, decisions, metrics, pending, sampleStages, score]);
+    return { colonyHealth, decisionQuality, researchOpportunity, radiationScore };
+  }, [decisions, metrics, pending, sampleStages, score]);
 
   if (!pending) {
     return (
@@ -4823,7 +4807,7 @@ export function MissionSimulation() {
                 </div>
               ))}
               <div className="grid gap-3 pt-3 sm:grid-cols-3">
-                <div className="border border-[#344e4d] bg-[#102329] p-4"><p className="text-[8px] uppercase tracking-[0.2em] text-[#748e8b]">Colony health</p><p className="mt-1 text-2xl font-mono text-[#dfe9d9]">{performance.colonyHealth}%</p><p className="mt-1 text-[8px] text-[#91aaa2]">Supplies {performance.resourceHealth}% · machine health {performance.facilityCondition}%</p></div>
+                <div className="border border-[#344e4d] bg-[#102329] p-4"><p className="text-[8px] uppercase tracking-[0.2em] text-[#748e8b]">Colony health</p><p className="mt-1 text-2xl font-mono text-[#dfe9d9]">{performance.colonyHealth}%</p></div>
                 <div className="border border-[#344e4d] bg-[#102329] p-4"><p className="text-[8px] uppercase tracking-[0.2em] text-[#748e8b]">Decision quality</p><p className="mt-1 text-2xl font-mono text-[#efb658]">{Math.round(performance.decisionQuality)}%</p></div>
                 <div className="border border-[#344e4d] bg-[#102329] p-4"><p className="text-[8px] uppercase tracking-[0.2em] text-[#748e8b]">Runtime score</p><p className="mt-1 text-2xl font-mono text-[#9fce82]">{Math.round(score)}</p></div>
               </div>
@@ -4914,43 +4898,12 @@ export function MissionSimulation() {
           speed={manualPaused || activeEvent ? 0 : speed}
         />
 
-        {manualPaused && (
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mission-pause-title"
-            className="pointer-events-auto absolute inset-0 z-[70] flex items-center justify-center bg-[#02070b]/80 p-5 backdrop-blur-md"
-          >
-            <div className="w-full max-w-md border border-[#71806b]/70 bg-[#0b171b] p-7 text-center shadow-[0_24px_90px_rgba(0,0,0,0.7)]">
-              <Pause className="mx-auto h-7 w-7 text-[#efb658]" />
-              <p className="mt-4 text-[9px] font-black uppercase tracking-[0.3em] text-[#91aaa2]">Mission control</p>
-              <h2 id="mission-pause-title" className="mt-2 text-2xl font-black uppercase tracking-[0.16em] text-[#edf4ec]">Game paused</h2>
-              <p className="mt-3 text-xs leading-5 text-[#9db0aa]">
-                Mission time, active work orders, and colony movement are suspended.
-              </p>
-              <div className="mt-5 border-y border-[#263d42] py-3 text-[9px] leading-5 text-[#9db0aa]">
-                WASD move · Space jump · F flashlight · E interact
-                <br />
-                Press Esc to resume
-              </div>
-              <button
-                type="button"
-                autoFocus
-                onClick={() => setManualPaused(false)}
-                className="mt-6 inline-flex items-center justify-center gap-2 border border-[#efb658]/70 bg-[#efb658] px-5 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-[#17201b] transition hover:bg-[#f5ca76]"
-              >
-                <Play className="h-4 w-4" /> Resume mission
-              </button>
-            </div>
-          </section>
-        )}
-
         {!dashboardOpen && (
           <div className="pointer-events-none absolute right-4 top-[68px] z-20 w-[min(92vw,510px)]">
             <div className="pointer-events-auto overflow-hidden border border-[#394b4e] bg-[#10191d]/95 shadow-[0_6px_20px_rgba(0,0,0,0.25)]">
               <div className="flex items-center justify-between gap-3 border-b border-[#344347] px-3.5 py-2.5">
                 <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.04em] text-[#d7e2dc]"><span className="h-1.5 w-1.5 rounded-full bg-[#85bd99]" />Colony status</span>
-                <span className="text-[9px] text-[#9eafaa]">Stability <strong className="ml-1 font-mono font-medium text-[#e1d19b]">{Math.round(performance.colonyHealth)} / 100</strong> · Machines <strong className="font-mono font-medium text-[#e1d19b]">{performance.facilityCondition}%</strong></span>
+                <span className="text-[9px] text-[#9eafaa]">Stability <strong className="ml-1 font-mono font-medium text-[#e1d19b]">{Math.round(performance.colonyHealth)} / 100</strong></span>
               </div>
               <div className="grid grid-cols-2 gap-px bg-[#344347] sm:grid-cols-4">
                 {[

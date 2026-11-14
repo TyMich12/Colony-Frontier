@@ -17,11 +17,11 @@ export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number 
 
     for (let i = 0; i < COUNT; i += 1) {
       const angle = rnd() * Math.PI * 2;
-      const radius = rnd() * 50;
+      const radius = rnd() * 34;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       pos[i * 3] = x;
-      pos[i * 3 + 1] = terrainHeight(x, z) + 0.4 + rnd() * 14;
+      pos[i * 3 + 1] = terrainHeight(x, z) + 0.4 + rnd() * 10;
       pos[i * 3 + 2] = z;
       spd[i] = 0.08 + rnd() * 0.55;
     }
@@ -43,7 +43,7 @@ export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number 
       const x = arr.getX(i);
       const z = arr.getZ(i);
       const floor = terrainHeight(x, z);
-      if (y > floor + 14) y = floor + 0.4;
+      if (y > floor + 10) y = floor + 0.4;
       arr.setY(i, y);
     }
 

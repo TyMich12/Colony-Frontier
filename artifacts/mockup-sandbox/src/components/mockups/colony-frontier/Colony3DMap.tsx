@@ -5,7 +5,6 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
-import { DustParticles } from "./solar-surface/dust-particles";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
@@ -26,8 +25,6 @@ export type MissionPhysicalReadings = {
   radiation: string;
   temperature: string;
 };
-
-export const COLONY_WORLD_SCALE = 1.35;
 
 type Props = {
   tracks: TechnologyTrack[];
@@ -128,7 +125,7 @@ const ROAD_Z = [-9, -0.6, 9];
 const ROAD_EDGE = 18;
 const PAD_Y = 0.12;
 
-export function nodeWorldPosition(node: MissionResourceNode): [number, number] {
+function nodeWorldPosition(node: MissionResourceNode): [number, number] {
   return [(node.x - 500) / 22, (node.y - 300) / 10];
 }
 
@@ -524,7 +521,7 @@ function Beacon({ color, active, height = 2.1 }: { color: string; active: boolea
   );
 }
 
-function BuildingArt({ id, accent, dust = 0 }: { id: string; accent: string; dust?: number }) {
+function BuildingArt({ id, accent }: { id: string; accent: string }) {
   const p = palette(id);
 
   if (id === "habitat") {
@@ -723,7 +720,6 @@ function BuildingArt({ id, accent, dust = 0 }: { id: string; accent: string; dus
         {[-0.85, 0.85].map((x) => (
           <group key={x} position={[x, 0.82, 0]}>
             <mesh rotation={[0.18, 0, 0]} castShadow><boxGeometry args={[1.02, 0.055, 1.62]} /><meshStandardMaterial color="#12334f" roughness={0.22} metalness={0.52} /></mesh>
-            {dust > 0 && <mesh position={[0, 0.039, 0]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.99, 0.012, 1.57]} /><meshStandardMaterial color="#bd8c63" transparent opacity={Math.min(0.78, dust / 100 * 0.78)} roughness={1} depthWrite={false} /></mesh>}
             {[-0.3, 0, 0.3].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.95, 0.015, 0.025]} /><meshStandardMaterial color="#79b9ca" metalness={0.3} /></mesh>)}
             {[-0.47, 0, 0.47].map((z) => <mesh key={z} position={[0, 0.035, z]} rotation={[0.18, 0, 0]}><boxGeometry args={[0.018, 0.015, 1.53]} /><meshStandardMaterial color="#6c9fb3" /></mesh>)}
             {[-0.8, 0.8].map((z) => <mesh key={z} position={[0, 0.018, z]}><boxGeometry args={[1.06, 0.04, 0.04]} /><meshStandardMaterial color="#b3beb9" metalness={0.75} /></mesh>)}
@@ -1378,7 +1374,7 @@ function Rover({
             // One colony-map unit represents approximately one metre. Convert the rated
             // safe traverse speed from km/h to m/s; simulation speed accelerates both travel
             // and the corresponding timed field-operation clock.
-            const baseSpeedMps = Math.max(0, traverseSpeedKmh / 3.6 / COLONY_WORLD_SCALE);
+            const baseSpeedMps = Math.max(0, traverseSpeedKmh / 3.6);
             const simRate = Math.min(4, Math.max(0.5, simulationSpeed));
             const terrainSampleDistance = Math.min(0.75, distance);
             const terrainAheadHeight = terrainHeight(current.x + (dx / distance) * terrainSampleDistance, current.z + (dz / distance) * terrainSampleDistance);
@@ -1861,36 +1857,6 @@ function ColonyRobot({
         <boxGeometry args={[0.27, 0.3, 0.12]} />
         <meshStandardMaterial color="#45575b" metalness={0.62} roughness={0.38} />
       </mesh>
-      {/* Rugged life-support / compute pack with radiator fins and service status lighting. */}
-      <group position={[0, 0.82, -0.285]}>
-        <RoundedBox args={[0.34, 0.34, 0.18]} radius={0.045} smoothness={3}>
-          <meshStandardMaterial color="#34464b" metalness={0.82} roughness={0.3} />
-        </RoundedBox>
-        {[-0.12, -0.06, 0, 0.06, 0.12].map((y) => (
-          <mesh key={y} position={[0, y, -0.098]}>
-            <boxGeometry args={[0.25, 0.018, 0.025]} />
-            <meshStandardMaterial color="#9aa9a2" metalness={0.88} roughness={0.26} />
-          </mesh>
-        ))}
-        <mesh position={[0, 0.02, -0.112]}>
-          <boxGeometry args={[0.12, 0.055, 0.012]} />
-          <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={0.85} />
-        </mesh>
-      </group>
-      {[-1, 1].map((side) => (
-        <group key={side} position={[side * 0.31, 0.82, -0.24]} rotation={[0, 0, side * -0.12]}>
-          <mesh position={[side * 0.11, 0, 0]}>
-            <boxGeometry args={[0.24, 0.29, 0.045]} />
-            <meshStandardMaterial color="#53666a" metalness={0.78} roughness={0.34} />
-          </mesh>
-          {Array.from({ length: 4 }, (_, fin) => (
-            <mesh key={fin} position={[side * 0.11, -0.105 + fin * 0.07, 0.027]}>
-              <boxGeometry args={[0.19, 0.012, 0.012]} />
-              <meshStandardMaterial color="#c0c9bd" metalness={0.86} roughness={0.25} />
-            </mesh>
-          ))}
-        </group>
-      ))}
       {[-0.095, 0.095].map((x) => (
         <mesh key={x} position={[x, 0.78, -0.25]}>
           <cylinderGeometry args={[0.045, 0.045, 0.22, 10]} />
@@ -2352,7 +2318,7 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} dust={runtime.dust} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} />
         <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
       </group>
       {statusBeaconColor && (
@@ -3111,7 +3077,6 @@ function BuildingSurfaceDetails({ large, accent }: { large: boolean; accent: str
 function WalkControls({
   tracks,
   resourceNodes,
-  paused,
   habitatInterior,
   cabinetOpen,
   airlockCycling,
@@ -3124,7 +3089,6 @@ function WalkControls({
   onWake,
   onExitHabitat,
   onToggleCabinet,
-  onToggleFlashlight,
   onLockChange,
   onLockError,
   onNearbyChange,
@@ -3134,7 +3098,6 @@ function WalkControls({
 }: {
   tracks: TechnologyTrack[];
   resourceNodes: MissionResourceNode[];
-  paused: boolean;
   habitatInterior: boolean;
   cabinetOpen: boolean;
   airlockCycling: boolean;
@@ -3147,7 +3110,6 @@ function WalkControls({
   onWake: () => void;
   onExitHabitat: () => void;
   onToggleCabinet: () => void;
-  onToggleFlashlight: () => void;
   onLockChange: (locked: boolean) => void;
   onLockError: (message: string) => void;
   onNearbyChange: (target: NearbyInteraction) => void;
@@ -3166,7 +3128,6 @@ function WalkControls({
   const latest = useRef({
     tracks,
     resourceNodes,
-    paused,
     selectedBuildingId,
     selectedResourceId,
     habitatInterior,
@@ -3184,12 +3145,10 @@ function WalkControls({
     onLockChange,
     onLockError,
     onNearbyChange,
-    onToggleFlashlight,
   });
   latest.current = {
     tracks,
     resourceNodes,
-    paused,
     selectedBuildingId,
     selectedResourceId,
     habitatInterior,
@@ -3207,7 +3166,6 @@ function WalkControls({
     onLockChange,
     onLockError,
     onNearbyChange,
-    onToggleFlashlight,
   };
 
   useEffect(() => {
@@ -3242,7 +3200,6 @@ function WalkControls({
       }
     };
     const handleClick = () => {
-      if (latest.current.paused) return;
       if (interactionClickHandled.current) {
         interactionClickHandled.current = false;
         return;
@@ -3255,7 +3212,7 @@ function WalkControls({
       latest.current.onLockChange(locked);
     };
     const handleMouseMove = (event: MouseEvent) => {
-      if (latest.current.paused || document.pointerLockElement !== canvas) return;
+      if (document.pointerLockElement !== canvas) return;
       yaw.current -= event.movementX * 0.0022;
       pitch.current = THREE.MathUtils.clamp(pitch.current - event.movementY * 0.0022, -1.25, 1.25);
     };
@@ -3263,11 +3220,10 @@ function WalkControls({
       const key = event.key.toLowerCase();
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
-      if (latest.current.paused) return;
       if (key === "f" && !event.repeat) {
         event.preventDefault();
-        latest.current.onToggleFlashlight();
-        return;
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
+        else requestPointerLock();
       }
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(key)) {
         event.preventDefault();
@@ -3361,12 +3317,6 @@ function WalkControls({
     };
   }, [gl, interactionClickHandled]);
 
-  useEffect(() => {
-    keys.current.clear();
-    jumpRequested.current = false;
-    if (paused && document.pointerLockElement === gl.domElement) document.exitPointerLock();
-  }, [gl, paused]);
-
   useFrame(({ camera }, delta) => {
     const player = camera as THREE.PerspectiveCamera;
     playerPosition.current.copy(player.position);
@@ -3398,7 +3348,7 @@ function WalkControls({
     }
     if (direction.lengthSq() > 0) {
       direction.normalize();
-      const speed = (keys.current.has("shift") ? 7 : 4.5) / (habitatInterior ? 1 : COLONY_WORLD_SCALE);
+      const speed = keys.current.has("shift") ? 7 : 4.5;
       const distance = speed * Math.min(delta, 0.05);
       const nextX = player.position.x + direction.x * distance;
       const nextZ = player.position.z + direction.z * distance;
@@ -3489,33 +3439,9 @@ function WalkControls({
   return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 12) + 1.72, 12]} fov={70} near={0.05} far={190} />;
 }
 
-function HelmetFlashlight({ enabled }: { enabled: boolean }) {
-  const { camera } = useThree();
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    const light = new THREE.SpotLight(0xffe6ad, 28, 30, Math.PI / 7, 0.55, 1.3);
-    const target = new THREE.Object3D();
-    target.position.set(0, 0, -1);
-    camera.add(light);
-    camera.add(target);
-    light.target = target;
-
-    return () => {
-      camera.remove(light);
-      camera.remove(target);
-    };
-  }, [camera, enabled]);
-
-  return null;
-}
-
 function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
   const firstPersonMode = walkMode || props.habitatInterior;
-  const paused = props.simulationSpeed === 0;
-  const [flashlightOn, setFlashlightOn] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
   const interactionClickHandled = useRef<InteractionClickState>({ current: false, requestPending: false });
@@ -3624,11 +3550,10 @@ function Scene({ props }: { props: Props }) {
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas
-      frameloop={paused ? "never" : "always"}
       orthographic
       shadows
       dpr={[1, 2]}
-      camera={{ position: [48, 56, 48], zoom: 20.5, near: 0.5, far: 190 }}
+      camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
       onCreated={({ gl }) => {
         gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -3666,8 +3591,6 @@ function Scene({ props }: { props: Props }) {
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
-      {mars && props.activeEventId === "regional-dust-front" && <DustParticles kind="mars" dust={Math.max(28, props.buildings.solar?.dust ?? 0)} />}
-      <group scale={COLONY_WORLD_SCALE}>
       <RoverRockField mars={mars} />
       <Foundation mars={mars} />
       <group frustumCulled={false}>
@@ -3706,15 +3629,12 @@ function Scene({ props }: { props: Props }) {
         <Crew mars={mars} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
       </group>
-      </group>
         </>
       )}
       {firstPersonMode ? (
-        <group scale={props.habitatInterior ? 1 : COLONY_WORLD_SCALE}>
         <WalkControls
           tracks={props.tracks}
           resourceNodes={props.resourceNodes}
-          paused={paused}
           habitatInterior={props.habitatInterior}
           cabinetOpen={cabinetOpen}
           airlockCycling={airlockCycling}
@@ -3733,7 +3653,6 @@ function Scene({ props }: { props: Props }) {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
             setCabinetOpen((open) => !open);
           }}
-          onToggleFlashlight={() => setFlashlightOn((active) => !active)}
           onLockChange={(locked) => {
             setPointerLocked(locked);
             if (locked) setPointerLockError(null);
@@ -3744,7 +3663,6 @@ function Scene({ props }: { props: Props }) {
           selectedBuildingId={props.selectedBuildingId}
           selectedResourceId={props.selectedResourceId}
         />
-        </group>
       ) : (
         <OrbitControls
           enableRotate
@@ -3765,7 +3683,6 @@ function Scene({ props }: { props: Props }) {
           target={[0, 0, 0]}
         />
       )}
-      {firstPersonMode && <HelmetFlashlight enabled={flashlightOn} />}
     </Canvas>
     {firstPersonMode && (
       <>
@@ -3917,7 +3834,7 @@ function Scene({ props }: { props: Props }) {
         <div className="w-full border border-white/15 bg-[#07131c]/90 px-3 py-2 text-left font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
           WASD move · Space jump · mouse look · Shift run
           <br />
-          F flashlight {flashlightOn ? "ON" : "OFF"} · E interact / airlock · Esc pause
+          F toggle mouse · E interact / airlock · Esc release mouse
           {!pointerLocked && <><br /><span className="text-[#f4d785]">Click the scene to look around</span></>}
           {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
         </div>
@@ -3940,7 +3857,7 @@ function Scene({ props }: { props: Props }) {
         )}
         <div className="rounded-lg border border-white/15 bg-[#07131c]/70 px-3 py-2 font-mono text-[8px] text-[#b6c9d4] shadow-lg backdrop-blur-sm">
           <div className="mb-1 font-black tracking-[0.16em] text-[#9bd9cf]">COLONY LINK</div>
-          {firstPersonMode ? `EVA MODE · Arrow keys / WASD move · mouse look · Space jump · F flashlight ${flashlightOn ? "ON" : "OFF"} · E interact` : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
+          {firstPersonMode ? "EVA MODE · Arrow keys / WASD move · mouse look · Space jump · E interact" : "MAP MODE · drag to rotate · right-drag to pan · wheel to zoom"}
         </div>
       </div>
     )}
