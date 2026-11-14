@@ -2319,12 +2319,10 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 
 function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolean }) {
   const lens = useRef<THREE.MeshStandardMaterial>(null);
-  const light = useRef<THREE.PointLight>(null);
 
   useFrame(({ clock }) => {
     const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 6 : 2.4)) + 1) / 2;
     if (lens.current) lens.current.emissiveIntensity = urgent ? 0.65 + pulse * 1.1 : 0.35 + pulse * 0.3;
-    if (light.current) light.current.intensity = urgent ? 0.42 + pulse * 0.85 : 0.18 + pulse * 0.2;
   });
 
   return (
@@ -2337,7 +2335,6 @@ function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolea
         <sphereGeometry args={[0.075, 14, 10]} />
         <meshStandardMaterial ref={lens} color={color} emissive={color} emissiveIntensity={1} toneMapped={false} />
       </mesh>
-      <pointLight ref={light} position={[0, 0.2, 0.05]} color={color} intensity={1} distance={urgent ? 3.8 : 2.4} decay={2} />
     </group>
   );
 }
