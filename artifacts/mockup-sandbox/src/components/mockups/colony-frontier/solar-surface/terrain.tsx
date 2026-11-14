@@ -4,9 +4,9 @@ import { fbm, mulberry32 } from "./noise";
 import { makeTerrainTexture } from "./textures";
 import type { TerrainKind } from "./state";
 
-const SIZE = 220;
-const SEGMENTS = 220;
-const CRATER_RIM_RADIUS = 88;
+const SIZE = 300;
+const SEGMENTS = 300;
+const CRATER_RIM_RADIUS = 100;
 
 // The settlement sits on a deliberately engineered, level foundation.
 // Keep a generous exclusion zone around the entire built area so natural
@@ -26,8 +26,10 @@ function heightAt(x: number, z: number): number {
   const dunes = Math.sin(x * 0.055) * Math.cos(z * 0.047) * 0.7;
   const outerBlend = THREE.MathUtils.smoothstep(radius, FOUNDATION_FADE, FOUNDATION_FADE + 8);
   const naturalHeight = (rough + dunes) * outerBlend;
+  const bowlRise = THREE.MathUtils.smoothstep(radius, FOUNDATION_FADE + 8, CRATER_RIM_RADIUS - 14) * 7.5;
+  const craterApron = 1 - THREE.MathUtils.smoothstep(radius, CRATER_RIM_RADIUS + 10, CRATER_RIM_RADIUS + 20);
 
-  return THREE.MathUtils.lerp(naturalHeight, FOUNDATION_TERRAIN_DEPTH, depression);
+  return THREE.MathUtils.lerp(naturalHeight, FOUNDATION_TERRAIN_DEPTH, depression) + bowlRise * craterApron;
 }
 
 export function terrainHeight(x: number, z: number) {
@@ -94,8 +96,8 @@ export function CraterRim({ kind }: { kind: TerrainKind }) {
 }
 
 function createCraterRimGeometry() {
-  const segments = 192;
-  const ringOffsets = [-1.5, 0, 1.2, 3.8, 8.5, 17];
+  const segments = 256;
+  const ringOffsets = [-14, -12, -9, -6, -3, -1, 0, 2, 4, 7, 10, 13, 16, 19, 20];
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -103,21 +105,35 @@ function createCraterRimGeometry() {
   for (let ring = 0; ring < ringOffsets.length; ring += 1) {
     for (let segment = 0; segment < segments; segment += 1) {
       const angle = (segment / segments) * Math.PI * 2;
-      const ridgeVariation = Math.sin(angle * 7 + 0.6) * 1.4
-        + Math.sin(angle * 17 - 0.8) * 0.7
-        + Math.sin(angle * 31 + 0.2) * 0.25;
-      const radius = CRATER_RIM_RADIUS + ringOffsets[ring] + ridgeVariation;
+      const ridgeVariation = Math.sin(angle * 3 + 0.6) * 3.1
+        + Math.sin(angle * 7 - 0.8) * 1.45
+        + Math.sin(angle * 17 + 0.2) * 0.65;
+      const progress = ring / (ringOffsets.length - 1);
+      const contour = ridgeVariation * (0.2 + Math.sin(progress * Math.PI) * 0.8);
+      const radius = CRATER_RIM_RADIUS + ringOffsets[ring] + contour;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const terrain = heightAt(x, z);
-      const peak = 34 + Math.sin(angle * 5) * 2.5 + Math.sin(angle * 13 + 0.4) * 1.2;
+      const peak = 34
+        + Math.sin(angle * 4 + 0.3) * 3.5
+        + Math.sin(angle * 11 + 0.4) * 1.8
+        + Math.sin(angle * 23 - 0.2) * 0.8;
       const heights = [
         terrain,
-        8 + Math.sin(angle * 11) * 1.2,
-        peak - 4,
-        peak,
+        terrain + 0.5,
+        terrain + 1.8,
+        terrain + 4.8,
+        terrain + 11,
         peak - 7,
-        heightAt(x, z) + 1,
+        peak,
+        peak - 1.5,
+        peak - 5,
+        peak - 11,
+        peak - 17,
+        peak - 23,
+        peak - 28,
+        terrain + 1.2,
+        terrain,
       ];
 
       positions.push(x, heights[ring], z);
