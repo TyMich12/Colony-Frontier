@@ -1,11 +1,15 @@
-import { Fragment, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import {
+  PANEL_SEGMENT_LENGTH_M,
+  PANEL_SEGMENT_WIDTH_M,
+  NUM_SEGMENTS,
   solarLive,
   smoothstep,
   lerp,
 } from "./state";
+import { makeDustTexture } from "./textures";
 
 const BOOM_LEN = 3.4;
 const SEG_LEN = 2.8;
@@ -20,6 +24,10 @@ interface WingProps {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
   boomMaterial: THREE.Material;
+  dustMaterial: THREE.Material;
+  terrain: "moon" | "mars";
+  wingIndex: number;
+  dustGenerationKey: number;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }
@@ -115,17 +123,89 @@ function Highlight({
 function PanelSegment({
   pvMaterial,
   frameMaterial,
+  terrain,
+  wingIndex,
+  dustGenerationKey,
   segmentIndex,
   onSelect,
   selectedComponentName,
 }: {
   pvMaterial: THREE.Material;
   frameMaterial: THREE.Material;
+  terrain: "moon" | "mars";
+  wingIndex: number;
+  dustGenerationKey: number;
   segmentIndex: number;
   onSelect?: (name: string, role: string, explanation: string) => void;
   selectedComponentName?: string | null;
 }) {
   const info = panelInfo(segmentIndex);
+
+  // Every plate gets its own dust material and its own procedural seed.
+  // dustGenerationKey changes when the player clicks Clear Dust, forcing a
+  // brand-new texture for every segment on every wing.
+  const localDustMaterial = useMemo(() => {
+    const material = new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      roughness: 1,
+      metalness: 0,
+      transparent: true,
+      alphaTest: 0.005,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      bumpScale: 0.12,
+    });
+
+    material.userData.wingIndex = wingIndex;
+    material.userData.segmentIndex = segmentIndex;
+    material.userData.generationKey = dustGenerationKey;
+    // Start with no map and zero opacity so the clean array can render immediately.
+    material.opacity = 0;
+    return material;
+  }, [wingIndex, segmentIndex, dustGenerationKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const panelOrder = wingIndex * NUM_SEG + segmentIndex;
+    // Spread texture work across multiple browser tasks instead of blocking first paint.
+    const delay = 80 + panelOrder * 28;
+
+    const id = window.setTimeout(() => {
+      if (cancelled) return;
+      const texture = makeDustTexture(terrain, 192, seed);
+      if (cancelled) {
+        texture.dispose();
+        return;
+      }
+      localDustMaterial.map?.dispose();
+      localDustMaterial.bumpMap?.dispose();
+      localDustMaterial.map = texture;
+      localDustMaterial.bumpMap = texture;
+      localDustMaterial.needsUpdate = true;
+    }, delay);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+      const material = localDustMaterial as THREE.MeshStandardMaterial;
+      material.map?.dispose();
+      material.map = null;
+      material.bumpMap = null;
+      material.dispose();
+    };
+  }, [terrain, wingIndex, segmentIndex, dustGenerationKey, localDustMaterial]);
+
+  useFrame(() => {
+    // The texture can exist while clean, but contributes zero visual dust until
+    // the simulation's dust loading rises above zero.
+    localDustMaterial.opacity = Math.max(
+      0,
+      Math.min(1, solarLive.dust / 100),
+    );
+  });
 
   const frame = frameInfo(segmentIndex);
   const bus = busInfo(segmentIndex);
@@ -149,6 +229,14 @@ function PanelSegment({
       </mesh>
 
       {frameSelected && <Highlight type="frame" />}
+
+      <mesh
+        position={[SEG_LEN / 2, 0.052, 0]}
+        scale={[1.002, 1.02, 1.002]}
+        material={localDustMaterial}
+      >
+        <boxGeometry args={[SEG_LEN - 0.28, 0.1, SEG_WIDTH]} />
+      </mesh>
 
       {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
         <mesh
@@ -181,6 +269,25 @@ function PanelSegment({
 
       {panelSelected && <Highlight type="panel" />}
 
+      <mesh
+        position={[SEG_LEN / 2, 0.106, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        material={localDustMaterial}
+      >
+        <planeGeometry args={[SEG_LEN * 0.9, SEG_WIDTH * 0.9]} />
+      </mesh>
+
+      {[-SEG_WIDTH / 3, 0, SEG_WIDTH / 3].map((z) => (
+        <mesh
+          key={`dust-bus-${z}`}
+          position={[SEG_LEN / 2, -0.037, z]}
+          scale={[1.002, 1.02, 1.04]}
+          material={localDustMaterial}
+        >
+          <boxGeometry args={[SEG_LEN - 0.2, 0.14, 0.08]} />
+        </mesh>
+      ))}
+
       {busSelected && <Highlight type="bus" />}
 
       {segmentIndex < NUM_SEG - 1 && (
@@ -199,6 +306,14 @@ function PanelSegment({
                 }}
               >
                 <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
+              </mesh>
+              <mesh
+                position={[SEG_LEN, 0.13, z]}
+                rotation={[Math.PI / 2, 0, 0]}
+                scale={[1.025, 1.025, 1.025]}
+                material={localDustMaterial}
+              >
+                <cylinderGeometry args={[0.125, 0.125, 0.52, 16]} />
               </mesh>
             </Fragment>
           ))}
@@ -219,6 +334,10 @@ export function PanelWing({
   pvMaterial,
   frameMaterial,
   boomMaterial,
+  dustMaterial,
+  terrain,
+  wingIndex,
+  dustGenerationKey,
   onSelect,
   selectedComponentName,
 }: WingProps) {
@@ -256,6 +375,9 @@ export function PanelWing({
         <PanelSegment
           pvMaterial={pvMaterial}
           frameMaterial={frameMaterial}
+          terrain={terrain}
+          wingIndex={wingIndex}
+          dustGenerationKey={dustGenerationKey}
           segmentIndex={i}
           onSelect={onSelect}
           selectedComponentName={selectedComponentName}
@@ -279,6 +401,10 @@ export function PanelWing({
         >
           <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
         </mesh>
+        <mesh position={[BOOM_LEN / 2, 0.115, 0]} material={dustMaterial}>
+          <boxGeometry args={[BOOM_LEN, 0.012, 0.21]} />
+        </mesh>
+
         {selectedComponentName === boomName && (
           <mesh position={[BOOM_LEN / 2, 0, 0]}>
             <boxGeometry args={[BOOM_LEN, 0.22, 0.22]} />
@@ -304,6 +430,10 @@ export function PanelWing({
         >
           <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
         </mesh>
+        <mesh position={[0.1, 0, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1.005, 1.005, 1.005]} material={dustMaterial}>
+          <cylinderGeometry args={[0.3, 0.3, 0.7, 16]} />
+        </mesh>
+
         {selectedComponentName === "Array deployment actuator" && <Highlight type="actuator" position={[0.1, 0, 0]} />}
 
         <mesh position={[BOOM_LEN / 2, -0.14, 0.09]} material={boomMaterial}>

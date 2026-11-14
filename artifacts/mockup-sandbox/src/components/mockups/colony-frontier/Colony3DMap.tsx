@@ -1,10 +1,11 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Html, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+import { DustParticles } from "./solar-surface/dust-particles";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
@@ -101,27 +102,6 @@ const BUILDING_SCALES: Record<string, number> = {
 function buildingClearanceRadius(id: string): number {
   const footprintRadius = id === "habitat" ? 4.4 : id === "rover" ? 1.85 : 1.825;
   return footprintRadius * (BUILDING_SCALES[id] ?? 1.2) + 0.2;
-}
-
-function keepPathAwayFromBuildings(position: [number, number], clearance: number): [number, number] {
-  let x = position[0];
-  let z = position[1];
-
-  for (const [id, [bx, bz]] of Object.entries(POSITIONS)) {
-    if (id === "rover") continue;
-    const radius = buildingClearanceRadius(id) + clearance;
-    const dx = x - bx;
-    const dz = z - bz;
-    const distance = Math.hypot(dx, dz);
-    if (distance === 0 || distance >= radius) continue;
-    const push = (radius - distance) * 0.52;
-    const nx = dx / distance;
-    const nz = dz / distance;
-    x += nx * push;
-    z += nz * push;
-  }
-
-  return [x, z];
 }
 
 const BUILDING_ROTATIONS: Record<string, number> = {
@@ -1637,10 +1617,10 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
   const haloRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    const pulse = alerted ? 1 + (Math.sin(t * 4.1) + 1) * 0.04 : selected ? 1.02 : 1;
+    const pulse = alerted ? 1 + (Math.sin(t * 5.2) + 1) * 0.055 : selected ? 1.025 : 1;
     if (ref.current) ref.current.scale.set(pulse, pulse, pulse);
     if (haloRef.current && alerted) {
-      const glow = 0.08 + (Math.sin(t * 3.4) + 1) * 0.028;
+      const glow = 0.1 + (Math.sin(t * 4.1) + 1) * 0.045;
       const material = haloRef.current.material as THREE.MeshBasicMaterial;
       material.opacity = glow;
     }
@@ -1660,7 +1640,7 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
             <ringGeometry args={[radius + 0.10, radius + 0.18, 72]} />
             <meshBasicMaterial color="#ff4b61" transparent opacity={0.95} depthWrite={false} toneMapped={false} />
           </mesh>
-          <pointLight position={[0, height + 0.28, 0]} color="#ff1f3c" intensity={1.2} distance={Math.max(4.5, radius * 2.4)} decay={2} />
+          <pointLight position={[0, height + 0.28, 0]} color="#ff1f3c" intensity={3.2} distance={Math.max(4.5, radius * 2.8)} decay={2} />
         </>
       )}
       <mesh ref={ref} position={[0, height + 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}>
@@ -1810,12 +1790,11 @@ function ColonyRobot({
       }
     }
 
-    const safePosition = keepPathAwayFromBuildings([x, z], 0.8);
     const gait = Math.sin(time * 3.8 + phaseOffset) * (servicing ? 0.08 : 0.34);
     ref.current.position.set(
-      safePosition[0],
+      x,
       -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * (servicing ? 0.006 : 0.018) - (servicing ? 0.025 : 0),
-      safePosition[1],
+      z,
     );
     const turn = Math.atan2(Math.sin(heading - ref.current.rotation.y), Math.cos(heading - ref.current.rotation.y));
     ref.current.rotation.y += turn * Math.min(1, delta * 5);
@@ -2039,8 +2018,7 @@ function CrewMember({ route, index, mars }: { route: Array<[number, number]>; in
     const [bx, bz] = route[(i + 1) % route.length];
     const x = THREE.MathUtils.lerp(ax, bx, f);
     const z = THREE.MathUtils.lerp(az, bz, f);
-    const safePosition = keepPathAwayFromBuildings([x, z], 0.55);
-    ref.current.position.set(safePosition[0], -0.176 + Math.abs(Math.sin(time * 3.4 + phaseOffset)) * 0.012, safePosition[1]);
+    ref.current.position.set(x, -0.176 + Math.abs(Math.sin(time * 3.4 + phaseOffset)) * 0.012, z);
     ref.current.rotation.y = Math.atan2(bx - ax, bz - az);
 
     // Slower, weightier EVA gait rather than a twitchy robot walk.
@@ -2319,10 +2297,12 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 
 function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolean }) {
   const lens = useRef<THREE.MeshStandardMaterial>(null);
+  const light = useRef<THREE.PointLight>(null);
 
   useFrame(({ clock }) => {
-    const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 6 : 2.4)) + 1) / 2;
-    if (lens.current) lens.current.emissiveIntensity = urgent ? 0.65 + pulse * 1.1 : 0.35 + pulse * 0.3;
+    const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 9 : 3)) + 1) / 2;
+    if (lens.current) lens.current.emissiveIntensity = urgent ? 0.8 + pulse * 1.8 : 0.45 + pulse * 0.45;
+    if (light.current) light.current.intensity = urgent ? 0.7 + pulse * 1.6 : 0.25 + pulse * 0.35;
   });
 
   return (
@@ -2335,6 +2315,7 @@ function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolea
         <sphereGeometry args={[0.075, 14, 10]} />
         <meshStandardMaterial ref={lens} color={color} emissive={color} emissiveIntensity={1} toneMapped={false} />
       </mesh>
+      <pointLight ref={light} position={[0, 0.2, 0.05]} color={color} intensity={1} distance={urgent ? 3.8 : 2.4} decay={2} />
     </group>
   );
 }
@@ -2371,8 +2352,8 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <MemoBuildingArt id={track.id} accent={tierColor(tier)} dust={runtime.dust} />
-        <MemoBuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
+        <BuildingArt id={track.id} accent={tierColor(tier)} dust={runtime.dust} />
+        <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
       </group>
       {statusBeaconColor && (
         <group position={[
@@ -2380,17 +2361,17 @@ function ColonyBuilding({
           track.id === "habitat" ? 0.39 : 0.35,
           track.id === "habitat" ? 1.92 : 0.86,
         ]}>
-          <MemoBuildingStatusBeacon color={statusBeaconColor} urgent={urgent} />
+          <BuildingStatusBeacon color={statusBeaconColor} urgent={urgent} />
         </group>
       )}
-      {alerted && <MemoIncidentEffects eventId={eventId} mars={mars} />}
+      {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
           without washing out the dark sky or pretending the Sun is still illuminating it. */}
       {nightMode && <group position={[0, track.id === "habitat" ? 3.3 : 1.9, 0]}>
         <mesh><sphereGeometry args={[0.13, 12, 10]} /><meshBasicMaterial color={p.accent} toneMapped={false} /></mesh>
         <pointLight color={p.accent} intensity={track.id === "habitat" ? 1.1 : 0.42} distance={track.id === "habitat" ? 7 : 3.8} decay={2} />
       </group>}
-      <MemoTierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
+      <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
         <ringGeometry args={track.id === "habitat" ? [2.02, 2.12, 48] : [1.42, 1.54, 40]} />
         <meshBasicMaterial color={alerted ? "#ff4052" : statusColor(runtime.condition)} transparent opacity={0.94} depthWrite={false} toneMapped={false} />
@@ -2401,7 +2382,7 @@ function ColonyBuilding({
           <meshBasicMaterial color="#efc85f" transparent opacity={0.98} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
-      <MemoSelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.24 : 2.05} height={0.12} />
+      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.24 : 2.05} height={0.12} />
       {track.id !== "rover" && (
   <Billboard
           position={[0, track.id === "habitat" ? 5.0 : track.id === "extraction" ? 4.35 : 3.35, 0]}
@@ -2527,7 +2508,7 @@ function MissionVitalsHUD({
 function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: boolean }) {
   const particles = useRef<Array<THREE.Mesh | null>>([]);
   const warningLight = useRef<THREE.PointLight>(null);
-  const count = 10;
+  const count = 18;
   const pressureLeak = eventId === "habitat-pressure";
   const regolithEjecta = eventId === "solar-dust" || eventId === "extraction-lock" || eventId === "micrometeoroid-impact";
   const marsDustFront = mars && eventId === "regional-dust-front";
@@ -2537,7 +2518,7 @@ function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: bool
 
   useFrame(({ clock }) => {
     const time = clock.getElapsedTime();
-    if (warningLight.current) warningLight.current.intensity = 1.15 + (Math.sin(time * 8.5) + 1) * 0.9;
+    if (warningLight.current) warningLight.current.intensity = 2.2 + (Math.sin(time * 10) + 1) * 1.4;
     particles.current.forEach((particle, index) => {
       if (!particle) return;
       const phase = (time * 0.72 + index / count) % 1;
@@ -2558,7 +2539,7 @@ function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: bool
 
   return (
     <group>
-      <pointLight ref={warningLight} position={[0, 2.1, 0]} color={warningColor} distance={8} decay={2} />
+      <pointLight ref={warningLight} position={[0, 2.1, 0]} color={warningColor} distance={10} decay={2} />
       {Array.from({ length: count }, (_, index) => (
         <mesh key={index} ref={(mesh) => { particles.current[index] = mesh; }} visible={false}>
           <sphereGeometry args={[pressureLeak ? 0.055 : 0.045, 8, 6]} />
@@ -3509,60 +3490,26 @@ function WalkControls({
 }
 
 function HelmetFlashlight({ enabled }: { enabled: boolean }) {
-  const { camera, scene } = useThree();
-  const targetRef = useRef<THREE.Object3D | null>(null);
-  const direction = useMemo(() => new THREE.Vector3(), []);
-  const cameraPosition = useMemo(() => new THREE.Vector3(), []);
+  const { camera } = useThree();
 
   useEffect(() => {
     if (!enabled) return;
 
     const light = new THREE.SpotLight(0xffe6ad, 28, 30, Math.PI / 7, 0.55, 1.3);
     const target = new THREE.Object3D();
+    target.position.set(0, 0, -1);
     camera.add(light);
-    scene.add(target);
+    camera.add(target);
     light.target = target;
-    targetRef.current = target;
 
     return () => {
       camera.remove(light);
-      scene.remove(target);
-      targetRef.current = null;
+      camera.remove(target);
     };
-  }, [camera, enabled, scene]);
-
-  useFrame(() => {
-    const target = targetRef.current;
-    if (!enabled || !target) return;
-    camera.updateMatrixWorld();
-    camera.getWorldPosition(cameraPosition);
-    camera.getWorldDirection(direction);
-    target.position.copy(cameraPosition).addScaledVector(direction, 20);
-    target.updateMatrixWorld();
-  });
+  }, [camera, enabled]);
 
   return null;
 }
-
-
-// Stable scene subtrees: simulation values update several times per second, but most
-// of the colony geometry does not. Memoisation prevents rebuilding those meshes.
-const MemoTerrain = memo(Terrain);
-const MemoRocks = memo(Rocks);
-const MemoFoundation = memo(Foundation);
-const MemoRoadNetwork = memo(RoadNetwork);
-const MemoPad = memo(Pad);
-const MemoBeacon = memo(Beacon);
-const MemoBuildingArt = memo(BuildingArt);
-const MemoRoverRockField = memo(RoverRockField);
-const MemoSelectionRing = memo(SelectionRing);
-const MemoCrew = memo(Crew);
-const MemoLandingPad = memo(LandingPad);
-const MemoMissionGuide = memo(MissionGuide);
-const MemoBuildingSurfaceDetails = memo(BuildingSurfaceDetails);
-const MemoTierHardware = memo(TierHardware);
-const MemoBuildingStatusBeacon = memo(BuildingStatusBeacon);
-const MemoIncidentEffects = memo(IncidentEffects);
 
 function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
@@ -3684,14 +3631,15 @@ function Scene({ props }: { props: Props }) {
     <Canvas
       frameloop={paused ? "never" : "always"}
       orthographic
-      dpr={0.85}
+      shadows
+      dpr={[1, 1]}
       camera={{ position: [48, 56, 48], zoom: 20.5, near: 0.5, far: 190 }}
-      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
       onCreated={({ gl }) => {
-        gl.setPixelRatio(0.85);
+        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1));
         gl.outputColorSpace = THREE.SRGBColorSpace;
-        // Dynamic shadow maps were the largest avoidable GPU cost in the colony scene.
-        gl.shadowMap.enabled = false;
+        gl.shadowMap.enabled = true;
+        gl.shadowMap.type = THREE.PCFSoftShadowMap;
       }}
     >
       {firstPersonMode && props.habitatInterior ? (
@@ -3706,7 +3654,7 @@ function Scene({ props }: { props: Props }) {
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
-      <directionalLight position={mars ? [18, 34, 20] : [0, 60, 0]} target={colonyLightTarget} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} />
+      <directionalLight position={mars ? [18, 34, 20] : [0, 60, 0]} target={colonyLightTarget} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       <primitive object={colonyLightTarget} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
         <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
@@ -3722,15 +3670,16 @@ function Scene({ props }: { props: Props }) {
         <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
         <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
       </group>}
-      <MemoTerrain kind={mars ? "mars" : "moon"} />
-      <MemoRocks kind={mars ? "mars" : "moon"} />
+      <Terrain kind={mars ? "mars" : "moon"} />
+      <Rocks kind={mars ? "mars" : "moon"} />
+      {mars && props.activeEventId === "regional-dust-front" && <DustParticles kind="mars" dust={Math.max(28, props.buildings.solar?.dust ?? 0)} />}
       <group scale={COLONY_WORLD_SCALE}>
-      <MemoRoverRockField mars={mars} />
-      <MemoFoundation mars={mars} />
+      <RoverRockField mars={mars} />
+      <Foundation mars={mars} />
       <group frustumCulled={false}>
-        <MemoMissionGuide mars={mars} />
-        <MemoRoadNetwork mars={mars} />
-        <MemoLandingPad mars={mars} />
+        <MissionGuide mars={mars} />
+        <RoadNetwork mars={mars} />
+        <LandingPad mars={mars} />
         {props.tracks.map((track) => track.id !== "rover" && (
           <ColonyBuilding
             key={track.id}
@@ -3760,7 +3709,7 @@ function Scene({ props }: { props: Props }) {
             <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} navigationAccuracy={navigationAccuracy} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
-        <MemoCrew mars={mars} />
+        <Crew mars={mars} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
       </group>
       </group>

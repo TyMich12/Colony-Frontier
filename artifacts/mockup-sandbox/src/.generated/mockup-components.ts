@@ -14,6 +14,7 @@ export const modules: ModuleMap = {
   "./components/mockups/colony-frontier/TechnologyLab.tsx": () => import("../components/mockups/colony-frontier/TechnologyLab.tsx"),
   "./components/mockups/colony-frontier/TechnologyLabRefresh.tsx": () => import("../components/mockups/colony-frontier/TechnologyLabRefresh.tsx"),
   "./components/mockups/colony-frontier/solar-surface/central-hub.tsx": () => import("../components/mockups/colony-frontier/solar-surface/central-hub.tsx"),
+  "./components/mockups/colony-frontier/solar-surface/dust-particles.tsx": () => import("../components/mockups/colony-frontier/solar-surface/dust-particles.tsx"),
   "./components/mockups/colony-frontier/solar-surface/panel-wing.tsx": () => import("../components/mockups/colony-frontier/solar-surface/panel-wing.tsx"),
   "./components/mockups/colony-frontier/solar-surface/solar-farm.tsx": () => import("../components/mockups/colony-frontier/solar-surface/solar-farm.tsx"),
   "./components/mockups/colony-frontier/solar-surface/terrain.tsx": () => import("../components/mockups/colony-frontier/solar-surface/terrain.tsx")

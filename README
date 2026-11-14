@@ -1,11 +1,10 @@
-## Run Colony Frontier
+Hello guys this is our project, go to codespaces, new codespace and run this command in terminal
 
-From the repository root, start the development server:
-
-```sh
 cd artifacts/mockup-sandbox
-pnpm dev
-```
 
-Open the localhost URL printed by Vite in a browser tab. The game menu loads
-automatically at the root URL. To open it directly, add `/preview/MainMenu`.
+and then this command:
+pnpm dev
+
+and then click localhost link in the terminal, after that go to url and then at the end add "/preview/MainMenu"
+
+scroll down to the bottom and the click command to start the game.
