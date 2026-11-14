@@ -57,6 +57,8 @@ class ColonyAudioEngine {
   private engineGain: GainNode | null = null;
   private engineOscillators: OscillatorNode[] = [];
   private engineNoise: AudioBufferSourceNode | null = null;
+  private engineNoiseGain: GainNode | null = null;
+  private engineNoiseFilter: BiquadFilterNode | null = null;
   private engineFilter: BiquadFilterNode | null = null;
   private engineThrottle = 0;
   private musicTimer: number | null = null;
@@ -185,43 +187,65 @@ class ColonyAudioEngine {
       this.engineGain.gain.value = 0.0001;
       this.engineGain.connect(this.effectsGain);
 
-      const lowOscillator = this.context.createOscillator();
-      lowOscillator.type = "sawtooth";
-      lowOscillator.connect(this.engineGain);
-      lowOscillator.start();
-
-      const upperOscillator = this.context.createOscillator();
-      upperOscillator.type = "triangle";
-      upperOscillator.connect(this.engineGain);
-      upperOscillator.start();
-      this.engineOscillators = [lowOscillator, upperOscillator];
-
       this.engineFilter = this.context.createBiquadFilter();
       this.engineFilter.type = "lowpass";
+      this.engineFilter.Q.value = 0.9;
       this.engineFilter.connect(this.engineGain);
+
+      this.engineNoiseFilter = this.context.createBiquadFilter();
+      this.engineNoiseFilter.type = "bandpass";
+      this.engineNoiseFilter.Q.value = 0.8;
+      this.engineNoiseGain = this.context.createGain();
+      this.engineNoiseGain.gain.value = 0.0001;
+      this.engineNoiseFilter.connect(this.engineNoiseGain);
+      this.engineNoiseGain.connect(this.engineGain);
+
+      const lowOscillator = this.context.createOscillator();
+      lowOscillator.type = "sawtooth";
+      lowOscillator.connect(this.engineFilter);
+      lowOscillator.start();
+
+      const midOscillator = this.context.createOscillator();
+      midOscillator.type = "square";
+      midOscillator.connect(this.engineFilter);
+      midOscillator.start();
+
+      const highOscillator = this.context.createOscillator();
+      highOscillator.type = "triangle";
+      highOscillator.connect(this.engineFilter);
+      highOscillator.start();
+      this.engineOscillators = [lowOscillator, midOscillator, highOscillator];
+
       const noiseBuffer = this.context.createBuffer(1, this.context.sampleRate * 2, this.context.sampleRate);
       const samples = noiseBuffer.getChannelData(0);
       for (let index = 0; index < samples.length; index += 1) {
-        samples[index] = Math.random() * 2 - 1;
+        const sweep = 1 - index / samples.length;
+        samples[index] = (Math.random() * 2 - 1) * sweep;
       }
       this.engineNoise = this.context.createBufferSource();
       this.engineNoise.buffer = noiseBuffer;
       this.engineNoise.loop = true;
-      this.engineNoise.connect(this.engineFilter);
+      this.engineNoise.connect(this.engineNoiseFilter);
       this.engineNoise.start();
     }
 
     const now = this.context.currentTime;
     const active = this.engineThrottle > 0;
-    this.engineGain.gain.setTargetAtTime(
-      active ? 0.18 + this.engineThrottle * 0.25 : 0.0001,
-      now,
-      active ? 0.45 : 0.3,
-    );
-    this.engineOscillators[0]?.frequency.setTargetAtTime(36 + this.engineThrottle * 28, now, 0.35);
-    this.engineOscillators[1]?.frequency.setTargetAtTime(64 + this.engineThrottle * 52, now, 0.35);
+    const targetGain = active ? 0.12 + this.engineThrottle * 0.58 : 0.0001;
+    this.engineGain.gain.setTargetAtTime(targetGain, now, active ? 0.7 : 0.3);
+    this.engineOscillators[0]?.frequency.setTargetAtTime(30 + this.engineThrottle * 54, now, 0.35);
+    this.engineOscillators[1]?.frequency.setTargetAtTime(72 + this.engineThrottle * 118, now, 0.28);
+    this.engineOscillators[2]?.frequency.setTargetAtTime(138 + this.engineThrottle * 210, now, 0.22);
     if (this.engineFilter) {
-      this.engineFilter.frequency.setTargetAtTime(180 + this.engineThrottle * 680, now, 0.35);
+      this.engineFilter.frequency.setTargetAtTime(180 + this.engineThrottle * 1040, now, 0.35);
+      this.engineFilter.Q.setTargetAtTime(0.6 + this.engineThrottle * 1.8, now, 0.24);
+    }
+    if (this.engineNoiseFilter) {
+      this.engineNoiseFilter.frequency.setTargetAtTime(220 + this.engineThrottle * 980, now, 0.25);
+      this.engineNoiseFilter.Q.setTargetAtTime(0.7 + this.engineThrottle * 2.2, now, 0.25);
+    }
+    if (this.engineNoiseGain) {
+      this.engineNoiseGain.gain.setTargetAtTime(active ? 0.06 + this.engineThrottle * 0.26 : 0.0001, now, 0.25);
     }
   }
 
@@ -264,6 +288,8 @@ class ColonyAudioEngine {
     this.engineGain = null;
     this.engineOscillators = [];
     this.engineNoise = null;
+    this.engineNoiseGain = null;
+    this.engineNoiseFilter = null;
     this.engineFilter = null;
   }
 }
