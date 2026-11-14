@@ -1866,7 +1866,7 @@ function ColonyRobot({
         const dx = waypoint[0] - position[0];
         const dz = waypoint[1] - position[1];
         const distance = Math.hypot(dx, dz);
-        const move = Math.min(distance, Math.max(0, delta) * 0.09);
+        const move = Math.min(distance, Math.max(0, delta) * 0.035);
         if (distance > 0.001) {
           position[0] += dx / distance * move;
           position[1] += dz / distance * move;
@@ -1888,18 +1888,18 @@ function ColonyRobot({
       ref.current.rotation.y += turn * Math.min(1, delta * 3);
     }
 
-    const gait = Math.sin(time * 2.8 + phaseOffset) * (servicing ? 0.08 : moving ? 0.34 : 0.035);
+    const gait = Math.sin(time * 1.05 + phaseOffset) * (servicing ? 0.035 : moving ? 0.12 : 0.018);
     ref.current.position.set(
       position[0],
-      -0.17 + Math.abs(Math.sin(time * 2.8 + phaseOffset)) * (moving ? 0.018 : 0.006) - (servicing ? 0.025 : 0),
+      -0.17 + Math.abs(Math.sin(time * 1.05 + phaseOffset)) * (moving ? 0.008 : 0.003) - (servicing ? 0.025 : 0),
       position[1],
     );
     if (leftArm.current) {
       leftArm.current.rotation.x = THREE.MathUtils.damp(leftArm.current.rotation.x, servicing ? -0.55 + gait : gait * 0.72, 6, delta);
     }
     if (rightArm.current) {
-      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.82 + Math.sin(time * 3.2) * 0.18 : -gait * 0.72, 6, delta);
-      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.28 + Math.sin(time * 2.6) * 0.08 : 0, 5, delta);
+      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.82 + Math.sin(time * 1.1) * 0.08 : -gait * 0.72, 6, delta);
+      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.28 + Math.sin(time * 0.9) * 0.04 : 0, 5, delta);
     }
     if (leftLeg.current) leftLeg.current.rotation.x = -gait;
     if (rightLeg.current) rightLeg.current.rotation.x = gait;
@@ -1919,10 +1919,14 @@ function ColonyRobot({
 
   const statusColor = index === 1 ? "#f2bd58" : "#62e4e6";
   return (
-    <group ref={ref} scale={1.38}>
+    <group
+      ref={ref}
+      position={[spawnPositions[index % spawnPositions.length][0], -0.17, spawnPositions[index % spawnPositions.length][1]]}
+      scale={1.38}
+    >
       <mesh position={[0, 0.43, 0]}>
       <cylinderGeometry args={[0.27, 0.31, 0.18, 16]} />
-      <meshStandardMaterial color="#d2ddd5" metalness={0.76} roughness={0.24} />
+      <meshStandardMaterial color="#35474a" metalness={0.82} roughness={0.24} />
       </mesh>
     <RoundedBox args={[0.64, 0.56, 0.43]} radius={0.12} smoothness={5} position={[0, 0.73, 0]} castShadow>
       <meshStandardMaterial color="#788b8d" metalness={0.76} roughness={0.24} />
@@ -1937,7 +1941,7 @@ function ColonyRobot({
       {[-0.09, -0.045, 0, 0.045, 0.09].map((x) => (
       <mesh key={x} position={[x * 1.7, 0.49, 0.205]}>
         <boxGeometry args={[0.026, 0.11, 0.014]} />
-        <meshStandardMaterial color="#d2ddd5" metalness={0.78} roughness={0.28} />
+        <meshStandardMaterial color="#526467" metalness={0.78} roughness={0.28} />
         </mesh>
       ))}
       {[-1, 1].map((side) => (
@@ -1951,14 +1955,14 @@ function ColonyRobot({
           <meshStandardMaterial color="#46d8e6" emissive="#147b87" emissiveIntensity={0.8} metalness={0.72} roughness={0.22} />
           </mesh>
         <RoundedBox args={[0.2, 0.28, 0.1]} radius={0.05} smoothness={4} position={[side * 0.06, 0.035, 0.11]}>
-          <meshStandardMaterial color="#c2d0c9" metalness={0.66} roughness={0.28} />
+          <meshStandardMaterial color="#3b5053" metalness={0.76} roughness={0.28} />
           </RoundedBox>
         </group>
       ))}
       {[-0.13, 0.13].map((x) => (
         <mesh key={x} position={[x, 0.91, 0.025]} rotation={[0, 0, x * 1.4]}>
           <boxGeometry args={[0.08, 0.14, 0.12]} />
-          <meshStandardMaterial color="#c0c8bd" metalness={0.58} roughness={0.42} />
+          <meshStandardMaterial color="#44575a" metalness={0.72} roughness={0.32} />
         </mesh>
       ))}
       <group position={[0, 0.82, -0.25]}>
@@ -1972,7 +1976,7 @@ function ColonyRobot({
         {[-0.16, -0.08, 0, 0.08, 0.16].map((x, finIndex) => (
           <mesh key={x} position={[x, 0.02, -0.213]}>
             <boxGeometry args={[0.03, 0.2, 0.024]} />
-            <meshStandardMaterial color={finIndex === 2 ? "#70dfe4" : "#a8bab7"} emissive={finIndex === 2 ? "#258894" : "#000000"} emissiveIntensity={0.9} metalness={0.78} roughness={0.25} />
+            <meshStandardMaterial color={finIndex === 2 ? "#70dfe4" : "#53676a"} emissive={finIndex === 2 ? "#258894" : "#000000"} emissiveIntensity={0.9} metalness={0.78} roughness={0.25} />
           </mesh>
         ))}
         {[-0.24, 0.24].map((x) => (
@@ -2003,14 +2007,14 @@ function ColonyRobot({
           </mesh>
           <mesh position={[side * 0.04, -0.29, forward * 0.02]} rotation={[forward * -0.16, 0, side * 0.1]}>
             <capsuleGeometry args={[0.065, 0.3, 5, 10]} />
-            <meshStandardMaterial color="#c0cec7" metalness={0.72} roughness={0.28} />
+            <meshStandardMaterial color="#435659" metalness={0.8} roughness={0.28} />
           </mesh>
           <mesh position={[side * 0.055, -0.5, forward * 0.12]}>
             <sphereGeometry args={[0.095, 14, 10]} />
             <meshStandardMaterial color="#2a3d42" metalness={0.84} roughness={0.2} />
           </mesh>
           <RoundedBox args={[0.2, 0.09, 0.26]} radius={0.035} smoothness={3} position={[side * 0.07, -0.58, forward * 0.18]}>
-            <meshStandardMaterial color="#d3ddd4" metalness={0.68} roughness={0.3} />
+            <meshStandardMaterial color="#35494c" metalness={0.78} roughness={0.3} />
           </RoundedBox>
           <mesh position={[side * 0.07, -0.53, forward * 0.21]}>
             <boxGeometry args={[0.12, 0.018, 0.035]} />
@@ -2029,7 +2033,7 @@ function ColonyRobot({
         </mesh>
         <mesh position={[0.19, -0.39, 0.33]} rotation={[0.5, 0, -0.22]}>
           <capsuleGeometry args={[0.045, 0.2, 4, 8]} />
-          <meshStandardMaterial color="#c6d2c9" metalness={0.76} roughness={0.24} />
+          <meshStandardMaterial color="#455a5d" metalness={0.82} roughness={0.24} />
         </mesh>
         <mesh position={[0.2, -0.51, 0.39]}>
           <boxGeometry args={[0.16, 0.055, 0.12]} />
@@ -2038,7 +2042,7 @@ function ColonyRobot({
         {[-1, 1].map((finger) => (
           <mesh key={finger} position={[0.2 + finger * 0.07, -0.55, 0.44]}>
             <boxGeometry args={[0.025, 0.12, 0.035]} />
-            <meshStandardMaterial color="#d8e0d7" metalness={0.78} roughness={0.24} />
+            <meshStandardMaterial color="#4c6062" metalness={0.82} roughness={0.24} />
           </mesh>
         ))}
         <mesh position={[0.2, -0.51, 0.47]}>
@@ -3381,7 +3385,8 @@ function WalkControls({
           const position = POSITIONS[track.id];
           if (!position) continue;
           const distance = Math.hypot(player.x - position[0], player.z - position[1]);
-          if (distance < 7.5 && (!closest || distance < closest.distance)) {
+          const interactionRadius = track.id === "habitat" ? 9.5 : 7.5;
+          if (distance < interactionRadius && (!closest || distance < closest.distance)) {
             closest = { distance, trackId: track.id };
           }
         }
@@ -3492,7 +3497,9 @@ function WalkControls({
           const position = POSITIONS[track.id];
           if (!position) return false;
           if (track.id === "habitat" && Math.abs(x - position[0]) < 2.1 && z - position[1] > 7.8 && z - position[1] < 14.5) return false;
-          const radius = buildingClearanceRadius(track.id);
+          const radius = track.id === "habitat"
+            ? 7.8
+            : Math.min(buildingClearanceRadius(track.id), 2);
           return Math.hypot(x - position[0], z - position[1]) < radius;
         });
         return nearBuilding || ROVER_ROUTE_ROCKS.some((rock) => Math.hypot(x - rock.x, z - rock.z) < rock.radius + 0.55);
@@ -3686,12 +3693,12 @@ function Scene({ props }: { props: Props }) {
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
   const sunArcAngle = Math.PI * (0.75 + sunProgress);
-  const sunOrbitRadius = 175;
+  const sunOrbitRadius = 122;
   const sunX = Math.cos(sunArcAngle) * sunOrbitRadius;
   const sunZ = Math.sin(sunArcAngle) * sunOrbitRadius;
   const sunPosition: [number, number, number] = [
     sunX,
-    terrainHeight(sunX, sunZ) + Math.sin(sunAltitudeRad) * 55,
+    terrainHeight(sunX, sunZ) + 25 + Math.sin(sunAltitudeRad) * 55,
     sunZ,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;

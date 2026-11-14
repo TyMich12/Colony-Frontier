@@ -2540,7 +2540,7 @@ export function MissionSimulation() {
   const applyBuildingActionRef = useRef<(trackId: string, action: string) => void>(() => {});
   const [manualActions, setManualActions] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(4);
   // Hysteresis prevents optional loads switching rapidly near the solar-demand threshold.
   const powerDeficitRef = useRef(false);
   const [results, setResults] = useState(false);
