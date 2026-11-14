@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LEVEL1_ENVIRONMENT, POWER_DEMAND_MODEL, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile, type RepairOption } from "./_shared/simulationBalance";
+import { LEVEL1_ENVIRONMENT, POWER_DEMAND_MODEL, baselineStateIndex, getAdditionalMetricRow, getAdditionalRating, getBaselineRating, getBaselineRow, getLunarCycleState, getRepairOption, getRepairOptions, getRepairEffectValue, getRetrofitInstallation, effectiveRepairTierIndex, interpolateSolarProfile, type RepairOption } from "./_shared/simulationBalance";
 import {
   Activity,
   AlertTriangle,
@@ -3002,12 +3002,13 @@ export function MissionSimulation() {
         const gridUpgrade = buildings.grid?.upgradeLevel ?? 0;
         const radiationUpgrade = buildings.radiation?.upgradeLevel ?? 0;
         const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2);
-        const lunarProfile = pending.campaign === "moon" ? interpolateSolarProfile(missionDay) : null;
+        const lunarCycle = pending.campaign === "moon" ? getLunarCycleState(elapsed) : null;
+        const lunarProfile = lunarCycle ? interpolateSolarProfile(lunarCycle.day) : null;
         const solarAvailability = blackoutMission
           ? 0
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
-            : missionDay < 14
+            : lunarCycle && !lunarCycle.isNight
               ? (lunarProfile?.sunlightGeometry ?? 0)
               : 0;
         const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
@@ -4882,7 +4883,7 @@ export function MissionSimulation() {
             handleBuildingAction(trackId, action);
           }}
           elapsed={elapsed}
-          lunarNight={pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2)}
+          lunarNight={pending.campaign === "moon" && getLunarCycleState(elapsed).isNight}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
           activeEventId={activeEventId}

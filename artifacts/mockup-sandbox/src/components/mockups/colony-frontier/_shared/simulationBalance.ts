@@ -102,3 +102,16 @@ export function interpolateSolarProfile(day: number) {
     cellTemperatureLoss: lower.cellTemperatureLoss + (upper.cellTemperatureLoss - lower.cellTemperatureLoss) * mix,
   };
 }
+
+const LUNAR_SYNODIC_MONTH_DAYS = 29.53059;
+const LUNAR_DAYLIGHT_DAYS = LUNAR_SYNODIC_MONTH_DAYS / 2;
+
+export function getLunarCycleState(elapsedSeconds: number) {
+  const elapsedDays = elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+  const cycleDay = ((elapsedDays % LUNAR_SYNODIC_MONTH_DAYS) + LUNAR_SYNODIC_MONTH_DAYS) % LUNAR_SYNODIC_MONTH_DAYS;
+  const isNight = cycleDay >= LUNAR_DAYLIGHT_DAYS;
+  return {
+    day: isNight ? 14 : (cycleDay / LUNAR_DAYLIGHT_DAYS) * 14,
+    isNight,
+  };
+}

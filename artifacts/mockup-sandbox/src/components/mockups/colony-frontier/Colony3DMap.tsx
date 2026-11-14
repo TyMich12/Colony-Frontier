@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Billboard, Html, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@react-three/drei";
+import { Billboard, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
+<<<<<<< HEAD
 import { terrainHeight, CraterRim, Terrain, Rocks } from "./solar-surface/terrain";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
+=======
+import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+import { getBaselineRating, getLunarCycleState, interpolateSolarProfile } from "./_shared/simulationBalance";
+>>>>>>> af1571d (tikitiki)
 
 export type MissionResourceNode = {
   id: string;
@@ -2458,39 +2463,6 @@ function LandingPad({ mars }: { mars:boolean }) {
   </group>;
 }
 
-function MissionGuide({ mars }: { mars: boolean }) {
-  return (
-    <Html fullscreen zIndexRange={[10, 20]} style={{ pointerEvents: "none" }}>
-      <div style={{
-        position: "absolute",
-        left: 16,
-        bottom: 16,
-        width: 285,
-        padding: "11px 13px",
-        border: "1px solid rgba(213,168,74,.58)",
-        borderRadius: 12,
-        background: "rgba(8,15,19,.86)",
-        boxShadow: "0 12px 30px rgba(0,0,0,.32)",
-        color: "#e7eeea",
-        fontFamily: "system-ui, sans-serif",
-        backdropFilter: "blur(8px)",
-      }}>
-        <div style={{fontSize:9,fontWeight:900,letterSpacing:".18em",textTransform:"uppercase",color:"#efc85f"}}>MISSION CONTROL · {mars ? "MARS" : "MOON"}</div>
-        <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
-          <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable, manage supplies, and complete the mission objectives.
-          <br/><b style={{color:"#e8eee9"}}>2.</b> Amber base lights need supervision; a pulsing red base light means immediate action. Open the marked facility to respond.
-          <br/><b style={{color:"#e8eee9"}}>3.</b> Walk the service lanes to inspect each facility. Field sites lie beyond the base; the rover navigates around structures and terrain.
-        </div>
-        <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
-          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
-          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#f0c45b",marginRight:4}}/>Needs supervision</span>
-          <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#ff6558",marginRight:4}}/>Do it now</span>
-        </div>
-      </div>
-    </Html>
-  );
-}
-
 function MissionVitalsHUD({
   metrics,
   physicalReadings,
@@ -3640,21 +3612,15 @@ function Scene({ props }: { props: Props }) {
   const roverRatedSpeedKmh = getBaselineRating("rover", roverTier, roverRetrofitLevel);
   const roverSpeedGap = props.buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
   const roverTraverseSpeedKmh = Math.max(0, roverRatedSpeedKmh - roverSpeedGap) * roverCondition / 100;
-  const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
-  const sunAngleDeg = props.lunarNight ? -8 : interpolateSolarProfile(lunarDay).sunAltitudeDeg;
-  // Place celestial bodies in the visible, far background of the colony camera. The
-  // old ±36-unit orbit pushed them outside the orthographic camera framing, so the
-  // simulation was technically drawing them but players could not see them.
+  const lunarCycle = getLunarCycleState(props.elapsed);
+  const lunarDay = lunarCycle.day;
+  const sunAngleDeg = interpolateSolarProfile(lunarDay).sunAltitudeDeg;
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
-  // Celestial bodies live on a distant sky plane, not hovering just behind the habitat.
-  // The orthographic scene uses a deliberately cinematic apparent size: Earth is visibly
-  // larger than the Sun, while both remain clearly separated from the terrain silhouette.
-  const skyDistance = -82;
   const sunPosition: [number, number, number] = [
-    -35 + sunProgress * 70,
-    props.lunarNight ? -25 : -2 + Math.sin(sunAltitudeRad) * 28,
-    skyDistance,
+    -45 + sunProgress * 90,
+    props.lunarNight ? -14 : Math.sin(sunAltitudeRad) * 28,
+    -72 + sunProgress * 144,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   const supplyStations = [
@@ -3691,15 +3657,23 @@ function Scene({ props }: { props: Props }) {
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
+<<<<<<< HEAD
         <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.32} depthWrite={false} toneMapped={false} /></mesh>
         {!props.lunarNight && <mesh><sphereGeometry args={[2.05, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.16} depthWrite={false} toneMapped={false} /></mesh>}
         {!props.lunarNight && <mesh><sphereGeometry args={[3.2, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.07} depthWrite={false} toneMapped={false} /></mesh>}
         {!props.lunarNight && <pointLight color="#fff0cf" intensity={4.5} distance={110} decay={1.6} />}
+=======
+        {!props.lunarNight && <>
+          <mesh><sphereGeometry args={[2.2, 64, 48]} /><meshBasicMaterial color="#fff9df" toneMapped={false} /></mesh>
+          <mesh><sphereGeometry args={[3.1, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={0.28} depthWrite={false} toneMapped={false} /></mesh>
+          <mesh><sphereGeometry args={[4.5, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.12} depthWrite={false} toneMapped={false} /></mesh>
+          <mesh><sphereGeometry args={[6.5, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
+          <pointLight color="#fff0cf" intensity={2.4} distance={95} decay={1.6} />
+        </>}
+>>>>>>> af1571d (tikitiki)
       </group>}
-      {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
-        {/* Earth is a distant, recognisable blue-white disc, with an apparent diameter
-            around three times the Sun in this cinematic camera framing. */}
+      {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false} visible={false}>
         <mesh><sphereGeometry args={[2.55, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#0b1d2a" emissiveIntensity={0.18} /></mesh>
         <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
         <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
@@ -3710,7 +3684,6 @@ function Scene({ props }: { props: Props }) {
       <RoverRockField mars={mars} />
       <Foundation mars={mars} />
       <group frustumCulled={false}>
-        <MissionGuide mars={mars} />
         <RoadNetwork mars={mars} />
         <LandingPad mars={mars} />
         {props.tracks.map((track) => track.id !== "rover" && (
@@ -3817,7 +3790,7 @@ function Scene({ props }: { props: Props }) {
             <div className="w-full max-w-sm rounded-2xl border border-[#77b7bf]/45 bg-[#07151c]/95 p-6 text-center font-mono shadow-[0_0_70px_rgba(75,158,188,.18)]">
               <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#7ed8dd]">Crew berth · sleep cycle</p>
               <h2 className="mt-3 text-xl font-black uppercase tracking-[0.1em] text-[#e7f2e7]">Resting in orbit</h2>
-              <p className="mt-2 text-[10px] leading-5 text-[#9cb5b6]">The habitat is quiet. Earth and the stars drift past the observation window while the crew sleeps.</p>
+              <p className="mt-2 text-[10px] leading-5 text-[#9cb5b6]">The habitat is quiet. Stars drift past the observation window while the crew sleeps.</p>
               <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#1d3037]">
                 <div className="h-full origin-left rounded-full bg-gradient-to-r from-[#5dc9cf] to-[#e6c982]" style={{ animation: "crew-sleep-progress 8s linear forwards" }} />
               </div>
@@ -3931,13 +3904,26 @@ function Scene({ props }: { props: Props }) {
     )}
     <div className="pointer-events-auto absolute left-3 top-1/2 z-30 flex w-[min(94vw,230px)] -translate-y-1/2 flex-col items-start gap-2">
       {walkMode && !props.habitatInterior && props.tracks.some((track) => track.id === "habitat") && (
-        <button
-          type="button"
-          onClick={props.onEnterHabitat}
-          className="w-full border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 text-left font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
-        >
-          Enter habitat
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              if (document.pointerLockElement) document.exitPointerLock();
+              setPointerLocked(false);
+              props.onSelect("habitat");
+            }}
+            className="w-full border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 text-left font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
+          >
+            Inspect habitat
+          </button>
+          <button
+            type="button"
+            onClick={props.onEnterHabitat}
+            className="w-full border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 text-left font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
+          >
+            Enter habitat
+          </button>
+        </>
       )}
       <button
         type="button"
@@ -3972,7 +3958,7 @@ function Scene({ props }: { props: Props }) {
           <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
             <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
             {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
-            <div className="mt-1 text-[8px] text-[#b6c9d4]">Earth remains visible · daylight and shadows follow the Sun</div>
+            <div className="mt-1 text-[8px] text-[#b6c9d4]">Daylight and shadows follow the lunar cycle</div>
           </div>
         )}
         <div className="rounded-lg border border-white/15 bg-[#07131c]/70 px-3 py-2 font-mono text-[8px] text-[#b6c9d4] shadow-lg backdrop-blur-sm">
