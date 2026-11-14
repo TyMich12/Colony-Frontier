@@ -56,29 +56,29 @@ type Props = {
 };
 
 export const POSITIONS: Record<string, [number, number]> = {
-  // Compact service lanes keep the outpost walkable while leaving room for each facility.
+  // Wide service ring leaves clear approach lanes around every facility.
   habitat: [0, 0],
-  water: [-16, 13],
-  extraction: [-5, 13],
-  isru: [5, 13],
-  radiation: [16, 13],
-  oxygen: [-16, 4],
-  comms: [-8, 4],
-  maintenance: [8, 4],
-  co2: [-16, -5],
-  grid: [-8, -5],
-  science: [8, -5],
-  battery: [16, -5],
-  thermal: [-16, -13],
-  solar: [-5, -13],
-  agriculture: [5, -13],
-  navigation: [16, -13],
-  rover: [19, -18],
+  water: [-27, 30],
+  extraction: [-9, 30],
+  isru: [9, 30],
+  radiation: [27, 30],
+  oxygen: [-30, 18],
+  comms: [-30, 6],
+  maintenance: [-30, -6],
+  co2: [-30, -18],
+  grid: [30, 18],
+  science: [30, 6],
+  battery: [30, -6],
+  agriculture: [30, -18],
+  thermal: [-27, -30],
+  solar: [-9, -30],
+  navigation: [9, -30],
+  rover: [0, -39],
 };
 
 const BUILDING_SCALES: Record<string, number> = {
   habitat: 1.35,
-  solar: 2.15,
+  solar: 1.65,
   battery: 1.28,
   oxygen: 1.28,
   water: 1.28,
@@ -120,9 +120,9 @@ const BUILDING_ROTATIONS: Record<string, number> = {
   maintenance: 0.2,
 };
 
-const ROAD_X = [-10, 0, 10];
-const ROAD_Z = [-9, -0.6, 9];
-const ROAD_EDGE = 18;
+const ROAD_X = [-38, -13, 13, 38];
+const ROAD_Z = [-38, -13, 13, 38];
+const ROAD_EDGE = 42;
 const PAD_Y = 0.12;
 
 function nodeWorldPosition(node: MissionResourceNode): [number, number] {
@@ -215,34 +215,22 @@ type RoverRockObstacle = {
   x: number;
   z: number;
   radius: number;
-  rerouteRoll: number;
 };
 
 const ROVER_ROUTE_ROCKS: RoverRockObstacle[] = [
-  { id: "central-boulder", label: "CENTRAL BOULDER", x: 1, z: -20, radius: 1.9, rerouteRoll: 0.64 },
-  { id: "eastern-ridge", label: "EASTERN BOULDER RIDGE", x: 29, z: 7, radius: 1.8, rerouteRoll: 0.76 },
-  { id: "southern-scree", label: "SOUTHERN SCREE", x: 27, z: -26, radius: 1.55, rerouteRoll: 0.85 },
-  { id: "western-scree", label: "WESTERN SCREE", x: -18, z: 14, radius: 2.0, rerouteRoll: 0.92 },
+  { id: "north-boulder", label: "NORTH BOULDER", x: 0, z: 46, radius: 1.9 },
+  { id: "east-ridge", label: "EASTERN RIDGE", x: 46, z: 0, radius: 1.8 },
+  { id: "south-scree", label: "SOUTHERN SCREE", x: 0, z: -46, radius: 1.55 },
+  { id: "west-scree", label: "WESTERN SCREE", x: -46, z: 0, radius: 2.0 },
 ];
 
-const SITE_ROUTE_CHALLENGES: Record<string, string> = {
-  ice: "central-boulder",
-  mineral: "eastern-ridge",
-  science: "southern-scree",
-  regolith: "western-scree",
-};
-
 // Grid-based A*: buildings and the same physical boulders rendered in the scene are obstacles.
-// An optional ignored rock is used only for the first, low-confidence approach so the rover can
-// reach the near side of a visible obstacle, pause, announce the diversion, and re-plan around it.
 function findRoverPath(
   start: [number, number],
   goal: [number, number],
-  ignoredRockId?: string | null,
-  ignoreAllRocks = false,
 ): [number, number][] {
   const step = 2;
-  const limit = 18; // ±36 world units; includes the remote science / extraction sites.
+  const limit = 22;
   const toGrid = (point: [number, number]) => ({
     x: Math.max(-limit, Math.min(limit, Math.round(point[0] / step))),
     z: Math.max(-limit, Math.min(limit, Math.round(point[1] / step))),
@@ -258,11 +246,11 @@ function findRoverPath(
     const wz = z * step;
     const nearBuilding = Object.entries(POSITIONS).some(([id, [bx, bz]]) => {
       if (id === "rover") return false;
-      const radius = buildingClearanceRadius(id);
+      const radius = buildingClearanceRadius(id) + 1.2;
       return Math.hypot(wx - bx, wz - bz) < radius;
     });
-    const nearRock = !ignoreAllRocks && ROVER_ROUTE_ROCKS.some((rock) =>
-      rock.id !== ignoredRockId && Math.hypot(wx - rock.x, wz - rock.z) < rock.radius + 0.8,
+    const nearRock = ROVER_ROUTE_ROCKS.some((rock) =>
+      Math.hypot(wx - rock.x, wz - rock.z) < rock.radius + 1.2,
     );
     return nearBuilding || nearRock;
   };
@@ -318,30 +306,17 @@ function findRoverPath(
   return path;
 }
 
-function planRoverPath(start: [number, number], goal: [number, number], ignoredRockId?: string | null): [number, number][] {
-  const planned = findRoverPath(start, goal, ignoredRockId);
-  if (planned.length) return planned;
-
-  // Second pass relaxes boulder avoidance only; buildings still block the path.
-  const rockFallback = findRoverPath(start, goal, null, true);
-  if (rockFallback.length) return rockFallback;
-
-  // A final bounded perimeter route ensures a destination never leaves the rover silently still.
-  const edgeX = goal[0] < start[0] ? -33 : 33;
-  const edgeZ = goal[1] < start[1] ? -33 : 33;
-  const route: [number, number][] = [[start[0], edgeZ], [edgeX, edgeZ], [edgeX, goal[1]], goal];
-  return route.filter((point, index) => {
-    const previous = index === 0 ? start : route[index - 1];
-    return Math.hypot(point[0] - previous[0], point[1] - previous[1]) > 0.4;
-  });
+function planRoverPath(start: [number, number], goal: [number, number]): [number, number][] {
+  return findRoverPath(start, goal);
 }
 
-function rockApproachPoint(start: [number, number], rock: RoverRockObstacle): [number, number] {
-  const dx = start[0] - rock.x;
-  const dz = start[1] - rock.z;
+function buildingApproachPoint(id: string, start: [number, number]): [number, number] {
+  const [x, z] = POSITIONS[id] ?? POSITIONS.habitat;
+  const dx = start[0] - x;
+  const dz = start[1] - z;
   const distance = Math.max(0.001, Math.hypot(dx, dz));
-  const standOff = rock.radius + 0.72;
-  return [rock.x + (dx / distance) * standOff, rock.z + (dz / distance) * standOff];
+  const standOff = buildingClearanceRadius(id) + 1.8;
+  return [x + (dx / distance) * standOff, z + (dz / distance) * standOff];
 }
 
 function tierColor(tier: Tier) {
@@ -355,7 +330,7 @@ function tierColor(tier: Tier) {
 }
 
 function statusColor(condition: number) {
-  return condition < 55 ? "#ff6558" : condition < 82 ? "#f0c45b" : "#73dda0";
+  return condition < 55 ? "#ff4052" : condition < 82 ? "#f0c45b" : "#73dda0";
 }
 
 function palette(id: string) {
@@ -387,20 +362,24 @@ function Foundation({ mars }: { mars: boolean }) {
   return (
     <group>
       <mesh receiveShadow position={[0, -0.205, 0]}>
-        <boxGeometry args={[58, 0.36, 58]} />
-        <meshStandardMaterial color={ground} roughness={0.98} />
+        <RoundedBox args={[86, 0.36, 86]} radius={1.4} smoothness={5}>
+          <meshStandardMaterial color={ground} roughness={0.98} />
+        </RoundedBox>
       </mesh>
       <mesh receiveShadow position={[0, 0.025, 0]}>
-        <boxGeometry args={[54, 0.11, 54]} />
-        <meshStandardMaterial color={mars ? "#8d5948" : "#74726e"} roughness={0.96} />
+        <RoundedBox args={[82, 0.11, 82]} radius={1.05} smoothness={5}>
+          <meshStandardMaterial color={mars ? "#8d5948" : "#74726e"} roughness={0.96} />
+        </RoundedBox>
       </mesh>
       <mesh position={[0, 0.105, 0]}>
-        <boxGeometry args={[53, 0.035, 53]} />
-        <meshStandardMaterial color={curb} roughness={0.9} metalness={0.12} />
+        <RoundedBox args={[81, 0.035, 81]} radius={0.8} smoothness={5}>
+          <meshStandardMaterial color={curb} roughness={0.9} metalness={0.12} />
+        </RoundedBox>
       </mesh>
       <mesh position={[0, 0.132, 0]}>
-        <boxGeometry args={[52, 0.028, 52]} />
-        <meshStandardMaterial color={mars ? "#774b3e" : "#666765"} roughness={0.94} />
+        <RoundedBox args={[80, 0.028, 80]} radius={0.55} smoothness={5}>
+          <meshStandardMaterial color={mars ? "#774b3e" : "#666765"} roughness={0.94} />
+        </RoundedBox>
       </mesh>
     </group>
   );
@@ -490,11 +469,12 @@ function Pad({ position, size, mars, accent, baseY = 0 }: { position: [number, n
   return (
     <group position={[x, baseY, z]}>
       <mesh receiveShadow>
-        <boxGeometry args={[size, 0.08, size]} />
-        <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
+        <RoundedBox args={[size, 0.08, size]} radius={Math.min(0.28, size * 0.08)} smoothness={5}>
+          <meshStandardMaterial color={mars ? "#795044" : "#4f5557"} roughness={0.95} />
+        </RoundedBox>
       </mesh>
       <mesh position={[0, 0.046, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[size * 0.43, size * 0.46, 4]} />
+        <ringGeometry args={[size * 0.43, size * 0.46, 64]} />
         <meshBasicMaterial color={accent} transparent opacity={0.42} />
       </mesh>
       <mesh position={[0, 0.052, 0]}>
@@ -1194,7 +1174,6 @@ function Rover({
   selected,
   alerted,
   traverseSpeedKmh,
-  navigationAccuracy,
   simulationSpeed,
 }: {
   task: string;
@@ -1205,7 +1184,6 @@ function Rover({
   selected: boolean;
   alerted: boolean;
   traverseSpeedKmh: number;
-  navigationAccuracy: number;
   simulationSpeed: number;
 }) {
   const ref = useRef<THREE.Group>(null);
@@ -1218,15 +1196,7 @@ function Rover({
   const routeRef = useRef<[number, number][]>([]);
   const routeCursorRef = useRef(0);
   const commandKeyRef = useRef("");
-  const encounteredRouteRef = useRef<string | null>(null);
-  const reroutePlanRef = useRef<{
-    commandKey: string;
-    rockId: string;
-    destination: [number, number];
-    phase: "APPROACH" | "HOLD";
-    resumeAt: number;
-  } | null>(null);
-  const [rerouteNotice, setRerouteNotice] = useState<string | null>(null);
+  const patrolRetryAtRef = useRef(0);
 
   const prefixes = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE ", "TRANSFERRING "];
   const taskPrefix = prefixes.find((prefix) => task.startsWith(prefix));
@@ -1240,7 +1210,7 @@ function Rover({
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
   const destination: [number, number] = isTransferring
-    ? POSITIONS.habitat
+    ? [0, 7]
     : isReturning
       ? position
       : target && (targetNodeId || isCollecting || isSurveying || task.startsWith("AT SITE "))
@@ -1255,7 +1225,7 @@ function Rover({
     (target && (isCollecting || isSurveying || task.startsWith("AT SITE "))) ||
     (repairTarget && POSITIONS[repairTarget]),
   );
-  const roverStatusLabel = rerouteNotice ?? (task === "STANDBY" ? null : task);
+  const roverStatusLabel = task === "STANDBY" ? "AUTONOMOUS PATROL" : task;
   const roverStatusWidth = Math.min(4.8, Math.max(2.1, (roverStatusLabel?.length ?? 0) * 0.095 + 0.55));
 
   // Start at the actual launch coordinate from the first rendered frame. Never rely on an effect
@@ -1280,86 +1250,44 @@ function Rover({
 
     const commandKey = hasDestination
       ? `${task}|${targetNodeId ?? ""}|${destination[0].toFixed(2)}|${destination[1].toFixed(2)}`
-      : "IDLE";
+      : task === "STANDBY" ? "IDLE_PATROL" : "IDLE";
 
     if (commandKey !== commandKeyRef.current) {
       commandKeyRef.current = commandKey;
       routeCursorRef.current = 0;
-      reroutePlanRef.current = null;
-      encounteredRouteRef.current = null;
-      setRerouteNotice(null);
-
-      if (!hasDestination || Math.hypot(destination[0] - current.x, destination[1] - current.z) < 1.2) {
-        routeRef.current = [];
+      if (hasDestination && Math.hypot(destination[0] - current.x, destination[1] - current.z) >= 1.2) {
+        const goal = repairTarget
+          ? buildingApproachPoint(repairTarget, start)
+          : isCleaning
+            ? buildingApproachPoint("solar", start)
+            : destination;
+        routeRef.current = planRoverPath(start, goal);
       } else {
-        const siteKey = target?.id.split("-").slice(-1)[0] ?? "";
-        const rockId = isSurveying || isCollecting ? SITE_ROUTE_CHALLENGES[siteKey] : undefined;
-        const rock = rockId ? ROVER_ROUTE_ROCKS.find((item) => item.id === rockId) : undefined;
-        // Each field corridor has a repeatable mapped difficulty. A higher Nav tier / retrofit
-        // has greater accuracy, so it detects more of these boulders before driving up to them.
-        // Only stage the surprise boulder on the outbound leg. Once the rover has reached
-        // a surveyed site, beginning collection must not send it back to the same obstacle.
-        const siteChallenge = Boolean(
-          rock &&
-          navigationAccuracy < rock.rerouteRoll &&
-          Math.hypot(destination[0] - current.x, destination[1] - current.z) > 6,
-        );
-        if (siteChallenge && rock) {
-          const approach = rockApproachPoint(start, rock);
-          const firstLeg = planRoverPath(start, approach, rock.id);
-          if (firstLeg.length) {
-            routeRef.current = firstLeg;
-            reroutePlanRef.current = {
-              commandKey,
-              rockId: rock.id,
-              destination: [...destination],
-              phase: "APPROACH",
-              resumeAt: 0,
-            };
-          } else {
-            routeRef.current = planRoverPath(start, destination);
-          }
-        } else {
-          routeRef.current = planRoverPath(start, destination);
+        routeRef.current = [];
+      }
+    }
+
+    if (commandKey === "IDLE_PATROL" && routeCursorRef.current >= routeRef.current.length && clock.elapsedTime >= patrolRetryAtRef.current) {
+      patrolRetryAtRef.current = clock.elapsedTime + 2;
+      routeRef.current = [];
+      for (let attempt = 0; attempt < 12 && routeRef.current.length === 0; attempt += 1) {
+        const goal: [number, number] = [Math.random() * 68 - 34, Math.random() * 68 - 34];
+        const obstructed = Object.entries(POSITIONS).some(([id, [x, z]]) =>
+          id !== "rover" && Math.hypot(goal[0] - x, goal[1] - z) < buildingClearanceRadius(id) + 2,
+        ) || ROVER_ROUTE_ROCKS.some((rock) => Math.hypot(goal[0] - rock.x, goal[1] - rock.z) < rock.radius + 2);
+        if (!obstructed && Math.hypot(goal[0] - current.x, goal[1] - current.z) > 8) {
+          routeRef.current = planRoverPath(start, goal);
+          routeCursorRef.current = 0;
         }
       }
     }
 
-    const reroutePlan = reroutePlanRef.current;
-    if (reroutePlan && reroutePlan.commandKey === commandKey && reroutePlan.phase === "HOLD") {
-      if (clock.getElapsedTime() < reroutePlan.resumeAt) {
-        current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * 2.2) * 0.006;
-        return;
-      }
-      // Re-plan around the actual boulder field after the vehicle has stopped at the near side.
-      routeRef.current = planRoverPath(start, reroutePlan.destination);
-      routeCursorRef.current = 0;
-      encounteredRouteRef.current = commandKey;
-      reroutePlanRef.current = null;
-      setRerouteNotice(null);
-    }
-
-    if (hasDestination && routeRef.current.length === 0 && Math.hypot(destination[0] - current.x, destination[1] - current.z) >= 1.2) {
-      routeRef.current = planRoverPath(start, destination);
-      routeCursorRef.current = 0;
-    }
-
-    if (hasDestination && routeRef.current.length) {
+    if (routeRef.current.length && routeCursorRef.current < routeRef.current.length) {
       const path = routeRef.current;
       let waypoint = path[routeCursorRef.current];
       while (waypoint && Math.hypot(waypoint[0] - current.x, waypoint[1] - current.z) < 0.42) {
         routeCursorRef.current += 1;
         waypoint = path[routeCursorRef.current];
-      }
-
-      const activeReroute = reroutePlanRef.current;
-      if (activeReroute && activeReroute.phase === "APPROACH" && routeCursorRef.current >= path.length) {
-        activeReroute.phase = "HOLD";
-        activeReroute.resumeAt = clock.getElapsedTime() + 2.0;
-        const rock = ROVER_ROUTE_ROCKS.find((item) => item.id === activeReroute.rockId);
-        setRerouteNotice(`REROUTING · ${rock?.label ?? "ROCK AHEAD"}`);
-        current.y = terrainHeight(current.x, current.z) + 0.47;
-        return;
       }
 
       if (waypoint) {
@@ -1368,7 +1296,7 @@ function Rover({
         const distance = Math.hypot(dx, dz);
         if (distance > 0.0001) {
           const finalWaypoint = routeCursorRef.current >= path.length - 1;
-          const arriveRadius = finalWaypoint ? (isCollecting ? 0.62 : isTransferring || isReturning ? 0.42 : 0.28) : 0.08;
+          const arriveRadius = finalWaypoint ? (isCollecting ? 0.9 : isTransferring || isReturning ? 0.7 : 0.5) : 0.08;
           if (distance > arriveRadius) {
             // The route must finish before the timed field task does. Simulation speed and rover tier both affect travel time.
             // One colony-map unit represents approximately one metre. Convert the rated
@@ -1601,7 +1529,7 @@ function Rover({
             <planeGeometry args={[roverStatusWidth, 0.48]} />
             <meshBasicMaterial color="#17212a" transparent opacity={0.94} depthWrite={false} />
           </mesh>
-          <Text frustumCulled={false} fontSize={0.17} color={rerouteNotice ? "#ffcf65" : "#a8edc2"} outlineWidth={0.025} outlineColor="#171a1c" anchorX="center" anchorY="middle">{roverStatusLabel}</Text>
+          <Text frustumCulled={false} fontSize={0.17} color={task === "STANDBY" ? "#8ee4d0" : "#a8edc2"} outlineWidth={0.025} outlineColor="#171a1c" anchorX="center" anchorY="middle">{roverStatusLabel}</Text>
         </Billboard>
       )}
     </group>
@@ -1636,7 +1564,6 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
             <ringGeometry args={[radius + 0.10, radius + 0.18, 72]} />
             <meshBasicMaterial color="#ff4b61" transparent opacity={0.95} depthWrite={false} toneMapped={false} />
           </mesh>
-          <pointLight position={[0, height + 0.28, 0]} color="#ff1f3c" intensity={3.2} distance={Math.max(4.5, radius * 2.8)} decay={2} />
         </>
       )}
       <mesh ref={ref} position={[0, height + 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}>
@@ -1694,33 +1621,26 @@ function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionRe
   </group>;
 }
 
-function Crew({ mars }: { mars: boolean }) {
+function Crew({ mars, tracks }: { mars: boolean; tracks: TechnologyTrack[] }) {
   const routes: Array<Array<[number,number]>> = [
-    [[-12.2,13],[-12.2,4],[-14,-0.6],[-14,-13],[0,-13],[12.2,-13],[14,-0.6],[14,5],[14,13]],
-    [[14,-18],[12.2,-13],[12.2,-9],[25.6,-9],[25.6,-25.6],[14,-25.6],[14,-18]],
-    [[-25.6,13],[-14,13],[-14,-0.6],[-4.4,-0.6],[-4.4,4],[-4.4,-0.6],[-14,-0.6],[-25.6,-0.6],[-25.6,13]],
-  ];
-  const serviceStops = [
-    [{ waypointIndex: 0, buildingPosition: [-16, 13] as [number, number] }, { waypointIndex: 1, buildingPosition: [-16, 4] as [number, number] }],
-    [{ waypointIndex: 1, buildingPosition: [16, -13] as [number, number] }],
-    [{ waypointIndex: 4, buildingPosition: [-8, 4] as [number, number] }],
+    [[-38,0],[-38,36],[38,36],[38,0],[38,-36],[-38,-36],[-38,0]],
+    [[0,-38],[-36,-38],[-36,38],[0,38],[36,38],[36,-38],[0,-38]],
+    [[38,0],[38,36],[-38,36],[-38,0],[-38,-36],[38,-36],[38,0]],
   ];
   return (
     <group>
       {Array.from({length:mars?7:5},(_,i)=><CrewMember key={i} route={routes[i%routes.length]} index={i} mars={mars}/>)}
-      {Array.from({ length: 3 }, (_, i) => <ColonyRobot key={`robot-${i}`} route={routes[i]} index={i} serviceStops={serviceStops[i]} />)}
+      {Array.from({ length: 3 }, (_, i) => <ColonyRobot key={`robot-${i}`} tracks={tracks} index={i} />)}
     </group>
   );
 }
 
 function ColonyRobot({
-  route,
+  tracks,
   index,
-  serviceStops,
 }: {
-  route: Array<[number, number]>;
+  tracks: TechnologyTrack[];
   index: number;
-  serviceStops: Array<{ waypointIndex: number; buildingPosition: [number, number] }>;
 }) {
   const ref = useRef<THREE.Group>(null);
   const leftArm = useRef<THREE.Group>(null);
@@ -1728,83 +1648,114 @@ function ColonyRobot({
   const leftLeg = useRef<THREE.Group>(null);
   const rightLeg = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
+  const routeRef = useRef<[number, number][]>([]);
+  const routeCursorRef = useRef(0);
+  const serviceTargetRef = useRef<[number, number] | null>(null);
+  const serviceUntilRef = useRef(0);
+  const nextTargetAtRef = useRef(0);
   const phaseOffset = index * 1.9;
-  const segmentDurations = useMemo(
-    () => route.map(([x, z], segmentIndex) => {
-      const [nextX, nextZ] = route[(segmentIndex + 1) % route.length];
-      const distance = Math.hypot(nextX - x, nextZ - z);
-      const speedVariation = 0.9 + ((index * 17 + segmentIndex * 13) % 7) * 0.09;
-      return Math.max(2.5, distance / speedVariation);
-    }),
-    [index, route],
-  );
-  const serviceDurations = useMemo(
-    () => new Map(serviceStops.map((stop, stopIndex) => [
-      stop.waypointIndex,
-      4 + ((index * 11 + stopIndex * 7) % 5),
-    ])),
-    [index, serviceStops],
-  );
-  const cycleDuration = segmentDurations.reduce((total, duration) => total + duration, 0)
-    + Array.from(serviceDurations.values()).reduce((total, duration) => total + duration, 0);
+  const spawnPositions: Array<[number, number]> = [[-36, 0], [36, 0], [0, 36]];
+  const [serviceLabel, setServiceLabel] = useState("ROAMING");
 
   useFrame(({ clock }, delta) => {
     if (!ref.current) return;
     const time = clock.getElapsedTime();
-    let remaining = (time + index * 19.7) % cycleDuration;
-    let x = route[0][0];
-    let z = route[0][1];
-    let heading = ref.current.rotation.y;
-    let servicing = false;
-    let serviceTarget: [number, number] | null = null;
-
-    for (let segmentIndex = 0; segmentIndex < route.length; segmentIndex += 1) {
-      const [ax, az] = route[segmentIndex];
-      const nextIndex = (segmentIndex + 1) % route.length;
-      const [bx, bz] = route[nextIndex];
-      const travelDuration = segmentDurations[segmentIndex];
-      if (remaining < travelDuration) {
-        const progress = remaining / travelDuration;
-        x = THREE.MathUtils.lerp(ax, bx, progress);
-        z = THREE.MathUtils.lerp(az, bz, progress);
-        heading = Math.atan2(bx - ax, bz - az);
-        break;
-      }
-
-      remaining -= travelDuration;
-      x = bx;
-      z = bz;
-      const dwellDuration = serviceDurations.get(nextIndex);
-      if (dwellDuration !== undefined) {
-        if (remaining < dwellDuration) {
-          servicing = true;
-          serviceTarget = serviceStops.find((stop) => stop.waypointIndex === nextIndex)?.buildingPosition ?? null;
-          if (serviceTarget) heading = Math.atan2(serviceTarget[0] - x, serviceTarget[1] - z);
-          break;
-        }
-        remaining -= dwellDuration;
-      }
+    const position: [number, number] = [ref.current.position.x, ref.current.position.z];
+    let servicing = time < serviceUntilRef.current && serviceTargetRef.current !== null;
+    if (!servicing && serviceTargetRef.current) {
+      serviceTargetRef.current = null;
+      setServiceLabel("ROAMING");
+      nextTargetAtRef.current = time + 1.5;
     }
 
-    const gait = Math.sin(time * 3.8 + phaseOffset) * (servicing ? 0.08 : 0.34);
+    if (!servicing && routeCursorRef.current >= routeRef.current.length && time >= nextTargetAtRef.current) {
+      const availableTracks = tracks.filter((track) => track.id !== "rover");
+      let nextRoute: [number, number][] = [];
+      let nextServiceTarget: [number, number] | null = null;
+      let nextLabel = "FIELD PATROL";
+
+      for (let attempt = 0; attempt < 12 && nextRoute.length === 0; attempt += 1) {
+        if (availableTracks.length > 0 && Math.random() < 0.72) {
+          const track = availableTracks[Math.floor(Math.random() * availableTracks.length)];
+          const [buildingX, buildingZ] = POSITIONS[track.id] ?? POSITIONS.habitat;
+          const angle = Math.random() * Math.PI * 2;
+          const radius = buildingClearanceRadius(track.id) + 1.8;
+          const goal: [number, number] = [
+            buildingX + Math.cos(angle) * radius,
+            buildingZ + Math.sin(angle) * radius,
+          ];
+          const route = planRoverPath(position, goal);
+          if (route.length) {
+            nextRoute = route;
+            nextServiceTarget = [buildingX, buildingZ];
+            nextLabel = `SYSTEM SERVICE · ${track.category.toUpperCase()}`;
+          }
+        } else {
+          const goal: [number, number] = [Math.random() * 68 - 34, Math.random() * 68 - 34];
+          const obstructed = Object.entries(POSITIONS).some(([id, [x, z]]) =>
+            id !== "rover" && Math.hypot(goal[0] - x, goal[1] - z) < buildingClearanceRadius(id) + 2,
+          ) || ROVER_ROUTE_ROCKS.some((rock) => Math.hypot(goal[0] - rock.x, goal[1] - rock.z) < rock.radius + 2);
+          if (!obstructed) nextRoute = planRoverPath(position, goal);
+        }
+      }
+
+      routeRef.current = nextRoute;
+      routeCursorRef.current = 0;
+      serviceTargetRef.current = nextServiceTarget;
+      if (nextRoute.length && nextServiceTarget) setServiceLabel(nextLabel);
+      nextTargetAtRef.current = time + (nextRoute.length ? 0 : 2);
+    }
+
+    let moving = false;
+    if (!servicing && routeCursorRef.current < routeRef.current.length) {
+      let waypoint = routeRef.current[routeCursorRef.current];
+      while (waypoint && Math.hypot(waypoint[0] - position[0], waypoint[1] - position[1]) < 0.55) {
+        routeCursorRef.current += 1;
+        waypoint = routeRef.current[routeCursorRef.current];
+      }
+      if (waypoint) {
+        const dx = waypoint[0] - position[0];
+        const dz = waypoint[1] - position[1];
+        const distance = Math.hypot(dx, dz);
+        const move = Math.min(distance, Math.max(0, delta) * 2.4);
+        if (distance > 0.001) {
+          position[0] += dx / distance * move;
+          position[1] += dz / distance * move;
+          const heading = Math.atan2(dx, dz);
+          const turn = Math.atan2(Math.sin(heading - ref.current.rotation.y), Math.cos(heading - ref.current.rotation.y));
+          ref.current.rotation.y += turn * Math.min(1, delta * 5);
+          moving = move > 0;
+        }
+      } else if (serviceTargetRef.current) {
+        servicing = true;
+        serviceUntilRef.current = time + 4 + Math.random() * 4;
+      } else {
+        nextTargetAtRef.current = time + 2 + Math.random() * 3;
+      }
+    }
+    if (servicing && serviceTargetRef.current) {
+      const heading = Math.atan2(serviceTargetRef.current[0] - position[0], serviceTargetRef.current[1] - position[1]);
+      const turn = Math.atan2(Math.sin(heading - ref.current.rotation.y), Math.cos(heading - ref.current.rotation.y));
+      ref.current.rotation.y += turn * Math.min(1, delta * 3);
+    }
+
+    const gait = Math.sin(time * 3.8 + phaseOffset) * (servicing ? 0.08 : moving ? 0.34 : 0.035);
     ref.current.position.set(
-      x,
-      -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * (servicing ? 0.006 : 0.018) - (servicing ? 0.025 : 0),
-      z,
+      position[0],
+      -0.17 + Math.abs(Math.sin(time * 3.8 + phaseOffset)) * (moving ? 0.018 : 0.006) - (servicing ? 0.025 : 0),
+      position[1],
     );
-    const turn = Math.atan2(Math.sin(heading - ref.current.rotation.y), Math.cos(heading - ref.current.rotation.y));
-    ref.current.rotation.y += turn * Math.min(1, delta * 5);
     if (leftArm.current) {
-      leftArm.current.rotation.x = THREE.MathUtils.damp(leftArm.current.rotation.x, servicing ? -0.65 + gait : gait * 0.72, 6, delta);
+      leftArm.current.rotation.x = THREE.MathUtils.damp(leftArm.current.rotation.x, servicing ? -0.55 + gait : gait * 0.72, 6, delta);
     }
     if (rightArm.current) {
-      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.72 + gait : -gait * 0.72, 6, delta);
-      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.22 : 0, 5, delta);
+      rightArm.current.rotation.x = THREE.MathUtils.damp(rightArm.current.rotation.x, servicing ? 0.82 + Math.sin(time * 5) * 0.18 : -gait * 0.72, 6, delta);
+      rightArm.current.rotation.z = THREE.MathUtils.damp(rightArm.current.rotation.z, servicing ? -0.28 + Math.sin(time * 4) * 0.08 : 0, 5, delta);
     }
     if (leftLeg.current) leftLeg.current.rotation.x = -gait;
     if (rightLeg.current) rightLeg.current.rotation.x = gait;
     if (head.current) {
-      head.current.rotation.y = Math.sin(time * 0.7 + phaseOffset) * (servicing ? 0.3 : 0.16);
+      head.current.rotation.y = servicing ? Math.sin(time * 0.7 + phaseOffset) * 0.12 : Math.sin(time * 0.7 + phaseOffset) * 0.16;
       head.current.rotation.x = THREE.MathUtils.damp(head.current.rotation.x, servicing ? 0.12 : 0, 4, delta);
     }
   });
@@ -1962,6 +1913,15 @@ function ColonyRobot({
         <torusGeometry args={[0.055, 0.012, 6, 12]} />
         <meshStandardMaterial color="#d3bd77" metalness={0.82} roughness={0.24} />
       </mesh>
+      <Billboard position={[0, 2.05, 0]} follow frustumCulled={false}>
+        <mesh position={[0, 0, -0.02]}>
+          <planeGeometry args={[2.45, 0.32]} />
+          <meshBasicMaterial color="#071117" transparent opacity={0.82} depthWrite={false} />
+        </mesh>
+        <Text frustumCulled={false} fontSize={0.13} color={serviceLabel === "ROAMING" ? "#8ee4d0" : "#f1d27b"} outlineWidth={0.02} outlineColor="#11191d" anchorX="center" anchorY="middle">
+          {serviceLabel}
+        </Text>
+      </Billboard>
     </group>
   );
 }
@@ -2263,12 +2223,10 @@ function TierHardware({ tier, large, upgradeLevel }: { tier: Tier; large: boolea
 
 function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolean }) {
   const lens = useRef<THREE.MeshStandardMaterial>(null);
-  const light = useRef<THREE.PointLight>(null);
 
   useFrame(({ clock }) => {
     const pulse = (Math.sin(clock.getElapsedTime() * (urgent ? 9 : 3)) + 1) / 2;
     if (lens.current) lens.current.emissiveIntensity = urgent ? 0.8 + pulse * 1.8 : 0.45 + pulse * 0.45;
-    if (light.current) light.current.intensity = urgent ? 0.7 + pulse * 1.6 : 0.25 + pulse * 0.35;
   });
 
   return (
@@ -2281,7 +2239,6 @@ function BuildingStatusBeacon({ color, urgent }: { color: string; urgent: boolea
         <sphereGeometry args={[0.075, 14, 10]} />
         <meshStandardMaterial ref={lens} color={color} emissive={color} emissiveIntensity={1} toneMapped={false} />
       </mesh>
-      <pointLight ref={light} position={[0, 0.2, 0.05]} color={color} intensity={1} distance={urgent ? 3.8 : 2.4} decay={2} />
     </group>
   );
 }
@@ -2335,7 +2292,6 @@ function ColonyBuilding({
           without washing out the dark sky or pretending the Sun is still illuminating it. */}
       {nightMode && <group position={[0, track.id === "habitat" ? 3.3 : 1.9, 0]}>
         <mesh><sphereGeometry args={[0.13, 12, 10]} /><meshBasicMaterial color={p.accent} toneMapped={false} /></mesh>
-        <pointLight color={p.accent} intensity={track.id === "habitat" ? 1.1 : 0.42} distance={track.id === "habitat" ? 7 : 3.8} decay={2} />
       </group>}
       <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
@@ -2396,7 +2352,7 @@ function MissionGuide({ mars }: { mars: boolean }) {
         <div style={{marginTop:5,fontSize:10,lineHeight:1.45,color:"#9fb0ad"}}>
           <b style={{color:"#e8eee9"}}>1.</b> Keep the colony stable, manage supplies, and complete the mission objectives.
           <br/><b style={{color:"#e8eee9"}}>2.</b> Amber base lights need supervision; a pulsing red base light means immediate action. Open the marked facility to respond.
-          <br/><b style={{color:"#e8eee9"}}>3.</b> Walk the compact outpost to inspect each facility. Field sites lie beyond the base; the rover follows its plotted route.
+          <br/><b style={{color:"#e8eee9"}}>3.</b> Walk the service lanes to inspect each facility. Field sites lie beyond the base; the rover navigates around structures and terrain.
         </div>
         <div style={{display:"flex",gap:9,marginTop:8,fontSize:8,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#7f9692"}}>
           <span><i style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"#73dda0",marginRight:4}}/>Stable</span>
@@ -2473,18 +2429,15 @@ function MissionVitalsHUD({
 
 function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: boolean }) {
   const particles = useRef<Array<THREE.Mesh | null>>([]);
-  const warningLight = useRef<THREE.PointLight>(null);
   const count = 18;
   const pressureLeak = eventId === "habitat-pressure";
   const regolithEjecta = eventId === "solar-dust" || eventId === "extraction-lock" || eventId === "micrometeoroid-impact";
   const marsDustFront = mars && eventId === "regional-dust-front";
   const particlesActive = pressureLeak || regolithEjecta || marsDustFront;
   const particleColor = pressureLeak ? "#c9f3ff" : mars ? "#a77a5a" : "#cbb894";
-  const warningColor = eventId === "radiation-burst" ? "#bd9cff" : regolithEjecta || marsDustFront ? "#f0a75c" : "#ff4354";
 
   useFrame(({ clock }) => {
     const time = clock.getElapsedTime();
-    if (warningLight.current) warningLight.current.intensity = 2.2 + (Math.sin(time * 10) + 1) * 1.4;
     particles.current.forEach((particle, index) => {
       if (!particle) return;
       const phase = (time * 0.72 + index / count) % 1;
@@ -2505,7 +2458,6 @@ function IncidentEffects({ eventId, mars }: { eventId: string | null; mars: bool
 
   return (
     <group>
-      <pointLight ref={warningLight} position={[0, 2.1, 0]} color={warningColor} distance={10} decay={2} />
       {Array.from({ length: count }, (_, index) => (
         <mesh key={index} ref={(mesh) => { particles.current[index] = mesh; }} visible={false}>
           <sphereGeometry args={[pressureLeak ? 0.055 : 0.045, 8, 6]} />
@@ -3089,6 +3041,7 @@ function WalkControls({
   onWake,
   onExitHabitat,
   onToggleCabinet,
+  onToggleFlashlight,
   onLockChange,
   onLockError,
   onNearbyChange,
@@ -3110,6 +3063,7 @@ function WalkControls({
   onWake: () => void;
   onExitHabitat: () => void;
   onToggleCabinet: () => void;
+  onToggleFlashlight: () => void;
   onLockChange: (locked: boolean) => void;
   onLockError: (message: string) => void;
   onNearbyChange: (target: NearbyInteraction) => void;
@@ -3142,6 +3096,7 @@ function WalkControls({
     onWake,
     onExitHabitat,
     onToggleCabinet,
+    onToggleFlashlight,
     onLockChange,
     onLockError,
     onNearbyChange,
@@ -3163,6 +3118,7 @@ function WalkControls({
     onWake,
     onExitHabitat,
     onToggleCabinet,
+    onToggleFlashlight,
     onLockChange,
     onLockError,
     onNearbyChange,
@@ -3192,7 +3148,7 @@ function WalkControls({
           })
           .catch(() => {
             interactionClickHandled.requestPending = false;
-            latest.current.onLockError("Mouse capture was denied. Press F or click the scene to try again.");
+            latest.current.onLockError("Mouse capture was denied. Click the scene to try again.");
           });
       } catch {
         interactionClickHandled.requestPending = false;
@@ -3222,8 +3178,7 @@ function WalkControls({
       if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
       if (key === "f" && !event.repeat) {
         event.preventDefault();
-        if (document.pointerLockElement === canvas) document.exitPointerLock();
-        else requestPointerLock();
+        latest.current.onToggleFlashlight();
       }
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(key)) {
         event.preventDefault();
@@ -3257,6 +3212,7 @@ function WalkControls({
         }
         const airlockDistance = Math.hypot(player.x, player.z - 4.45);
         if (airlockDistance < 1.8) {
+          if (document.pointerLockElement === canvas) document.exitPointerLock();
           latest.current.onEnterHabitat();
           return;
         }
@@ -3302,12 +3258,14 @@ function WalkControls({
     };
 
     canvas.addEventListener("click", handleClick);
+    window.addEventListener("colony-request-pointer-lock", requestPointerLock);
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     document.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
     return () => {
       canvas.removeEventListener("click", handleClick);
+      window.removeEventListener("colony-request-pointer-lock", requestPointerLock);
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       document.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("keydown", handleKeyDown);
@@ -3348,7 +3306,7 @@ function WalkControls({
     }
     if (direction.lengthSq() > 0) {
       direction.normalize();
-      const speed = keys.current.has("shift") ? 7 : 4.5;
+      const speed = keys.current.has("shift") ? 11 : 7;
       const distance = speed * Math.min(delta, 0.05);
       const nextX = player.position.x + direction.x * distance;
       const nextZ = player.position.z + direction.z * distance;
@@ -3439,9 +3397,43 @@ function WalkControls({
   return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 12) + 1.72, 12]} fov={70} near={0.05} far={190} />;
 }
 
+function HelmetFlashlight() {
+  const { camera, scene } = useThree();
+  const targetRef = useRef<THREE.Object3D | null>(null);
+  const cameraPosition = useMemo(() => new THREE.Vector3(), []);
+  const direction = useMemo(() => new THREE.Vector3(), []);
+
+  useEffect(() => {
+    const light = new THREE.SpotLight(0xffe6ad, 24, 36, Math.PI / 7, 0.62, 1.3);
+    const target = new THREE.Object3D();
+    camera.add(light);
+    scene.add(target);
+    light.target = target;
+    targetRef.current = target;
+
+    return () => {
+      camera.remove(light);
+      scene.remove(target);
+      targetRef.current = null;
+    };
+  }, [camera, scene]);
+
+  useFrame(() => {
+    const target = targetRef.current;
+    if (!target) return;
+    camera.updateMatrixWorld();
+    camera.getWorldPosition(cameraPosition);
+    camera.getWorldDirection(direction);
+    target.position.copy(cameraPosition).addScaledVector(direction, 28);
+  });
+
+  return null;
+}
+
 function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
   const firstPersonMode = walkMode || props.habitatInterior;
+  const [flashlightOn, setFlashlightOn] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerLockError, setPointerLockError] = useState<string | null>(null);
   const interactionClickHandled = useRef<InteractionClickState>({ current: false, requestPending: false });
@@ -3511,6 +3503,9 @@ function Scene({ props }: { props: Props }) {
     }, 800);
   };
   const mars = props.environmentLabel === "MARS";
+  useEffect(() => {
+    if (!props.lunarNight) setFlashlightOn(false);
+  }, [props.lunarNight]);
   const earthTextures = useMemo(() => createEarthTextures(), []);
   const roverTier = props.selected.rover ?? "Foundation";
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
@@ -3518,13 +3513,6 @@ function Scene({ props }: { props: Props }) {
   const roverRatedSpeedKmh = getBaselineRating("rover", roverTier, roverRetrofitLevel);
   const roverSpeedGap = props.buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
   const roverTraverseSpeedKmh = Math.max(0, roverRatedSpeedKmh - roverSpeedGap) * roverCondition / 100;
-  const navTier = props.selected.navigation ?? "Foundation";
-  const navRetrofitLevel = props.buildings.navigation?.upgradeLevel ?? 0;
-  const navCondition = Math.max(25, Math.min(100, props.buildings.navigation?.condition ?? 100));
-  const navRatedErrorM = getBaselineRating("navigation", navTier, navRetrofitLevel);
-  const navErrorGapM = props.buildings.navigation?.repairMetrics?.["Unrestored fault gap · Horizontal position error reduced"] ?? 0;
-  const navigationErrorM = (navRatedErrorM + navErrorGapM) * (100 / navCondition);
-  const navigationAccuracy = Math.max(0, Math.min(100, 100 - navigationErrorM)) / 100;
   const lunarDay = Math.max(0, Math.min(14, props.elapsed / 86400));
   const sunAngleDeg = props.lunarNight ? -8 : interpolateSolarProfile(lunarDay).sunAltitudeDeg;
   // Place celestial bodies in the visible, far background of the colony camera. The
@@ -3552,11 +3540,11 @@ function Scene({ props }: { props: Props }) {
     <Canvas
       orthographic
       shadows
-      dpr={[1, 2]}
-      camera={{ position: [48, 56, 48], zoom: 25, near: 0.5, far: 190 }}
+      dpr={[1, 1.5]}
+      camera={{ position: [48, 56, 48], zoom: 14, near: 0.5, far: 190 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
       onCreated={({ gl }) => {
-        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
         gl.outputColorSpace = THREE.SRGBColorSpace;
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -3574,7 +3562,7 @@ function Scene({ props }: { props: Props }) {
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
-      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[4096, 4096]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
         <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.24} depthWrite={false} toneMapped={false} /></mesh>
@@ -3623,10 +3611,10 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} navigationAccuracy={navigationAccuracy} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
-        <Crew mars={mars} />
+        <Crew mars={mars} tracks={props.tracks} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
       </group>
         </>
@@ -3652,6 +3640,9 @@ function Scene({ props }: { props: Props }) {
           onToggleCabinet={() => {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
             setCabinetOpen((open) => !open);
+          }}
+          onToggleFlashlight={() => {
+            if (props.lunarNight && firstPersonMode) setFlashlightOn((active) => !active);
           }}
           onLockChange={(locked) => {
             setPointerLocked(locked);
@@ -3683,6 +3674,7 @@ function Scene({ props }: { props: Props }) {
           target={[0, 0, 0]}
         />
       )}
+      {firstPersonMode && props.lunarNight && flashlightOn && <HelmetFlashlight />}
     </Canvas>
     {firstPersonMode && (
       <>
@@ -3834,8 +3826,8 @@ function Scene({ props }: { props: Props }) {
         <div className="w-full border border-white/15 bg-[#07131c]/90 px-3 py-2 text-left font-mono text-[9px] leading-4 text-[#d3dfdc] shadow-lg backdrop-blur-sm">
           WASD move · Space jump · mouse look · Shift run
           <br />
-          F toggle mouse · E interact / airlock · Esc release mouse
-          {!pointerLocked && <><br /><span className="text-[#f4d785]">Click the scene to look around</span></>}
+          F flashlight · E inspect / interact · Esc show mouse
+          {!pointerLocked && <><br /><span className="text-[#f4d785]">WASD still moves · click scene to capture look</span></>}
           {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
         </div>
       )}

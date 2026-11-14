@@ -10,9 +10,9 @@ const SEGMENTS = 220;
 // The settlement sits on a deliberately engineered, level foundation.
 // Keep a generous exclusion zone around the entire built area so natural
 // terrain and loose rocks can never visually overlap colony assets.
-const FOUNDATION_X = 28;
-const FOUNDATION_Z = 28;
-const FOUNDATION_FADE = 34;
+const FOUNDATION_X = 44;
+const FOUNDATION_Z = 44;
+const FOUNDATION_FADE = 50;
 const FOUNDATION_TERRAIN_DEPTH = -0.32;
 
 function heightAt(x: number, z: number): number {
@@ -87,7 +87,7 @@ export function Rocks({ kind }: { kind: TerrainKind }) {
 
       // Reject diagonal rocks as well as those beside the straight edges:
       // polar samples near 45 degrees could otherwise land on the base corners.
-      if (Math.abs(x) < 29.5 && Math.abs(z) < 29.5) continue;
+      if (Math.abs(x) < 45 && Math.abs(z) < 45) continue;
 
       arr.push({
         p: new THREE.Vector3(x, heightAt(x, z) + s * 0.32, z),

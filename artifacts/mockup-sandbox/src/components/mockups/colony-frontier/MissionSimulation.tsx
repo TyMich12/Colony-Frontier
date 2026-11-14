@@ -4861,6 +4861,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setHabitatInterior(true);
+            window.dispatchEvent(new Event("colony-request-pointer-lock"));
           }}
           onExitHabitat={() => setHabitatInterior(false)}
           onSupplyAction={(trackId, action) => {
@@ -5172,7 +5173,10 @@ export function MissionSimulation() {
             operation={activeOperations[selectedResource.id] ?? activeOperations.rover ?? activeOperations.science ?? Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)) ?? null}
             actionBusy={Boolean(activeOperations[selectedResource.id] || activeOperations.rover || activeOperations.science || Object.values(activeOperations).find((job) => ["SURVEY", "COLLECT", "TRANSFER"].includes(job.kind)))}
             onAction={(action) => handleResourceAction(selectedResource.id, action)}
-            onClose={() => setSelectedResourceId(null)}
+            onClose={() => {
+              setSelectedResourceId(null);
+              window.dispatchEvent(new Event("colony-request-pointer-lock"));
+            }}
             getBlockers={checkActionPrerequisites}
             simulationSpeed={speed}
           />
@@ -5184,11 +5188,15 @@ export function MissionSimulation() {
             tier={selectedTier}
             runtime={buildings[selectedTrack.id] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 }}
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
-            onClose={() => setSelectedBuildingId(null)}
+            onClose={() => {
+              setSelectedBuildingId(null);
+              window.dispatchEvent(new Event("colony-request-pointer-lock"));
+            }}
             onEnterHabitat={() => {
               setSelectedBuildingId(null);
               setSelectedResourceId(null);
               setHabitatInterior(true);
+              window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
             hasMaintenance={pending.selected.maintenance !== undefined}
             operation={activeOperations[selectedTrack.id] ?? Object.values(activeOperations).find((job) => job.supportSystems?.includes(selectedTrack.id)) ?? null}
