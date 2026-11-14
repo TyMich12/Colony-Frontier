@@ -29,7 +29,7 @@ function SunLight({ elevation }: { elevation: number }) {
       intensity={3.2}
       color="#fff6ec"
       castShadow
-      shadow-mapSize={[1024, 1024]}
+      shadow-mapSize={[512, 512]}
       shadow-bias={-0.0004}
       shadow-camera-near={1}
       shadow-camera-far={140}

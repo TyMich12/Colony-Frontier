@@ -5,28 +5,31 @@ import { mulberry32 } from "./noise";
 import { terrainHeight } from "./terrain";
 import type { TerrainKind } from "./state";
 
-const COUNT = 2400;
+const COUNT = 1200;
 
 export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number }) {
   const matRef = useRef<THREE.PointsMaterial>(null);
 
-  const { positions, speeds } = useMemo(() => {
+  const { positions, speeds, floorHeights } = useMemo(() => {
     const rnd = mulberry32(kind === "moon" ? 3 : 42);
     const pos = new Float32Array(COUNT * 3);
     const spd = new Float32Array(COUNT);
+    const floors = new Float32Array(COUNT);
 
     for (let i = 0; i < COUNT; i += 1) {
       const angle = rnd() * Math.PI * 2;
       const radius = rnd() * 50;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
+      const floor = terrainHeight(x, z);
       pos[i * 3] = x;
-      pos[i * 3 + 1] = terrainHeight(x, z) + 0.4 + rnd() * 14;
+      pos[i * 3 + 1] = floor + 0.4 + rnd() * 14;
       pos[i * 3 + 2] = z;
+      floors[i] = floor;
       spd[i] = 0.08 + rnd() * 0.55;
     }
 
-    return { positions: pos, speeds: spd };
+    return { positions: pos, speeds: spd, floorHeights: floors };
   }, [kind]);
 
   const geometry = useMemo(() => {
@@ -36,21 +39,23 @@ export function DustParticles({ kind, dust }: { kind: TerrainKind; dust: number 
   }, [positions]);
 
   useFrame((_, delta) => {
-    const arr = geometry.attributes.position as THREE.BufferAttribute;
-
-    for (let i = 0; i < COUNT; i += 1) {
-      let y = arr.getY(i) + speeds[i] * delta;
-      const x = arr.getX(i);
-      const z = arr.getZ(i);
-      const floor = terrainHeight(x, z);
-      if (y > floor + 14) y = floor + 0.4;
-      arr.setY(i, y);
-    }
-
-    arr.needsUpdate = true;
     if (matRef.current) {
-      matRef.current.opacity = 0.12 + (dust / 100) * 0.78;
+      matRef.current.opacity = dust <= 0 ? 0 : 0.12 + (dust / 100) * 0.78;
     }
+    if (dust <= 0) return;
+
+    const position = geometry.attributes.position as THREE.BufferAttribute;
+    const values = position.array as Float32Array;
+    const step = Math.min(delta, 0.05);
+    for (let i = 0; i < COUNT; i += 1) {
+      const yIndex = i * 3 + 1;
+      const floor = floorHeights[i];
+      let y = values[yIndex] + speeds[i] * step;
+      if (y > floor + 14) y = floor + 0.4;
+      values[yIndex] = y;
+    }
+
+    position.needsUpdate = true;
   });
 
   return (

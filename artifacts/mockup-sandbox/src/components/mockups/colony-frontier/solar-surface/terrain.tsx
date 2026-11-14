@@ -5,7 +5,7 @@ import { makeTerrainTexture } from "./textures";
 import type { TerrainKind } from "./state";
 
 const SIZE = 220;
-const SEGMENTS = 220;
+const SEGMENTS = 128;
 
 // The settlement sits on a deliberately engineered, level foundation.
 // Keep a generous exclusion zone around the entire built area so natural
