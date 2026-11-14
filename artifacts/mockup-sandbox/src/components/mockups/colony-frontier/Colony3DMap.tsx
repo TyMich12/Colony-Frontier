@@ -5,7 +5,7 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, CraterRim, Terrain, Rocks } from "./solar-surface/terrain";
-import { getBaselineRating, getLunarCycleState, interpolateSolarProfile } from "./_shared/simulationBalance";
+import { getBaselineRating, getLunarCycleState, interpolateSolarProfile, LEVEL1_ENVIRONMENT } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
   id: string;
@@ -36,6 +36,7 @@ type Props = {
   selectedBuildingId: string | null;
   elapsed: number;
   lunarNight: boolean;
+  blackoutMission: boolean;
   environmentLabel: "MOON" | "MARS";
   environmentTitle: string;
   activeEventId: string | null;
@@ -3307,7 +3308,8 @@ function WalkControls({
         const airlockDistance = Math.hypot(player.x, player.z - 9.4);
         if (airlockDistance < 1.8) {
           if (document.pointerLockElement === canvas) document.exitPointerLock();
-          latest.current.onEnterHabitat();
+          if (latest.current.selectedBuildingId === "habitat") latest.current.onEnterHabitat();
+          else latest.current.onSelect("habitat");
           return;
         }
         let closest: { distance: number; trackId?: string; node?: MissionResourceNode } | null = null;
@@ -3608,7 +3610,9 @@ function Scene({ props }: { props: Props }) {
   const roverSpeedGap = props.buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
   const roverTraverseSpeedKmh = Math.max(0, roverRatedSpeedKmh - roverSpeedGap) * roverCondition / 100;
   const lunarCycle = getLunarCycleState(props.elapsed);
-  const lunarDay = lunarCycle.day;
+  const lunarDay = props.blackoutMission
+    ? props.lunarNight ? 14 : Math.min(14, props.elapsed / LEVEL1_ENVIRONMENT.secondsPerEarthDay * 14)
+    : lunarCycle.day;
   const sunAngleDeg = props.lunarNight ? -18 : interpolateSolarProfile(lunarDay).sunAltitudeDeg;
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
@@ -3770,7 +3774,7 @@ function Scene({ props }: { props: Props }) {
         <MissionVitalsHUD metrics={props.metrics} physicalReadings={props.physicalReadings} colonyHealth={props.colonyHealth} alerted={Boolean(props.activeEventTrackId)} />
         {nearbyTarget && (
           <div role="status" className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 translate-y-6 border border-[#d6c17a]/55 bg-[#07151b]/90 px-3 py-1.5 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-[#f3dda0] shadow-lg backdrop-blur-sm">
-            E · {nearbyTarget.kind === "CABINET" ? (cabinetOpen ? "close" : "open") : nearbyTarget.kind === "AIRLOCK" ? "cycle airlock" : nearbyTarget.kind === "BERTH" ? "sleep" : nearbyTarget.kind === "GALLEY" ? "use galley" : "inspect / close"} · {nearbyTarget.label}
+            E · {nearbyTarget.kind === "CABINET" ? (cabinetOpen ? "close" : "open") : nearbyTarget.kind === "AIRLOCK" ? (props.habitatInterior ? "exit habitat" : props.selectedBuildingId === "habitat" ? "enter habitat" : "inspect habitat") : nearbyTarget.kind === "BERTH" ? "sleep" : nearbyTarget.kind === "GALLEY" ? "use galley" : "inspect / close"} · {nearbyTarget.label}
           </div>
         )}
         {props.habitatInterior && crewSleeping && (
@@ -3902,14 +3906,14 @@ function Scene({ props }: { props: Props }) {
             }}
             className="w-full border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 text-left font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
           >
-            Inspect habitat
+            {props.selectedBuildingId === "habitat" ? "Toggle habitat inspection" : "Inspect habitat"}
           </button>
           <button
             type="button"
             onClick={props.onEnterHabitat}
             className="w-full border border-[#78c9a1]/60 bg-[#10251f]/95 px-3 py-2 text-left font-mono text-[10px] font-black uppercase tracking-[0.12em] text-[#c5f0d7] shadow-lg backdrop-blur-sm transition hover:border-[#d3c27b] hover:bg-[#1d4437]"
           >
-            Enter habitat
+            Enter crew habitat
           </button>
         </>
       )}

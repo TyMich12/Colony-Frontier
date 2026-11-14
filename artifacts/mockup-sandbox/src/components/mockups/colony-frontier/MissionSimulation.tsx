@@ -815,6 +815,11 @@ function dustTransmission(dust: number): number {
   return points[points.length - 1].transmission;
 }
 
+function isLunarBlackoutMission(campaign: "moon" | "mars", missionTitle: string, missionNumber = ""): boolean {
+  const stage = Number.parseInt(missionNumber.replace(/[^0-9]/g, ""), 10);
+  return campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || stage === 2);
+}
+
 function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}, elapsedSeconds = LEVEL1_ENVIRONMENT.secondsPerEarthDay * 6, campaign: "moon" | "mars" = "moon", missionTitle = "", missionNumber = ""): { label: string; value: string } {
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
@@ -831,16 +836,18 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   switch (systemId) {
     case "solar": {
       const day7 = interpolateSolarProfile(7);
-      const liveDay = Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
+      const blackoutMission = isLunarBlackoutMission(campaign, missionTitle, missionNumber);
+      const blackoutActive = blackoutMission && elapsedSeconds >= LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+      const liveDay = blackoutMission
+        ? Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay * 14))
+        : Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
       const liveProfile = interpolateSolarProfile(liveDay);
       const liveCellTemperatureLoss = liveProfile.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, liveProfile.cellTempC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
-      const missionFraction = clamp(elapsedSeconds / TOTAL_MISSION_SECONDS, 0, 1);
-      const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || Number.parseInt(missionNumber.replace(/[^0-9]/g, ""), 10) === 2);
-      const liveSunlight = blackoutMission
+      const liveSunlight = blackoutActive
         ? 0
         : campaign === "mars"
           ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
-          : liveDay < 14 ? liveProfile.sunlightGeometry : 0;
+          : blackoutMission ? liveProfile.sunlightGeometry : liveDay < 14 ? liveProfile.sunlightGeometry : 0;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
       const conditionAdjustedRating = rating * clamp(_condition, 0, 100) / 100;
       const modeledSolarFaultPenalty = solarDegradationPenaltyFraction(_condition, dust, repairMetrics);
@@ -1318,6 +1325,7 @@ function IsometricMap({
   selectedBuildingId,
   elapsed,
   lunarNight,
+  blackoutMission,
   environmentLabel,
   environmentTitle,
   activeEventTrackId,
@@ -1344,6 +1352,7 @@ function IsometricMap({
   selectedBuildingId: string | null;
   elapsed: number;
   lunarNight: boolean;
+  blackoutMission: boolean;
   environmentLabel: string;
   environmentTitle: string;
   activeEventTrackId: string | null;
@@ -1371,6 +1380,7 @@ function IsometricMap({
       selectedBuildingId={selectedBuildingId}
       elapsed={elapsed}
       lunarNight={lunarNight}
+      blackoutMission={blackoutMission}
       environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
       environmentTitle={environmentTitle}
       activeEventId={activeEventId}
@@ -2468,7 +2478,8 @@ export function MissionSimulation() {
   const pending = useMemo<PendingMission | null>(() => loadPendingMission(), []);
   // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
   const missionStage = pending ? Math.max(1, Number.parseInt((pending.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1) : 1;
-  const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
+  const blackoutMission = pending ? isLunarBlackoutMission(pending.campaign, pending.missionTitle, pending.missionNumber) : false;
+  const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.065) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
   const savedRuntime = pending ? loadMissionRuntime(pending.missionId) : null;
   // Never hydrate a completed 14-day snapshot into a fresh active mission.
   const runtime = savedRuntime && savedRuntime.elapsedSeconds < TOTAL_MISSION_SECONDS ? savedRuntime : null;
@@ -2476,7 +2487,7 @@ export function MissionSimulation() {
   const [habitatInterior, setHabitatInterior] = useState(false);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
-  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: 1.10, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: POWER_DEMAND_MODEL.coreLoadKW + POWER_DEMAND_MODEL.airRevitalization.baseKW, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
   const [pulseExpandedMetric, setPulseExpandedMetric] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
@@ -2568,6 +2579,7 @@ export function MissionSimulation() {
       : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
+  const blackoutActive = blackoutMission && elapsed >= LEVEL1_ENVIRONMENT.secondsPerEarthDay;
   const physicalTelemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
 
   const finishOperation = useCallback((operation: MissionOperation) => {
@@ -3001,18 +3013,24 @@ export function MissionSimulation() {
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const gridUpgrade = buildings.grid?.upgradeLevel ?? 0;
         const radiationUpgrade = buildings.radiation?.upgradeLevel ?? 0;
-        const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2);
+        const blackoutMission = isLunarBlackoutMission(pending.campaign, pending.missionTitle, pending.missionNumber);
+        const blackoutActive = blackoutMission && elapsed >= LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const lunarCycle = pending.campaign === "moon" ? getLunarCycleState(elapsed) : null;
         const lunarProfile = lunarCycle ? interpolateSolarProfile(lunarCycle.day) : null;
-        const solarAvailability = blackoutMission
+        const operatingSolarProfile = blackoutMission
+          ? interpolateSolarProfile(Math.min(14, missionDay * 14))
+          : lunarProfile;
+        const solarAvailability = blackoutActive
           ? 0
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
+            : blackoutMission
+              ? operatingSolarProfile?.sunlightGeometry ?? 0
             : lunarCycle && !lunarCycle.isNight
-              ? (lunarProfile?.sunlightGeometry ?? 0)
+              ? (operatingSolarProfile?.sunlightGeometry ?? 0)
               : 0;
-        const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
-        const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
+        const cellTemperatureC = operatingSolarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
+        const cellTemperatureLoss = operatingSolarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
         const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
         // Solar is a primary source, not a load behind the general dependency check.
         // Calculate output from its own installation, condition and active fault so an
@@ -3246,7 +3264,7 @@ export function MissionSimulation() {
         const WATER_RESERVE_LOSS_FACTOR = missionStage === 1 ? 0.22 : 0.45;
         const waterDelta = -waterLossLDay * WATER_RESERVE_LOSS_FACTOR * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
-        const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
+        const ambientTemperature = blackoutActive ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalPowered = thermalOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const thermalRatedKW = thermalPowered
           ? conditionAdjustedOutput("thermal", repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics), buildings)
@@ -4883,7 +4901,8 @@ export function MissionSimulation() {
             handleBuildingAction(trackId, action);
           }}
           elapsed={elapsed}
-          lunarNight={pending.campaign === "moon" && getLunarCycleState(elapsed).isNight}
+          lunarNight={blackoutMission ? blackoutActive : pending.campaign === "moon" && getLunarCycleState(elapsed).isNight}
+          blackoutMission={blackoutMission}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
           activeEventId={activeEventId}
@@ -4924,9 +4943,11 @@ export function MissionSimulation() {
                   {pulseExpandedMetric === "generation" && (
                     <>
                       <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Solar generation · source breakdown</p>
-                      {electricalReadings.generationSources.length ? electricalReadings.generationSources.map((source) => (
+                      {electricalReadings.generationKW > 0.01 ? electricalReadings.generationSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.generationKW > 0 ? (source.kw / electricalReadings.generationKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
-                      )) : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
+                      )) : blackoutActive
+                        ? <p className="text-[9px] text-[#e2c986]">Lunar blackout: sunlight is intentionally unavailable. The battery powers life support while optional loads are shed to protect the reserve.</p>
+                        : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
                       <p className="mt-1 text-[8px] text-[#789a96]">Battery discharge is shown separately under Charging / discharging because it uses stored energy; it is not new generation. This mission has no nuclear generator.</p>
                     </>
                   )}

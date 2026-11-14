@@ -1,6 +1,13 @@
 # Colony-Frontier — Master System Performance & Upgrade Table
 
-**Status: shared live balance table updated; secondary retrofit effects still require implementation.** Research-tier values below supersede the earlier Research column and create a much larger generation jump. These are explicit game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating. Before implementation, reconcile these targets with retrofit behaviour, power draw, and the current simulation.
+**Status:** shared ratings, retrofit progress, and repair choices are connected to live inspection and simulation. The secondary numerical effects below remain design targets unless a corresponding live simulation effect is explicitly implemented. Research-tier values supersede the earlier Research column. These are game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating.
+
+## Current mission power tuning
+
+- Reference life-support demand is **1.30 kW** for shared habitat loads plus **1.45 kW** for air revitalisation. The per-system base, tier, and retrofit draw estimates were increased by 20% to make equipment operation a more meaningful trade-off.
+- Mission 2's Blackout scenario starts with one simulated Earth day of sunlight, with the Sun moving from sunrise to sunset. The following 13 days are intentionally dark; the power panel labels this state, and optional loads shed as the battery reaches 95% charge.
+- At the 2.75 kW life-support load, 13 dark days require about **903 kWh** from the battery after 95% discharge efficiency. A full 1,200 kWh Foundation battery therefore ends near **24.7% charge**, just above the protected 20% reserve. This is a no-incident planning estimate; repairs and load shedding remain important.
+- Missions after Mission 1 apply a slightly stronger stage-pressure increase: 6.5% per stage, capped at 80%, with the existing Mars pressure adjustment unchanged.
 
 ## How to read the table
 
@@ -89,7 +96,7 @@ A retrofit is a discrete installed improvement. It uses commissioning energy and
 | Science | Add analyser insert/reference standards; improves assay throughput or quality | Calibrate optics/sensors and improve sample handling; improves valid results and repeatability | Instrument sensitivity, assay throughput, and measurement capability |
 | Navigation | Calibrate inertial/ranging sensors; reduces position error | Add/tune timing and sensor-fusion module; reduces error further | Sensor suite, mapping, reference quality, and navigation algorithm |
 
-## Balancing rules before coding
+## Balancing rules for remaining implementation
 
 1. **One authoritative number per metric and state.** The live simulation, system inspector, retrofit preview, and status dashboard should all read the same value.
 2. **Do not stack old direct gains on top of this table.** Decide whether a retrofit changes the selected table state or adds a separately displayed effect. Do one, not both.
@@ -102,13 +109,11 @@ A retrofit is a discrete installed improvement. It uses commissioning energy and
 9. **The standalone repair/mitigation option remains genuinely standalone.** It must require no other systems; optional/integrated options may use their stated support systems.
 10. **These are balance targets, not universal scientific specifications.** In particular, research-tier range, throughput, purity, and accuracy need mission-specific plausibility checks.
 
-## Implementation order
+## Validation and remaining work
 
-1. Review/approve these target values and mechanisms.
-2. Reconcile each existing retrofit's `directGain`, materials, commissioning energy, and duration with the intended metric change.
-3. Update the shared balance source once, with tests/checks for all 28 metrics and 12 states per metric.
-4. Wire system inspectors, simulation behavior, and power draw to the shared source without double-counting.
-5. Run a build and scenario checks for Foundation/Frontier/Apex/Research, all retrofit levels, and power-starved conditions.
+1. Reconcile each not-yet-implemented secondary retrofit effect with its `directGain`, materials, commissioning energy, and duration.
+2. Keep the shared balance source authoritative and avoid double-counting effects in the inspector, simulation, and power model.
+3. Validate Foundation/Frontier/Apex/Research and retrofit levels under normal and power-starved conditions.
 
 
 ## Numerical retrofit effects — exact intended changes
