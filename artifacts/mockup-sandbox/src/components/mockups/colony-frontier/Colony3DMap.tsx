@@ -4,13 +4,8 @@ import { Billboard, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
-<<<<<<< HEAD
 import { terrainHeight, CraterRim, Terrain, Rocks } from "./solar-surface/terrain";
-import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
-=======
-import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
 import { getBaselineRating, getLunarCycleState, interpolateSolarProfile } from "./_shared/simulationBalance";
->>>>>>> af1571d (tikitiki)
 
 export type MissionResourceNode = {
   id: string;
@@ -3614,13 +3609,16 @@ function Scene({ props }: { props: Props }) {
   const roverTraverseSpeedKmh = Math.max(0, roverRatedSpeedKmh - roverSpeedGap) * roverCondition / 100;
   const lunarCycle = getLunarCycleState(props.elapsed);
   const lunarDay = lunarCycle.day;
-  const sunAngleDeg = interpolateSolarProfile(lunarDay).sunAltitudeDeg;
+  const sunAngleDeg = props.lunarNight ? -18 : interpolateSolarProfile(lunarDay).sunAltitudeDeg;
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
+  const sunArcAngle = Math.PI * (0.75 + sunProgress);
+  const sunX = Math.cos(sunArcAngle) * 105;
+  const sunZ = Math.sin(sunArcAngle) * 105;
   const sunPosition: [number, number, number] = [
-    -45 + sunProgress * 90,
-    props.lunarNight ? -14 : Math.sin(sunAltitudeRad) * 28,
-    -72 + sunProgress * 144,
+    sunX,
+    terrainHeight(sunX, sunZ) + Math.sin(sunAltitudeRad) * 56,
+    sunZ,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   const supplyStations = [
@@ -3634,7 +3632,7 @@ function Scene({ props }: { props: Props }) {
       orthographic
       shadows
       dpr={[1, 1.5]}
-      camera={{ position: [48, 56, 48], zoom: 14, near: 0.5, far: 190 }}
+      camera={{ position: [48, 56, 48], zoom: 14, near: 0.5, far: 320 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
       onCreated={({ gl }) => {
         gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -3657,23 +3655,13 @@ function Scene({ props }: { props: Props }) {
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
-<<<<<<< HEAD
-        <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.32} depthWrite={false} toneMapped={false} /></mesh>
-        {!props.lunarNight && <mesh><sphereGeometry args={[2.05, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.16} depthWrite={false} toneMapped={false} /></mesh>}
-        {!props.lunarNight && <mesh><sphereGeometry args={[3.2, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.07} depthWrite={false} toneMapped={false} /></mesh>}
-        {!props.lunarNight && <pointLight color="#fff0cf" intensity={4.5} distance={110} decay={1.6} />}
-=======
-        {!props.lunarNight && <>
-          <mesh><sphereGeometry args={[2.2, 64, 48]} /><meshBasicMaterial color="#fff9df" toneMapped={false} /></mesh>
-          <mesh><sphereGeometry args={[3.1, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={0.28} depthWrite={false} toneMapped={false} /></mesh>
-          <mesh><sphereGeometry args={[4.5, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.12} depthWrite={false} toneMapped={false} /></mesh>
-          <mesh><sphereGeometry args={[6.5, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
-          <pointLight color="#fff0cf" intensity={2.4} distance={95} decay={1.6} />
-        </>}
->>>>>>> af1571d (tikitiki)
+        <mesh><sphereGeometry args={[7.5, 64, 48]} /><meshBasicMaterial color="#fff9df" toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[10, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={0.28} depthWrite={false} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[14, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.12} depthWrite={false} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[20, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
+        {!props.lunarNight && <pointLight color="#fff0cf" intensity={8} distance={150} decay={1.6} />}
       </group>}
-      {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false} visible={false}>
+      {!mars && <group position={[-63, 35, -93]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
         <mesh><sphereGeometry args={[2.55, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#0b1d2a" emissiveIntensity={0.18} /></mesh>
         <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
         <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
