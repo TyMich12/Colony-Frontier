@@ -2543,6 +2543,9 @@ export function MissionSimulation() {
   );
   const eventResponseRef = useRef<string | null>(null);
   const completionSavedRef = useRef(false);
+  const runtimeSaveTimerRef = useRef<number | null>(null);
+  const latestRuntimeSnapshotRef = useRef<Parameters<typeof saveMissionRuntime>[0] | null>(null);
+  const lastRuntimeSaveAtRef = useRef(0);
 
   const selectedTracks = pending ? selectedTrackData(pending.selected) : [];
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
@@ -2574,6 +2577,30 @@ export function MissionSimulation() {
       ? roverFieldWorkOrder?.targetId ?? null
       : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
+  const simulationTickStateRef = useRef({
+    activeFaults,
+    buildings,
+    elapsed,
+    metrics,
+    resolvedEventIds,
+    speed,
+    environmentLabel,
+    surveyedNodes,
+    sampleStages,
+    resourceYield,
+  });
+  simulationTickStateRef.current = {
+    activeFaults,
+    buildings,
+    elapsed,
+    metrics,
+    resolvedEventIds,
+    speed,
+    environmentLabel,
+    surveyedNodes,
+    sampleStages,
+    resourceYield,
+  };
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
   const physicalTelemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
 
@@ -2888,6 +2915,18 @@ export function MissionSimulation() {
     if (!pending || results || manualPaused || activeEventId) return;
 
     const timer = window.setInterval(() => {
+      const {
+        activeFaults,
+        buildings,
+        elapsed,
+        metrics,
+        resolvedEventIds,
+        speed,
+        environmentLabel,
+        surveyedNodes,
+        sampleStages,
+        resourceYield,
+      } = simulationTickStateRef.current;
       // Resource systems use a gentler balance clock than the accelerated mission timeline.
       const resourceDt = 0.25 * speed * GAME_TIME_ACCELERATION * 0.25;
       setElapsed((current) => {
@@ -3353,11 +3392,11 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, activeFaults, buildings, elapsed, emergencyPowerMode, manualPaused, metrics, pending, resolvedEventIds, results, speed]);
+  }, [activeEventId, manualPaused, pending, results]);
 
   useEffect(() => {
     if (!pending || results) return;
-    saveMissionRuntime({
+    latestRuntimeSnapshotRef.current = {
       missionId: pending.missionId,
       elapsedSeconds: elapsed,
       metrics,
@@ -3378,12 +3417,30 @@ export function MissionSimulation() {
       earthReportAtSeconds,
       fallbackReadyAt,
       activeFaults,
-
       sampleQuality,
       emergencyPowerMode,
       eventsTriggered: eventPointerRef.current,
-    });
+    };
+
+    if (runtimeSaveTimerRef.current !== null) return;
+    const delay = Math.max(0, 1000 - (Date.now() - lastRuntimeSaveAtRef.current));
+    runtimeSaveTimerRef.current = window.setTimeout(() => {
+      runtimeSaveTimerRef.current = null;
+      const snapshot = latestRuntimeSnapshotRef.current;
+      if (!snapshot) return;
+      saveMissionRuntime(snapshot);
+      lastRuntimeSaveAtRef.current = Date.now();
+    }, delay);
   }, [activeEventId, activeFaults, activeOperation, activeOperations, aiMessage, buildings, decisions, elapsed, emergencyPowerMode, earthReport, earthReportAtSeconds, fallbackReadyAt, metrics, operationResult, pending, resourceYield, resolvedEventIds, results, roverTask, sampleQuality, sampleStages, score, surveyedNodes]);
+
+  useEffect(() => () => {
+    if (runtimeSaveTimerRef.current !== null) {
+      window.clearTimeout(runtimeSaveTimerRef.current);
+      runtimeSaveTimerRef.current = null;
+    }
+    const snapshot = latestRuntimeSnapshotRef.current;
+    if (snapshot) saveMissionRuntime(snapshot);
+  }, []);
 
   useEffect(() => {
     if (!results || !pending || aiCloseoutReady) return;
