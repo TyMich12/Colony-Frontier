@@ -359,11 +359,11 @@ export function SoundSettings() {
     <section className="border border-[#3e5550] bg-[#101f23] p-5" aria-label="Audio settings">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-[#e8e9d9]">
-            Audio
+          <h3 className="text-sm font-bold uppercase tracking-[0.14em]">
+            Audio settings
           </h3>
           <p className="mt-1 text-xs leading-5 text-[#9ca9a2]">
-            Ambient soundtrack and interface feedback.
+            Music, footsteps, engine, and interface sounds.
           </p>
         </div>
         <button
@@ -372,10 +372,10 @@ export function SoundSettings() {
           onClick={() => updatePreferences({ muted: !preferences.muted })}
           className="shrink-0 border border-[#405c4e] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.16em] text-[#c9debc] transition hover:border-[#efb658]"
         >
-          {preferences.muted ? "Sound off" : "Sound on"}
+          {preferences.muted ? "Enable sound" : "Mute sound"}
         </button>
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <div className="mt-5 grid gap-4">
         {([
           ["Music", "musicVolume"],
           ["Sound effects", "effectsVolume"],

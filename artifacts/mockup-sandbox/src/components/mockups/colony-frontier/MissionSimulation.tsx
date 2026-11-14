@@ -2816,6 +2816,12 @@ export function MissionSimulation() {
   }, [storedEventIsInvalid, activeEventId]);
 
   useEffect(() => {
+    if (!activeEventId || !activeTargetTrackId) return;
+    setSelectedResourceId(null);
+    setSelectedBuildingId(activeTargetTrackId);
+  }, [activeEventId, activeTargetTrackId]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setSelectedBuildingId(null);
@@ -2891,13 +2897,13 @@ export function MissionSimulation() {
           setTimeout(() => {
             eventResponseRef.current = null;
             setActiveEventId(event.id);
-            setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setOperationResult(null);
 
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
+            setSelectedBuildingId(targetId);
             const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.52;
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
             const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
@@ -4849,15 +4855,19 @@ export function MissionSimulation() {
           colonyHealth={performance.colonyHealth}
           onSelect={(trackId) => {
             setSelectedResourceId(null);
-            setSelectedBuildingId((current) => current === trackId ? null : trackId);
+            setSelectedBuildingId((current) => activeEventId
+              ? activeTargetTrackId
+              : current === trackId ? null : trackId);
           }}
           selectedBuildingId={selectedBuildingId}
           habitatInterior={habitatInterior}
           onCloseInspector={() => {
+            if (activeEventId) return;
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
           }}
           onEnterHabitat={() => {
+            if (activeEventId) return;
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
             setHabitatInterior(true);
@@ -5189,10 +5199,12 @@ export function MissionSimulation() {
             runtime={buildings[selectedTrack.id] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 }}
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => {
+              if (activeEventId) return;
               setSelectedBuildingId(null);
               window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
             onEnterHabitat={() => {
+              if (activeEventId) return;
               setSelectedBuildingId(null);
               setSelectedResourceId(null);
               setHabitatInterior(true);

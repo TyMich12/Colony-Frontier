@@ -26,6 +26,7 @@ import {
   ProgressBar,
   SectionLabel,
 } from "./_shared/GameShell";
+import { SoundSettings } from "./_shared/SoundSystem";
 
 const routes = {
   moon: "/preview/CampaignMapRefresh",
@@ -403,6 +404,10 @@ export function MainMenu() {
             <p className="mt-4 text-sm leading-7 text-[#a8bbb1]">
               Manage your local campaign data and program preferences.
             </p>
+
+            <div className="mt-7">
+              <SoundSettings />
+            </div>
 
             <div className="mt-7 border border-[#3e5550] bg-[#101f23] p-5">
               <div className="flex items-center justify-between gap-4">

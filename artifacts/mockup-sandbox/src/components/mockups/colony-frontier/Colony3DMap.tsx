@@ -4,13 +4,8 @@ import { Billboard, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
-<<<<<<< HEAD
 import { terrainHeight, CraterRim, Terrain, Rocks } from "./solar-surface/terrain";
-import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
-=======
-import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
 import { getBaselineRating, getLunarCycleState, interpolateSolarProfile } from "./_shared/simulationBalance";
->>>>>>> af1571d (tikitiki)
 
 export type MissionResourceNode = {
   id: string;
@@ -3602,9 +3597,6 @@ function Scene({ props }: { props: Props }) {
     }, 800);
   };
   const mars = props.environmentLabel === "MARS";
-  useEffect(() => {
-    if (!props.lunarNight) setFlashlightOn(false);
-  }, [props.lunarNight]);
   const earthTextures = useMemo(() => createEarthTextures(), []);
   const roverTier = props.selected.rover ?? "Foundation";
   const roverRetrofitLevel = props.buildings.rover?.upgradeLevel ?? 0;
@@ -3618,9 +3610,9 @@ function Scene({ props }: { props: Props }) {
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
   const sunPosition: [number, number, number] = [
-    -45 + sunProgress * 90,
-    props.lunarNight ? -14 : Math.sin(sunAltitudeRad) * 28,
-    -72 + sunProgress * 144,
+    -100 + sunProgress * 200,
+    props.lunarNight ? -35 : Math.sin(sunAltitudeRad) * 95,
+    -125,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   const supplyStations = [
@@ -3657,21 +3649,11 @@ function Scene({ props }: { props: Props }) {
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
-<<<<<<< HEAD
-        <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.32} depthWrite={false} toneMapped={false} /></mesh>
-        {!props.lunarNight && <mesh><sphereGeometry args={[2.05, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.16} depthWrite={false} toneMapped={false} /></mesh>}
-        {!props.lunarNight && <mesh><sphereGeometry args={[3.2, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.07} depthWrite={false} toneMapped={false} /></mesh>}
+        <mesh><sphereGeometry args={[5, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
+        <mesh><sphereGeometry args={[7, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.32} depthWrite={false} toneMapped={false} /></mesh>
+        {!props.lunarNight && <mesh><sphereGeometry args={[10, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.16} depthWrite={false} toneMapped={false} /></mesh>}
+        {!props.lunarNight && <mesh><sphereGeometry args={[14, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.07} depthWrite={false} toneMapped={false} /></mesh>}
         {!props.lunarNight && <pointLight color="#fff0cf" intensity={4.5} distance={110} decay={1.6} />}
-=======
-        {!props.lunarNight && <>
-          <mesh><sphereGeometry args={[2.2, 64, 48]} /><meshBasicMaterial color="#fff9df" toneMapped={false} /></mesh>
-          <mesh><sphereGeometry args={[3.1, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={0.28} depthWrite={false} toneMapped={false} /></mesh>
-          <mesh><sphereGeometry args={[4.5, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.12} depthWrite={false} toneMapped={false} /></mesh>
-          <mesh><sphereGeometry args={[6.5, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
-          <pointLight color="#fff0cf" intensity={2.4} distance={95} decay={1.6} />
-        </>}
->>>>>>> af1571d (tikitiki)
       </group>}
       {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false} visible={false}>
         <mesh><sphereGeometry args={[2.55, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#0b1d2a" emissiveIntensity={0.18} /></mesh>
@@ -3743,7 +3725,7 @@ function Scene({ props }: { props: Props }) {
             setCabinetOpen((open) => !open);
           }}
           onToggleFlashlight={() => {
-            if (props.lunarNight && firstPersonMode) setFlashlightOn((active) => !active);
+            if (firstPersonMode) setFlashlightOn((active) => !active);
           }}
           onLockChange={(locked) => {
             setPointerLocked(locked);
@@ -3775,7 +3757,7 @@ function Scene({ props }: { props: Props }) {
           target={[0, 0, 0]}
         />
       )}
-      {firstPersonMode && props.lunarNight && flashlightOn && <HelmetFlashlight />}
+      {firstPersonMode && flashlightOn && <HelmetFlashlight />}
     </Canvas>
     {firstPersonMode && (
       <>
@@ -3945,6 +3927,20 @@ function Scene({ props }: { props: Props }) {
           {pointerLockError && <><br /><span className="text-[#ffadb0]">{pointerLockError}</span></>}
         </div>
       )}
+      {firstPersonMode && (
+        <button
+          type="button"
+          onClick={() => setFlashlightOn((active) => !active)}
+          aria-pressed={flashlightOn}
+          className={`w-full border px-3 py-2 text-left font-mono text-[10px] font-bold uppercase tracking-[0.14em] shadow-lg transition ${
+            flashlightOn
+              ? "border-[#ffe7a0] bg-[#40341e]/95 text-[#ffe7a0]"
+              : "border-[#e7c56e]/50 bg-[#10191d]/90 text-[#f4d785] hover:border-[#ffe7a0]"
+          }`}
+        >
+          Torch · {flashlightOn ? "On" : "Off"}
+        </button>
+      )}
     </div>
     {firstPersonMode && pointerLocked && (
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-3 w-3 -translate-x-1/2 -translate-y-1/2">
@@ -3958,7 +3954,7 @@ function Scene({ props }: { props: Props }) {
           <div className="rounded-lg border border-white/20 bg-[#07131c]/80 px-3 py-2 text-[9px] font-mono text-white shadow-lg backdrop-blur-sm">
             <div className="mb-1 font-black tracking-[0.16em] text-[#f3d16f]">LUNAR SKY</div>
             {props.lunarNight ? <div className="text-[#9dbbd2]">SUN BELOW HORIZON · 0°</div> : <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full bg-[#ffe17b] shadow-[0_0_12px_4px_rgba(255,211,91,.65)]" /><span>SUN ALTITUDE · {sunAngleDeg.toFixed(1)}°</span></div>}
-            <div className="mt-1 text-[8px] text-[#b6c9d4]">Daylight and shadows follow the lunar cycle</div>
+            <div className="mt-1 text-[8px] text-[#b6c9d4]">Day and night alternate every minute</div>
           </div>
         )}
         <div className="rounded-lg border border-white/15 bg-[#07131c]/70 px-3 py-2 font-mono text-[8px] text-[#b6c9d4] shadow-lg backdrop-blur-sm">

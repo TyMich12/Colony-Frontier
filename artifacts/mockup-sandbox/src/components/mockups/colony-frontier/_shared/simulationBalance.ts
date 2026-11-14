@@ -103,7 +103,8 @@ export function interpolateSolarProfile(day: number) {
   };
 }
 
-const LUNAR_SYNODIC_MONTH_DAYS = 29.53059;
+// At 1x speed, two simulated days take one real minute.
+const LUNAR_SYNODIC_MONTH_DAYS = 4;
 const LUNAR_DAYLIGHT_DAYS = LUNAR_SYNODIC_MONTH_DAYS / 2;
 
 export function getLunarCycleState(elapsedSeconds: number) {

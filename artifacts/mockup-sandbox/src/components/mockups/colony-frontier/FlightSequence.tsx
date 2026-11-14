@@ -4,6 +4,7 @@ import { ContactShadows, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { ArrowDown, ArrowUp, Check, Compass, Crosshair, Gauge, Glasses, Radio, Rocket, ShieldCheck, Timer, TriangleAlert } from "lucide-react";
 import { loadPendingMission } from "./missionRuntime";
+import { useSoundSystem } from "./_shared/SoundSystem";
 
 type Stage = "approach" | "boarding" | "startup" | "ascent" | "orbit" | "transfer" | "landing" | "crashed" | "landed" | "outside" | "entering";
 type FlightState = {
@@ -674,11 +675,13 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
   stage: Stage; onStageChange: (stage: Stage) => void; onTelemetry: (state: FlightState) => void;
 }) {
   const { camera, gl } = useThree();
+  const { playFootstep } = useSoundSystem();
   const cameraPosition = useRef(new THREE.Vector3(0, 1.72, PAD_APPROACH_DISTANCE - 2.5));
   const lookYaw = useRef(0);
   const lookPitch = useRef(0);
   const jumpHeight = useRef(0);
   const jumpVelocity = useRef(0);
+  const footstepTimer = useRef(0);
   useEffect(() => {
     const canvas = gl.domElement;
     const requestLook = () => {
@@ -802,6 +805,17 @@ function FlightScene({ flight, keys, stage, onStageChange, onTelemetry }: {
       s.walkDistance = clamp(s.walkZ, 0, 17);
       if (s.walkDistance >= 16.4) onStageChange("entering");
     }
+    const walking = (s.stage === "approach" || s.stage === "outside") &&
+      Math.hypot(walkInput, strafeInput) > 0.1;
+    if (walking) {
+      footstepTimer.current += dt;
+      if (footstepTimer.current >= 0.44) {
+        footstepTimer.current -= 0.44;
+        playFootstep(s.stage === "outside" ? "lunar" : "pad");
+      }
+    } else {
+      footstepTimer.current = 0;
+    }
     const cockpit = ["startup", "ascent", "orbit", "transfer", "landing", "crashed"].includes(s.stage);
     let target: THREE.Vector3;
     let direction: THREE.Vector3;
@@ -873,6 +887,7 @@ function Stat({ label, value, unit, accent = false }: { label: string; value: st
 }
 
 export function FlightSequence() {
+  const { setEngineSound } = useSoundSystem();
   const pending = loadPendingMission();
   const flight = useRef(makeFlight());
   const keys = useRef(new Set<string>());
@@ -911,6 +926,11 @@ export function FlightSequence() {
     window.addEventListener("keydown", down); window.addEventListener("keyup", up); window.addEventListener("blur", clear);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", clear); };
   }, []);
+  useEffect(() => {
+    const poweredFlight = stage === "ascent" || stage === "transfer" || stage === "landing";
+    setEngineSound(poweredFlight ? telemetry.throttle / 100 : 0);
+  }, [setEngineSound, stage, telemetry.throttle]);
+  useEffect(() => () => setEngineSound(0), [setEngineSound]);
   useEffect(() => {
     const xr = (navigator as Navigator & { xr?: XRSystemHandle }).xr;
     if (!xr || !window.isSecureContext) {
