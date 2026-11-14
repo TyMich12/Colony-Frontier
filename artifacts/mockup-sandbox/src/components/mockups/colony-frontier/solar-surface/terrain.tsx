@@ -6,27 +6,25 @@ import type { TerrainKind } from "./state";
 
 const SIZE = 220;
 const SEGMENTS = 220;
+const CRATER_RIM_RADIUS = 88;
 
 // The settlement sits on a deliberately engineered, level foundation.
 // Keep a generous exclusion zone around the entire built area so natural
 // terrain and loose rocks can never visually overlap colony assets.
-const FOUNDATION_X = 44;
-const FOUNDATION_Z = 44;
+const FOUNDATION_RADIUS = 44;
 const FOUNDATION_FADE = 50;
 const FOUNDATION_TERRAIN_DEPTH = -0.32;
 
 function heightAt(x: number, z: number): number {
-  const ax = Math.abs(x);
-  const az = Math.abs(z);
-  const edge = Math.max(ax, az);
+  const radius = Math.hypot(x, z);
 
   // The natural terrain must sit below the engineered foundation, not pass
   // through its upper layers. Feather the depression into the terrain outside
   // the slab so the join remains smooth when the camera moves.
-  const depression = 1 - THREE.MathUtils.smoothstep(edge, FOUNDATION_X, FOUNDATION_FADE);
+  const depression = 1 - THREE.MathUtils.smoothstep(radius, FOUNDATION_RADIUS, FOUNDATION_FADE);
   const rough = (fbm(x * 0.045 + 10, z * 0.045 + 10, 5) - 0.5) * 5.2;
   const dunes = Math.sin(x * 0.055) * Math.cos(z * 0.047) * 0.7;
-  const outerBlend = THREE.MathUtils.smoothstep(edge, FOUNDATION_FADE, FOUNDATION_FADE + 8);
+  const outerBlend = THREE.MathUtils.smoothstep(radius, FOUNDATION_FADE, FOUNDATION_FADE + 8);
   const naturalHeight = (rough + dunes) * outerBlend;
 
   return THREE.MathUtils.lerp(naturalHeight, FOUNDATION_TERRAIN_DEPTH, depression);
@@ -69,6 +67,81 @@ export function Terrain({ kind }: { kind: TerrainKind }) {
       />
     </mesh>
   );
+}
+
+export function CraterRim({ kind }: { kind: TerrainKind }) {
+  const geometry = useMemo(() => createCraterRimGeometry(), []);
+  const texture = useMemo(() => {
+    const map = makeTerrainTexture(kind);
+    map.wrapS = THREE.RepeatWrapping;
+    map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(1, 1);
+    map.anisotropy = 4;
+    return map;
+  }, [kind]);
+
+  return (
+    <mesh geometry={geometry} castShadow receiveShadow frustumCulled={false}>
+      <meshStandardMaterial
+        map={texture}
+        color={kind === "moon" ? "#aaa397" : "#b2765e"}
+        roughness={1}
+        flatShading
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function createCraterRimGeometry() {
+  const segments = 192;
+  const ringOffsets = [-1.5, 0, 1.2, 3.8, 8.5, 17];
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let ring = 0; ring < ringOffsets.length; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const angle = (segment / segments) * Math.PI * 2;
+      const ridgeVariation = Math.sin(angle * 7 + 0.6) * 1.4
+        + Math.sin(angle * 17 - 0.8) * 0.7
+        + Math.sin(angle * 31 + 0.2) * 0.25;
+      const radius = CRATER_RIM_RADIUS + ringOffsets[ring] + ridgeVariation;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const terrain = heightAt(x, z);
+      const peak = 34 + Math.sin(angle * 5) * 2.5 + Math.sin(angle * 13 + 0.4) * 1.2;
+      const heights = [
+        terrain,
+        8 + Math.sin(angle * 11) * 1.2,
+        peak - 4,
+        peak,
+        peak - 7,
+        heightAt(x, z) + 1,
+      ];
+
+      positions.push(x, heights[ring], z);
+      uvs.push((segment / segments) * 18, ring * 1.2);
+    }
+  }
+
+  for (let ring = 0; ring < ringOffsets.length - 1; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const next = (segment + 1) % segments;
+      const inner = ring * segments + segment;
+      const innerNext = ring * segments + next;
+      const outer = (ring + 1) * segments + segment;
+      const outerNext = (ring + 1) * segments + next;
+      indices.push(inner, innerNext, outer, innerNext, outerNext, outer);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 export function Rocks({ kind }: { kind: TerrainKind }) {

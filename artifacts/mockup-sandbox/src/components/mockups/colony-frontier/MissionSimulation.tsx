@@ -1292,19 +1292,18 @@ function BuildingShape({
 }
 
 const RESOURCE_NODES: Record<"MOON" | "MARS", ResourceNode[]> = {
-  // Four sites sit beyond the facility pads and service-road perimeter. Their coordinates
-  // map to world-space positions near (±30, ±25), so field work requires an actual outbound trip.
+  // Field sites are outside the colony lanes and clear of all facility footprints.
   MOON: [
-    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: -160, y: 120, description: "A cold-trap site beyond the west perimeter with a strong water-ice signature." },
-    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 1160, y: 440, description: "A mineral ridge beyond the east service lanes; core drilling can verify the ilmenite-rich signal." },
-    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 1204, y: -20, description: "A remote crater ejecta deposit outside the south-east perimeter." },
-    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: -160, y: 550, description: "A broad regolith field beyond the western ridge suitable for rover mapping." },
+    { id: "moon-ice", label: "ICE DEPOSIT", kind: "ICE", x: -556, y: 120, description: "A cold-trap site beyond the west perimeter with a strong water-ice signature." },
+    { id: "moon-mineral", label: "ILMENITE RIDGE", kind: "MINERAL", x: 1556, y: 460, description: "A mineral ridge beyond the east service lanes; core drilling can verify the ilmenite-rich signal." },
+    { id: "moon-science", label: "CRATER SAMPLE", kind: "SCIENCE", x: 1490, y: -180, description: "A remote crater ejecta deposit outside the south-east perimeter." },
+    { id: "moon-regolith", label: "REGOLITH FIELD", kind: "REGOLITH", x: -534, y: 720, description: "A broad regolith field in the north-west terrain beyond the colony perimeter." },
   ],
   MARS: [
-    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: -160, y: 120, description: "Orbital data suggests shallow buried water ice beyond the west side of the outpost." },
-    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 1160, y: 440, description: "An iron-rich ridge beyond the outpost's east traffic lanes." },
-    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 1204, y: -20, description: "A remote basalt outcrop beyond the south-east perimeter, suitable for geological sampling." },
-    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: -160, y: 550, description: "A distant dust plain beyond the west-north service road." },
+    { id: "mars-ice", label: "SUBSURFACE ICE", kind: "ICE", x: -556, y: 120, description: "Orbital data suggests shallow buried water ice beyond the west side of the outpost." },
+    { id: "mars-mineral", label: "IRON RIDGE", kind: "MINERAL", x: 1556, y: 460, description: "An iron-rich ridge beyond the outpost's east traffic lanes." },
+    { id: "mars-science", label: "BASALT OUTCROP", kind: "SCIENCE", x: 1490, y: -180, description: "A remote basalt outcrop beyond the south-east perimeter, suitable for geological sampling." },
+    { id: "mars-regolith", label: "DUST PLAIN", kind: "REGOLITH", x: -534, y: 720, description: "A distant dust plain in the north-west terrain beyond the colony perimeter." },
   ],
 };
 
@@ -3947,8 +3946,8 @@ export function MissionSimulation() {
     const extractionFactor = hasExtraction ? repairCapabilityFraction("extraction", pending.selected, buildings) : 1;
     const nodeWorldX = (node.x - 500) / 22;
     const nodeWorldZ = (node.y - 300) / 10;
-    const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : 24;
-    const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : -22;
+    const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : POSITIONS.rover[0];
+    const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : POSITIONS.rover[1];
     const roverTravelToNodeSeconds = hasRover && roverEffectiveSpeed > 0.1
       ? Math.hypot(nodeWorldX - roverStartX, nodeWorldZ - roverStartZ) * 1.5 / (roverEffectiveSpeed / 3.6)
       : 0;
@@ -4111,8 +4110,8 @@ export function MissionSimulation() {
       const roverSpeedGap = buildings.rover?.repairMetrics?.["Unrestored fault gap · Safe traverse speed restored"] ?? 0;
       const roverTravelSpeedKmh = Math.max(0, roverRatedSpeed - roverSpeedGap) * clamp(buildings.rover?.condition ?? 100, 0, 100) / 100;
       const repairPosition = POSITIONS[repairTargetId] ?? [0, 0];
-      const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : 24;
-      const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : -22;
+      const roverStartX = roverTaskTarget ? (roverTaskTarget.x - 500) / 22 : POSITIONS.rover[0];
+      const roverStartZ = roverTaskTarget ? (roverTaskTarget.y - 300) / 10 : POSITIONS.rover[1];
       if (roverCanAssist && roverTravelSpeedKmh <= 0.1) {
         setOperationResult("REPAIR HELD · The supporting rover cannot traverse at its current condition. Restore mobility before selecting a rover-assisted procedure.");
         return;

@@ -4,7 +4,7 @@ import { Billboard, Html, OrbitControls, PerspectiveCamera, RoundedBox, Text } f
 import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
-import { terrainHeight, Terrain, Rocks } from "./solar-surface/terrain";
+import { terrainHeight, CraterRim, Terrain, Rocks } from "./solar-surface/terrain";
 import { getBaselineRating, interpolateSolarProfile } from "./_shared/simulationBalance";
 
 export type MissionResourceNode = {
@@ -77,7 +77,7 @@ export const POSITIONS: Record<string, [number, number]> = {
 };
 
 const BUILDING_SCALES: Record<string, number> = {
-  habitat: 1.35,
+  habitat: 2.5,
   solar: 1.65,
   battery: 1.28,
   oxygen: 1.28,
@@ -97,7 +97,7 @@ const BUILDING_SCALES: Record<string, number> = {
 };
 
 function buildingClearanceRadius(id: string): number {
-  const footprintRadius = id === "habitat" ? 4.4 : id === "rover" ? 1.85 : 1.825;
+  const footprintRadius = id === "habitat" ? 5.2 : id === "rover" ? 1.85 : 1.825;
   return footprintRadius * (BUILDING_SCALES[id] ?? 1.2) + 0.2;
 }
 
@@ -120,9 +120,10 @@ const BUILDING_ROTATIONS: Record<string, number> = {
   maintenance: 0.2,
 };
 
-const ROAD_X = [-38, -13, 13, 38];
-const ROAD_Z = [-38, -13, 13, 38];
+const ROAD_X = [-38, -15, 15, 38];
+const ROAD_Z = [-38, -15, 15, 38];
 const ROAD_EDGE = 42;
+const CRATER_WALK_RADIUS = 84;
 const PAD_Y = 0.12;
 
 function nodeWorldPosition(node: MissionResourceNode): [number, number] {
@@ -218,10 +219,10 @@ type RoverRockObstacle = {
 };
 
 const ROVER_ROUTE_ROCKS: RoverRockObstacle[] = [
-  { id: "north-boulder", label: "NORTH BOULDER", x: 0, z: 46, radius: 1.9 },
-  { id: "east-ridge", label: "EASTERN RIDGE", x: 46, z: 0, radius: 1.8 },
-  { id: "south-scree", label: "SOUTHERN SCREE", x: 0, z: -46, radius: 1.55 },
-  { id: "west-scree", label: "WESTERN SCREE", x: -46, z: 0, radius: 2.0 },
+  { id: "northwest-outcrop", label: "NORTHWEST OUTCROP", x: -53, z: 53, radius: 2.6 },
+  { id: "northeast-outcrop", label: "NORTHEAST OUTCROP", x: 53, z: 53, radius: 2.6 },
+  { id: "southeast-outcrop", label: "SOUTHEAST OUTCROP", x: 53, z: -53, radius: 2.6 },
+  { id: "southwest-outcrop", label: "SOUTHWEST OUTCROP", x: -53, z: -53, radius: 2.6 },
 ];
 
 // Grid-based A*: buildings and the same physical boulders rendered in the scene are obstacles.
@@ -230,7 +231,7 @@ function findRoverPath(
   goal: [number, number],
 ): [number, number][] {
   const step = 2;
-  const limit = 22;
+  const limit = 30;
   const toGrid = (point: [number, number]) => ({
     x: Math.max(-limit, Math.min(limit, Math.round(point[0] / step))),
     z: Math.max(-limit, Math.min(limit, Math.round(point[1] / step))),
@@ -450,8 +451,7 @@ function RoadNetwork({ mars }: { mars: boolean }) {
     ...ROAD_X.filter((x) => x !== 0).map((x) => ({ a: [x, -ROAD_EDGE] as [number, number], b: [x, ROAD_EDGE] as [number, number], level: 0 })),
     // The central lane skirts the habitat and is interrupted around the separate landing pad.
     { a: [0, -ROAD_EDGE] as [number, number], b: [0, -25.0] as [number, number], level: 0 },
-    { a: [0, -15.0] as [number, number], b: [0, -5.0] as [number, number], level: 0 },
-    { a: [0, 5.0] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
+    { a: [0, 15.0] as [number, number], b: [0, ROAD_EDGE] as [number, number], level: 0 },
     ...ROAD_Z.filter((z) => z !== -0.6).map((z) => ({ a: [-ROAD_EDGE, z] as [number, number], b: [ROAD_EDGE, z] as [number, number], level: 1 })),
     { a: [-ROAD_EDGE, -0.6] as [number, number], b: [-5.0, -0.6] as [number, number], level: 1 },
     { a: [5.0, -0.6] as [number, number], b: [ROAD_EDGE, -0.6] as [number, number], level: 1 },
@@ -1214,6 +1214,7 @@ function Rover({
   const routeRef = useRef<[number, number][]>([]);
   const routeCursorRef = useRef(0);
   const commandKeyRef = useRef("");
+  const routeRetryAtRef = useRef(0);
   const patrolRetryAtRef = useRef(0);
 
   const prefixes = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE ", "TRANSFERRING "];
@@ -1273,6 +1274,7 @@ function Rover({
     if (commandKey !== commandKeyRef.current) {
       commandKeyRef.current = commandKey;
       routeCursorRef.current = 0;
+      routeRetryAtRef.current = clock.elapsedTime + 1;
       if (hasDestination && Math.hypot(destination[0] - current.x, destination[1] - current.z) >= 1.2) {
         const goal = repairTarget
           ? buildingApproachPoint(repairTarget, start)
@@ -1283,6 +1285,22 @@ function Rover({
       } else {
         routeRef.current = [];
       }
+    }
+
+    if (
+      hasDestination
+      && routeRef.current.length === 0
+      && Math.hypot(destination[0] - current.x, destination[1] - current.z) >= 1.2
+      && clock.elapsedTime >= routeRetryAtRef.current
+    ) {
+      routeRetryAtRef.current = clock.elapsedTime + 1;
+      const goal = repairTarget
+        ? buildingApproachPoint(repairTarget, start)
+        : isCleaning
+          ? buildingApproachPoint("solar", start)
+          : destination;
+      routeRef.current = planRoverPath(start, goal);
+      routeCursorRef.current = 0;
     }
 
     if (commandKey === "IDLE_PATROL" && routeCursorRef.current >= routeRef.current.length && clock.elapsedTime >= patrolRetryAtRef.current) {
@@ -1599,44 +1617,116 @@ function SelectionRing({ selected, alerted, radius, height = 0.23 }: { selected:
 }
 
 function RoverRockField({ mars }: { mars: boolean }) {
-  const rockColor = mars ? "#806357" : "#77766f";
-  const highlight = mars ? "#bd9273" : "#a8a69a";
   return (
     <group>
-      {ROVER_ROUTE_ROCKS.map((rock, index) => {
-        const y = terrainHeight(rock.x, rock.z);
-        const scale = rock.radius / 1.8;
-        return (
-          <group key={rock.id} position={[rock.x, y - 0.06, rock.z]}>
-            <mesh castShadow receiveShadow position={[0, 0.56 * scale, 0]} scale={[1.35 * scale, 0.86 * scale, 1.08 * scale]}>
-              <dodecahedronGeometry args={[1, 1]} />
-              <meshStandardMaterial color={rockColor} roughness={0.98} flatShading />
-            </mesh>
-            <mesh castShadow receiveShadow position={[-0.82 * scale, 0.28 * scale, 0.32 * scale]} scale={[0.72 * scale, 0.58 * scale, 0.7 * scale]}>
-              <icosahedronGeometry args={[1, 0]} />
-              <meshStandardMaterial color={index % 2 ? rockColor : highlight} roughness={1} flatShading />
-            </mesh>
-            <mesh castShadow receiveShadow position={[0.86 * scale, 0.22 * scale, -0.35 * scale]} scale={[0.58 * scale, 0.47 * scale, 0.64 * scale]}>
-              <dodecahedronGeometry args={[1, 0]} />
-              <meshStandardMaterial color={highlight} roughness={1} flatShading />
-            </mesh>
-          </group>
-        );
-      })}
+      {ROVER_ROUTE_ROCKS.map((rock, index) => <RegolithOutcrop key={rock.id} rock={rock} index={index} mars={mars} />)}
+    </group>
+  );
+}
+
+function RegolithOutcrop({ rock, index, mars }: { rock: RoverRockObstacle; index: number; mars: boolean }) {
+  const crystalRef = useRef<THREE.Group>(null);
+  const haloMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const rockColor = mars ? "#806357" : "#77766f";
+  const highlight = mars ? "#bd9273" : "#a8a69a";
+  const glow = mars ? "#ffd196" : "#78efff";
+  const scale = rock.radius / 1.8;
+
+  useFrame(({ clock }) => {
+    const pulse = (Math.sin(clock.elapsedTime * 1.1 + index * 0.8) + 1) / 2;
+    if (crystalRef.current) crystalRef.current.scale.setScalar(0.94 + pulse * 0.12);
+    if (haloMaterial.current) haloMaterial.current.opacity = 0.22 + pulse * 0.3;
+  });
+
+  return (
+    <group position={[rock.x, terrainHeight(rock.x, rock.z) - 0.06, rock.z]}>
+      <mesh castShadow receiveShadow position={[0, 0.56 * scale, 0]} scale={[1.35 * scale, 0.86 * scale, 1.08 * scale]}>
+        <dodecahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial color={rockColor} roughness={0.98} flatShading />
+      </mesh>
+      <mesh castShadow receiveShadow position={[-0.82 * scale, 0.28 * scale, 0.32 * scale]} scale={[0.72 * scale, 0.58 * scale, 0.7 * scale]}>
+        <icosahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={index % 2 ? rockColor : highlight} roughness={1} flatShading />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0.86 * scale, 0.22 * scale, -0.35 * scale]} scale={[0.58 * scale, 0.47 * scale, 0.64 * scale]}>
+        <dodecahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={highlight} roughness={1} flatShading />
+      </mesh>
+      <group ref={crystalRef}>
+        {[
+          { position: [-0.32, 0.52, 0.18] as [number, number, number], scale: [0.34, 0.9, 0.38] as [number, number, number] },
+          { position: [0.28, 0.68, -0.06] as [number, number, number], scale: [0.31, 1.25, 0.34] as [number, number, number] },
+          { position: [0.58, 0.38, 0.32] as [number, number, number], scale: [0.25, 0.68, 0.3] as [number, number, number] },
+        ].map((crystal, crystalIndex) => (
+          <mesh key={crystalIndex} castShadow position={crystal.position} scale={crystal.scale} rotation={[0.08, crystalIndex * 1.6, 0.14]}>
+            <octahedronGeometry args={[0.55, 1]} />
+            <meshPhysicalMaterial color={glow} emissive={glow} emissiveIntensity={1.6} metalness={0.12} roughness={0.18} clearcoat={1} />
+          </mesh>
+        ))}
+      </group>
+      <mesh position={[0, 0.035, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[rock.radius * 1.08, rock.radius * 1.23, 64]} />
+        <meshBasicMaterial ref={haloMaterial} color={glow} transparent opacity={0.4} depthWrite={false} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
 
 function ResourceMarker({ node, selected, surveyed, onClick }: { node: MissionResourceNode; selected: boolean; surveyed: boolean; onClick: ()=>void }) {
-  const ref=useRef<THREE.Group>(null);
-  const [x,z]=nodeWorldPosition(node);
-  const color=node.kind==="ICE"?"#55e7ff":node.kind==="MINERAL"?"#ffd25b":node.kind==="SCIENCE"?"#d18dff":"#b5a384";
-  useFrame(({clock})=>{ if(ref.current) ref.current.scale.setScalar(selected?1.1+(Math.sin(clock.getElapsedTime()*4)+1)*0.03:1); });
-  return <group ref={ref} position={[x,terrainHeight(x,z)+0.5,z]} onClick={(e)=>{e.stopPropagation();onClick();}}>
-    <mesh castShadow><octahedronGeometry args={[0.38,0]}/><meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected?0.9:0.45}/></mesh>
-    <mesh position={[0,-0.34,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.48,selected?0.74:0.62,24]}/><meshBasicMaterial color={color} transparent opacity={0.82}/></mesh>
-    {selected && <Billboard position={[0,0.82,0]} follow><Text frustumCulled={false} fontSize={0.25} color="#fff2c0" outlineWidth={0.03} outlineColor="#11191d" anchorX="center">{surveyed?"SURVEYED":node.label}</Text></Billboard>}
-  </group>;
+  const ref = useRef<THREE.Group>(null);
+  const crystalRef = useRef<THREE.Group>(null);
+  const haloMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const [x, z] = nodeWorldPosition(node);
+  const isRegolith = node.kind === "REGOLITH";
+  const color = node.kind === "ICE" ? "#55e7ff" : node.kind === "MINERAL" ? "#ffd25b" : node.kind === "SCIENCE" ? "#d18dff" : "#b5a384";
+
+  useFrame(({ clock }) => {
+    const time = clock.getElapsedTime();
+    if (ref.current) ref.current.scale.setScalar(selected ? 1.1 + (Math.sin(time * 4) + 1) * 0.03 : 1);
+    if (crystalRef.current) crystalRef.current.scale.setScalar(0.94 + (Math.sin(time * 1.2) + 1) * 0.08);
+    if (haloMaterial.current) haloMaterial.current.opacity = 0.36 + (Math.sin(time * 1.2) + 1) * 0.2;
+  });
+
+  return (
+    <group ref={ref} position={[x, terrainHeight(x, z) + (isRegolith ? 0.24 : 0.5), z]} onClick={(event) => { event.stopPropagation(); onClick(); }}>
+      {isRegolith ? (
+        <>
+          <group ref={crystalRef}>
+            {[
+              { position: [-0.38, 0.14, 0.04] as [number, number, number], scale: [0.46, 0.7, 0.42] as [number, number, number] },
+              { position: [0.08, 0.28, 0] as [number, number, number], scale: [0.48, 1.0, 0.45] as [number, number, number] },
+              { position: [0.48, 0.16, -0.06] as [number, number, number], scale: [0.4, 0.62, 0.4] as [number, number, number] },
+            ].map((crystal, index) => (
+              <mesh key={index} castShadow position={crystal.position} scale={crystal.scale} rotation={[0.08, index * 1.4, 0.14]}>
+                <octahedronGeometry args={[0.42, 1]} />
+                <meshPhysicalMaterial color="#b4f4e3" emissive="#3de0c6" emissiveIntensity={1.8} metalness={0.14} roughness={0.16} clearcoat={1} />
+              </mesh>
+            ))}
+          </group>
+          <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.85, 1.04, 64]} />
+            <meshBasicMaterial ref={haloMaterial} color="#65f4dc" transparent opacity={0.52} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[1.18, 1.24, 64]} />
+            <meshBasicMaterial color="#d3fff2" transparent opacity={0.54} depthWrite={false} toneMapped={false} />
+          </mesh>
+        </>
+      ) : (
+        <>
+          <mesh castShadow><octahedronGeometry args={[0.38, 0]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected ? 0.9 : 0.45} /></mesh>
+          <mesh position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.48, selected ? 0.74 : 0.62, 24]} /><meshBasicMaterial color={color} transparent opacity={0.82} /></mesh>
+        </>
+      )}
+      {selected && (
+        <Billboard position={[0, isRegolith ? 1.55 : 0.82, 0]} follow>
+          <Text frustumCulled={false} fontSize={0.25} color="#fff2c0" outlineWidth={0.03} outlineColor="#11191d" anchorX="center">
+            {surveyed ? "SURVEYED" : node.label}
+          </Text>
+        </Billboard>
+      )}
+    </group>
+  );
 }
 
 function Crew({ mars, tracks }: { mars: boolean; tracks: TechnologyTrack[] }) {
@@ -1735,7 +1825,7 @@ function ColonyRobot({
         const dx = waypoint[0] - position[0];
         const dz = waypoint[1] - position[1];
         const distance = Math.hypot(dx, dz);
-        const move = Math.min(distance, Math.max(0, delta) * 1.15);
+        const move = Math.min(distance, Math.max(0, delta) * 0.34);
         if (distance > 0.001) {
           position[0] += dx / distance * move;
           position[1] += dz / distance * move;
@@ -1822,16 +1912,35 @@ function ColonyRobot({
           <meshStandardMaterial color="#c0c8bd" metalness={0.58} roughness={0.42} />
         </mesh>
       ))}
-      <mesh position={[0, 0.78, -0.18]}>
-        <boxGeometry args={[0.27, 0.3, 0.12]} />
-        <meshStandardMaterial color="#45575b" metalness={0.62} roughness={0.38} />
-      </mesh>
-      {[-0.095, 0.095].map((x) => (
-        <mesh key={x} position={[x, 0.78, -0.25]}>
-          <cylinderGeometry args={[0.045, 0.045, 0.22, 10]} />
-          <meshStandardMaterial color="#a6b0a7" metalness={0.72} roughness={0.28} />
+      <group position={[0, 0.8, -0.2]}>
+        <RoundedBox args={[0.42, 0.46, 0.18]} radius={0.06} smoothness={4} position={[0, 0, -0.08]} castShadow>
+          <meshStandardMaterial color="#384a50" metalness={0.74} roughness={0.32} />
+        </RoundedBox>
+        <mesh position={[0, 0.02, -0.177]}>
+          <boxGeometry args={[0.27, 0.24, 0.018]} />
+          <meshStandardMaterial color="#172c34" metalness={0.54} roughness={0.28} />
         </mesh>
-      ))}
+        {[-0.13, 0, 0.13].map((x, finIndex) => (
+          <mesh key={x} position={[x, 0.02, -0.19]}>
+            <boxGeometry args={[0.024, 0.18, 0.022]} />
+            <meshStandardMaterial color={finIndex === 1 ? "#70dfe4" : "#b2beb5"} emissive={finIndex === 1 ? "#258894" : "#000000"} emissiveIntensity={0.7} metalness={0.62} roughness={0.34} />
+          </mesh>
+        ))}
+        {[-0.24, 0.24].map((x) => (
+          <group key={x} position={[x, 0, -0.045]}>
+            <mesh>
+              <cylinderGeometry args={[0.065, 0.065, 0.34, 12]} />
+              <meshStandardMaterial color="#9eaaa5" metalness={0.72} roughness={0.3} />
+            </mesh>
+            {[-0.13, 0.13].map((y) => (
+              <mesh key={y} position={[0, y, 0]}>
+                <torusGeometry args={[0.066, 0.014, 6, 14]} />
+                <meshStandardMaterial color="#d3bd77" metalness={0.82} roughness={0.24} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+      </group>
       <mesh position={[0, 1.12, 0]}>
         <cylinderGeometry args={[0.055, 0.075, 0.11, 12]} />
         <meshStandardMaterial color="#d2bd77" metalness={0.72} roughness={0.26} />
@@ -2291,7 +2400,7 @@ function ColonyBuilding({
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = ""; }}
     >
-      <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
+      <Pad position={[0, 0]} size={track.id === "habitat" ? 9.2 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
         <BuildingArt id={track.id} accent={tierColor(tier)} />
         <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
@@ -3228,7 +3337,7 @@ function WalkControls({
           else if (airlockDistance < 1.8) latest.current.onExitHabitat();
           return;
         }
-        const airlockDistance = Math.hypot(player.x, player.z - 4.45);
+        const airlockDistance = Math.hypot(player.x, player.z - 9.4);
         if (airlockDistance < 1.8) {
           if (document.pointerLockElement === canvas) document.exitPointerLock();
           latest.current.onEnterHabitat();
@@ -3345,11 +3454,11 @@ function WalkControls({
             || (x > -2.16 && x < -1.6 && z > -2.72 && z < -0.18)
             || (x > -0.3 && x < 3.5 && z > -4.02 && z < -3.1);
         }
-        if (Math.abs(x) > 48 || Math.abs(z) > 48) return true;
+        if (Math.hypot(x, z) > CRATER_WALK_RADIUS) return true;
         const nearBuilding = tracks.some((track) => {
           const position = POSITIONS[track.id];
           if (!position) return false;
-          if (track.id === "habitat" && Math.abs(x - position[0]) < 1.35 && z - position[1] > 3.3 && z - position[1] < 6.4) return false;
+          if (track.id === "habitat" && Math.abs(x - position[0]) < 2.1 && z - position[1] > 7.8 && z - position[1] < 14.5) return false;
           const radius = buildingClearanceRadius(track.id);
           return Math.hypot(x - position[0], z - position[1]) < radius;
         });
@@ -3384,7 +3493,7 @@ function WalkControls({
         nearest = { distance: airlockDistance, target: { id: "habitat-airlock", label: "HABITAT AIRLOCK", kind: "AIRLOCK" } };
       }
     } else {
-      const exteriorAirlockDistance = Math.hypot(player.position.x, player.position.z - 4.45);
+      const exteriorAirlockDistance = Math.hypot(player.position.x, player.position.z - 9.4);
       if (exteriorAirlockDistance < 1.8) {
         nearest = { distance: exteriorAirlockDistance, target: { id: "habitat-airlock", label: "HABITAT AIRLOCK", kind: "AIRLOCK" } };
       }
@@ -3580,13 +3689,13 @@ function Scene({ props }: { props: Props }) {
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
-      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 2.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
         <mesh><sphereGeometry args={[1.02, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.24} depthWrite={false} toneMapped={false} /></mesh>
-        {!props.lunarNight && <mesh><sphereGeometry args={[2.05, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.10} depthWrite={false} toneMapped={false} /></mesh>}
-        {!props.lunarNight && <mesh><sphereGeometry args={[3.2, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.035} depthWrite={false} toneMapped={false} /></mesh>}
-        {!props.lunarNight && <pointLight color="#fff0cf" intensity={2.4} distance={95} decay={1.6} />}
+        <mesh><sphereGeometry args={[1.42, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.32} depthWrite={false} toneMapped={false} /></mesh>
+        {!props.lunarNight && <mesh><sphereGeometry args={[2.05, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.16} depthWrite={false} toneMapped={false} /></mesh>}
+        {!props.lunarNight && <mesh><sphereGeometry args={[3.2, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.07} depthWrite={false} toneMapped={false} /></mesh>}
+        {!props.lunarNight && <pointLight color="#fff0cf" intensity={4.5} distance={110} decay={1.6} />}
       </group>}
       {!mars && <group position={[-22, 20, -79]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
         {/* Earth is a distant, recognisable blue-white disc, with an apparent diameter
@@ -3596,6 +3705,7 @@ function Scene({ props }: { props: Props }) {
         <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
+      <CraterRim kind={mars ? "mars" : "moon"} />
       <Rocks kind={mars ? "mars" : "moon"} />
       <RoverRockField mars={mars} />
       <Foundation mars={mars} />
