@@ -1,6 +1,7 @@
 import { Component, useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
+import { TranslationProvider } from "./components/mockups/colony-frontier/_shared/TranslationProvider";
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
@@ -193,10 +194,12 @@ function App() {
 
   if (previewPath) {
     return (
-      <PreviewRenderer
-        componentPath={previewPath}
-        modules={discoveredModules}
-      />
+      <TranslationProvider>
+        <PreviewRenderer
+          componentPath={previewPath}
+          modules={discoveredModules}
+        />
+      </TranslationProvider>
     );
   }
 

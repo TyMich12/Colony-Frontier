@@ -1,6 +1,13 @@
 # Colony-Frontier — Master System Performance & Upgrade Table
 
-**Status: shared live balance table updated; secondary retrofit effects still require implementation.** Research-tier values below supersede the earlier Research column and create a much larger generation jump. These are explicit game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating. Before implementation, reconcile these targets with retrofit behaviour, power draw, and the current simulation.
+**Status:** shared ratings, retrofit progress, and repair choices are connected to live inspection and simulation. The secondary numerical effects below remain design targets unless a corresponding live simulation effect is explicitly implemented. Research-tier values supersede the earlier Research column. These are game-balance targets under standard reference conditions, not claims that one real spacecraft design would achieve every rating.
+
+## Current mission power tuning
+
+- Reference life-support demand is **1.30 kW** for shared habitat loads plus **1.45 kW** for air revitalisation. The per-system base, tier, and retrofit draw estimates were increased by 20% to make equipment operation a more meaningful trade-off.
+- Mission 2's Blackout scenario starts with one simulated Earth day of sunlight, with the Sun moving from sunrise to sunset. The following 13 days are intentionally dark; the power panel labels this state, and optional loads shed as the battery reaches 95% charge.
+- At the 2.75 kW life-support load, 13 dark days require about **903 kWh** from the battery after 95% discharge efficiency. A full 1,200 kWh Foundation battery therefore ends near **24.7% charge**, just above the protected 20% reserve. This is a no-incident planning estimate; repairs and load shedding remain important.
+- Missions after Mission 1 apply a slightly stronger stage-pressure increase: 6.5% per stage, capped at 80%, with the existing Mars pressure adjustment unchanged.
 
 ## How to read the table
 
@@ -89,7 +96,7 @@ A retrofit is a discrete installed improvement. It uses commissioning energy and
 | Science | Add analyser insert/reference standards; improves assay throughput or quality | Calibrate optics/sensors and improve sample handling; improves valid results and repeatability | Instrument sensitivity, assay throughput, and measurement capability |
 | Navigation | Calibrate inertial/ranging sensors; reduces position error | Add/tune timing and sensor-fusion module; reduces error further | Sensor suite, mapping, reference quality, and navigation algorithm |
 
-## Balancing rules before coding
+## Balancing rules for remaining implementation
 
 1. **One authoritative number per metric and state.** The live simulation, system inspector, retrofit preview, and status dashboard should all read the same value.
 2. **Do not stack old direct gains on top of this table.** Decide whether a retrofit changes the selected table state or adds a separately displayed effect. Do one, not both.
@@ -102,13 +109,11 @@ A retrofit is a discrete installed improvement. It uses commissioning energy and
 9. **The standalone repair/mitigation option remains genuinely standalone.** It must require no other systems; optional/integrated options may use their stated support systems.
 10. **These are balance targets, not universal scientific specifications.** In particular, research-tier range, throughput, purity, and accuracy need mission-specific plausibility checks.
 
-## Implementation order
+## Validation and remaining work
 
-1. Review/approve these target values and mechanisms.
-2. Reconcile each existing retrofit's `directGain`, materials, commissioning energy, and duration with the intended metric change.
-3. Update the shared balance source once, with tests/checks for all 28 metrics and 12 states per metric.
-4. Wire system inspectors, simulation behavior, and power draw to the shared source without double-counting.
-5. Run a build and scenario checks for Foundation/Frontier/Apex/Research, all retrofit levels, and power-starved conditions.
+1. Reconcile each not-yet-implemented secondary retrofit effect with its `directGain`, materials, commissioning energy, and duration.
+2. Keep the shared balance source authoritative and avoid double-counting effects in the inspector, simulation, and power model.
+3. Validate Foundation/Frontier/Apex/Research and retrofit levels under normal and power-starved conditions.
 
 
 ## Numerical retrofit effects — exact intended changes
@@ -513,6 +518,7 @@ This section documents the current MissionSimulation implementation. It supersed
 - Foundation solar is **12 kW rated at reference illumination**. The physical reference calculation is 37.2 m² × 1,361 W/m² × 25% cell efficiency × 0.95 packing factor ≈ **12.0 kW** before sunlight angle, temperature, dust, pointing and condition losses. NASA lunar-surface concepts include 10 kW-class solar systems, so the output is a credible order of magnitude, not a guarantee of 12 kW all day.
 - The lunar campaign is split into **two separate 14-Earth-day missions**: **Mission 1 is the lunar daylight phase** (sunrise through sunset), and **Mission 2 is the lunar-night/blackout phase** (the Sun remains below the horizon and solar generation is 0 kW throughout). Each mission has a 336-hour clock; the Mission 1 clock must not continue into Mission 2.
 - The HUD displays **Hours: elapsed / 336** and a fractional day such as **13.9 / 14** near the end. It reaches **14.0 / 14 only when the 14-day mission actually completes**, rather than showing 14/14 while the player is still playing. Mission completion must be tied to elapsed mission duration and objective checks, not crew failure.
+- At **1×**, the mission clock advances **3,600 simulated seconds (one hour) per real second**; the optional 2× and 4× controls scale that rate accordingly.
 - During Mission 2, the battery model must apply charge/discharge efficiency and the protected 20% reserve; when a deficit is expected, shed optional loads first while preserving essential habitat pressure and air revitalisation. Do not assume that a 1,200 kWh Foundation battery can sustain every optional system for 14 days.
 - Physical reference assumptions remain explicit: Foundation solar is 12 kW at normal reference illumination (37.2 m² × 1,361 W/m² × 25% cell efficiency × 0.95 packing), but actual output depends on sun angle, cell temperature, dust, pointing and condition. The 1,200 kWh Foundation battery is a large infrastructure pack (roughly 6 tonnes at an illustrative 200 Wh/kg before packaging and thermal controls), not a small rover battery.
 - Water must be conserved by litres in/out and recovery throughput; food by kg/day and stored edible mass; navigation by position error and sensor/terrain uncertainty; communications by link availability, antenna pointing and data rate; rover movement by speed, terrain, energy and navigation accuracy. These are engineering-grounded simulation models, not exact predictions for a specific flight-qualified NASA vehicle. The game must not use arbitrary percentage bonuses in place of the underlying physical quantities.

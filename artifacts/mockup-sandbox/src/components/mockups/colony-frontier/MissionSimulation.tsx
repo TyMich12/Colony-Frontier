@@ -815,6 +815,11 @@ function dustTransmission(dust: number): number {
   return points[points.length - 1].transmission;
 }
 
+function isLunarBlackoutMission(campaign: "moon" | "mars", missionTitle: string, missionNumber = ""): boolean {
+  const stage = Number.parseInt(missionNumber.replace(/[^0-9]/g, ""), 10);
+  return campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || stage === 2);
+}
+
 function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number, _condition = 100, dust = 0, repairMetrics: Record<string, number> = {}, elapsedSeconds = LEVEL1_ENVIRONMENT.secondsPerEarthDay * 6, campaign: "moon" | "mars" = "moon", missionTitle = "", missionNumber = ""): { label: string; value: string } {
   const baseline = getBaselineRow(systemId);
   if (!baseline) return { label: "Rated system output", value: "No baseline recorded" };
@@ -831,16 +836,18 @@ function physicalSystemOutput(systemId: string, tier: Tier, upgradeLevel: number
   switch (systemId) {
     case "solar": {
       const day7 = interpolateSolarProfile(7);
-      const liveDay = Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
+      const blackoutMission = isLunarBlackoutMission(campaign, missionTitle, missionNumber);
+      const blackoutActive = blackoutMission && elapsedSeconds >= LEVEL1_ENVIRONMENT.secondsPerEarthDay;
+      const liveDay = blackoutMission
+        ? Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay * 14))
+        : Math.min(14, Math.max(0, elapsedSeconds / LEVEL1_ENVIRONMENT.secondsPerEarthDay));
       const liveProfile = interpolateSolarProfile(liveDay);
       const liveCellTemperatureLoss = liveProfile.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, liveProfile.cellTempC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
-      const missionFraction = clamp(elapsedSeconds / TOTAL_MISSION_SECONDS, 0, 1);
-      const blackoutMission = campaign === "moon" && (missionTitle.toLowerCase().includes("blackout") || Number.parseInt(missionNumber.replace(/[^0-9]/g, ""), 10) === 2);
-      const liveSunlight = blackoutMission
+      const liveSunlight = blackoutActive
         ? 0
         : campaign === "mars"
           ? Math.max(0.25, 0.78 + Math.sin(liveDay * Math.PI / 7) * 0.10)
-          : liveDay < 14 ? liveProfile.sunlightGeometry : 0;
+          : blackoutMission ? liveProfile.sunlightGeometry : liveDay < 14 ? liveProfile.sunlightGeometry : 0;
       const pointingError = repairMetrics["Residual array pointing error after recalibration"] ?? 15;
       const conditionAdjustedRating = rating * clamp(_condition, 0, 100) / 100;
       const modeledSolarFaultPenalty = solarDegradationPenaltyFraction(_condition, dust, repairMetrics);
@@ -1079,109 +1086,109 @@ function getEventChoices(event: MissionEvent, selected: Record<string, Tier>): E
 
   const choices: Record<string, EventChoice[]> = {
     "solar-dust": [
-      { id: "clean", label: hasRover ? "Dispatch rover to clean array" : "Clean the array", detail: hasRover ? "Use the deployed rover for a safer, faster cleaning pass." : "Use the colony direct cleaning procedure. It costs a little time and power." },
-      { id: "shed", label: "Reduce non-critical systems", detail: "Protect the battery by cutting optional colony loads for a short period." },
-      { id: "battery", label: "Increase battery discharge", detail: "Maintain normal operations by drawing harder from stored energy." },
+      { id: "clean", label: hasRover ? "Send the rover to clean the panels" : "Clean the solar panels", detail: hasRover ? "Use the rover for a safer, faster cleaning pass." : "Clean the panels directly. It costs a little time and power." },
+      { id: "shed", label: "Turn off non-essential gear", detail: "Save battery power by shutting down optional systems for a short time." },
+      { id: "battery", label: "Use more battery power", detail: "Keep everything running normally by drawing harder from your batteries." },
     ],
     "battery-thermal": [
-      { id: "isolate", label: "Isolate affected storage path", detail: "Sacrifice a little available storage to protect the remaining bank." },
-      { id: "rebalance", label: "Rebalance colony loads", detail: "Reduce electrical stress without interrupting essential life support." },
-      { id: "continue", label: "Continue normally", detail: "Keep everything online and accept a larger battery penalty." },
+      { id: "isolate", label: "Shut down the overheating battery", detail: "Give up a little total battery capacity to keep the rest of the batteries safe." },
+      { id: "rebalance", label: "Reduce power strain", detail: "Lower the electrical load without turning off essential life support." },
+      { id: "continue", label: "Keep running normally", detail: "Leave everything on and accept a bigger drop in battery charge." },
     ],
     "oxygen-filter": [
-      { id: "reset", label: "Reset oxygen processing loop", detail: "Spend a brief power spike to restore atmospheric processing." },
-      { id: "reduce", label: "Reduce non-essential habitation load", detail: "Give the oxygen loop extra margin while keeping the colony online." },
-      { id: "ignore", label: "Continue normally", detail: "Accept faster oxygen depletion and let the system recover slowly." },
+      { id: "reset", label: "Clear and restart the air filters", detail: "Spend a quick burst of power to get the air flowing normally again." },
+      { id: "reduce", label: "Turn off non-essential room systems", detail: "Give the air filters extra breathing room while keeping the base running." },
+      { id: "ignore", label: "Keep running normally", detail: "Accept faster oxygen loss and let the system recover slowly on its own." },
     ],
     "co2-scrubber-loading": [
-      { id: "scrub", label: "Purge the scrubber bed", detail: "Run the regeneration cycle and restore CO₂ removal margin." },
-      { id: "recover", label: "Recover carbon compounds", detail: "Use the recovery stage for a slower cycle that preserves useful carbon feedstock." },
-      { id: "ignore", label: "Continue with reduced margin", detail: "Save power for now, but accept lower air-quality margin until the next cycle." },
+      { id: "scrub", label: "Clean the CO₂ filter", detail: "Run a cleaning cycle to get CO₂ removal back to normal." },
+      { id: "recover", label: "Run a slow carbon-saving clean", detail: "Use a slower cleaning cycle that saves useful carbon materials for later." },
+      { id: "ignore", label: "Keep running as-is", detail: "Save power for now, but accept stale air until the next cycle." },
     ],
     "water-filter": [
-      { id: "flush", label: "Flush filtration system", detail: "Use extra power to restore the water recovery loop." },
-      { id: "ration", label: "Enter water conservation mode", detail: "Protect the reserve while keeping normal operations mostly intact." },
-      { id: "ignore", label: "Continue normally", detail: "Let the blockage reduce recovery efficiency." },
+      { id: "flush", label: "Flush out the water filter", detail: "Use extra power to clear the blockage and restore clean water flow." },
+      { id: "ration", label: "Conserve water", detail: "Protect your water supply while keeping normal base operations mostly intact." },
+      { id: "ignore", label: "Keep running normally", detail: "Let the blockage slow down how much clean water you get." },
     ],
     "habitat-pressure": [
-      { id: "seal", label: "Seal and inspect", detail: "Use maintenance procedures to stabilise the affected structural area." },
-      { id: "monitor", label: "Monitor the seal", detail: "Keep the habitat operating while watching the pressure sensors." },
-      { id: "ignore", label: "Continue normally", detail: "Accept a chance of worsening structural degradation." },
+      { id: "seal", label: "Find and seal the leak", detail: "Spend maintenance time to patch the wall and stop air from escaping." },
+      { id: "monitor", label: "Keep watching the pressure", detail: "Keep the base running while keeping a close eye on the air sensors." },
+      { id: "ignore", label: "Keep running normally", detail: "Leave it alone and risk the leak getting worse." },
     ],
     "radiation-burst": [
-      { id: "shelter", label: "Switch colony to shelter mode", detail: "Reduce exposed activity until the radiation spike passes." },
-      { id: "maintain", label: "Maintain surface operations", detail: "Keep the colony productive but accept higher radiation exposure." },
-      { id: "ignore", label: "Ignore the alert", detail: "Continue everything normally and take the largest radiation penalty." },
+      { id: "shelter", label: "Put the colony in shelter mode", detail: "Stop outdoor work and protect the crew until the radiation wave passes." },
+      { id: "maintain", label: "Keep working outside", detail: "Keep the base productive, but accept higher radiation exposure." },
+      { id: "ignore", label: "Ignore the warning", detail: "Change nothing and take the worst radiation damage." },
     ],
     "micrometeoroid-impact": [
-      { id: "inspect", label: "Inspect exposed hardware", detail: "Use the rover or crew procedures to identify the damaged external subsystem before returning to full operations." },
-      { id: "isolate", label: "Isolate the affected circuit", detail: "Protect the habitat power network while sacrificing a small amount of available capacity." },
-      { id: "defer", label: "Defer inspection", detail: "Keep the base operating, but accept additional equipment and habitat safety margin loss." },
+      { id: "inspect", label: "Check the damaged gear", detail: "Send the rover or crew to find what broke before going back to normal." },
+      { id: "isolate", label: "Cut power to the damaged area", detail: "Protect the main power grid by giving up a small amount of power capacity." },
+      { id: "defer", label: "Check it later", detail: "Keep the base running now, but accept extra wear on your equipment and safety." },
     ],
     "polar-shadow-cold-soak": [
-      { id: "heat", label: "Increase heater power", detail: "Use electrical power to keep exposed hardware above its qualified minimum temperature." },
-      { id: "reroute", label: "Reroute power from non-critical loads", detail: "Protect thermal survival by shedding optional loads first." },
-      { id: "defer", label: "Accept cold-soak", detail: "Conserve stored energy and accept reduced equipment condition." },
+      { id: "heat", label: "Turn up the heaters", detail: "Spend battery power to keep exposed gear warm enough to work." },
+      { id: "reroute", label: "Shift power from non-essential gear", detail: "Keep equipment from freezing by turning off optional systems first." },
+      { id: "defer", label: "Let it stay cold", detail: "Save battery power and accept wear and tear on your equipment." },
     ],
     "regional-dust-front": [
-      { id: "shed", label: "Shed non-critical loads", detail: "Prepare for lower solar input and preserve battery reserve." },
-      { id: "protect", label: "Protect and monitor arrays", detail: "Reduce exposure of vulnerable equipment while the dust front passes." },
-      { id: "battery", label: "Maintain full operations on storage", detail: "Keep the colony productive using stored energy while solar input falls." },
+      { id: "shed", label: "Turn off non-essential gear", detail: "Prepare for low sunlight and save your battery reserves." },
+      { id: "protect", label: "Protect the solar panels", detail: "Shield vulnerable gear from the dust while the storm passes over." },
+      { id: "battery", label: "Run everything on batteries", detail: "Keep the base working at full speed using stored power while sunlight is blocked." },
     ],
     "mars-comm-relay-loss": [
-      { id: "autonomy", label: "Enter autonomous operations", detail: "Continue critical control and science without relying on continuous Earth commands." },
-      { id: "repoint", label: "Repoint the relay", detail: "Use the remaining link margin to restore a stable high-gain connection." },
-      { id: "hold", label: "Hold current configuration", detail: "Wait for the link to recover while accepting lower communications reliability." },
+      { id: "autonomy", label: "Let automatic systems take over", detail: "Keep essential base systems and science running without waiting on Earth." },
+      { id: "repoint", label: "Re-aim the radio antenna", detail: "Use what is left of the signal to lock back onto a clear connection." },
+      { id: "hold", label: "Leave it as-is", detail: "Wait for the dust to clear while dealing with an unstable radio link." },
     ],
     "thermal-drift": [
-      { id: "rebalance", label: "Rebalance thermal system", detail: "Restore the preferred temperature band with a small power cost." },
-      { id: "conserve", label: "Conserve stored energy", detail: "Accept a slower thermal correction to protect the battery." },
-      { id: "ignore", label: "Continue normally", detail: "Let the temperature drift farther from its ideal range." },
+      { id: "rebalance", label: "Fix the room temperature", detail: "Spend a small amount of power to bring the base back to a comfortable temperature." },
+      { id: "conserve", label: "Save battery power", detail: "Let the temperature adjust slowly so you don't drain the batteries." },
+      { id: "ignore", label: "Keep running normally", detail: "Save power and let the crew deal with an uncomfortable base." },
     ],
     "comms-drift": [
-      { id: "repoint", label: "Repoint communications array", detail: "Restore line-of-sight alignment and recover signal margin." },
-      { id: "redundancy", label: hasNavigation ? "Switch to autonomous routing" : "Hold current link", detail: hasNavigation ? "Use navigation redundancy to preserve the link while the array realigns." : "Keep the existing link open and wait for the drift to settle." },
-      { id: "ignore", label: "Continue without intervention", detail: "Accept reduced communications reliability." },
+      { id: "repoint", label: "Re-aim the main dish", detail: "Line the antenna back up with Earth to get a strong signal again." },
+      { id: "redundancy", label: hasNavigation ? "Use backup navigation routing" : "Hold the current connection", detail: hasNavigation ? "Use your navigation system to keep the connection alive while the dish realigns." : "Keep the current link open and wait for the drift to settle." },
+      { id: "ignore", label: "Do nothing", detail: "Accept a weaker, less reliable connection with Earth." },
     ],
     "grid-overload": [
-      { id: "reroute", label: "Reroute the power bus", detail: "Use active distribution control to keep essential systems stable." },
-      { id: "shed", label: "Shed optional loads", detail: "Drop non-critical equipment before the overload spreads." },
-      { id: "continue", label: "Continue normally", detail: "Keep every load active and accept a deeper battery draw." },
+      { id: "reroute", label: "Spread out the power load", detail: "Shift electricity across different power lines to keep essential systems safe." },
+      { id: "shed", label: "Turn off optional machines", detail: "Shut down non-essential gear before the power line trips." },
+      { id: "continue", label: "Keep everything turned on", detail: "Leave all machines running and accept a heavy drain on your batteries." },
     ],
     "rover-wheel": [
-      { id: "reroute", label: "Reroute rover", detail: "Take a longer route around the obstruction and preserve rover condition." },
-      { id: "recall", label: "Recall to habitat", detail: "Abort the current task and bring the rover home safely." },
-      { id: "force", label: "Force through obstruction", detail: "Save time now at the cost of rover condition." },
+      { id: "reroute", label: "Drive around the soft dirt", detail: "Take a longer path to keep the rover's wheels and motors safe." },
+      { id: "recall", label: "Bring the rover back to base", detail: "Cancel the current trip and drive the rover home safely." },
+      { id: "force", label: "Power through the dust", detail: "Save time right now, even though it wears down the rover's motors." },
     ],
     "extraction-lock": [
-      { id: "throttle", label: "Throttle extraction", detail: "Reduce torque and let the rig work through the obstruction carefully." },
-      { id: "abort", label: "Abort extraction run", detail: "Protect the equipment and give up the immediate resource opportunity." },
-      { id: "continue", label: "Keep full power", detail: "Try to break through immediately, risking equipment condition." },
+      { id: "throttle", label: "Slow down the drill", detail: "Ease up on the power so the drill can work through the hard ground safely." },
+      { id: "abort", label: "Stop the dig", detail: "Protect the drill from breaking, even if you miss out on resources right now." },
+      { id: "continue", label: "Keep drilling at full speed", detail: "Try to push through quickly, risking damage to the drill motor." },
     ],
     "isru-pressure": [
-      { id: "throttle", label: "Throttle processing", detail: "Lower throughput and preserve power-system stability." },
-      { id: "isolate", label: "Isolate the processing line", detail: "Protect the wider colony if the local process continues to misbehave." },
-      { id: "continue", label: "Continue at full throughput", detail: "Keep output high and accept a larger power penalty." },
+      { id: "throttle", label: "Slow down processing", detail: "Lower the machine's speed to bring pipe pressure back down safely." },
+      { id: "isolate", label: "Shut off the clogged pipe", detail: "Protect the rest of the base's power and heaters if the clog gets worse." },
+      { id: "continue", label: "Keep running at full speed", detail: "Keep making materials fast and accept a bigger drain on your power." },
     ],
     "agriculture-stress": [
-      { id: "lights", label: "Stabilise greenhouse controls", detail: "Increase electrical support to protect the crop environment." },
-      { id: "conserve", label: "Conserve power", detail: "Protect battery reserves but accept slower food production." },
-      { id: "continue", label: "Continue normally", detail: "Keep the schedule unchanged and accept crop stress." },
+      { id: "lights", label: "Fix the greenhouse climate", detail: "Spend extra power to get the temperature, CO₂, and nutrients back on track." },
+      { id: "conserve", label: "Save battery power", detail: "Keep your power reserves safe and accept a smaller harvest later." },
+      { id: "continue", label: "Keep running normally", detail: "Leave the schedule alone and let the crops deal with the stress." },
     ],
     "science-anomaly": [
-      { id: "secure", label: "Secure the research data", detail: "Safely preserve the unexpected result before continuing the experiment." },
-      { id: "isolate", label: "Isolate the instrument", detail: "Protect the equipment while saving most of the scientific value." },
-      { id: "push", label: "Push the experiment", detail: "Take the risk for a larger scientific payoff." },
+      { id: "secure", label: "Save the current data first", detail: "Back up the unusual readings safely before doing anything else." },
+      { id: "isolate", label: "Recalibrate the sensor", detail: "Fix the sensor's accuracy while keeping most of your research data." },
+      { id: "push", label: "Keep running the experiment", detail: "Risk messy data for a chance at a bigger scientific discovery." },
     ],
     "maintenance-alert": [
-      { id: "dispatch", label: "Dispatch maintenance response", detail: "Repair the developing fault before it becomes a colony-wide problem." },
-      { id: "monitor", label: "Monitor the subsystem", detail: "Save power now and accept a little additional wear." },
-      { id: "ignore", label: "Ignore the warning", detail: "Keep everything running and accept a condition penalty." },
+      { id: "dispatch", label: "Repair the part now", detail: "Fix the worn part while it's easy, before it breaks down completely." },
+      { id: "monitor", label: "Keep an eye on it", detail: "Save power right now and accept a little extra wear on the machine." },
+      { id: "ignore", label: "Ignore the alert", detail: "Keep running everything normally and accept more equipment damage." },
     ],
     "core-power": [
-      { id: "shed", label: "Reduce non-critical systems", detail: "Preserve battery reserves by cutting optional loads." },
-      { id: "balance", label: "Balance the power network", detail: "Use colony distribution controls to stabilise generation and demand." },
-      { id: "battery", label: "Use stored power", detail: "Keep everything online by spending battery reserve." },
+      { id: "shed", label: "Turn off non-essential gear", detail: "Protect your backup batteries by shutting down optional systems." },
+      { id: "balance", label: "Balance colony power", detail: "Shift power around the base to keep usage and generation steady." },
+      { id: "battery", label: "Drain the backup batteries", detail: "Keep everything running normally by using up your stored battery power." },
     ],
   };
 
@@ -1318,6 +1325,7 @@ function IsometricMap({
   selectedBuildingId,
   elapsed,
   lunarNight,
+  blackoutMission,
   environmentLabel,
   environmentTitle,
   activeEventTrackId,
@@ -1331,6 +1339,7 @@ function IsometricMap({
   onSupplyAction,
   roverTask,
   roverTargetNodeId,
+  onRoverTaskComplete,
   speed,
   activeEventId,
 }: {
@@ -1344,6 +1353,7 @@ function IsometricMap({
   selectedBuildingId: string | null;
   elapsed: number;
   lunarNight: boolean;
+  blackoutMission: boolean;
   environmentLabel: string;
   environmentTitle: string;
   activeEventTrackId: string | null;
@@ -1357,6 +1367,7 @@ function IsometricMap({
   onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
   roverTargetNodeId: string | null;
+  onRoverTaskComplete: (task: string) => void;
   speed: number;
   activeEventId: string | null;
 }) {
@@ -1371,6 +1382,7 @@ function IsometricMap({
       selectedBuildingId={selectedBuildingId}
       elapsed={elapsed}
       lunarNight={lunarNight}
+      blackoutMission={blackoutMission}
       environmentLabel={environmentLabel === "MARS" ? "MARS" : "MOON"}
       environmentTitle={environmentTitle}
       activeEventId={activeEventId}
@@ -1387,6 +1399,7 @@ function IsometricMap({
       onSupplyAction={onSupplyAction}
       roverTask={roverTask}
       roverTargetNodeId={roverTargetNodeId}
+      onRoverTaskComplete={onRoverTaskComplete}
       simulationSpeed={speed}
     />
   );
@@ -1398,12 +1411,14 @@ function MissionTaskRibbon({
   resolvedEvents,
   sampleStages,
   roverTask,
+  roverWaitingForPhysicalWork,
 }: {
   pending: PendingMission;
   elapsed: number;
   resolvedEvents: string[];
   sampleStages: Record<string, SampleStage>;
   roverTask: string;
+  roverWaitingForPhysicalWork: boolean;
 }) {
   const elapsedDay = Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
   const dayProgress = elapsed >= TOTAL_MISSION_SECONDS ? 14 : Math.min(13.9, elapsedDay);
@@ -1437,7 +1452,7 @@ function MissionTaskRibbon({
             </div>
           ))}
           <div className="px-0.5 pt-2 text-[9px] leading-4 text-[#849895]">
-            {roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
+            {roverWaitingForPhysicalWork ? "ROVER AT SITE · PERFORMING TASK" : roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
           </div>
         </div>
       </div>
@@ -1842,7 +1857,7 @@ function BuildingInspector({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
-      <div className="pointer-events-auto max-h-[84vh] w-[min(94vw,520px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
+      <div className="pointer-events-auto max-h-[88vh] w-[min(96vw,840px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
         <div className="relative overflow-hidden border-b border-[#30454b] bg-gradient-to-r from-[#172b32] via-[#152329] to-[#111a1f] px-5 py-4">
           <div className="absolute right-[-30px] top-[-40px] h-32 w-32 rounded-full bg-[#f4c75e]/[0.06] blur-2xl" />
           <div className="relative flex items-start gap-3">
@@ -2059,8 +2074,8 @@ function BuildingInspector({
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
             </button>
-            {showRepairMethods && <div className="mt-2 grid gap-2">
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {showRepairMethods && <div className="mt-2 grid gap-2 md:grid-cols-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 md:col-span-2">
                 {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => {
                   const count = repairOptions.filter((option) => option.category === category).length;
                   const label = category === "Dual" ? "Dual-System" : category === "Integrated" ? "Fully Integrated" : category;
@@ -2080,7 +2095,7 @@ function BuildingInspector({
                   );
                 })}
               </div>
-              <div className="rounded-lg border border-[#2e4c51] bg-[#0a1a20] px-3 py-2">
+              <div className="rounded-lg border border-[#2e4c51] bg-[#0a1a20] px-3 py-2 md:col-span-2">
                 <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#d5e9df]">
                   {repairCategory === "Standalone" ? "Standalone · no optional support required" :
                     repairCategory === "Enhanced" ? "Enhanced · one support system required" :
@@ -2468,15 +2483,19 @@ export function MissionSimulation() {
   const pending = useMemo<PendingMission | null>(() => loadPendingMission(), []);
   // Keep stage difficulty in component scope so all state updaters and effects can safely reuse it.
   const missionStage = pending ? Math.max(1, Number.parseInt((pending.missionNumber ?? "").replace(/[^0-9]/g, ""), 10) || 1) : 1;
-  const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.06) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
+  const blackoutMission = pending ? isLunarBlackoutMission(pending.campaign, pending.missionTitle, pending.missionNumber) : false;
+  const stagePressure = pending ? 1 + Math.min(0.8, (missionStage - 1) * 0.065) + (pending.campaign === "mars" ? 0.12 : 0) : 1;
   const savedRuntime = pending ? loadMissionRuntime(pending.missionId) : null;
   // Never hydrate a completed 14-day snapshot into a fresh active mission.
   const runtime = savedRuntime && savedRuntime.elapsedSeconds < TOTAL_MISSION_SECONDS ? savedRuntime : null;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [habitatInterior, setHabitatInterior] = useState(false);
+  const [habitatEntryAnimating, setHabitatEntryAnimating] = useState(false);
+  const habitatEntryInProgressRef = useRef(false);
+  const habitatEntryTimerRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
-  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: 1.10, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
+  const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: POWER_DEMAND_MODEL.coreLoadKW + POWER_DEMAND_MODEL.airRevitalization.baseKW, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
   const [pulseExpandedMetric, setPulseExpandedMetric] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Record<string, BuildingRuntime>>(() => runtime?.buildings ?? (pending ? initialBuildings(pending.selected) : {}));
   const buildingsRef = useRef(buildings);
@@ -2486,6 +2505,7 @@ export function MissionSimulation() {
   const [decisions, setDecisions] = useState<MissionDecision[]>(runtime?.decisions ?? []);
   const [aiMessage, setAiMessage] = useState(runtime?.aiMessage ?? "Mission AI online. I am monitoring power, life support, habitat condition, and system behaviour.");
   const [roverTask, setRoverTask] = useState(runtime?.roverTask ?? "STANDBY");
+  const [roverTaskComplete, setRoverTaskComplete] = useState(false);
   const [score, setScore] = useState(runtime?.score ?? 72);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [surveyedNodes, setSurveyedNodes] = useState<string[]>(() => runtime?.surveyedNodes ?? []);
@@ -2536,6 +2556,26 @@ export function MissionSimulation() {
   );
   const eventResponseRef = useRef<string | null>(null);
   const completionSavedRef = useRef(false);
+  useEffect(() => () => {
+    if (habitatEntryTimerRef.current !== null) window.clearTimeout(habitatEntryTimerRef.current);
+  }, []);
+
+  const handleEnterHabitat = () => {
+    if (habitatInterior || habitatEntryInProgressRef.current) return;
+    habitatEntryInProgressRef.current = true;
+    setHabitatEntryAnimating(true);
+    setSelectedBuildingId(null);
+    setSelectedResourceId(null);
+    window.dispatchEvent(new Event("colony-request-pointer-lock"));
+    habitatEntryTimerRef.current = window.setTimeout(() => {
+      setHabitatInterior(true);
+      habitatEntryTimerRef.current = window.setTimeout(() => {
+        setHabitatEntryAnimating(false);
+        habitatEntryInProgressRef.current = false;
+        habitatEntryTimerRef.current = null;
+      }, 1400);
+    }, 700);
+  };
 
   const selectedTracks = pending ? selectedTrackData(pending.selected) : [];
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
@@ -2551,6 +2591,12 @@ export function MissionSimulation() {
   const activeTargetTrackId = activeEvent?.trackId === "power"
     ? (pending?.selected.grid ? "grid" : pending?.selected.battery ? "battery" : pending?.selected.solar ? "solar" : null)
     : activeEvent?.trackId ?? null;
+  useEffect(() => {
+    if (!activeEvent || !activeTargetTrackId) return;
+    setSelectedResourceId(null);
+    setSelectedBuildingId(activeTargetTrackId);
+    setDashboardOpen(false);
+  }, [activeEvent, activeTargetTrackId]);
   const selectedResource = selectedResourceId
     ? RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === selectedResourceId)
     : undefined;
@@ -2568,6 +2614,7 @@ export function MissionSimulation() {
       : roverTaskTarget?.id ?? null;
   const environmentLabel = pending?.campaign === "mars" ? "MARS" : "MOON";
   const environmentTitle = pending?.campaign === "mars" ? "Utopia Planitia" : "Mare Tranquillitatis";
+  const blackoutActive = blackoutMission && elapsed >= LEVEL1_ENVIRONMENT.secondsPerEarthDay;
   const physicalTelemetry = physicalResourceTelemetry(metrics, pending?.selected ?? {}, buildings);
 
   const finishOperation = useCallback((operation: MissionOperation) => {
@@ -2823,19 +2870,19 @@ export function MissionSimulation() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || activeEventId) return;
       setSelectedBuildingId(null);
       setSelectedResourceId(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [activeEventId]);
 
 
   useEffect(() => {
-    if (!pending || results || manualPaused || activeEventId) return;
+    if (!pending || results || manualPaused) return;
 
-    // One stable timer advances all independent system jobs. An incident pauses every job.
+    // Keep independent system jobs progressing while an incident decision is open.
     const timer = window.setInterval(() => {
       if (Object.keys(activeOperationsRef.current).length === 0) return;
       setActiveOperations((current) => {
@@ -2844,7 +2891,7 @@ export function MissionSimulation() {
         for (const [key, operation] of Object.entries(current)) {
           const remaining = Math.max(0, operation.remainingSeconds - 0.25 * Math.max(0, speed));
           if (remaining <= 0) {
-            if (!operationCompletionRef.current.has(operation.id)) {
+            if ((!operation.roverAssigned || roverTaskComplete) && !operationCompletionRef.current.has(operation.id)) {
               operationCompletionRef.current.add(operation.id);
               window.setTimeout(() => finishOperation({ ...operation, remainingSeconds: 0 }), 0);
             }
@@ -2862,7 +2909,7 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, finishOperation, manualPaused, pending, results, speed]);
+  }, [finishOperation, manualPaused, pending, results, roverTaskComplete, speed]);
 
   useEffect(() => {
     if (!pending || missionFailed) return;
@@ -2878,7 +2925,7 @@ export function MissionSimulation() {
   }, [metrics, missionFailed, pending, results]);
 
   useEffect(() => {
-    if (!pending || results || manualPaused || activeEventId) return;
+    if (!pending || results || manualPaused) return;
 
     const timer = window.setInterval(() => {
       // Resource systems use a gentler balance clock than the accelerated mission timeline.
@@ -2895,6 +2942,7 @@ export function MissionSimulation() {
           const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventIndex, metrics);
           eventPointerRef.current += 1;
           setTimeout(() => {
+<<<<<<< HEAD
             eventResponseRef.current = null;
             setActiveEventId(event.id);
             setSelectedResourceId(null);
@@ -2904,6 +2952,18 @@ export function MissionSimulation() {
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
             setSelectedBuildingId(targetId);
+=======
+            const targetId = event.trackId === "power"
+              ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
+              : event.trackId;
+            eventResponseRef.current = null;
+            setActiveEventId(event.id);
+            setSelectedBuildingId(targetId);
+            setSelectedResourceId(null);
+            setDashboardOpen(false);
+            setOperationResult(null);
+            setAiMessage(`INCIDENT RESPONSE NEEDED · ${event.title}. Choose a facility response; the mission clock continues while you decide.`);
+>>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
             const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.52;
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
             const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
@@ -3007,18 +3067,24 @@ export function MissionSimulation() {
         const habitatUpgrade = buildings.habitat?.upgradeLevel ?? 0;
         const gridUpgrade = buildings.grid?.upgradeLevel ?? 0;
         const radiationUpgrade = buildings.radiation?.upgradeLevel ?? 0;
-        const blackoutMission = pending.campaign === "moon" && (pending.missionTitle.toLowerCase().includes("blackout") || missionStage === 2);
+        const blackoutMission = isLunarBlackoutMission(pending.campaign, pending.missionTitle, pending.missionNumber);
+        const blackoutActive = blackoutMission && elapsed >= LEVEL1_ENVIRONMENT.secondsPerEarthDay;
         const lunarCycle = pending.campaign === "moon" ? getLunarCycleState(elapsed) : null;
         const lunarProfile = lunarCycle ? interpolateSolarProfile(lunarCycle.day) : null;
-        const solarAvailability = blackoutMission
+        const operatingSolarProfile = blackoutMission
+          ? interpolateSolarProfile(Math.min(14, missionDay * 14))
+          : lunarProfile;
+        const solarAvailability = blackoutActive
           ? 0
           : pending.campaign === "mars"
             ? Math.max(0.25, 0.78 + Math.sin(missionDay * Math.PI / 7) * 0.10)
+            : blackoutMission
+              ? operatingSolarProfile?.sunlightGeometry ?? 0
             : lunarCycle && !lunarCycle.isNight
-              ? (lunarProfile?.sunlightGeometry ?? 0)
+              ? (operatingSolarProfile?.sunlightGeometry ?? 0)
               : 0;
-        const cellTemperatureC = lunarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
-        const cellTemperatureLoss = lunarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
+        const cellTemperatureC = operatingSolarProfile?.cellTempC ?? (pending.campaign === "mars" ? 42 + Math.sin(missionDay * Math.PI / 7) * 18 : 25);
+        const cellTemperatureLoss = operatingSolarProfile?.cellTemperatureLoss ?? Math.min(0.8, Math.max(0, cellTemperatureC - LEVEL1_ENVIRONMENT.referenceCellTemperatureC) * LEVEL1_ENVIRONMENT.cellTemperatureDeratePerC);
         const pointingError = buildings.solar?.repairMetrics?.["Residual array pointing error after recalibration"] ?? 15;
         // Solar is a primary source, not a load behind the general dependency check.
         // Calculate output from its own installation, condition and active fault so an
@@ -3252,7 +3318,7 @@ export function MissionSimulation() {
         const WATER_RESERVE_LOSS_FACTOR = missionStage === 1 ? 0.22 : 0.45;
         const waterDelta = -waterLossLDay * WATER_RESERVE_LOSS_FACTOR * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.waterReserveL * 100;
         const foodDelta = (foodProductionKgDay - foodDemandKgDay) * resourceDt / LEVEL1_ENVIRONMENT.secondsPerEarthDay / RESOURCE_CAPACITIES.foodReserveKg * 100;
-        const ambientTemperature = blackoutMission ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
+        const ambientTemperature = blackoutActive ? 16.5 : pending.campaign === "mars" ? 18.0 : 24.0;
         const thermalPowered = thermalOnline && optionalLoadKW > 0 && deliveredPowerKW >= (missionStage === 1 ? 1.0 : 2.0);
         const thermalRatedKW = thermalPowered
           ? conditionAdjustedOutput("thermal", repairAdjustedRating("thermal", getBaselineRating("thermal", pending.selected.thermal ?? "Foundation", thermalUpgrade), buildings.thermal?.repairMetrics), buildings)
@@ -3912,9 +3978,10 @@ export function MissionSimulation() {
       ...(specimenQuality !== undefined ? { sampleQuality: specimenQuality } : {}),
       ...(actionId !== undefined ? { actionId } : {}),
     };
+    if (roverAssigned) setRoverTaskComplete(false);
     operationCompletionRef.current.delete(operation.id);
     setActiveOperations((current) => ({ ...current, [operationKey]: operation }));
-    if (durationSeconds <= 0) {
+    if (durationSeconds <= 0 && !roverAssigned) {
       operationCompletionRef.current.add(operation.id);
       window.setTimeout(() => finishOperation({ ...operation, remainingSeconds: 0 }), 0);
     }
@@ -4854,6 +4921,7 @@ export function MissionSimulation() {
           physicalReadings={physicalTelemetry}
           colonyHealth={performance.colonyHealth}
           onSelect={(trackId) => {
+            if (activeEventId) return;
             setSelectedResourceId(null);
             setSelectedBuildingId((current) => activeEventId
               ? activeTargetTrackId
@@ -4866,6 +4934,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
           }}
+<<<<<<< HEAD
           onEnterHabitat={() => {
             if (activeEventId) return;
             setSelectedBuildingId(null);
@@ -4873,6 +4942,9 @@ export function MissionSimulation() {
             setHabitatInterior(true);
             window.dispatchEvent(new Event("colony-request-pointer-lock"));
           }}
+=======
+          onEnterHabitat={handleEnterHabitat}
+>>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
           onExitHabitat={() => setHabitatInterior(false)}
           onSupplyAction={(trackId, action) => {
             if (!pending.selected[trackId]) {
@@ -4893,7 +4965,8 @@ export function MissionSimulation() {
             handleBuildingAction(trackId, action);
           }}
           elapsed={elapsed}
-          lunarNight={pending.campaign === "moon" && getLunarCycleState(elapsed).isNight}
+          lunarNight={blackoutMission ? blackoutActive : pending.campaign === "moon" && getLunarCycleState(elapsed).isNight}
+          blackoutMission={blackoutMission}
           environmentLabel={environmentLabel}
           environmentTitle={environmentTitle}
           activeEventId={activeEventId}
@@ -4901,13 +4974,47 @@ export function MissionSimulation() {
           selectedResourceId={selectedResourceId}
           surveyedNodes={surveyedNodes}
           onSelectResource={(node) => {
+            if (activeEventId) return;
             setSelectedResourceId(node.id);
             setSelectedBuildingId(null);
           }}
           roverTask={roverTask}
           roverTargetNodeId={roverTargetNodeId}
-          speed={manualPaused || activeEvent ? 0 : speed}
+          onRoverTaskComplete={(completedTask) => {
+            if (completedTask === roverTask) setRoverTaskComplete(true);
+          }}
+          speed={manualPaused ? 0 : speed}
         />
+
+        {habitatEntryAnimating && (
+          <div className="pointer-events-none absolute inset-0 z-[100] overflow-hidden" role="status" aria-live="polite" aria-label="Entering the crew habitat">
+            <style>{`
+              @keyframes habitat-hatch-left {
+                0% { transform: translateX(-101%); }
+                24%, 66% { transform: translateX(0); }
+                100% { transform: translateX(-101%); }
+              }
+              @keyframes habitat-hatch-right {
+                0% { transform: translateX(101%); }
+                24%, 66% { transform: translateX(0); }
+                100% { transform: translateX(101%); }
+              }
+              @keyframes habitat-entry-label {
+                0%, 15%, 82%, 100% { opacity: 0; transform: translateY(8px); }
+                28%, 66% { opacity: 1; transform: translateY(0); }
+              }
+            `}</style>
+            <div className="absolute inset-y-0 left-0 w-1/2 border-r border-[#9cb7ad]/40 bg-[linear-gradient(90deg,#0b171b,#1b2c31_76%,#101b1f)] shadow-[18px_0_60px_rgba(0,0,0,0.7)]" style={{ animation: "habitat-hatch-left 2.1s cubic-bezier(.7,0,.3,1) both" }} />
+            <div className="absolute inset-y-0 right-0 w-1/2 border-l border-[#9cb7ad]/40 bg-[linear-gradient(270deg,#0b171b,#1b2c31_76%,#101b1f)] shadow-[-18px_0_60px_rgba(0,0,0,0.7)]" style={{ animation: "habitat-hatch-right 2.1s cubic-bezier(.7,0,.3,1) both" }} />
+            <div className="absolute left-1/2 top-1/2 w-[min(82vw,360px)] -translate-x-1/2 -translate-y-1/2 border border-[#54716f] bg-[#0a161b]/95 px-6 py-5 text-center shadow-[0_0_50px_rgba(0,0,0,0.75)]" style={{ animation: "habitat-entry-label 2.1s ease both" }}>
+              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#79d8be]">Crew airlock · cycle in progress</p>
+              <p className="mt-2 text-sm font-black uppercase tracking-[0.16em] text-[#e1ebe4]">Entering habitat</p>
+              <div className="mx-auto mt-4 h-1 max-w-[220px] overflow-hidden bg-[#253b3e]">
+                <div className="h-full w-full origin-left animate-[pulse_700ms_ease-in-out_infinite] bg-[#79d8be]" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {!dashboardOpen && (
           <div className="pointer-events-none absolute right-4 top-[68px] z-20 w-[min(92vw,510px)]">
@@ -4934,9 +5041,11 @@ export function MissionSimulation() {
                   {pulseExpandedMetric === "generation" && (
                     <>
                       <p className="mb-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#b6e6d0]">Solar generation · source breakdown</p>
-                      {electricalReadings.generationSources.length ? electricalReadings.generationSources.map((source) => (
+                      {electricalReadings.generationKW > 0.01 ? electricalReadings.generationSources.map((source) => (
                         <div key={source.label} className="flex items-center justify-between gap-3 py-0.5 text-[9px]"><span className="text-[#b5c9c4]">{source.label}</span><span className="shrink-0 font-mono text-[#f0cf69]">{electricalReadings.generationKW > 0 ? (source.kw / electricalReadings.generationKW * 100).toFixed(1) : "0.0"}% · {source.kw.toFixed(2)} kW</span></div>
-                      )) : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
+                      )) : blackoutActive
+                        ? <p className="text-[9px] text-[#e2c986]">Lunar blackout: sunlight is intentionally unavailable. The battery powers life support while optional loads are shed to protect the reserve.</p>
+                        : <p className="text-[9px] text-[#ffb3b6]">No power is currently being supplied. Solar generation and battery discharge are both zero.</p>}
                       <p className="mt-1 text-[8px] text-[#789a96]">Battery discharge is shown separately under Charging / discharging because it uses stored energy; it is not new generation. This mission has no nuclear generator.</p>
                     </>
                   )}
@@ -5027,6 +5136,9 @@ export function MissionSimulation() {
           resolvedEvents={resolvedEventIds}
           sampleStages={sampleStages}
           roverTask={roverTask}
+          roverWaitingForPhysicalWork={Object.values(activeOperations).some((operation) =>
+            Boolean(operation.roverAssigned) && operation.remainingSeconds <= 0 && !roverTaskComplete,
+          )}
         />
         <>
             <button
@@ -5203,6 +5315,7 @@ export function MissionSimulation() {
               setSelectedBuildingId(null);
               window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
+<<<<<<< HEAD
             onEnterHabitat={() => {
               if (activeEventId) return;
               setSelectedBuildingId(null);
@@ -5210,6 +5323,9 @@ export function MissionSimulation() {
               setHabitatInterior(true);
               window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
+=======
+            onEnterHabitat={handleEnterHabitat}
+>>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
             hasMaintenance={pending.selected.maintenance !== undefined}
             operation={activeOperations[selectedTrack.id] ?? Object.values(activeOperations).find((job) => job.supportSystems?.includes(selectedTrack.id)) ?? null}
             activeFault={Object.values(activeFaults).find((fault) => fault.targetTrackId === selectedTrack.id) ?? null}
