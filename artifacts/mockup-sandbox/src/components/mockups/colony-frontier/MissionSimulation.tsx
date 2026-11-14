@@ -2490,6 +2490,9 @@ export function MissionSimulation() {
   const runtime = savedRuntime && savedRuntime.elapsedSeconds < TOTAL_MISSION_SECONDS ? savedRuntime : null;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [habitatInterior, setHabitatInterior] = useState(false);
+  const [habitatEntryAnimating, setHabitatEntryAnimating] = useState(false);
+  const habitatEntryInProgressRef = useRef(false);
+  const habitatEntryTimerRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(runtime?.elapsedSeconds ?? 0);
   const [metrics, setMetrics] = useState<MissionMetrics>(() => runtime?.metrics ?? (pending ? initialMetrics(pending.selected) : initialMetrics({ solar: "Foundation" })));
   const [electricalReadings, setElectricalReadings] = useState({ generationKW: 0, actualSupplyKW: 0, consumptionKW: POWER_DEMAND_MODEL.coreLoadKW + POWER_DEMAND_MODEL.airRevitalization.baseKW, batteryFlowKW: 0, enduranceHours: null as number | null, generationSources: [] as { label: string; kw: number }[], demandSources: [] as { label: string; kw: number }[] });
@@ -2540,7 +2543,7 @@ export function MissionSimulation() {
   const applyBuildingActionRef = useRef<(trackId: string, action: string) => void>(() => {});
   const [manualActions, setManualActions] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
-  const [speed, setSpeed] = useState(4);
+  const [speed, setSpeed] = useState(1);
   // Hysteresis prevents optional loads switching rapidly near the solar-demand threshold.
   const powerDeficitRef = useRef(false);
   const [results, setResults] = useState(false);
@@ -2553,6 +2556,26 @@ export function MissionSimulation() {
   );
   const eventResponseRef = useRef<string | null>(null);
   const completionSavedRef = useRef(false);
+  useEffect(() => () => {
+    if (habitatEntryTimerRef.current !== null) window.clearTimeout(habitatEntryTimerRef.current);
+  }, []);
+
+  const handleEnterHabitat = () => {
+    if (habitatInterior || habitatEntryInProgressRef.current) return;
+    habitatEntryInProgressRef.current = true;
+    setHabitatEntryAnimating(true);
+    setSelectedBuildingId(null);
+    setSelectedResourceId(null);
+    window.dispatchEvent(new Event("colony-request-pointer-lock"));
+    habitatEntryTimerRef.current = window.setTimeout(() => {
+      setHabitatInterior(true);
+      habitatEntryTimerRef.current = window.setTimeout(() => {
+        setHabitatEntryAnimating(false);
+        habitatEntryInProgressRef.current = false;
+        habitatEntryTimerRef.current = null;
+      }, 1400);
+    }, 700);
+  };
 
   const selectedTracks = pending ? selectedTrackData(pending.selected) : [];
   const selectedTrack = selectedBuildingId ? selectedTracks.find((track) => track.id === selectedBuildingId) : undefined;
@@ -4882,12 +4905,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
           }}
-          onEnterHabitat={() => {
-            setSelectedBuildingId(null);
-            setSelectedResourceId(null);
-            setHabitatInterior(true);
-            window.dispatchEvent(new Event("colony-request-pointer-lock"));
-          }}
+          onEnterHabitat={handleEnterHabitat}
           onExitHabitat={() => setHabitatInterior(false)}
           onSupplyAction={(trackId, action) => {
             if (!pending.selected[trackId]) {
@@ -4927,6 +4945,36 @@ export function MissionSimulation() {
           }}
           speed={manualPaused || activeEvent ? 0 : speed}
         />
+
+        {habitatEntryAnimating && (
+          <div className="pointer-events-none absolute inset-0 z-[100] overflow-hidden" role="status" aria-live="polite" aria-label="Entering the crew habitat">
+            <style>{`
+              @keyframes habitat-hatch-left {
+                0% { transform: translateX(-101%); }
+                24%, 66% { transform: translateX(0); }
+                100% { transform: translateX(-101%); }
+              }
+              @keyframes habitat-hatch-right {
+                0% { transform: translateX(101%); }
+                24%, 66% { transform: translateX(0); }
+                100% { transform: translateX(101%); }
+              }
+              @keyframes habitat-entry-label {
+                0%, 15%, 82%, 100% { opacity: 0; transform: translateY(8px); }
+                28%, 66% { opacity: 1; transform: translateY(0); }
+              }
+            `}</style>
+            <div className="absolute inset-y-0 left-0 w-1/2 border-r border-[#9cb7ad]/40 bg-[linear-gradient(90deg,#0b171b,#1b2c31_76%,#101b1f)] shadow-[18px_0_60px_rgba(0,0,0,0.7)]" style={{ animation: "habitat-hatch-left 2.1s cubic-bezier(.7,0,.3,1) both" }} />
+            <div className="absolute inset-y-0 right-0 w-1/2 border-l border-[#9cb7ad]/40 bg-[linear-gradient(270deg,#0b171b,#1b2c31_76%,#101b1f)] shadow-[-18px_0_60px_rgba(0,0,0,0.7)]" style={{ animation: "habitat-hatch-right 2.1s cubic-bezier(.7,0,.3,1) both" }} />
+            <div className="absolute left-1/2 top-1/2 w-[min(82vw,360px)] -translate-x-1/2 -translate-y-1/2 border border-[#54716f] bg-[#0a161b]/95 px-6 py-5 text-center shadow-[0_0_50px_rgba(0,0,0,0.75)]" style={{ animation: "habitat-entry-label 2.1s ease both" }}>
+              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#79d8be]">Crew airlock · cycle in progress</p>
+              <p className="mt-2 text-sm font-black uppercase tracking-[0.16em] text-[#e1ebe4]">Entering habitat</p>
+              <div className="mx-auto mt-4 h-1 max-w-[220px] overflow-hidden bg-[#253b3e]">
+                <div className="h-full w-full origin-left animate-[pulse_700ms_ease-in-out_infinite] bg-[#79d8be]" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {!dashboardOpen && (
           <div className="pointer-events-none absolute right-4 top-[68px] z-20 w-[min(92vw,510px)]">
@@ -5226,12 +5274,7 @@ export function MissionSimulation() {
               setSelectedBuildingId(null);
               window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
-            onEnterHabitat={() => {
-              setSelectedBuildingId(null);
-              setSelectedResourceId(null);
-              setHabitatInterior(true);
-              window.dispatchEvent(new Event("colony-request-pointer-lock"));
-            }}
+            onEnterHabitat={handleEnterHabitat}
             hasMaintenance={pending.selected.maintenance !== undefined}
             operation={activeOperations[selectedTrack.id] ?? Object.values(activeOperations).find((job) => job.supportSystems?.includes(selectedTrack.id)) ?? null}
             activeFault={Object.values(activeFaults).find((fault) => fault.targetTrackId === selectedTrack.id) ?? null}
