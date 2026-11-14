@@ -2942,17 +2942,6 @@ export function MissionSimulation() {
           const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventIndex, metrics);
           eventPointerRef.current += 1;
           setTimeout(() => {
-<<<<<<< HEAD
-            eventResponseRef.current = null;
-            setActiveEventId(event.id);
-            setSelectedResourceId(null);
-            setOperationResult(null);
-
-            const targetId = event.trackId === "power"
-              ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
-              : event.trackId;
-            setSelectedBuildingId(targetId);
-=======
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
@@ -2963,7 +2952,6 @@ export function MissionSimulation() {
             setDashboardOpen(false);
             setOperationResult(null);
             setAiMessage(`INCIDENT RESPONSE NEEDED · ${event.title}. Choose a facility response; the mission clock continues while you decide.`);
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
             const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.52;
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
             const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
@@ -4934,17 +4922,7 @@ export function MissionSimulation() {
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
           }}
-<<<<<<< HEAD
-          onEnterHabitat={() => {
-            if (activeEventId) return;
-            setSelectedBuildingId(null);
-            setSelectedResourceId(null);
-            setHabitatInterior(true);
-            window.dispatchEvent(new Event("colony-request-pointer-lock"));
-          }}
-=======
           onEnterHabitat={handleEnterHabitat}
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
           onExitHabitat={() => setHabitatInterior(false)}
           onSupplyAction={(trackId, action) => {
             if (!pending.selected[trackId]) {
@@ -5315,17 +5293,7 @@ export function MissionSimulation() {
               setSelectedBuildingId(null);
               window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
-<<<<<<< HEAD
-            onEnterHabitat={() => {
-              if (activeEventId) return;
-              setSelectedBuildingId(null);
-              setSelectedResourceId(null);
-              setHabitatInterior(true);
-              window.dispatchEvent(new Event("colony-request-pointer-lock"));
-            }}
-=======
             onEnterHabitat={handleEnterHabitat}
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
             hasMaintenance={pending.selected.maintenance !== undefined}
             operation={activeOperations[selectedTrack.id] ?? Object.values(activeOperations).find((job) => job.supportSystems?.includes(selectedTrack.id)) ?? null}
             activeFault={Object.values(activeFaults).find((fault) => fault.targetTrackId === selectedTrack.id) ?? null}

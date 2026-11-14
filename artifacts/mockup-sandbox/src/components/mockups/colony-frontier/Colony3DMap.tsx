@@ -5,11 +5,7 @@ import * as THREE from "three";
 import type { TechnologyTrack, Tier } from "./_shared/gameData";
 import type { BuildingRuntime, MissionMetrics } from "./missionRuntime";
 import { terrainHeight, CraterRim, Terrain, Rocks } from "./solar-surface/terrain";
-<<<<<<< HEAD
-import { getBaselineRating, getLunarCycleState, interpolateSolarProfile } from "./_shared/simulationBalance";
-=======
 import { getBaselineRating, getLunarCycleState, interpolateSolarProfile, LEVEL1_ENVIRONMENT } from "./_shared/simulationBalance";
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
 
 export type MissionResourceNode = {
   id: string;
@@ -3702,15 +3698,9 @@ function Scene({ props }: { props: Props }) {
   const sunX = Math.cos(sunArcAngle) * sunHorizontalRadius;
   const sunZ = Math.sin(sunArcAngle) * sunHorizontalRadius;
   const sunPosition: [number, number, number] = [
-<<<<<<< HEAD
-    -100 + sunProgress * 200,
-    props.lunarNight ? -35 : Math.sin(sunAltitudeRad) * 95,
-    -125,
-=======
     sunX,
     terrainHeight(0, 0) + Math.sin(sunAltitudeRad) * sunOrbitRadius,
     sunZ,
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
   const supplyStations = [
@@ -3747,19 +3737,11 @@ function Scene({ props }: { props: Props }) {
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
       <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={250} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
-<<<<<<< HEAD
         <mesh><sphereGeometry args={[5, 64, 48]} /><meshBasicMaterial color={props.lunarNight ? "#d8d8cf" : "#fff9df"} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[7, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={props.lunarNight ? 0.025 : 0.32} depthWrite={false} toneMapped={false} /></mesh>
         {!props.lunarNight && <mesh><sphereGeometry args={[10, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.16} depthWrite={false} toneMapped={false} /></mesh>}
         {!props.lunarNight && <mesh><sphereGeometry args={[14, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.07} depthWrite={false} toneMapped={false} /></mesh>}
-        {!props.lunarNight && <pointLight color="#fff0cf" intensity={4.5} distance={110} decay={1.6} />}
-=======
-        <mesh><sphereGeometry args={[7.5, 64, 48]} /><meshBasicMaterial color="#fff9df" toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[10, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={0.28} depthWrite={false} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[14, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.12} depthWrite={false} toneMapped={false} /></mesh>
-        <mesh><sphereGeometry args={[20, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
         {!props.lunarNight && <pointLight color="#fff0cf" intensity={daylight * 8} distance={260} decay={1.6} />}
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
       </group>}
       {!mars && <group position={[-210, 145, -260]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
         <mesh><sphereGeometry args={[2.1, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#16415c" emissiveIntensity={0.28} /></mesh>
@@ -3831,13 +3813,7 @@ function Scene({ props }: { props: Props }) {
             if (!cabinetOpen && document.pointerLockElement) document.exitPointerLock();
             setCabinetOpen((open) => !open);
           }}
-<<<<<<< HEAD
-          onToggleFlashlight={() => {
-            if (firstPersonMode) setFlashlightOn((active) => !active);
-          }}
-=======
           onToggleFlashlight={toggleFlashlight}
->>>>>>> 085bb2fa4b00b8cde63159a7dde9c614c2607c6b
           onLockChange={(locked) => {
             setPointerLocked(locked);
             if (locked) setPointerLockError(null);
