@@ -1184,6 +1184,9 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
   );
 }
 
+const ROVER_MODEL_SCALE = 1.55;
+const ROVER_GROUND_OFFSET = 0.395 * ROVER_MODEL_SCALE + 0.075;
+
 function Rover({
   task,
   position,
@@ -1252,7 +1255,7 @@ function Rover({
   // to move an origin-positioned (and easily mis-hit) vehicle into view after mount.
   useEffect(() => {
     if (ref.current) {
-      ref.current.position.set(position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]);
+      ref.current.position.set(position[0], terrainHeight(position[0], position[1]) + ROVER_GROUND_OFFSET, position[1]);
     }
   }, [position[0], position[1]]);
 
@@ -1264,7 +1267,7 @@ function Rover({
     let travelled = 0;
 
     if (simulationSpeed <= 0) {
-      current.y = terrainHeight(current.x, current.z) + 0.47;
+      current.y = terrainHeight(current.x, current.z) + ROVER_GROUND_OFFSET;
       return;
     }
 
@@ -1357,8 +1360,8 @@ function Rover({
       }
     }
 
-    current.y = terrainHeight(current.x, current.z) + 0.47 + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
-    if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / 0.235; });
+    current.y = terrainHeight(current.x, current.z) + ROVER_GROUND_OFFSET + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
+    if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / (0.235 * ROVER_MODEL_SCALE); });
     if (drillRef.current) {
       const working = isCollecting || Boolean(repairTarget);
       drillRef.current.rotation.y = isCollecting ? clock.getElapsedTime() * 4.5 : repairTarget ? clock.getElapsedTime() * 2.4 : 0;
@@ -1389,11 +1392,12 @@ function Rover({
   });
 
   const wheelZ = [-0.55, 0, 0.55];
-  const basePosition = useMemo<[number, number, number]>(() => [position[0], terrainHeight(position[0], position[1]) + 0.47, position[1]], [position[0], position[1]]);
+  const basePosition = useMemo<[number, number, number]>(() => [position[0], terrainHeight(position[0], position[1]) + ROVER_GROUND_OFFSET, position[1]], [position[0], position[1]]);
   return (
     <group
       ref={ref}
       position={basePosition}
+      scale={ROVER_MODEL_SCALE}
       frustumCulled={false}
       onClick={(event) => { event.stopPropagation(); onClick(); }}
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
@@ -1826,7 +1830,7 @@ function ColonyRobot({
         const dx = waypoint[0] - position[0];
         const dz = waypoint[1] - position[1];
         const distance = Math.hypot(dx, dz);
-        const move = Math.min(distance, Math.max(0, delta) * 0.34);
+        const move = Math.min(distance, Math.max(0, delta) * 0.12);
         if (distance > 0.001) {
           position[0] += dx / distance * move;
           position[1] += dz / distance * move;
@@ -1874,13 +1878,13 @@ function ColonyRobot({
     <group ref={ref} scale={1.18}>
       <mesh position={[0, 0.43, 0]}>
         <cylinderGeometry args={[0.17, 0.2, 0.14, 12]} />
-        <meshStandardMaterial color="#35454a" metalness={0.76} roughness={0.3} />
+        <meshStandardMaterial color="#111b20" metalness={0.82} roughness={0.28} />
       </mesh>
       <RoundedBox args={[0.39, 0.4, 0.25]} radius={0.08} smoothness={4} position={[0, 0.68, 0]} castShadow>
-        <meshStandardMaterial color="#7f9290" metalness={0.66} roughness={0.34} />
+        <meshStandardMaterial color="#26363c" metalness={0.78} roughness={0.29} />
       </RoundedBox>
       <RoundedBox args={[0.29, 0.17, 0.04]} radius={0.035} smoothness={3} position={[0, 0.69, 0.143]}>
-        <meshStandardMaterial color="#22353b" metalness={0.44} roughness={0.28} />
+        <meshStandardMaterial color="#09151b" metalness={0.62} roughness={0.2} />
       </RoundedBox>
       <mesh position={[0, 0.71, 0.17]}>
         <boxGeometry args={[0.19, 0.035, 0.018]} />
@@ -1896,14 +1900,14 @@ function ColonyRobot({
         <group key={side} position={[side * 0.205, 0.88, 0]}>
           <mesh rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.095, 0.095, 0.08, 16]} />
-            <meshStandardMaterial color="#46585c" metalness={0.84} roughness={0.25} />
+            <meshStandardMaterial color="#1b2b31" metalness={0.88} roughness={0.22} />
           </mesh>
           <mesh position={[0, 0, 0.02]}>
             <torusGeometry args={[0.072, 0.014, 6, 14]} />
             <meshStandardMaterial color="#d3bd77" metalness={0.8} roughness={0.24} />
           </mesh>
           <RoundedBox args={[0.14, 0.2, 0.06]} radius={0.035} smoothness={3} position={[side * 0.04, 0.035, 0.09]}>
-            <meshStandardMaterial color="#b2bdb4" metalness={0.62} roughness={0.36} />
+            <meshStandardMaterial color="#788b8c" metalness={0.78} roughness={0.28} />
           </RoundedBox>
         </group>
       ))}
@@ -1915,7 +1919,7 @@ function ColonyRobot({
       ))}
       <group position={[0, 0.8, -0.2]}>
         <RoundedBox args={[0.42, 0.46, 0.18]} radius={0.06} smoothness={4} position={[0, 0, -0.08]} castShadow>
-          <meshStandardMaterial color="#384a50" metalness={0.74} roughness={0.32} />
+          <meshStandardMaterial color="#1b2a30" metalness={0.82} roughness={0.26} />
         </RoundedBox>
         <mesh position={[0, 0.02, -0.177]}>
           <boxGeometry args={[0.27, 0.24, 0.018]} />
@@ -1924,7 +1928,7 @@ function ColonyRobot({
         {[-0.13, 0, 0.13].map((x, finIndex) => (
           <mesh key={x} position={[x, 0.02, -0.19]}>
             <boxGeometry args={[0.024, 0.18, 0.022]} />
-            <meshStandardMaterial color={finIndex === 1 ? "#70dfe4" : "#b2beb5"} emissive={finIndex === 1 ? "#258894" : "#000000"} emissiveIntensity={0.7} metalness={0.62} roughness={0.34} />
+            <meshStandardMaterial color={finIndex === 1 ? "#70dfe4" : "#788b8c"} emissive={finIndex === 1 ? "#258894" : "#000000"} emissiveIntensity={0.7} metalness={0.78} roughness={0.28} />
           </mesh>
         ))}
         {[-0.24, 0.24].map((x) => (
@@ -1948,10 +1952,10 @@ function ColonyRobot({
       </mesh>
       <group ref={head} position={[0, 1.29, 0]}>
         <RoundedBox args={[0.38, 0.3, 0.31]} radius={0.12} smoothness={5} castShadow>
-          <meshStandardMaterial color="#b4beb5" metalness={0.64} roughness={0.3} />
+          <meshStandardMaterial color="#34464c" metalness={0.8} roughness={0.25} />
         </RoundedBox>
         <RoundedBox args={[0.3, 0.16, 0.035]} radius={0.06} smoothness={4} position={[0, -0.015, 0.162]}>
-          <meshStandardMaterial color="#14272e" metalness={0.38} roughness={0.2} />
+          <meshStandardMaterial color="#071319" metalness={0.58} roughness={0.16} />
         </RoundedBox>
         <mesh position={[0, -0.01, 0.19]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.07, 0.07, 0.022, 20]} />
@@ -1980,7 +1984,7 @@ function ColonyRobot({
         <group key={side} ref={side < 0 ? leftArm : rightArm} position={[side * 0.26, 0.84, 0]}>
           <mesh position={[side * 0.055, -0.13, 0]}>
             <capsuleGeometry args={[0.065, 0.17, 4, 8]} />
-            <meshStandardMaterial color="#aeb9b1" metalness={0.55} roughness={0.4} />
+            <meshStandardMaterial color="#758887" metalness={0.72} roughness={0.3} />
           </mesh>
           <mesh position={[side * 0.09, -0.27, 0]}>
             <sphereGeometry args={[0.07, 12, 10]} />
@@ -1996,7 +2000,7 @@ function ColonyRobot({
           </mesh>
           <mesh position={[side * 0.08, -0.37, 0.015]}>
             <capsuleGeometry args={[0.052, 0.13, 4, 8]} />
-            <meshStandardMaterial color="#899b96" metalness={0.6} roughness={0.36} />
+            <meshStandardMaterial color="#4d6265" metalness={0.78} roughness={0.28} />
           </mesh>
           <mesh position={[side * 0.08, -0.45, 0.035]}>
             <boxGeometry args={[0.12, 0.09, 0.12]} />
@@ -2014,7 +2018,7 @@ function ColonyRobot({
         <group key={side} ref={side < 0 ? leftLeg : rightLeg} position={[side * 0.105, 0.43, 0]}>
           <mesh position={[0, -0.12, 0]}>
             <capsuleGeometry args={[0.065, 0.18, 4, 8]} />
-            <meshStandardMaterial color="#899995" metalness={0.58} roughness={0.42} />
+            <meshStandardMaterial color="#56696b" metalness={0.75} roughness={0.3} />
           </mesh>
           <mesh position={[0, -0.24, 0]}>
             <sphereGeometry args={[0.065, 10, 8]} />
@@ -2026,7 +2030,7 @@ function ColonyRobot({
           </mesh>
           <mesh position={[0, -0.35, 0]}>
             <capsuleGeometry args={[0.05, 0.14, 4, 8]} />
-            <meshStandardMaterial color="#aab5ac" metalness={0.62} roughness={0.36} />
+            <meshStandardMaterial color="#768988" metalness={0.76} roughness={0.29} />
           </mesh>
           <mesh position={[0, -0.32, -0.045]} rotation={[0.22, 0, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.18, 8]} />
@@ -3089,9 +3093,37 @@ function BuildingSurfaceDetails({ large, accent }: { large: boolean; accent: str
   const fasteners: Array<[number, number]> = large
     ? [[-2.82, -2.08], [2.82, -2.08], [-2.82, 2.08], [2.82, 2.08]]
     : [[-1.12, -0.76], [1.12, -0.76], [-1.12, 0.76], [1.12, 0.76]];
+  const serviceStations: Array<[number, number]> = large
+    ? [[-2.8, -2.04], [2.8, -2.04], [-2.8, 2.04], [2.8, 2.04]]
+    : [[-1.2, -1], [1.2, -1], [-1.2, 1], [1.2, 1]];
+  const stationSize = large ? 0.46 : 0.3;
 
   return (
     <group>
+      {serviceStations.map(([x, z]) => (
+        <group key={`service-${x}-${z}`} position={[x, 0.31, z]}>
+          <mesh position={[0, -0.19, 0]}>
+            <cylinderGeometry args={[stationSize * 0.24, stationSize * 0.3, 0.34, 8]} />
+            <meshStandardMaterial color="#526267" metalness={0.76} roughness={0.3} />
+          </mesh>
+          <RoundedBox args={[stationSize, 0.11, stationSize * 1.12]} radius={stationSize * 0.12} smoothness={3} castShadow>
+            <meshStandardMaterial color="#26383d" metalness={0.66} roughness={0.38} />
+          </RoundedBox>
+          <RoundedBox args={[stationSize * 0.76, 0.15, stationSize * 0.74]} radius={stationSize * 0.1} smoothness={3} position={[0, 0.11, 0]}>
+            <meshStandardMaterial color="#43585d" metalness={0.7} roughness={0.32} />
+          </RoundedBox>
+          <mesh position={[0, 0.12, stationSize * 0.39]}>
+            <boxGeometry args={[stationSize * 0.42, stationSize * 0.2, 0.018]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} toneMapped={false} />
+          </mesh>
+          {[-1, 0, 1].map((slot) => (
+            <mesh key={slot} position={[slot * stationSize * 0.16, 0.035, stationSize * 0.37]}>
+              <boxGeometry args={[stationSize * 0.08, 0.035, 0.02]} />
+              <meshStandardMaterial color="#c5d0ca" metalness={0.82} roughness={0.3} />
+            </mesh>
+          ))}
+        </group>
+      ))}
       {fasteners.map(([x, z]) => (
         <group key={`${x}-${z}`} position={[x, large ? 0.335 : 0.365, z]}>
           <mesh material={washerMaterial}>
@@ -3621,7 +3653,7 @@ function Scene({ props }: { props: Props }) {
   const sunZ = Math.sin(sunArcAngle) * 105;
   const sunPosition: [number, number, number] = [
     sunX,
-    terrainHeight(sunX, sunZ) + Math.sin(sunAltitudeRad) * 56,
+    terrainHeight(sunX, sunZ) + Math.sin(sunAltitudeRad) * 42,
     sunZ,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;

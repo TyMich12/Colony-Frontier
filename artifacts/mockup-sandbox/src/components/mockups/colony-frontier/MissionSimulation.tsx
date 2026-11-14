@@ -1852,7 +1852,7 @@ function BuildingInspector({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex justify-center px-3 sm:bottom-5">
-      <div className="pointer-events-auto max-h-[84vh] w-[min(94vw,520px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
+      <div className="pointer-events-auto max-h-[88vh] w-[min(96vw,840px)] overflow-y-auto rounded-[26px] border border-[#6e7d7b] bg-[#0b1519]/[0.98] shadow-[0_24px_70px_rgba(0,0,0,0.62)] backdrop-blur-md">
         <div className="relative overflow-hidden border-b border-[#30454b] bg-gradient-to-r from-[#172b32] via-[#152329] to-[#111a1f] px-5 py-4">
           <div className="absolute right-[-30px] top-[-40px] h-32 w-32 rounded-full bg-[#f4c75e]/[0.06] blur-2xl" />
           <div className="relative flex items-start gap-3">
@@ -2069,8 +2069,8 @@ function BuildingInspector({
               </span>
               <span className="text-[9px] font-black text-[#f1cf70]">{showRepairMethods ? "HIDE −" : "VIEW OPTIONS +"}</span>
             </button>
-            {showRepairMethods && <div className="mt-2 grid gap-2">
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {showRepairMethods && <div className="mt-2 grid gap-2 md:grid-cols-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 md:col-span-2">
                 {(["Standalone", "Enhanced", "Dual", "Integrated"] as const).map((category) => {
                   const count = repairOptions.filter((option) => option.category === category).length;
                   const label = category === "Dual" ? "Dual-System" : category === "Integrated" ? "Fully Integrated" : category;
@@ -2090,7 +2090,7 @@ function BuildingInspector({
                   );
                 })}
               </div>
-              <div className="rounded-lg border border-[#2e4c51] bg-[#0a1a20] px-3 py-2">
+              <div className="rounded-lg border border-[#2e4c51] bg-[#0a1a20] px-3 py-2 md:col-span-2">
                 <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#d5e9df]">
                   {repairCategory === "Standalone" ? "Standalone · no optional support required" :
                     repairCategory === "Enhanced" ? "Enhanced · one support system required" :
