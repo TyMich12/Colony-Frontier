@@ -3202,7 +3202,7 @@ function WalkControls({
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
   const pitch = useRef(0);
-  const playerPosition = useRef(new THREE.Vector3(0, 1.72, 12));
+  const playerPosition = useRef(new THREE.Vector3(0, 1.72, 11));
   const jumpRequested = useRef(false);
   const jumpVelocity = useRef(0);
   const nearbyId = useRef<string | null>(null);
@@ -3252,7 +3252,7 @@ function WalkControls({
   };
 
   useEffect(() => {
-    const spawnZ = habitatInterior ? 2.2 : 7;
+    const spawnZ = habitatInterior ? 2.2 : 11;
     camera.position.set(0, habitatInterior ? 1.56 : terrainHeight(0, spawnZ) + 1.72, spawnZ);
     yaw.current = habitatInterior ? Math.PI : 0;
     pitch.current = 0;
@@ -3521,7 +3521,7 @@ function WalkControls({
     }
   });
 
-  return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 12) + 1.72, 12]} fov={70} near={0.05} far={190} />;
+  return <PerspectiveCamera makeDefault position={[0, terrainHeight(0, 11) + 1.72, 11]} fov={70} near={0.05} far={190} />;
 }
 
 function HelmetFlashlight() {
