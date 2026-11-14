@@ -4,4 +4,4 @@ compatibility_date = "2026-11-14"
 
 [vars]
 # Set this to the exact deployed game origin before production use.
-ALLOWED_ORIGIN = "*"
+ALLOWED_ORIGIN = "https://your-game-domain.example"
