@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Html, OrbitControls, PerspectiveCamera, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -2371,8 +2371,8 @@ function ColonyBuilding({
     >
       <Pad position={[0, 0]} size={track.id === "habitat" ? 8.8 : 3.65} mars={mars} accent={p.accent} />
       <group position={[0, 0.04, 0]} frustumCulled={false}>
-        <BuildingArt id={track.id} accent={tierColor(tier)} dust={runtime.dust} />
-        <BuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
+        <MemoBuildingArt id={track.id} accent={tierColor(tier)} dust={runtime.dust} />
+        <MemoBuildingSurfaceDetails large={track.id === "habitat"} accent={tierColor(tier)} />
       </group>
       {statusBeaconColor && (
         <group position={[
@@ -2380,17 +2380,17 @@ function ColonyBuilding({
           track.id === "habitat" ? 0.39 : 0.35,
           track.id === "habitat" ? 1.92 : 0.86,
         ]}>
-          <BuildingStatusBeacon color={statusBeaconColor} urgent={urgent} />
+          <MemoBuildingStatusBeacon color={statusBeaconColor} urgent={urgent} />
         </group>
       )}
-      {alerted && <IncidentEffects eventId={eventId} mars={mars} />}
+      {alerted && <MemoIncidentEffects eventId={eventId} mars={mars} />}
       {/* Low-power exterior beacons make the colony readable at lunar sunset/night
           without washing out the dark sky or pretending the Sun is still illuminating it. */}
       {nightMode && <group position={[0, track.id === "habitat" ? 3.3 : 1.9, 0]}>
         <mesh><sphereGeometry args={[0.13, 12, 10]} /><meshBasicMaterial color={p.accent} toneMapped={false} /></mesh>
         <pointLight color={p.accent} intensity={track.id === "habitat" ? 1.1 : 0.42} distance={track.id === "habitat" ? 7 : 3.8} decay={2} />
       </group>}
-      <TierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
+      <MemoTierHardware tier={tier} large={track.id === "habitat"} upgradeLevel={runtime.upgradeLevel ?? 0} />
       <mesh position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
         <ringGeometry args={track.id === "habitat" ? [2.02, 2.12, 48] : [1.42, 1.54, 40]} />
         <meshBasicMaterial color={alerted ? "#ff4052" : statusColor(runtime.condition)} transparent opacity={0.94} depthWrite={false} toneMapped={false} />
@@ -2401,7 +2401,7 @@ function ColonyBuilding({
           <meshBasicMaterial color="#efc85f" transparent opacity={0.98} depthWrite={false} toneMapped={false} />
         </mesh>
       )}
-      <SelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.24 : 2.05} height={0.12} />
+      <MemoSelectionRing selected={selected} alerted={alerted} radius={track.id === "habitat" ? 4.24 : 2.05} height={0.12} />
       {track.id !== "rover" && (
   <Billboard
           position={[0, track.id === "habitat" ? 5.0 : track.id === "extraction" ? 4.35 : 3.35, 0]}
@@ -3544,6 +3544,26 @@ function HelmetFlashlight({ enabled }: { enabled: boolean }) {
   return null;
 }
 
+
+// Stable scene subtrees: simulation values update several times per second, but most
+// of the colony geometry does not. Memoisation prevents rebuilding those meshes.
+const MemoTerrain = memo(Terrain);
+const MemoRocks = memo(Rocks);
+const MemoFoundation = memo(Foundation);
+const MemoRoadNetwork = memo(RoadNetwork);
+const MemoPad = memo(Pad);
+const MemoBeacon = memo(Beacon);
+const MemoBuildingArt = memo(BuildingArt);
+const MemoRoverRockField = memo(RoverRockField);
+const MemoSelectionRing = memo(SelectionRing);
+const MemoCrew = memo(Crew);
+const MemoLandingPad = memo(LandingPad);
+const MemoMissionGuide = memo(MissionGuide);
+const MemoBuildingSurfaceDetails = memo(BuildingSurfaceDetails);
+const MemoTierHardware = memo(TierHardware);
+const MemoBuildingStatusBeacon = memo(BuildingStatusBeacon);
+const MemoIncidentEffects = memo(IncidentEffects);
+
 function Scene({ props }: { props: Props }) {
   const [walkMode, setWalkMode] = useState(true);
   const firstPersonMode = walkMode || props.habitatInterior;
@@ -3702,15 +3722,15 @@ function Scene({ props }: { props: Props }) {
         <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
         <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
       </group>}
-      <Terrain kind={mars ? "mars" : "moon"} />
-      <Rocks kind={mars ? "mars" : "moon"} />
+      <MemoTerrain kind={mars ? "mars" : "moon"} />
+      <MemoRocks kind={mars ? "mars" : "moon"} />
       <group scale={COLONY_WORLD_SCALE}>
-      <RoverRockField mars={mars} />
-      <Foundation mars={mars} />
+      <MemoRoverRockField mars={mars} />
+      <MemoFoundation mars={mars} />
       <group frustumCulled={false}>
-        <MissionGuide mars={mars} />
-        <RoadNetwork mars={mars} />
-        <LandingPad mars={mars} />
+        <MemoMissionGuide mars={mars} />
+        <MemoRoadNetwork mars={mars} />
+        <MemoLandingPad mars={mars} />
         {props.tracks.map((track) => track.id !== "rover" && (
           <ColonyBuilding
             key={track.id}
@@ -3740,7 +3760,7 @@ function Scene({ props }: { props: Props }) {
             <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} navigationAccuracy={navigationAccuracy} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
           </>
         )}
-        <Crew mars={mars} />
+        <MemoCrew mars={mars} />
         {props.resourceNodes.map((node) => <ResourceMarker key={node.id} node={node} surveyed={props.surveyedNodes.includes(node.id)} selected={props.selectedResourceId === node.id} onClick={() => props.onSelectResource(node)} />)}
       </group>
       </group>
