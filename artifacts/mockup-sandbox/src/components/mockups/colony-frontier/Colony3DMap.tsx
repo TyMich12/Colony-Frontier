@@ -3694,11 +3694,12 @@ function Scene({ props }: { props: Props }) {
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
   const sunArcAngle = Math.PI * (0.75 + sunProgress);
   const sunOrbitRadius = 122;
-  const sunX = Math.cos(sunArcAngle) * sunOrbitRadius;
-  const sunZ = Math.sin(sunArcAngle) * sunOrbitRadius;
+  const sunHorizontalRadius = Math.cos(sunAltitudeRad) * sunOrbitRadius;
+  const sunX = Math.cos(sunArcAngle) * sunHorizontalRadius;
+  const sunZ = Math.sin(sunArcAngle) * sunHorizontalRadius;
   const sunPosition: [number, number, number] = [
     sunX,
-    terrainHeight(sunX, sunZ) + 25 + Math.sin(sunAltitudeRad) * 55,
+    terrainHeight(0, 0) + Math.sin(sunAltitudeRad) * sunOrbitRadius,
     sunZ,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
@@ -3713,7 +3714,7 @@ function Scene({ props }: { props: Props }) {
       orthographic
       shadows
       dpr={[1, 1.5]}
-      camera={{ position: [48, 56, 48], zoom: 14, near: 0.5, far: 320 }}
+      camera={{ position: [48, 56, 48], zoom: 14, near: 0.5, far: 500 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08, depth: true, stencil: false }}
       onCreated={({ gl }) => {
         gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -3742,10 +3743,11 @@ function Scene({ props }: { props: Props }) {
         <mesh><sphereGeometry args={[20, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
         {!props.lunarNight && <pointLight color="#fff0cf" intensity={daylight * 8} distance={260} decay={1.6} />}
       </group>}
-      {!mars && <group position={[-106, 35, -130]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
-        <mesh><sphereGeometry args={[2.55, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#0b1d2a" emissiveIntensity={0.18} /></mesh>
-        <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
-        <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
+      {!mars && <group position={[-210, 145, -260]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
+        <mesh><sphereGeometry args={[2.1, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#16415c" emissiveIntensity={0.28} /></mesh>
+        <mesh scale={1.018}><sphereGeometry args={[2.1, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.42} roughness={1} depthWrite={false} /></mesh>
+        <mesh scale={1.1}><sphereGeometry args={[2.1, 48, 32]} /><meshBasicMaterial color="#73bdeb" transparent opacity={0.24} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
+        <mesh scale={1.26}><sphereGeometry args={[2.1, 48, 32]} /><meshBasicMaterial color="#8ac9ef" transparent opacity={0.08} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
       </group>}
       <Terrain kind={mars ? "mars" : "moon"} />
       <CraterRim kind={mars ? "mars" : "moon"} />
