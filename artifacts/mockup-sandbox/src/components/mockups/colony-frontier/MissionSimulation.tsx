@@ -1339,6 +1339,7 @@ function IsometricMap({
   onSupplyAction,
   roverTask,
   roverTargetNodeId,
+  onRoverTaskComplete,
   speed,
   activeEventId,
 }: {
@@ -1366,6 +1367,7 @@ function IsometricMap({
   onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
   roverTargetNodeId: string | null;
+  onRoverTaskComplete: (task: string) => void;
   speed: number;
   activeEventId: string | null;
 }) {
@@ -1397,6 +1399,7 @@ function IsometricMap({
       onSupplyAction={onSupplyAction}
       roverTask={roverTask}
       roverTargetNodeId={roverTargetNodeId}
+      onRoverTaskComplete={onRoverTaskComplete}
       simulationSpeed={speed}
     />
   );
@@ -1408,12 +1411,14 @@ function MissionTaskRibbon({
   resolvedEvents,
   sampleStages,
   roverTask,
+  roverWaitingForPhysicalWork,
 }: {
   pending: PendingMission;
   elapsed: number;
   resolvedEvents: string[];
   sampleStages: Record<string, SampleStage>;
   roverTask: string;
+  roverWaitingForPhysicalWork: boolean;
 }) {
   const elapsedDay = Math.max(0, elapsed) / LEVEL1_ENVIRONMENT.secondsPerEarthDay;
   const dayProgress = elapsed >= TOTAL_MISSION_SECONDS ? 14 : Math.min(13.9, elapsedDay);
@@ -1447,7 +1452,7 @@ function MissionTaskRibbon({
             </div>
           ))}
           <div className="px-0.5 pt-2 text-[9px] leading-4 text-[#849895]">
-            {roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
+            {roverWaitingForPhysicalWork ? "ROVER AT SITE · PERFORMING TASK" : roverTask !== "STANDBY" ? roverTask : "Keep the settlement stable."}
           </div>
         </div>
       </div>
@@ -2497,6 +2502,7 @@ export function MissionSimulation() {
   const [decisions, setDecisions] = useState<MissionDecision[]>(runtime?.decisions ?? []);
   const [aiMessage, setAiMessage] = useState(runtime?.aiMessage ?? "Mission AI online. I am monitoring power, life support, habitat condition, and system behaviour.");
   const [roverTask, setRoverTask] = useState(runtime?.roverTask ?? "STANDBY");
+  const [roverTaskComplete, setRoverTaskComplete] = useState(false);
   const [score, setScore] = useState(runtime?.score ?? 72);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [surveyedNodes, setSurveyedNodes] = useState<string[]>(() => runtime?.surveyedNodes ?? []);
@@ -2850,7 +2856,7 @@ export function MissionSimulation() {
         for (const [key, operation] of Object.entries(current)) {
           const remaining = Math.max(0, operation.remainingSeconds - 0.25 * Math.max(0, speed));
           if (remaining <= 0) {
-            if (!operationCompletionRef.current.has(operation.id)) {
+            if ((!operation.roverAssigned || roverTaskComplete) && !operationCompletionRef.current.has(operation.id)) {
               operationCompletionRef.current.add(operation.id);
               window.setTimeout(() => finishOperation({ ...operation, remainingSeconds: 0 }), 0);
             }
@@ -2868,7 +2874,7 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, finishOperation, manualPaused, pending, results, speed]);
+  }, [activeEventId, finishOperation, manualPaused, pending, results, roverTaskComplete, speed]);
 
   useEffect(() => {
     if (!pending || missionFailed) return;
@@ -3924,9 +3930,10 @@ export function MissionSimulation() {
       ...(specimenQuality !== undefined ? { sampleQuality: specimenQuality } : {}),
       ...(actionId !== undefined ? { actionId } : {}),
     };
+    if (roverAssigned) setRoverTaskComplete(false);
     operationCompletionRef.current.delete(operation.id);
     setActiveOperations((current) => ({ ...current, [operationKey]: operation }));
-    if (durationSeconds <= 0) {
+    if (durationSeconds <= 0 && !roverAssigned) {
       operationCompletionRef.current.add(operation.id);
       window.setTimeout(() => finishOperation({ ...operation, remainingSeconds: 0 }), 0);
     }
@@ -4915,6 +4922,9 @@ export function MissionSimulation() {
           }}
           roverTask={roverTask}
           roverTargetNodeId={roverTargetNodeId}
+          onRoverTaskComplete={(completedTask) => {
+            if (completedTask === roverTask) setRoverTaskComplete(true);
+          }}
           speed={manualPaused || activeEvent ? 0 : speed}
         />
 
@@ -5038,6 +5048,9 @@ export function MissionSimulation() {
           resolvedEvents={resolvedEventIds}
           sampleStages={sampleStages}
           roverTask={roverTask}
+          roverWaitingForPhysicalWork={Object.values(activeOperations).some((operation) =>
+            Boolean(operation.roverAssigned) && operation.remainingSeconds <= 0 && !roverTaskComplete,
+          )}
         />
         <>
             <button

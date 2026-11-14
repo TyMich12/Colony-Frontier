@@ -53,6 +53,7 @@ type Props = {
   onSupplyAction: (trackId: string, action: string) => void;
   roverTask: string;
   roverTargetNodeId: string | null;
+  onRoverTaskComplete: (task: string) => void;
   simulationSpeed: number;
 };
 
@@ -80,18 +81,18 @@ export const POSITIONS: Record<string, [number, number]> = {
 const BUILDING_SCALES: Record<string, number> = {
   habitat: 2.5,
   solar: 1.65,
-  battery: 1.28,
-  oxygen: 1.28,
-  water: 1.28,
+  battery: 1.4,
+  oxygen: 1.4,
+  water: 1.5,
   co2: 1.24,
   comms: 1.3,
   navigation: 1.28,
   radiation: 1.3,
   science: 1.3,
-  agriculture: 1.4,
-  extraction: 1.4,
+  agriculture: 1.5,
+  extraction: 1.5,
   isru: 1.34,
-  thermal: 1.28,
+  thermal: 1.4,
   grid: 1.28,
   maintenance: 1.3,
   rover: 1.2,
@@ -763,7 +764,7 @@ function BuildingArt({ id, accent }: { id: string; accent: string }) {
           <meshStandardMaterial color={p.body} roughness={0.62} metalness={0.28} />
         </RoundedBox>
         {[-0.78, 0.78].map((x) => (
-          <group key={x} position={[x, 0.92, 0]}>
+          <group key={x} position={[x, 0.92, 0]} scale={id === "water" ? 1.42 : 1}>
             <mesh castShadow><cylinderGeometry args={[0.47, 0.52, 1.35, 20]} /><meshStandardMaterial color="#aeb9b5" roughness={0.34} metalness={0.48} /></mesh>
             <mesh position={[0, 0.72, 0]}><sphereGeometry args={[0.47, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} /><meshStandardMaterial color="#d8e0da" roughness={0.3} metalness={0.34} /></mesh>
             <mesh position={[0, 0.2, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.49, 0.04, 8, 28]} /><meshStandardMaterial color="#d6dcd4" metalness={0.72} roughness={0.28} /></mesh>
@@ -1197,6 +1198,7 @@ function Rover({
   alerted,
   traverseSpeedKmh,
   simulationSpeed,
+  onTaskComplete,
 }: {
   task: string;
   position: [number, number];
@@ -1207,6 +1209,7 @@ function Rover({
   alerted: boolean;
   traverseSpeedKmh: number;
   simulationSpeed: number;
+  onTaskComplete: (task: string) => void;
 }) {
   const ref = useRef<THREE.Group>(null);
   const wheelRefs = useRef<Array<THREE.Group | null>>([]);
@@ -1220,6 +1223,8 @@ function Rover({
   const commandKeyRef = useRef("");
   const routeRetryAtRef = useRef(0);
   const patrolRetryAtRef = useRef(0);
+  const taskWorkElapsedRef = useRef(0);
+  const taskCompletionSentRef = useRef(false);
 
   const prefixes = ["SURVEYING ", "MAPPING ", "COLLECTING ", "AT SITE ", "TRANSFERRING "];
   const taskPrefix = prefixes.find((prefix) => task.startsWith(prefix));
@@ -1233,7 +1238,7 @@ function Rover({
   const repairTarget = task.startsWith("REPAIRING ") ? task.slice("REPAIRING ".length).toLowerCase() : "";
   const isCleaning = task === "CLEANING ARRAY";
   const destination: [number, number] = isTransferring
-    ? [0, 7]
+    ? [0, -(buildingClearanceRadius("habitat") + 1.8)]
     : isReturning
       ? position
       : target && (targetNodeId || isCollecting || isSurveying || task.startsWith("AT SITE "))
@@ -1279,6 +1284,8 @@ function Rover({
       commandKeyRef.current = commandKey;
       routeCursorRef.current = 0;
       routeRetryAtRef.current = clock.elapsedTime + 1;
+      taskWorkElapsedRef.current = 0;
+      taskCompletionSentRef.current = false;
       if (hasDestination && Math.hypot(destination[0] - current.x, destination[1] - current.z) >= 1.2) {
         const goal = repairTarget
           ? buildingApproachPoint(repairTarget, start)
@@ -1360,21 +1367,40 @@ function Rover({
       }
     }
 
+    const routeGoal = routeRef.current[routeRef.current.length - 1] ?? destination;
+    const distanceToDestination = Math.hypot(routeGoal[0] - current.x, routeGoal[1] - current.z);
+    const destinationRadius = isCollecting ? 0.9 : isTransferring || isReturning ? 0.7 : 0.5;
+    const routeAtGoal = routeCursorRef.current >= routeRef.current.length ||
+      (routeCursorRef.current === routeRef.current.length - 1 && distanceToDestination <= destinationRadius);
+    const arrived = hasDestination && routeAtGoal && distanceToDestination <= destinationRadius;
+    const physicalTask = isCollecting || isSurveying || isTransferring || isCleaning || Boolean(repairTarget) || task === "RETURNING";
+    const workingAtSite = arrived && physicalTask && task !== "RETURNING";
+    if (arrived && physicalTask && !taskCompletionSentRef.current) {
+      taskWorkElapsedRef.current += Math.max(0, delta) * Math.min(4, Math.max(0.5, simulationSpeed));
+      const requiredWorkSeconds = task === "RETURNING" ? 0 : 3;
+      if (taskWorkElapsedRef.current >= requiredWorkSeconds) {
+        taskCompletionSentRef.current = true;
+        onTaskComplete(task);
+      }
+    } else if (!arrived) {
+      taskWorkElapsedRef.current = 0;
+    }
+
     current.y = terrainHeight(current.x, current.z) + ROVER_GROUND_OFFSET + Math.sin(clock.getElapsedTime() * (travelled > 0 ? 7 : 2.2)) * (travelled > 0 ? 0.018 : 0.005);
     if (travelled > 0) wheelRefs.current.forEach((wheel) => { if (wheel) wheel.rotation.x += travelled / (0.235 * ROVER_MODEL_SCALE); });
     if (drillRef.current) {
-      const working = isCollecting || Boolean(repairTarget);
-      drillRef.current.rotation.y = isCollecting ? clock.getElapsedTime() * 4.5 : repairTarget ? clock.getElapsedTime() * 2.4 : 0;
+      const working = workingAtSite && (isCollecting || Boolean(repairTarget));
+      drillRef.current.rotation.y = working && isCollecting ? clock.getElapsedTime() * 4.5 : working && repairTarget ? clock.getElapsedTime() * 2.4 : 0;
       drillRef.current.position.y = working
         ? -0.12 + Math.sin(clock.getElapsedTime() * 15) * 0.025
         : 0.14;
     }
     if (sensorSweepRef.current) {
-      sensorSweepRef.current.rotation.y = isSurveying ? Math.sin(clock.getElapsedTime() * 1.35) * 0.78 : 0;
-      sensorSweepRef.current.rotation.x = isSurveying ? Math.sin(clock.getElapsedTime() * 2.1) * 0.08 : 0;
+      sensorSweepRef.current.rotation.y = workingAtSite && isSurveying ? Math.sin(clock.getElapsedTime() * 1.35) * 0.78 : 0;
+      sensorSweepRef.current.rotation.x = workingAtSite && isSurveying ? Math.sin(clock.getElapsedTime() * 2.1) * 0.08 : 0;
     }
     if (toolArmRef.current) {
-      const deployed = isCollecting || isCleaning || Boolean(repairTarget);
+      const deployed = workingAtSite && (isCollecting || isCleaning || Boolean(repairTarget));
       toolArmRef.current.rotation.x = THREE.MathUtils.damp(
         toolArmRef.current.rotation.x,
         deployed ? 0.62 + Math.sin(clock.getElapsedTime() * 3.2) * 0.04 : 0,
@@ -1383,11 +1409,11 @@ function Rover({
       );
     }
     if (cleaningBrushRef.current) {
-      cleaningBrushRef.current.visible = isCleaning;
-      if (isCleaning) cleaningBrushRef.current.rotation.x = clock.getElapsedTime() * 9;
+      cleaningBrushRef.current.visible = workingAtSite && isCleaning;
+      if (workingAtSite && isCleaning) cleaningBrushRef.current.rotation.x = clock.getElapsedTime() * 9;
     }
     if (cargoLightRef.current) {
-      cargoLightRef.current.emissiveIntensity = isTransferring ? 0.7 + (Math.sin(clock.getElapsedTime() * 7) + 1) * 0.7 : 0.2;
+      cargoLightRef.current.emissiveIntensity = workingAtSite && isTransferring ? 0.7 + (Math.sin(clock.getElapsedTime() * 7) + 1) * 0.7 : 0.2;
     }
   });
 
@@ -1403,6 +1429,15 @@ function Rover({
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = ""; }}
     >
+      <mesh
+        position={[0, 0.45, 0]}
+        onClick={(event) => { event.stopPropagation(); onClick(); }}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = ""; }}
+      >
+        <sphereGeometry args={[1.05, 16, 12]} />
+        <meshBasicMaterial transparent opacity={0} colorWrite={false} depthWrite={false} />
+      </mesh>
       <mesh
         castShadow
         position={[0, 0.01, 0]}
@@ -1761,6 +1796,7 @@ function ColonyRobot({
   const leftLeg = useRef<THREE.Group>(null);
   const rightLeg = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
+  const serviceArm = useRef<THREE.Group>(null);
   const routeRef = useRef<[number, number][]>([]);
   const routeCursorRef = useRef(0);
   const serviceTargetRef = useRef<[number, number] | null>(null);
@@ -1830,7 +1866,7 @@ function ColonyRobot({
         const dx = waypoint[0] - position[0];
         const dz = waypoint[1] - position[1];
         const distance = Math.hypot(dx, dz);
-        const move = Math.min(distance, Math.max(0, delta) * 0.12);
+        const move = Math.min(distance, Math.max(0, delta) * 0.09);
         if (distance > 0.001) {
           position[0] += dx / distance * move;
           position[1] += dz / distance * move;
@@ -1871,43 +1907,51 @@ function ColonyRobot({
       head.current.rotation.y = servicing ? Math.sin(time * 0.7 + phaseOffset) * 0.12 : Math.sin(time * 0.7 + phaseOffset) * 0.16;
       head.current.rotation.x = THREE.MathUtils.damp(head.current.rotation.x, servicing ? 0.12 : 0, 4, delta);
     }
+    if (serviceArm.current) {
+      serviceArm.current.rotation.x = THREE.MathUtils.damp(
+        serviceArm.current.rotation.x,
+        servicing ? -0.34 + Math.sin(time * 3.2) * 0.16 : 0,
+        5,
+        delta,
+      );
+    }
   });
 
   const statusColor = index === 1 ? "#f2bd58" : "#62e4e6";
   return (
-    <group ref={ref} scale={1.18}>
+    <group ref={ref} scale={1.38}>
       <mesh position={[0, 0.43, 0]}>
-        <cylinderGeometry args={[0.17, 0.2, 0.14, 12]} />
-        <meshStandardMaterial color="#111b20" metalness={0.82} roughness={0.28} />
+      <cylinderGeometry args={[0.27, 0.31, 0.18, 16]} />
+      <meshStandardMaterial color="#d2ddd5" metalness={0.76} roughness={0.24} />
       </mesh>
-      <RoundedBox args={[0.39, 0.4, 0.25]} radius={0.08} smoothness={4} position={[0, 0.68, 0]} castShadow>
-        <meshStandardMaterial color="#26363c" metalness={0.78} roughness={0.29} />
+    <RoundedBox args={[0.64, 0.56, 0.43]} radius={0.12} smoothness={5} position={[0, 0.73, 0]} castShadow>
+      <meshStandardMaterial color="#788b8d" metalness={0.76} roughness={0.24} />
       </RoundedBox>
-      <RoundedBox args={[0.29, 0.17, 0.04]} radius={0.035} smoothness={3} position={[0, 0.69, 0.143]}>
-        <meshStandardMaterial color="#09151b" metalness={0.62} roughness={0.2} />
+    <RoundedBox args={[0.48, 0.22, 0.055]} radius={0.045} smoothness={4} position={[0, 0.74, 0.235]}>
+      <meshStandardMaterial color="#071319" metalness={0.68} roughness={0.16} />
       </RoundedBox>
-      <mesh position={[0, 0.71, 0.17]}>
-        <boxGeometry args={[0.19, 0.035, 0.018]} />
-        <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.35} />
+    <mesh position={[0, 0.74, 0.269]}>
+      <boxGeometry args={[0.38, 0.055, 0.018]} />
+      <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={2.2} toneMapped={false} />
       </mesh>
       {[-0.09, -0.045, 0, 0.045, 0.09].map((x) => (
-        <mesh key={x} position={[x, 0.55, 0.132]}>
-          <boxGeometry args={[0.018, 0.065, 0.012]} />
-          <meshStandardMaterial color="#b4c0b5" metalness={0.78} roughness={0.32} />
+      <mesh key={x} position={[x * 1.7, 0.49, 0.205]}>
+        <boxGeometry args={[0.026, 0.11, 0.014]} />
+        <meshStandardMaterial color="#d2ddd5" metalness={0.78} roughness={0.28} />
         </mesh>
       ))}
       {[-1, 1].map((side) => (
-        <group key={side} position={[side * 0.205, 0.88, 0]}>
+      <group key={side} position={[side * 0.36, 0.91, 0]}>
           <mesh rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.095, 0.095, 0.08, 16]} />
-            <meshStandardMaterial color="#1b2b31" metalness={0.88} roughness={0.22} />
+          <cylinderGeometry args={[0.13, 0.13, 0.14, 20]} />
+          <meshStandardMaterial color="#17282d" metalness={0.88} roughness={0.2} />
           </mesh>
           <mesh position={[0, 0, 0.02]}>
-            <torusGeometry args={[0.072, 0.014, 6, 14]} />
-            <meshStandardMaterial color="#d3bd77" metalness={0.8} roughness={0.24} />
+          <torusGeometry args={[0.105, 0.018, 8, 18]} />
+          <meshStandardMaterial color="#46d8e6" emissive="#147b87" emissiveIntensity={0.8} metalness={0.72} roughness={0.22} />
           </mesh>
-          <RoundedBox args={[0.14, 0.2, 0.06]} radius={0.035} smoothness={3} position={[side * 0.04, 0.035, 0.09]}>
-            <meshStandardMaterial color="#788b8c" metalness={0.78} roughness={0.28} />
+        <RoundedBox args={[0.2, 0.28, 0.1]} radius={0.05} smoothness={4} position={[side * 0.06, 0.035, 0.11]}>
+          <meshStandardMaterial color="#c2d0c9" metalness={0.66} roughness={0.28} />
           </RoundedBox>
         </group>
       ))}
@@ -1917,18 +1961,18 @@ function ColonyRobot({
           <meshStandardMaterial color="#c0c8bd" metalness={0.58} roughness={0.42} />
         </mesh>
       ))}
-      <group position={[0, 0.8, -0.2]}>
-        <RoundedBox args={[0.42, 0.46, 0.18]} radius={0.06} smoothness={4} position={[0, 0, -0.08]} castShadow>
-          <meshStandardMaterial color="#1b2a30" metalness={0.82} roughness={0.26} />
+      <group position={[0, 0.82, -0.25]}>
+        <RoundedBox args={[0.52, 0.5, 0.22]} radius={0.08} smoothness={4} position={[0, 0, -0.08]} castShadow>
+          <meshStandardMaterial color="#24363b" metalness={0.82} roughness={0.22} />
         </RoundedBox>
-        <mesh position={[0, 0.02, -0.177]}>
-          <boxGeometry args={[0.27, 0.24, 0.018]} />
+        <mesh position={[0, 0.02, -0.197]}>
+          <boxGeometry args={[0.36, 0.26, 0.022]} />
           <meshStandardMaterial color="#172c34" metalness={0.54} roughness={0.28} />
         </mesh>
-        {[-0.13, 0, 0.13].map((x, finIndex) => (
-          <mesh key={x} position={[x, 0.02, -0.19]}>
-            <boxGeometry args={[0.024, 0.18, 0.022]} />
-            <meshStandardMaterial color={finIndex === 1 ? "#70dfe4" : "#788b8c"} emissive={finIndex === 1 ? "#258894" : "#000000"} emissiveIntensity={0.7} metalness={0.78} roughness={0.28} />
+        {[-0.16, -0.08, 0, 0.08, 0.16].map((x, finIndex) => (
+          <mesh key={x} position={[x, 0.02, -0.213]}>
+            <boxGeometry args={[0.03, 0.2, 0.024]} />
+            <meshStandardMaterial color={finIndex === 2 ? "#70dfe4" : "#a8bab7"} emissive={finIndex === 2 ? "#258894" : "#000000"} emissiveIntensity={0.9} metalness={0.78} roughness={0.25} />
           </mesh>
         ))}
         {[-0.24, 0.24].map((x) => (
@@ -1946,29 +1990,78 @@ function ColonyRobot({
           </group>
         ))}
       </group>
+      {[
+        { key: "front-left", ref: leftArm, side: -1, forward: 1 },
+        { key: "front-right", ref: rightArm, side: 1, forward: 1 },
+        { key: "rear-left", ref: leftLeg, side: -1, forward: -1 },
+        { key: "rear-right", ref: rightLeg, side: 1, forward: -1 },
+      ].map(({ key, ref: legRef, side, forward }) => (
+        <group key={key} ref={legRef} position={[side * 0.4, 0.71, forward * 0.29]}>
+          <mesh position={[0, -0.08, 0]}>
+            <sphereGeometry args={[0.14, 16, 12]} />
+            <meshStandardMaterial color="#24363b" metalness={0.88} roughness={0.2} />
+          </mesh>
+          <mesh position={[side * 0.04, -0.29, forward * 0.02]} rotation={[forward * -0.16, 0, side * 0.1]}>
+            <capsuleGeometry args={[0.065, 0.3, 5, 10]} />
+            <meshStandardMaterial color="#c0cec7" metalness={0.72} roughness={0.28} />
+          </mesh>
+          <mesh position={[side * 0.055, -0.5, forward * 0.12]}>
+            <sphereGeometry args={[0.095, 14, 10]} />
+            <meshStandardMaterial color="#2a3d42" metalness={0.84} roughness={0.2} />
+          </mesh>
+          <RoundedBox args={[0.2, 0.09, 0.26]} radius={0.035} smoothness={3} position={[side * 0.07, -0.58, forward * 0.18]}>
+            <meshStandardMaterial color="#d3ddd4" metalness={0.68} roughness={0.3} />
+          </RoundedBox>
+          <mesh position={[side * 0.07, -0.53, forward * 0.21]}>
+            <boxGeometry args={[0.12, 0.018, 0.035]} />
+            <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.4} toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
+      <group ref={serviceArm} position={[0.3, 0.78, 0.25]}>
+        <mesh position={[0.08, -0.1, 0.11]} rotation={[0.4, 0, -0.35]}>
+          <capsuleGeometry args={[0.055, 0.25, 4, 8]} />
+          <meshStandardMaterial color="#e1c97e" metalness={0.74} roughness={0.24} />
+        </mesh>
+        <mesh position={[0.18, -0.27, 0.25]}>
+          <sphereGeometry args={[0.075, 12, 10]} />
+          <meshStandardMaterial color="#2a3d42" metalness={0.86} roughness={0.22} />
+        </mesh>
+        <mesh position={[0.19, -0.39, 0.33]} rotation={[0.5, 0, -0.22]}>
+          <capsuleGeometry args={[0.045, 0.2, 4, 8]} />
+          <meshStandardMaterial color="#c6d2c9" metalness={0.76} roughness={0.24} />
+        </mesh>
+        <mesh position={[0.2, -0.51, 0.39]}>
+          <boxGeometry args={[0.16, 0.055, 0.12]} />
+          <meshStandardMaterial color="#24363b" metalness={0.8} roughness={0.22} />
+        </mesh>
+        {[-1, 1].map((finger) => (
+          <mesh key={finger} position={[0.2 + finger * 0.07, -0.55, 0.44]}>
+            <boxGeometry args={[0.025, 0.12, 0.035]} />
+            <meshStandardMaterial color="#d8e0d7" metalness={0.78} roughness={0.24} />
+          </mesh>
+        ))}
+        <mesh position={[0.2, -0.51, 0.47]}>
+          <sphereGeometry args={[0.025, 10, 8]} />
+          <meshStandardMaterial color="#f0c45b" emissive="#d39a34" emissiveIntensity={1.5} />
+        </mesh>
+      </group>
       <mesh position={[0, 1.12, 0]}>
         <cylinderGeometry args={[0.055, 0.075, 0.11, 12]} />
         <meshStandardMaterial color="#d2bd77" metalness={0.72} roughness={0.26} />
       </mesh>
-      <group ref={head} position={[0, 1.29, 0]}>
-        <RoundedBox args={[0.38, 0.3, 0.31]} radius={0.12} smoothness={5} castShadow>
-          <meshStandardMaterial color="#34464c" metalness={0.8} roughness={0.25} />
-        </RoundedBox>
-        <RoundedBox args={[0.3, 0.16, 0.035]} radius={0.06} smoothness={4} position={[0, -0.015, 0.162]}>
-          <meshStandardMaterial color="#071319" metalness={0.58} roughness={0.16} />
-        </RoundedBox>
-        <mesh position={[0, -0.01, 0.19]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.07, 0.07, 0.022, 20]} />
-          <meshStandardMaterial color="#74898c" metalness={0.82} roughness={0.24} />
+      <group ref={head} position={[0, 1.36, 0]}>
+        <mesh castShadow>
+          <sphereGeometry args={[0.24, 24, 18]} />
+          <meshStandardMaterial color="#283a40" metalness={0.82} roughness={0.2} />
         </mesh>
-        <mesh position={[0, -0.01, 0.207]}>
-          <sphereGeometry args={[0.045, 16, 12]} />
-          <meshPhysicalMaterial color="#53d8ed" emissive="#16748a" emissiveIntensity={0.9} roughness={0.12} metalness={0.12} clearcoat={1} />
-        </mesh>
-        {[-0.12, 0.12].map((x) => (
-          <mesh key={x} position={[x, 0.08, 0.17]}>
-            <sphereGeometry args={[0.018, 8, 6]} />
-            <meshStandardMaterial color="#e3b65d" emissive="#b98537" emissiveIntensity={0.5} />
+        <RoundedBox args={[0.48, 0.18, 0.055]} radius={0.065} smoothness={5} position={[0, -0.005, 0.204]}>
+          <meshStandardMaterial color="#06151b" metalness={0.62} roughness={0.12} />
+        </RoundedBox>
+        {[-0.15, 0, 0.15].map((x) => (
+          <mesh key={x} position={[x, 0, 0.241]}>
+            <sphereGeometry args={[x === 0 ? 0.055 : 0.035, 16, 12]} />
+            <meshPhysicalMaterial color={x === 0 ? "#70edff" : "#f2c65d"} emissive={x === 0 ? "#16748a" : "#b98537"} emissiveIntensity={1.5} roughness={0.12} metalness={0.12} clearcoat={1} />
           </mesh>
         ))}
         <mesh position={[0, 0.19, 0]}>
@@ -1980,67 +2073,6 @@ function ColonyRobot({
           <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.2} />
         </mesh>
       </group>
-      {[-1, 1].map((side) => (
-        <group key={side} ref={side < 0 ? leftArm : rightArm} position={[side * 0.26, 0.84, 0]}>
-          <mesh position={[side * 0.055, -0.13, 0]}>
-            <capsuleGeometry args={[0.065, 0.17, 4, 8]} />
-            <meshStandardMaterial color="#758887" metalness={0.72} roughness={0.3} />
-          </mesh>
-          <mesh position={[side * 0.09, -0.27, 0]}>
-            <sphereGeometry args={[0.07, 12, 10]} />
-            <meshStandardMaterial color="#4d6062" metalness={0.74} roughness={0.28} />
-          </mesh>
-          <mesh position={[side * 0.09, -0.27, 0.055]}>
-            <torusGeometry args={[0.054, 0.012, 6, 12]} />
-            <meshStandardMaterial color="#d3bd77" metalness={0.82} roughness={0.24} />
-          </mesh>
-          <mesh position={[side * 0.08, -0.32, -0.045]} rotation={[0.28, 0, side * 0.12]}>
-            <cylinderGeometry args={[0.018, 0.018, 0.22, 8]} />
-            <meshStandardMaterial color="#ccd2c7" metalness={0.82} roughness={0.25} />
-          </mesh>
-          <mesh position={[side * 0.08, -0.37, 0.015]}>
-            <capsuleGeometry args={[0.052, 0.13, 4, 8]} />
-            <meshStandardMaterial color="#4d6265" metalness={0.78} roughness={0.28} />
-          </mesh>
-          <mesh position={[side * 0.08, -0.45, 0.035]}>
-            <boxGeometry args={[0.12, 0.09, 0.12]} />
-            <meshStandardMaterial color="#35484c" metalness={0.7} roughness={0.3} />
-          </mesh>
-          {[-1, 1].map((finger) => (
-            <mesh key={finger} position={[side * 0.08 + finger * 0.035, -0.5, 0.075]}>
-              <cylinderGeometry args={[0.012, 0.012, 0.075, 6]} />
-              <meshStandardMaterial color="#c0c9bd" metalness={0.76} roughness={0.28} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      {[-1, 1].map((side) => (
-        <group key={side} ref={side < 0 ? leftLeg : rightLeg} position={[side * 0.105, 0.43, 0]}>
-          <mesh position={[0, -0.12, 0]}>
-            <capsuleGeometry args={[0.065, 0.18, 4, 8]} />
-            <meshStandardMaterial color="#56696b" metalness={0.75} roughness={0.3} />
-          </mesh>
-          <mesh position={[0, -0.24, 0]}>
-            <sphereGeometry args={[0.065, 10, 8]} />
-            <meshStandardMaterial color="#44565a" metalness={0.74} roughness={0.28} />
-          </mesh>
-          <mesh position={[0, -0.24, 0.048]}>
-            <torusGeometry args={[0.05, 0.012, 6, 12]} />
-            <meshStandardMaterial color="#d1bb76" metalness={0.82} roughness={0.24} />
-          </mesh>
-          <mesh position={[0, -0.35, 0]}>
-            <capsuleGeometry args={[0.05, 0.14, 4, 8]} />
-            <meshStandardMaterial color="#768988" metalness={0.76} roughness={0.29} />
-          </mesh>
-          <mesh position={[0, -0.32, -0.045]} rotation={[0.22, 0, 0]}>
-            <cylinderGeometry args={[0.015, 0.015, 0.18, 8]} />
-            <meshStandardMaterial color="#d0d5c9" metalness={0.84} roughness={0.24} />
-          </mesh>
-          <RoundedBox args={[0.16, 0.09, 0.24]} radius={0.035} smoothness={3} position={[0, -0.45, 0.045]}>
-            <meshStandardMaterial color="#344347" metalness={0.56} roughness={0.54} />
-          </RoundedBox>
-        </group>
-      ))}
       <mesh position={[0.21, 0.59, 0.03]} rotation={[0, 0, Math.PI / 2]}>
         <torusGeometry args={[0.055, 0.012, 6, 12]} />
         <meshStandardMaterial color="#d3bd77" metalness={0.82} roughness={0.24} />
@@ -3528,6 +3560,7 @@ function WalkControls({
 function HelmetFlashlight() {
   const { camera, scene } = useThree();
   const targetRef = useRef<THREE.Object3D | null>(null);
+  const lightRef = useRef<THREE.SpotLight | null>(null);
   const cameraPosition = useMemo(() => new THREE.Vector3(), []);
   const direction = useMemo(() => new THREE.Vector3(), []);
 
@@ -3535,24 +3568,28 @@ function HelmetFlashlight() {
     const light = new THREE.SpotLight(0xffe6ad, 24, 36, Math.PI / 7, 0.62, 1.3);
     const target = new THREE.Object3D();
     camera.add(light);
+    light.position.set(0, -0.08, -0.05);
     scene.add(target);
     light.target = target;
+    lightRef.current = light;
     targetRef.current = target;
 
     return () => {
       camera.remove(light);
       scene.remove(target);
+      lightRef.current = null;
       targetRef.current = null;
     };
   }, [camera, scene]);
 
   useFrame(() => {
     const target = targetRef.current;
-    if (!target) return;
+    const light = lightRef.current;
+    if (!target || !light) return;
     camera.updateMatrixWorld();
-    camera.getWorldPosition(cameraPosition);
+    light.getWorldPosition(cameraPosition);
     camera.getWorldDirection(direction);
-    target.position.copy(cameraPosition).addScaledVector(direction, 28);
+    target.position.copy(cameraPosition).addScaledVector(direction, 32);
   });
 
   return null;
@@ -3649,11 +3686,12 @@ function Scene({ props }: { props: Props }) {
   const sunProgress = lunarDay / 14;
   const sunAltitudeRad = (sunAngleDeg * Math.PI) / 180;
   const sunArcAngle = Math.PI * (0.75 + sunProgress);
-  const sunX = Math.cos(sunArcAngle) * 105;
-  const sunZ = Math.sin(sunArcAngle) * 105;
+  const sunOrbitRadius = 175;
+  const sunX = Math.cos(sunArcAngle) * sunOrbitRadius;
+  const sunZ = Math.sin(sunArcAngle) * sunOrbitRadius;
   const sunPosition: [number, number, number] = [
     sunX,
-    terrainHeight(sunX, sunZ) + Math.sin(sunAltitudeRad) * 42,
+    terrainHeight(sunX, sunZ) + Math.sin(sunAltitudeRad) * 55,
     sunZ,
   ];
   const daylight = props.lunarNight ? 0 : interpolateSolarProfile(lunarDay).sunlightGeometry;
@@ -3689,15 +3727,15 @@ function Scene({ props }: { props: Props }) {
       <color attach="background" args={[mars ? "#7b4638" : props.lunarNight ? "#02050b" : daylight < 0.08 ? "#111824" : daylight < 0.5 ? "#303d4c" : "#596d80"]} />
       <ambientLight intensity={mars ? 0.68 : props.lunarNight ? 0.035 : 0.13 + daylight * 0.22} color={mars ? "#ffe6db" : "#dce8f5"} />
       <hemisphereLight args={[mars ? "#ffe5da" : "#dce8f5", mars ? "#3d2722" : "#080d16", mars ? 1.0 : props.lunarNight ? 0.06 : 0.20 + daylight * 0.38]} />
-      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={180} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
+      <directionalLight position={mars ? [18, 34, 20] : sunPosition} intensity={mars ? 1.7 : props.lunarNight ? 0.015 : daylight * 4.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={250} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-bias={-0.00012} />
       {!mars && <group position={sunPosition} frustumCulled={false}>
         <mesh><sphereGeometry args={[7.5, 64, 48]} /><meshBasicMaterial color="#fff9df" toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[10, 64, 48]} /><meshBasicMaterial color="#fff0bd" transparent opacity={0.28} depthWrite={false} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[14, 48, 32]} /><meshBasicMaterial color="#ffdda0" transparent opacity={0.12} depthWrite={false} toneMapped={false} /></mesh>
         <mesh><sphereGeometry args={[20, 48, 32]} /><meshBasicMaterial color="#ffc96e" transparent opacity={0.045} depthWrite={false} toneMapped={false} /></mesh>
-        {!props.lunarNight && <pointLight color="#fff0cf" intensity={8} distance={150} decay={1.6} />}
+        {!props.lunarNight && <pointLight color="#fff0cf" intensity={daylight * 8} distance={260} decay={1.6} />}
       </group>}
-      {!mars && <group position={[-63, 35, -93]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
+      {!mars && <group position={[-106, 35, -130]} rotation={[0.08, -0.35, 0.02]} frustumCulled={false}>
         <mesh><sphereGeometry args={[2.55, 64, 48]} /><meshStandardMaterial map={earthTextures.surface} roughness={0.9} metalness={0} emissive="#0b1d2a" emissiveIntensity={0.18} /></mesh>
         <mesh scale={1.018}><sphereGeometry args={[2.55, 48, 32]} /><meshStandardMaterial map={earthTextures.clouds} transparent opacity={0.72} roughness={1} depthWrite={false} /></mesh>
         <mesh scale={1.045}><sphereGeometry args={[2.55, 48, 32]} /><meshBasicMaterial color="#5b9bd0" transparent opacity={0.18} side={THREE.BackSide} toneMapped={false} /></mesh>
@@ -3736,7 +3774,7 @@ function Scene({ props }: { props: Props }) {
         {props.tracks.some((track) => track.id === "rover") && (
           <>
             <Pad position={POSITIONS.rover} size={3.8} mars={mars} accent="#52e9f2" baseY={0.04} />
-            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} simulationSpeed={props.simulationSpeed} onClick={() => props.onSelect("rover")} />
+            <Rover task={props.roverTask} position={POSITIONS.rover} resourceNodes={props.resourceNodes} targetNodeId={props.roverTargetNodeId} selected={props.selectedBuildingId === "rover"} alerted={props.activeEventTrackId === "rover"} traverseSpeedKmh={roverTraverseSpeedKmh} simulationSpeed={props.simulationSpeed} onTaskComplete={props.onRoverTaskComplete} onClick={() => props.onSelect("rover")} />
           </>
         )}
         <Crew mars={mars} tracks={props.tracks} />
