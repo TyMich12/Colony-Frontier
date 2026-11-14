@@ -2591,6 +2591,12 @@ export function MissionSimulation() {
   const activeTargetTrackId = activeEvent?.trackId === "power"
     ? (pending?.selected.grid ? "grid" : pending?.selected.battery ? "battery" : pending?.selected.solar ? "solar" : null)
     : activeEvent?.trackId ?? null;
+  useEffect(() => {
+    if (!activeEvent || !activeTargetTrackId) return;
+    setSelectedResourceId(null);
+    setSelectedBuildingId(activeTargetTrackId);
+    setDashboardOpen(false);
+  }, [activeEvent, activeTargetTrackId]);
   const selectedResource = selectedResourceId
     ? RESOURCE_NODES[pending?.campaign === "mars" ? "MARS" : "MOON"].find((node) => node.id === selectedResourceId)
     : undefined;
@@ -2858,19 +2864,19 @@ export function MissionSimulation() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || activeEventId) return;
       setSelectedBuildingId(null);
       setSelectedResourceId(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [activeEventId]);
 
 
   useEffect(() => {
-    if (!pending || results || manualPaused || activeEventId) return;
+    if (!pending || results || manualPaused) return;
 
-    // One stable timer advances all independent system jobs. An incident pauses every job.
+    // Keep independent system jobs progressing while an incident decision is open.
     const timer = window.setInterval(() => {
       if (Object.keys(activeOperationsRef.current).length === 0) return;
       setActiveOperations((current) => {
@@ -2897,7 +2903,7 @@ export function MissionSimulation() {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeEventId, finishOperation, manualPaused, pending, results, roverTaskComplete, speed]);
+  }, [finishOperation, manualPaused, pending, results, roverTaskComplete, speed]);
 
   useEffect(() => {
     if (!pending || missionFailed) return;
@@ -2913,7 +2919,7 @@ export function MissionSimulation() {
   }, [metrics, missionFailed, pending, results]);
 
   useEffect(() => {
-    if (!pending || results || manualPaused || activeEventId) return;
+    if (!pending || results || manualPaused) return;
 
     const timer = window.setInterval(() => {
       // Resource systems use a gentler balance clock than the accelerated mission timeline.
@@ -2930,15 +2936,16 @@ export function MissionSimulation() {
           const event = pickNextEvent(environmentLabel, pending.selected, resolvedEventIds, eventIndex, metrics);
           eventPointerRef.current += 1;
           setTimeout(() => {
-            eventResponseRef.current = null;
-            setActiveEventId(event.id);
-            setSelectedBuildingId(null);
-            setSelectedResourceId(null);
-            setOperationResult(null);
-
             const targetId = event.trackId === "power"
               ? (pending.selected.grid ? "grid" : pending.selected.battery ? "battery" : "solar")
               : event.trackId;
+            eventResponseRef.current = null;
+            setActiveEventId(event.id);
+            setSelectedBuildingId(targetId);
+            setSelectedResourceId(null);
+            setDashboardOpen(false);
+            setOperationResult(null);
+            setAiMessage(`INCIDENT RESPONSE NEEDED · ${event.title}. Choose a facility response; the mission clock continues while you decide.`);
             const shock = (1 + Math.min(1.3, (missionStage - 1) * 0.085 + eventIndex * 0.055 + (pending.campaign === "mars" ? 0.12 : 0))) * 0.52;
             const faultSeverity = 0.85 + Math.min(1.5, (missionStage - 1) * 0.105 + eventIndex * 0.075 + (pending.campaign === "mars" ? 0.18 : 0));
             const responseWindow = Math.max(16, 36 - missionStage * 0.8 - eventIndex * 1.25) * GAME_TIME_ACCELERATION;
@@ -4896,12 +4903,14 @@ export function MissionSimulation() {
           physicalReadings={physicalTelemetry}
           colonyHealth={performance.colonyHealth}
           onSelect={(trackId) => {
+            if (activeEventId) return;
             setSelectedResourceId(null);
             setSelectedBuildingId((current) => current === trackId ? null : trackId);
           }}
           selectedBuildingId={selectedBuildingId}
           habitatInterior={habitatInterior}
           onCloseInspector={() => {
+            if (activeEventId) return;
             setSelectedBuildingId(null);
             setSelectedResourceId(null);
           }}
@@ -4935,6 +4944,7 @@ export function MissionSimulation() {
           selectedResourceId={selectedResourceId}
           surveyedNodes={surveyedNodes}
           onSelectResource={(node) => {
+            if (activeEventId) return;
             setSelectedResourceId(node.id);
             setSelectedBuildingId(null);
           }}
@@ -4943,7 +4953,7 @@ export function MissionSimulation() {
           onRoverTaskComplete={(completedTask) => {
             if (completedTask === roverTask) setRoverTaskComplete(true);
           }}
-          speed={manualPaused || activeEvent ? 0 : speed}
+          speed={manualPaused ? 0 : speed}
         />
 
         {habitatEntryAnimating && (
@@ -5271,6 +5281,7 @@ export function MissionSimulation() {
             runtime={buildings[selectedTrack.id] ?? { condition: 100, dust: 0, status: "ONLINE", upgradeLevel: 0 }}
             onAction={(action) => handleBuildingAction(selectedTrack.id, action)}
             onClose={() => {
+              if (activeEventId) return;
               setSelectedBuildingId(null);
               window.dispatchEvent(new Event("colony-request-pointer-lock"));
             }}
