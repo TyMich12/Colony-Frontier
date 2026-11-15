@@ -10,19 +10,14 @@ import {
 } from "react";
 
 type LanguageOption = { code: string; name: string };
-type TranslationStatus =
-  | "idle"
-  | "loading-languages"
-  | "ready"
-  | "not-configured"
-  | "error";
+type TranslationStatus = "idle" | "ready" | "loading-model" | "unavailable" | "error";
 
 type TranslationContextValue = {
   language: string;
   supported: boolean;
   status: TranslationStatus;
   progress: number;
-  availability: null;
+  availability: string | null;
   setLanguage: (language: string) => void;
   translate: (text: string) => Promise<string>;
 };
@@ -30,23 +25,62 @@ type TranslationContextValue = {
 const TranslationContext = createContext<TranslationContextValue | null>(null);
 
 const LANGUAGE_KEY = "colony-frontier-language";
-const API_URL = (import.meta.env.VITE_TRANSLATION_API_URL ?? "").trim().replace(/\/+$/, "");
-const FALLBACK_LANGUAGES: LanguageOption[] = [
-  { code: "en", name: "English" },
-  { code: "es", name: "Spanish" },
-  { code: "fr", name: "French" },
-  { code: "de", name: "German" },
-  { code: "ar", name: "Arabic" },
-  { code: "hi", name: "Hindi" },
-  { code: "zh-CN", name: "Chinese (Simplified)" },
-  { code: "zh-TW", name: "Chinese (Traditional)" },
-  { code: "ja", name: "Japanese" },
-  { code: "pt", name: "Portuguese" },
-  { code: "ru", name: "Russian" },
+const TOUCAN_API_URL = (import.meta.env.VITE_TOUCAN_API_URL ?? "http://127.0.0.1:8765").trim().replace(/\/+$/, "");
+
+// Toucan uses ISO-639-3 target prefixes. Chrome's Translator API uses BCP-47 codes.
+const LANGUAGES: Array<LanguageOption & { browserCode?: string }> = [
+  { code: "aar", name: "Afar" },
+  { code: "ach", name: "Acholi" },
+  { code: "afr", name: "Afrikaans", browserCode: "af" },
+  { code: "aka", name: "Akan" },
+  { code: "amh", name: "Amharic", browserCode: "am" },
+  { code: "bam", name: "Bambara" },
+  { code: "bas", name: "Basaa" },
+  { code: "bem", name: "Bemba" },
+  { code: "btg", name: "Bete Gagnoa" },
+  { code: "eng", name: "English", browserCode: "en" },
+  { code: "ewe", name: "Ewe" },
+  { code: "fon", name: "Fon" },
+  { code: "fra", name: "French", browserCode: "fr" },
+  { code: "hau", name: "Hausa" },
+  { code: "ibo", name: "Igbo" },
+  { code: "kbp", name: "Kabiye" },
+  { code: "lgg", name: "Lugbara" },
+  { code: "lug", name: "Luganda" },
+  { code: "mlg", name: "Malagasy" },
+  { code: "nyn", name: "Nyankole" },
+  { code: "orm", name: "Oromo" },
+  { code: "som", name: "Somali" },
+  { code: "sot", name: "Sesotho", browserCode: "st" },
+  { code: "swa", name: "Swahili", browserCode: "sw" },
+  { code: "tir", name: "Tigrinya" },
+  { code: "yor", name: "Yoruba" },
+  { code: "teo", name: "Ateso" },
+  { code: "gez", name: "Geez" },
+  { code: "wal", name: "Wolaytta" },
+  { code: "fan", name: "Fang" },
+  { code: "kau", name: "Kanuri" },
+  { code: "kin", name: "Kinyarwanda" },
+  { code: "kon", name: "Kongo" },
+  { code: "lin", name: "Lingala" },
+  { code: "nya", name: "Chichewa" },
+  { code: "pcm", name: "Nigerian Pidgin" },
+  { code: "ssw", name: "Siswati" },
+  { code: "tsn", name: "Setswana" },
+  { code: "tso", name: "Tsonga" },
+  { code: "twi", name: "Twi" },
+  { code: "wol", name: "Wolof" },
+  { code: "xho", name: "Xhosa" },
+  { code: "zul", name: "Zulu" },
+  { code: "nnb", name: "Nande" },
+  { code: "swc", name: "Congo Swahili" },
+  { code: "ara", name: "Arabic", browserCode: "ar" },
 ];
 
+const FALLBACK_LANGUAGES: LanguageOption[] = LANGUAGES;
 const translationCache = new Map<string, string>();
 const pendingTranslations = new Map<string, Promise<string>>();
+const browserTranslators = new Map<string, Promise<BrowserTranslator | null>>();
 
 function getSavedLanguage(): string {
   try {
@@ -58,82 +92,156 @@ function getSavedLanguage(): string {
 
 async function readError(response: Response): Promise<string> {
   try {
-    const body = (await response.json()) as { error?: string };
-    return body.error || `Translation service returned ${response.status}.`;
+    const body = (await response.json()) as { detail?: string; error?: string };
+    return body.detail || body.error || `Toucan service returned ${response.status}.`;
   } catch {
-    return `Translation service returned ${response.status}.`;
+    return `Toucan service returned ${response.status}.`;
   }
 }
 
-async function requestTranslations(
-  texts: string[],
-  target: string,
-): Promise<string[]> {
-  if (!API_URL) throw new Error("Google Cloud Translation is not configured.");
+async function getBrowserTranslator(language: string): Promise<BrowserTranslator | null> {
+  const option = LANGUAGES.find((item) => item.code === language);
+  if (!option?.browserCode || !window.Translator) return null;
 
-  const response = await fetch(API_URL, {
+  const cached = browserTranslators.get(language);
+  if (cached) return cached;
+
+  const task = (async () => {
+    const options = { sourceLanguage: "en", targetLanguage: option.browserCode! };
+    const availability = await window.Translator!.availability(options);
+    if (availability === "unavailable") return null;
+
+    return window.Translator!.create({
+      ...options,
+      monitor: (monitor) => {
+        monitor.addEventListener("downloadprogress", (event) => {
+          window.dispatchEvent(new CustomEvent("colony-translation-progress", {
+            detail: Math.round(event.loaded * 100),
+          }));
+        });
+      },
+    });
+  })();
+
+  browserTranslators.set(language, task);
+  try {
+    return await task;
+  } catch (error) {
+    browserTranslators.delete(language);
+    console.warn("Chrome Translator API unavailable for this language; trying Toucan.", error);
+    return null;
+  }
+}
+
+async function waitForToucanReady(): Promise<void> {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${TOUCAN_API_URL}/health`);
+    if (!response.ok) throw new Error("Start the local Toucan service before using this language.");
+    const health = await response.json() as { ready?: boolean; loading?: boolean; error?: string };
+    if (health.ready) return;
+    if (health.error) throw new Error(`Toucan failed to load: ${health.error}`);
+    if (!health.loading) throw new Error("The local Toucan service is not ready.");
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+  }
+  throw new Error("Toucan is taking too long to load. Check the local service terminal.");
+}
+
+async function requestToucanTranslations(texts: string[], target: string): Promise<string[]> {
+  await waitForToucanReady();
+  const response = await fetch(`${TOUCAN_API_URL}/translate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      q: texts,
-      source: "en",
-      target,
-      format: "text",
-    }),
+    body: JSON.stringify({ texts, target_language: target }),
   });
-
   if (!response.ok) throw new Error(await readError(response));
+  const result = (await response.json()) as { translations?: string[] };
+  if (!Array.isArray(result.translations) || result.translations.length !== texts.length) {
+    throw new Error("Toucan returned an unexpected translation response.");
+  }
+  return result.translations;
+}
 
-  const result = (await response.json()) as {
-    translations?: Array<{ translatedText?: string }>;
-  };
-  return (result.translations ?? []).map((item) => item.translatedText ?? "");
+async function translateWithFallback(text: string, target: string): Promise<string> {
+  const translator = await getBrowserTranslator(target);
+  if (translator) {
+    try {
+      return await translator.translate(text);
+    } catch (error) {
+      browserTranslators.delete(target);
+      console.warn("Chrome translation failed; falling back to Toucan.", error);
+    }
+  }
+  const [translated] = await requestToucanTranslations([text], target);
+  return translated || text;
+}
+
+async function requestTranslations(texts: string[], target: string): Promise<string[]> {
+  const translator = await getBrowserTranslator(target);
+  if (!translator) return requestToucanTranslations(texts, target);
+
+  const results = await Promise.all(texts.map(async (text) => {
+    try {
+      return await translator.translate(text);
+    } catch {
+      return null;
+    }
+  }));
+  const missingIndexes = results
+    .map((value, index) => value === null ? index : -1)
+    .filter((index) => index >= 0);
+  if (!missingIndexes.length) return results as string[];
+
+  browserTranslators.delete(target);
+  const fallback = await requestToucanTranslations(
+    missingIndexes.map((index) => texts[index]),
+    target,
+  );
+  const merged = [...results] as Array<string | null>;
+  missingIndexes.forEach((index, fallbackIndex) => {
+    merged[index] = fallback[fallbackIndex];
+  });
+  return merged.map((value, index) => value || texts[index]);
 }
 
 export function TranslationProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<string>(getSavedLanguage);
-  const [languages, setLanguages] = useState<LanguageOption[]>(FALLBACK_LANGUAGES);
-  const [status, setStatus] = useState<TranslationStatus>(
-    API_URL ? "loading-languages" : "not-configured",
-  );
+  const [language, setLanguageState] = useState<string>(() => {
+    const saved = getSavedLanguage();
+    return saved === "en" ? "eng" : saved;
+  });
+  const languages = FALLBACK_LANGUAGES;
+  const [status, setStatus] = useState<TranslationStatus>("idle");
+  const [progress, setProgress] = useState(0);
   const [search, setSearch] = useState("");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!API_URL) return;
-
     let active = true;
-    void fetch(`${API_URL}/languages?target=en`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await readError(response));
-        return (await response.json()) as {
-          languages?: Array<{ code?: string; language?: string; name?: string }>;
-        };
+    const updateProgress = (event: Event) => {
+      const custom = event as CustomEvent<number>;
+      setProgress(Number.isFinite(custom.detail) ? custom.detail : 0);
+    };
+    window.addEventListener("colony-translation-progress", updateProgress);
+
+    fetch(`${TOUCAN_API_URL}/health`)
+      .then((response) => {
+        if (!response.ok) throw new Error("Toucan service is not available.");
+        return response.json() as Promise<{ ready?: boolean }>;
       })
       .then((result) => {
         if (!active) return;
-        const received = (result.languages ?? [])
-          .filter((item) => (item.code || item.language) && item.name)
-          .map((item) => ({
-            code: (item.code || item.language)!,
-            name: item.name!,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-
-        if (!received.some((item) => item.code === "en")) {
-          received.unshift({ code: "en", name: "English" });
-        }
-        if (received.length) setLanguages(received);
-        setStatus("ready");
+        if (result.ready) setStatus("ready");
+        else if (result.loading) setStatus("loading-model");
+        else setStatus(window.Translator ? "ready" : "unavailable");
       })
-      .catch((error: unknown) => {
-        console.error("Colony Frontier could not load Google's language list:", error);
-        if (active) setStatus("error");
+      .catch(() => {
+        if (active) setStatus(window.Translator ? "ready" : "unavailable");
       });
 
     return () => {
       active = false;
+      window.removeEventListener("colony-translation-progress", updateProgress);
     };
   }, []);
 
@@ -151,7 +259,7 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   }, [languageMenuOpen]);
 
   const translate = useCallback(async (text: string): Promise<string> => {
-    if (language === "en" || !text.trim() || !API_URL) return text;
+    if (language === "eng" || !text.trim()) return text;
 
     const key = `${language}:${text}`;
     const cached = translationCache.get(key);
@@ -160,17 +268,20 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     const pending = pendingTranslations.get(key);
     if (pending) return pending;
 
-    const task = requestTranslations([text], language)
-      .then((results) => {
-        const translated = results[0] || text;
-        translationCache.set(key, translated);
-        return translated;
-      })
-      .catch((error: unknown) => {
+    const task = (async () => {
+      try {
+        const translator = await getBrowserTranslator(language);
+        if (!translator) setStatus("loading-model");
+        const result = await translateWithFallback(text, language);
+        translationCache.set(key, result || text);
+        setStatus("ready");
+        return result || text;
+      } catch (error) {
         console.error("Colony Frontier translation failed:", error);
         setStatus("error");
         return text;
-      })
+      }
+    })()
       .finally(() => {
         pendingTranslations.delete(key);
       });
@@ -191,7 +302,8 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       // The language still works for this session if storage is unavailable.
     }
 
-    setStatus(API_URL ? "ready" : "not-configured");
+    setProgress(0);
+    setStatus("idle");
   };
 
   useEffect(() => {
@@ -260,9 +372,9 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       pendingNodes.clear();
 
       try {
-        // Google Cloud Translation accepts multiple q values in one request.
-        for (let start = 0; start < nodes.length; start += 40) {
-          const batch = nodes.slice(start, start + 40);
+        // Translate visible text in batches to reduce per-request overhead.
+        for (let start = 0; start < nodes.length; start += 32) {
+          const batch = nodes.slice(start, start + 32);
           const items = batch.map((node) => {
             const original = originals.get(node) ?? node.nodeValue ?? "";
             const leading = original.match(/^\s*/)?.[0] ?? "";
@@ -282,13 +394,15 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
 
           if (uniqueTexts.length) {
             try {
+              if (!(await getBrowserTranslator(language))) setStatus("loading-model");
               const results = await requestTranslations(uniqueTexts, language);
               uniqueTexts.forEach((text, index) => {
                 const value = results[index];
                 if (value) translationCache.set(`${language}:${text}`, value);
               });
+              setStatus("ready");
             } catch (error) {
-              console.error("Colony Frontier batch translation failed:", error);
+              console.error("Colony Frontier translation batch failed:", error);
               setStatus("error");
             }
           }
@@ -319,10 +433,10 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       }
       translated.delete(node);
       originals.set(node, node.nodeValue ?? "");
-      if (language !== "en" && API_URL) pendingNodes.add(node);
+      if (language !== "eng") pendingNodes.add(node);
     }
 
-    if (language === "en" || !API_URL) return;
+    if (language === "eng") return;
 
     const observer = new MutationObserver((records) => {
       for (const record of records) {
@@ -363,21 +477,21 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   const selectedLanguage = languages.find((item) => item.code === language);
   const statusLabel = {
     idle: "",
-    "loading-languages": "Loading Google language list…",
     ready: "",
-    "not-configured": "Configure the Google Cloud Worker to enable translation",
-    error: "Translation service unavailable — original text is shown",
+    "loading-model": "Loading Toucan translation model…",
+    unavailable: "Start the local Toucan service or use a supported Chrome language",
+    error: "Translation unavailable — original text is shown",
   }[status];
 
   const context = useMemo<TranslationContextValue>(() => ({
     language,
-    supported: Boolean(API_URL),
+    supported: status === "ready" || status === "loading-model",
     status,
-    progress: 0,
+    progress,
     availability: null,
     setLanguage: chooseLanguage,
     translate,
-  }), [language, status, translate]);
+  }), [language, status, progress, translate]);
 
   return (
     <TranslationContext.Provider value={context}>
@@ -454,6 +568,9 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
             </div>
           )}
         </div>
+        {status === "loading-model" && progress > 0 && (
+          <span className="text-[9px] text-[#a9c1b6]">{progress}%</span>
+        )}
         {statusLabel && (
           <span
             role="status"

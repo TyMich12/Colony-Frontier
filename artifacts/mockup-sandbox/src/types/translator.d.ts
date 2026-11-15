@@ -1,8 +1,4 @@
-type TranslatorAvailability =
-  | "available"
-  | "downloadable"
-  | "downloading"
-  | "unavailable";
+type TranslatorAvailability = "available" | "downloadable" | "downloading" | "unavailable";
 
 interface TranslatorProgressEvent extends Event {
   loaded: number;
