@@ -76,7 +76,7 @@ async function getTranslator(): Promise<TranslationPipeline> {
     workerScope.postMessage({ type: "status", status: "loading" });
 
     let loaded: TranslationPipeline;
-    if (env.apis.IS_WEBGPU_AVAILABLE) {
+    if (env.IS_WEBGPU_AVAILABLE) {
       try {
         loaded = await createPipeline("webgpu");
       } catch (webgpuError) {
