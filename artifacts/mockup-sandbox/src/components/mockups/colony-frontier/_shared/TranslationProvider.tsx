@@ -227,7 +227,7 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     fetch(`${TOUCAN_API_URL}/health`)
       .then((response) => {
         if (!response.ok) throw new Error("Toucan service is not available.");
-        return response.json() as Promise<{ ready?: boolean }>;
+        return response.json() as Promise<{ ready?: boolean; loading?: boolean }>;
       })
       .then((result) => {
         if (!active) return;
