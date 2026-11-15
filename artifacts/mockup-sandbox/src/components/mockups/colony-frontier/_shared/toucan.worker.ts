@@ -1,44 +1,10 @@
-import { env, pipeline } from "@huggingface/transformers";
 
-type TranslateRequest = {
-  type: "translate";
-  id: number;
-  texts: string[];
-  targetLanguage: string;
-};
-
-type WorkerRequest = TranslateRequest;
-
-type WorkerResponse =
-  | { type: "status"; status: "loading" | "ready"; message?: string }
-  | { type: "progress"; progress: number; file?: string }
-  | { type: "translated"; id: number; translations: string[] }
-  | { type: "error"; id: number; message: string };
-
-type TranslationPipeline = (
-  texts: string[],
-  options?: Record<string, unknown>,
-) => Promise<unknown>;
-
-type WorkerScope = {
-  onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;
-  postMessage: (message: WorkerResponse) => void;
-};
-
-const workerScope = self as unknown as WorkerScope;
-const MODEL_DIRECTORY = "UBC-NLP/toucan-base";
-let translator: TranslationPipeline | null = null;
-let loadingPromise: Promise<TranslationPipeline> | null = null;
-let queue = Promise.resolve();
-
-// Model files are served as static assets by the game host. The browser caches
-// them using the Cache API, so no translation server is needed after download.
+// Model files are served as static assets by the game host. Transformers.js
+// uses the browser cache so downloaded files can be reused on later visits.
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.localModelPath = "/models/";
 env.useBrowserCache = true;
-env.useWasmCache = true;
-env.cacheKey = "colony-frontier-toucan-v1";
 
 function reportProgress(event: Record<string, unknown>): void {
   const progress = typeof event.progress === "number"
@@ -75,15 +41,16 @@ async function getTranslator(): Promise<TranslationPipeline> {
   loadingPromise = (async () => {
     workerScope.postMessage({ type: "status", status: "loading" });
 
+    // Try WebGPU first. If the browser or device cannot initialise it,
+    // fall back to WebAssembly without relying on version-specific env flags.
     let loaded: TranslationPipeline;
-    if (env.IS_WEBGPU_AVAILABLE) {
-      try {
-        loaded = await createPipeline("webgpu");
-      } catch (webgpuError) {
-        console.warn("Toucan WebGPU initialisation failed; trying WebAssembly.", webgpuError);
-        loaded = await createPipeline("wasm");
-      }
-    } else {
+    try {
+      loaded = await createPipeline("webgpu");
+    } catch (webgpuError) {
+      console.warn(
+        "Toucan WebGPU initialisation failed; trying WebAssembly.",
+        webgpuError,
+      );
       loaded = await createPipeline("wasm");
     }
 
