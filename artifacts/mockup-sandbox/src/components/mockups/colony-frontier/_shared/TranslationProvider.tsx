@@ -144,6 +144,7 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState(0);
   const [search, setSearch] = useState("");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -416,9 +417,25 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     <TranslationContext.Provider value={context}>
       {children}
       <div
-        className="fixed right-3 top-3 z-[100] flex max-w-[calc(100vw-1.5rem)] items-center gap-2 border border-[#496267] bg-[#08171f]/95 px-3 py-2 shadow-lg backdrop-blur"
+        className="fixed right-3 top-3 z-[100] max-w-[calc(100vw-1.5rem)] border border-[#496267] bg-[#08171f]/95 shadow-lg backdrop-blur"
         data-no-translate="true"
       >
+        <button
+          type="button"
+          aria-expanded={languagePanelOpen}
+          aria-controls="colony-frontier-language-panel"
+          onClick={() => {
+            setLanguagePanelOpen((open) => !open);
+            setLanguageMenuOpen(false);
+            setSearch("");
+          }}
+          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#a9c1b6] hover:bg-[#173039]"
+        >
+          <span>Language: {selectedLanguage?.name ?? language}</span>
+          <span aria-hidden="true">{languagePanelOpen ? "−" : "+"}</span>
+        </button>
+        {languagePanelOpen && (
+          <div id="colony-frontier-language-panel" className="flex items-center gap-2 border-t border-[#496267] px-3 py-2">
         <label
           htmlFor="colony-frontier-language-search"
           className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#a9c1b6]"
@@ -498,6 +515,8 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
           >
             {statusLabel}
           </span>
+        )}
+          </div>
         )}
       </div>
     </TranslationContext.Provider>
