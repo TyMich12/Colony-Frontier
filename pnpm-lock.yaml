@@ -219,10 +219,6 @@ importers:
         version: 3.1.0
 
   artifacts/mockup-sandbox:
-    dependencies:
-      '@huggingface/transformers':
-        specifier: ^3.8.1
-        version: 3.8.1
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
