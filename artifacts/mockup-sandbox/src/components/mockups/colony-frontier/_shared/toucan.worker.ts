@@ -1,3 +1,35 @@
+import { env, pipeline } from "@huggingface/transformers";
+
+type TranslateRequest = {
+  type: "translate";
+  id: number;
+  texts: string[];
+  targetLanguage: string;
+};
+
+type WorkerRequest = TranslateRequest;
+
+type WorkerResponse =
+  | { type: "status"; status: "loading" | "ready"; message?: string }
+  | { type: "progress"; progress: number; file?: string }
+  | { type: "translated"; id: number; translations: string[] }
+  | { type: "error"; id: number; message: string };
+
+type TranslationPipeline = (
+  texts: string[],
+  options?: Record<string, unknown>,
+) => Promise<unknown>;
+
+type WorkerScope = {
+  onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;
+  postMessage: (message: WorkerResponse) => void;
+};
+
+const workerScope = self as unknown as WorkerScope;
+const MODEL_DIRECTORY = "UBC-NLP/toucan-base";
+let translator: TranslationPipeline | null = null;
+let loadingPromise: Promise<TranslationPipeline> | null = null;
+let queue: Promise<void> = Promise.resolve();
 
 // Model files are served as static assets by the game host. Transformers.js
 // uses the browser cache so downloaded files can be reused on later visits.
@@ -41,8 +73,7 @@ async function getTranslator(): Promise<TranslationPipeline> {
   loadingPromise = (async () => {
     workerScope.postMessage({ type: "status", status: "loading" });
 
-    // Try WebGPU first. If the browser or device cannot initialise it,
-    // fall back to WebAssembly without relying on version-specific env flags.
+    // Try WebGPU first. If it cannot initialise, fall back to WebAssembly.
     let loaded: TranslationPipeline;
     try {
       loaded = await createPipeline("webgpu");
