@@ -7,8 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "export:toucan": "bash scripts/export-toucan-browser.sh"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -76,7 +75,5 @@
     "@types/three": "^0.186.0",
     "three": "^0.186.0"
   },
-  "dependencies": {
-    "@huggingface/transformers": "^3.8.1"
-  }
+  "dependencies": {}
 }
